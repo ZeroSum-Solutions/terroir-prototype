@@ -1,0 +1,13 @@
+{
+  "torri_url": "https://www.sciencedirect.com/science/article/pii/S0950329313000104",
+  "retrieval": "primary publisher result via web search, abstract and Wine samples preview",
+  "quotes": [
+    "high quality Italian red wines",
+    "Eleven wines served as stimuli"
+  ],
+  "total_quoted_words": 10,
+  "water_deficit_url": "https://doi.org/10.20870/oeno-one.2018.52.2.2208",
+  "capture": "harvest/climate/doi.org-381809152.md",
+  "location": "line 104; berry sugar discussion",
+  "finding": "Explicitly says impact of water deficit on berry sugar is non-linear; draft nevertheless narrowed to sugar-response wording."
+}

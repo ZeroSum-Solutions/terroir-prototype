@@ -1,0 +1,43 @@
+{
+  "artifact": "final-findings-ledger",
+  "claim_count": 24,
+  "root_cause_count": 20,
+  "claims_covered": [
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13",
+    "FV2-1", "FV2-2", "FV2-3", "FV2-4", "FV2-5",
+    "G1", "G2", "G3", "G4", "G5", "G6"
+  ],
+  "findings": [
+    {"id":"L01","provenance":["F1"],"topic":"vertical_first_write","status":"resolved_fable_v2_verified","evidence":["03-delivery.md:21-32"]},
+    {"id":"L02","provenance":["F2"],"topic":"candidate_authorization","status":"resolved_fable_v2_verified","evidence":["02-architecture-data.md:54-60"]},
+    {"id":"L03","provenance":["F3"],"topic":"restore_boundary","status":"resolved_fable_v2_verified","evidence":["02-architecture-data.md:46-52","02-architecture-data.md:62"]},
+    {"id":"L04","provenance":["F4"],"topic":"lookup_ownership","status":"resolved_fable_v2_verified","evidence":["04-ownership.md:10","04-ownership.md:18"]},
+    {"id":"L05","provenance":["F5"],"topic":"human_availability","status":"accepted_as_explicit_unverified_estimate_fable_v2_verified","evidence":["03-delivery.md:36-38"]},
+    {"id":"L06","provenance":["F6"],"topic":"estimate_compression","status":"residual_resolved_by_objective_check_final_fable_reread_unavailable","evidence":["03-delivery.md:15","03-delivery.md:30-36"],"related":"L14"},
+    {"id":"L07","provenance":["F7"],"topic":"performance_acceptance","status":"residual_resolved_by_objective_check_final_fable_reread_unavailable","evidence":["05-ci-tests.md:58"],"related":"L16"},
+    {"id":"L08","provenance":["F8"],"topic":"claim_protocol","status":"resolved_fable_v2_verified","evidence":["07-protocol.md:5-11"]},
+    {"id":"L09","provenance":["F9"],"topic":"ci_complexity_and_390px_defect","status":"planning_correction_resolved_bug_still_unfixed_fable_v2_verified","evidence":["04-ownership.md:16","05-ci-tests.md:35"]},
+    {"id":"L10","provenance":["F10"],"topic":"deferred_test_scope","status":"resolved_fable_v2_verified_tests_not_executed","evidence":["05-ci-tests.md:39-41","05-ci-tests.md:62","scope.csv","tests.csv"]},
+    {"id":"L11","provenance":["F11"],"topic":"group_and_cost_grants","status":"resolved_fable_v2_verified","evidence":["03-delivery.md:11-13"]},
+    {"id":"L12","provenance":["F12"],"topic":"reviewer_inference","status":"withdrawn_with_evidence_by_fable_v2","evidence":["11-model-routing.md:12-25"]},
+    {"id":"L13","provenance":["F13"],"topic":"f_only_complexity","status":"resolved_fable_v2_verified","evidence":["05-ci-tests.md:35","05-ci-tests.md:60-62"]},
+    {"id":"L14","provenance":["FV2-1","G6"],"topic":"conservative_capacity","status":"resolved_objectively_gemini_verified_final_fable_reread_unavailable","evidence":["03-delivery.md:15","03-delivery.md:36"],"facts":{"author_hours":[34,69],"review_integration_hours":[10.5,17.5],"qualification_hours_max":2,"total_hours":[46.5,88.5],"capacity_hours":88,"upper_overrun_hours":0.5,"s_count":15,"deferred_r_count":20}},
+    {"id":"L15","provenance":["FV2-2","G5"],"topic":"v0_calibration_risk","status":"condition_specified_objectively_gemini_verified_risk_remains","evidence":["03-delivery.md:23","03-delivery.md:50-58"],"implementation_acceptance":false},
+    {"id":"L16","provenance":["FV2-3"],"topic":"s_baseline_subject","status":"resolved_objectively_final_fable_reread_unavailable","evidence":["05-ci-tests.md:58"]},
+    {"id":"L17","provenance":["FV2-4","G4"],"topic":"model_routing_evidence","status":"resolved_objectively_gemini_verified_final_fable_reread_unavailable","evidence":["11-model-routing.md:9","11-model-routing.md:14","11-model-routing.md:18-25"]},
+    {"id":"L18","provenance":["FV2-5","G2"],"topic":"s_test_ownership","status":"resolved_objectively_gemini_verified_final_fable_reread_unavailable","evidence":["05-ci-tests.md:41","tests.csv"]},
+    {"id":"L19","provenance":["G1"],"topic":"ev05_parity","status":"resolved_gemini_verified","evidence":["05-ci-tests.md:41","05-ci-tests.md:49"]},
+    {"id":"L20","provenance":["G3"],"topic":"controller_prose","status":"resolved_gemini_verified","evidence":["07-protocol.md:7","07-protocol.md:15-23"]}
+  ],
+  "closure": {
+    "planning_artifact": "verified_for_owner_gate_1_consideration",
+    "gate_1": "NOT_APPROVED",
+    "full_release_f_14_day": "NO_GO",
+    "narrowed_s": "CONDITIONAL_ONLY",
+    "implementation_tests_run": false,
+    "current_390px_bug_fixed": false,
+    "fable_v2": "valid_conditional_agreement",
+    "fable_final_reread": "UNAVAILABLE_EXIT_1_NOT_CLOSURE",
+    "gemini_final": "valid_original_finder_closure"
+  }
+}

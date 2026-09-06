@@ -1,0 +1,219 @@
+{
+  "ci_n": 18,
+  "duration_s": {
+    "min": 292.0,
+    "median": 358.5,
+    "max": 684.0
+  },
+  "created_to_job_start_s": {
+    "min": 2.0,
+    "median": 12.0,
+    "max": 68.0
+  },
+  "steps": {
+    "Set up job": {
+      "n": 18,
+      "min_s": 2.0,
+      "median_s": 3.0,
+      "max_s": 294.0
+    },
+    "Set up runner": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 0.0
+    },
+    "Checkout": {
+      "n": 18,
+      "min_s": 3.0,
+      "median_s": 3.0,
+      "max_s": 4.0
+    },
+    "Setup pnpm": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 1.0,
+      "max_s": 1.0
+    },
+    "Setup Node": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 3.0,
+      "max_s": 8.0
+    },
+    "Install dependencies": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 2.0,
+      "max_s": 6.0
+    },
+    "Feature ledger verification": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "VWP eval traceability": {
+      "n": 18,
+      "min_s": 3.0,
+      "median_s": 3.0,
+      "max_s": 4.0
+    },
+    "API contract verification": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 1.0,
+      "max_s": 1.0
+    },
+    "Product contract conformance": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 1.0,
+      "max_s": 1.0
+    },
+    "Typecheck": {
+      "n": 18,
+      "min_s": 12.0,
+      "median_s": 16.5,
+      "max_s": 21.0
+    },
+    "Lint": {
+      "n": 18,
+      "min_s": 15.0,
+      "median_s": 21.0,
+      "max_s": 40.0
+    },
+    "Install Supabase CLI": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 2.0,
+      "max_s": 2.0
+    },
+    "Start local Supabase": {
+      "n": 18,
+      "min_s": 51.0,
+      "median_s": 57.0,
+      "max_s": 94.0
+    },
+    "Export local Supabase env for tests and E2E": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 2.0,
+      "max_s": 2.0
+    },
+    "Seed local Supabase for tests and E2E": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 2.0,
+      "max_s": 2.0
+    },
+    "Test": {
+      "n": 18,
+      "min_s": 81.0,
+      "median_s": 95.5,
+      "max_s": 148.0
+    },
+    "Build": {
+      "n": 18,
+      "min_s": 26.0,
+      "median_s": 33.5,
+      "max_s": 64.0
+    },
+    "Contract tests": {
+      "n": 18,
+      "min_s": 2.0,
+      "median_s": 3.0,
+      "max_s": 5.0
+    },
+    "Schema drift check": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Types drift check": {
+      "n": 18,
+      "min_s": 1.0,
+      "median_s": 2.5,
+      "max_s": 3.0
+    },
+    "Design system check": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "File-size ratchet": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Control-row ratchet": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Down migrations check": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Migration manifest check": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Local Supabase seed dry-run": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Install Playwright Chromium": {
+      "n": 18,
+      "min_s": 20.0,
+      "median_s": 28.0,
+      "max_s": 65.0
+    },
+    "E2E \u2014 critical journeys (scan\u2192commit, list publish, pour)": {
+      "n": 18,
+      "min_s": 42.0,
+      "median_s": 51.5,
+      "max_s": 81.0
+    },
+    "Post Setup Node": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 5.0
+    },
+    "Post Setup pnpm": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Post Checkout": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    },
+    "Complete runner": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 0.0
+    },
+    "Complete job": {
+      "n": 18,
+      "min_s": 0.0,
+      "median_s": 0.0,
+      "max_s": 1.0
+    }
+  }
+}

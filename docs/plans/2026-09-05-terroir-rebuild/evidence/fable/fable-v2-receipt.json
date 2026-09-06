@@ -1,0 +1,17 @@
+{
+  "lane": "fable",
+  "requested_model": "claude-fable-5-1",
+  "effort": "medium",
+  "reported_models": [
+    "claude-fable-5-1"
+  ],
+  "session_id": "afd0f4d2-85a7-4f94-a836-d36105e25314",
+  "fresh_session": false,
+  "harness": "Claude Code Max OAuth",
+  "packet_sha256": "052ff0643a783d1a74762c7717b91607a7664ee332f5ea60253bb9ef9f35924f",
+  "exit": 0,
+  "status": "success",
+  "seconds": 85,
+  "has_response": true,
+  "api_equivalent_estimate_not_subscription_invoice": 1.351936
+}

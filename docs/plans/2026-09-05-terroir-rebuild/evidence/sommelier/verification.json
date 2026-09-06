@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-06T02:31:14.405450+00:00",
+  "kind": "planning and source verification, not implementation acceptance",
+  "draft_sha256": "a40f637c24413d24cf2e89624b8cd82ee4d27043a863785150d5aeea8752f4e0",
+  "matrix_sha256": "2e2a58e6f199a2a34f0c7ea4d506d5e9aa5b2a12324736dae36d30e255486cb5",
+  "base_core_hashes_unchanged": 17,
+  "capabilities": 14,
+  "outcome_references_resolve": true,
+  "base_outcomes": 68,
+  "new_AI_slices_admitted_to_S": 0,
+  "application_changes": false,
+  "application_tests_or_benchmarks_run": false,
+  "model_weights_downloaded": false,
+  "gate1_approved": false,
+  "baseline_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "quote_checks": {
+    "claims": 28,
+    "passed": 28,
+    "max_words_per_page": 25,
+    "quoted_pages": 25
+  }
+}

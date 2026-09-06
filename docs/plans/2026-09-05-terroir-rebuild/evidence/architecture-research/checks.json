@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-09-06T01:31:50.161456+00:00",
+  "literal_claims": 38,
+  "literal_claim_passes": 38,
+  "unique_quoted_pages": 35,
+  "max_quoted_words_per_page": 24,
+  "source_records": 46,
+  "original_core_files_checked": 17,
+  "original_core_file_changes": 0,
+  "report_lint": "LINT OK",
+  "application_tests_run": false,
+  "scope_matrix_changed": false,
+  "gate1_approved": false,
+  "baseline_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "reviewer_dispatch": {
+    "mechanism": "collaboration.spawn_agent",
+    "task_name": "/root/research_verifier",
+    "requested_model": "gpt-5.6-sol",
+    "requested_reasoning_effort": "xhigh",
+    "evidence": "Root host tool invocation in this task; no independent provider attestation requested"
+  },
+  "limitations": [
+    "Literal quote checks establish captured wording, not runtime correctness or licensing clearance.",
+    "Vendor documentation does not establish a current private backend.",
+    "Raw full-page captures remain scratch and are not included in the deliverable."
+  ]
+}

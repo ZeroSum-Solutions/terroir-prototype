@@ -1,0 +1,50 @@
+[
+  {
+    "path": "e2e/opp-7-staff-analytics.spec.ts",
+    "shared_db_reason": false
+  },
+  {
+    "path": "e2e/reconcile-queue.test.ts",
+    "shared_db_reason": false
+  },
+  {
+    "path": "e2e/lists-insights-role.test.ts",
+    "shared_db_reason": false
+  },
+  {
+    "path": "e2e/bins.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/opp-10-partial-bottles.spec.ts",
+    "shared_db_reason": false
+  },
+  {
+    "path": "e2e/lineage.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/insights-drilldown.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/pricing-recommendations.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/branded-menus.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/taxonomy.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/cellar-health.test.ts",
+    "shared_db_reason": true
+  },
+  {
+    "path": "e2e/cellar-section-dnd.spec.ts",
+    "shared_db_reason": true
+  }
+]

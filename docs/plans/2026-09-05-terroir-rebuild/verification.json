@@ -1,0 +1,73 @@
+{
+  "checked_at": "2026-09-06T00:57:40.272964+00:00",
+  "outcomes": 68,
+  "R": 35,
+  "S_bounded_outcomes": 15,
+  "deferred_R": 20,
+  "test_rows": 57,
+  "S_tags_on_deferred": 0,
+  "future_roles_own_active_S": 0,
+  "dag_nodes": 15,
+  "dag_edges": 21,
+  "acyclic": true,
+  "author_hours": [
+    34,
+    69
+  ],
+  "review_hours": [
+    10.5,
+    17.5
+  ],
+  "qualification_max_hours": 2,
+  "total_hours": [
+    46.5,
+    88.5
+  ],
+  "capacity_hours": 88,
+  "upper_overrun_hours": 0.5,
+  "buffer_days": 3,
+  "gate1_approved": false,
+  "application_tests_run": false,
+  "version": 2,
+  "status": "PASS planning structural/provenance checks; NOT implementation acceptance",
+  "as_of_utc": "2026-09-06T01:06:23.303386+00:00",
+  "baseline_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "repository_changes": "Only uncommitted planning package",
+  "table_dispositions": 44,
+  "explorer_word_counts": {
+    "database-summary.md": 568,
+    "architecture-summary.md": 552,
+    "ci-summary.md": 627,
+    "cleanup-summary.md": 582,
+    "journeys-summary.md": 550,
+    "harness-evidence.md": 590
+  },
+  "resolving_local_links": 57,
+  "review_ledger": "evidence/fable/final-findings-ledger.json",
+  "independent_verification": "evidence/fable/v2-verification.json",
+  "fable_successful_conditional_agreement_receipt": "evidence/fable/fable-v2-receipt.json",
+  "fable_final_reread": "UNAVAILABLE: quota response, exit1",
+  "gemini_final_agreement_receipt": "evidence/fable/gemini-closure-receipt.json",
+  "production_readiness_certified": false,
+  "gate2_approved": false,
+  "coding_benchmarks_run": false,
+  "core_file_hashes": {
+    "11-model-routing.md": "0613b6049bd2378721c8f3925dc844b0ec1d6de76e707e472ff272f6124e6683",
+    "START-HERE.md": "b52654b4f13a4f76e8036b932eccc6adf94a392eff88313ddbad779223b1ccf7",
+    "07-protocol.md": "2be816b49d5983e87eab2bf7c726a3efa8275b3cc414ca0fccb2008dd7688603",
+    "10-fable-decisions.md": "8b10e1e94e99db4558091576635440496b0f2e1110f09b7579ac27092a008c2f",
+    "04-ownership.md": "8ce12e70104ff8621ae9937e0433b24d89c23f1e11a36606621363094c0f420e",
+    "09-review.md": "cd5651c5592531b0a2669efeaec062cbaedc6f0c2a2ec22fd7510ec679b861c1",
+    "scope.csv": "006113433354908c859a59b41c1e4b34ce1db0582c1dcdbc00b87b273ef37e62",
+    "02-architecture-data.md": "99ee10287e79762bc7013a479d6fcba3dbb7880850692a469a9735b894f61287",
+    "dependency-graph.mmd": "a116eb5c725298495cb427a83b40b6d0150a609a85c70a3f87ce2d6ca720c175",
+    "tests.csv": "4a4043a37e8d3837b317288ef1d142c1f2548809df0e04c9f7a1db93586ef509",
+    "database-dispositions.csv": "d34a1b1def76b780e4463493f825ea789e8db664d8b1bc7dcae1b44e1b7f819c",
+    "05-ci-tests.md": "bba7e465e9bf83a552a41c12d77ba1fc1bffc4ddc2e93c9e310b2b34d4134608",
+    "01-evidence.md": "457cdf0c2803eece9e7c873d34a3aa13c5bd8330b9e8905eda09e51d9503556e",
+    "06-capacity.md": "8c3dafe040714600faf8c9b131065bd9313537be5d790ab37ba510a81f7227ba",
+    "dependency-edges.json": "45528dcb7fcb4094d4c993dc2985314db6d98c528463c9efe286257451965729",
+    "08-risks-cleanup.md": "e5f224b059b1a55fbe6dc9469b462038778bbf8f65b7ae397e3220e5b48f771f",
+    "03-delivery.md": "118b9e6844bbd0d49f3ed59e722d1df82aa46fee27bdf0ea152fb241b5a68560"
+  }
+}

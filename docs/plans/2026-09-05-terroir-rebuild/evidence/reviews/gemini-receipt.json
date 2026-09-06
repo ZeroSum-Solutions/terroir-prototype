@@ -1,0 +1,14 @@
+{
+  "lane": "gemini",
+  "requested_model": "gemini-3.8-flash-low",
+  "harness": "Antigravity agy",
+  "packet_sha256": "4e2cd7298446c83ba4998f65956b8d09b04f0fc1adb383c8cc43fea81b6fc232",
+  "exit": 0,
+  "seconds": 15,
+  "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+  "reported_models": [],
+  "status": "SUCCESS",
+  "has_review": true,
+  "author": "Codex root",
+  "fresh_session": true
+}

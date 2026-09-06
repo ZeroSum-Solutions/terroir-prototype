@@ -1,0 +1,356 @@
+[
+  {
+    "url": "https://www.vivino.com/en/wine-news/vivino-wine-scanner",
+    "capture_sha256": "619a3dfd8735cb82968c91934f05e72b2e63e146647d5b00490ae43230d1e650",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/vivino.com-2596590590.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://www.ptc.com/en/case-studies/vivino",
+    "capture_sha256": "6e660961a422d33f1d3b7aae9113bba64742ccdd43b1f149424ff335fa623973",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/ptc.com-1650517588.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://delectable.com/feeds/10_tips_delectable",
+    "capture_sha256": "0868b892842c8fece0bcadf9de188e5f909de965daab4e15e016b4a5a7b86e08",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/delectable.com-4201718383.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://v1.vinous.com/articles/press-release-vinous-announces-launch-of-revolutionary-wine-app-dec-2015",
+    "capture_sha256": "088d1fdc23123a489621433d80ced2dca8a63106b4ec978d73fb9758cc6425f2",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/v1.vinous.com-3209769435.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://invintory.com/api/",
+    "capture_sha256": "e6d84d52c3d6dda800a6bd04f5bd9dab4cc40151122fd5c3ceded2198ed4912e",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/invintory.com-1403507291.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://help.invintory.com/en/articles/9945386-common-vinlocate-terms",
+    "capture_sha256": "e25812292d15d871506772979f43cdb44393d14c0eab83a4b5ed0fdf2cf5d138",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/help.invintory.com-1472896170.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://bevlypos.com/pos-solutions/audits-shrink-control/",
+    "capture_sha256": "959e507bc7aca4cf82a9f489cebe378f31edfd3bee73071c7740ef7716ddb637",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/bevlypos.com-1694743747.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://bevrly.com/docs/inventory/cycle-overview",
+    "capture_sha256": "03ac6a597bbb4cb31075ddf96daba046e5232ca21d40c9169bfb57d17c077e9d",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/bevrly.com-cycle-overview-direct.md",
+    "fetched_at": "2026-09-06T01:15:29Z"
+  },
+  {
+    "url": "https://kubernetes.io/docs/concepts/architecture/controller/",
+    "capture_sha256": "7f3154615953f4391c417f67f7a7db9737a71e8f55b9958d7848aafda24fa4d9",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/kubernetes.io-3440708428.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/circuit_breaker.proto.html",
+    "capture_sha256": "e1114350e6aecf4cab392611b9b445c890c0f965fa2a63846ee91f92a3850ed1",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/envoyproxy.io-3639868237.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://cadenceworkflow.io/docs/concepts/workflow-engine",
+    "capture_sha256": "2cf473109d7d85ed9ba41189cf385eeda5df0b5b52b0e72df8f757621a7751da",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/cadenceworkflow.io-970184414.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://cadenceworkflow.io/docs/concepts/activities",
+    "capture_sha256": "9ab04b1ac20900fa2de415a5f60ce257a3824e5086dba105ad7bbd7d4149f92a",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/cadenceworkflow.io-650011810.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://backstage.io/docs/features/software-catalog/",
+    "capture_sha256": "38e39f89c065458d25c4240d49f2590b2611f941d1ef4d17c212b79842fda7eb",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/backstage.io-3603661550.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://etcd.io/docs/v3.7/op-guide/recovery/",
+    "capture_sha256": "f8be277abd63164696950308efdf1e55f837b2ded96a7dc131352155e51a5a8f",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/etcd.io-2810426695.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://www.cockroachlabs.com/docs/stable/developer-basics.html",
+    "capture_sha256": "ee91dc7f6ecfa5bcf90b3168d0caac46344b771c3f1189aac46b3dd46e02e206",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/cockroachlabs.com-690601784.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://gvisor.dev/docs/architecture_guide/security/",
+    "capture_sha256": "3493803c199851588543bce0b3b24190b03015eb037721738b93426728d0549c",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/infrastructure/gvisor.dev-2417926594.md",
+    "fetched_at": "2026-09-06T01:15:12Z"
+  },
+  {
+    "url": "https://huggingface.co/ibm-granite/granite-docling-258M",
+    "capture_sha256": "e01f8f406b2fa8663b1ce87c1114e1bc82d2d0b491d649e7154301407b226b16",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/huggingface.co-698300604.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://github.com/docling-project/docling",
+    "capture_sha256": "8eb15c4605717086db9b020d275de92c24310ece16e891137ff0635f3a7df0a4",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/github.com-385715736.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://github.com/PaddlePaddle/PaddleOCR",
+    "capture_sha256": "a2d00adacd8e8a675f08dcfa5673060ea2b85f453e72eebe9fa39b1573e54bfe",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/github.com-1284734792.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://github.com/facebookresearch/dinov2",
+    "capture_sha256": "7008dfe428c39787886789a6d5e724bdeef4305a92fbbad1bb3e6b63077a7908",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/github.com-614654725.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://github.com/rogerioxavier/X-Wines",
+    "capture_sha256": "9457aacf50cc8bc671ef9c863b9841b1dfb63c1ae0a39a39ef1f747e28cf4815",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/github.com-1332594922.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://huggingface.co/datasets/Dakhoo/L2T-NeurIPS-2023",
+    "capture_sha256": "5b95c98a8248b014ea8a8cec6d7a68d01d40fda3cb38c27a1e3e1ed481c4bd05",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/huggingface.co-1173021735.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.5",
+    "capture_sha256": "966f75208407b1c0e8a1b301b2e88b4ec993461e3154faecac91bcbe00c41365",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/huggingface.co-561494395.md",
+    "fetched_at": "2026-09-06T01:15:05Z"
+  },
+  {
+    "url": "https://github.com/timgit/pg-boss",
+    "capture_sha256": "a6bcb887d99b7466095cca6aa7546496970403b46e8c78c4d8d7c90e9a4cc83a",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/github.com-1947382784.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://worker.graphile.org/docs",
+    "capture_sha256": "5e8fe1043c6b1e1eeae89c1cd77fd0ed03ace1f35caa21c2186fd85f049ceb6c",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/worker.graphile.org-1690420502.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://docs.medusajs.com/resources/commerce-modules/inventory/concepts",
+    "capture_sha256": "2820341f20647a210c5e9563cb2c1655aa5848b3601835f5f6d8e66206757db8",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/docs.medusajs.com-696715820.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://github.com/medusajs/medusa/blob/develop/LICENSE",
+    "capture_sha256": "cf67cc556c17e0b00dc0c74a3d71db8dec9aae98af747a2503803a640fba9bb5",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/medusajs-medusa-license.txt",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://github.com/maplibre/maplibre-gl-js",
+    "capture_sha256": "8363b128e3be9a6061c576cf2dd6a4c0ce422427f2de34376f026bde651b22fc",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/github.com-2090624533.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://supabase.com/docs/guides/database/extensions/postgis",
+    "capture_sha256": "146ea500520b95461fd87996fbfb74479d27efc9e5448f750505b18da16f8d85",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/supabase.com-1960094963.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://opentelemetry.io/docs/what-is-opentelemetry/",
+    "capture_sha256": "2796eeaa4ebaac6838e4394e1f41e39895dc17e157d188c282cc2b5fc2e3d325",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/opentelemetry.io-390475821.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://supabase.com/docs/guides/database/full-text-search",
+    "capture_sha256": "6296bdee59539767049adc7d193d27d0987f63ff3c446ca15d8b7eca08b26757",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/supabase.com-133230926.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://www.postgresql.org/docs/current/pgtrgm.html",
+    "capture_sha256": "2ceb8cf1335dbe7d86b70cf90d3d2898424f9091424a6e6cecd4e66b0ba1fd6a",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/postgresql.org-44400837.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://docs.frappe.io/erpnext/immutable-ledger-in-erpnext",
+    "capture_sha256": "e3ef83043ebb72bb53de0855ab3a11c736cfcb958bcfef2e68728d75156a893f",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/docs.frappe.io-3333359466.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://docs.inventree.org/en/stable/stock/",
+    "capture_sha256": "33c16be2c662a0220c3b4df064d8f87b6a84fb8199f0c0c0b7d8e99c335866a1",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/docs.inventree.org-2711512753.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://docs.inventree.org/en/stable/purchasing/purchase_order/",
+    "capture_sha256": "efb426d34261e5bfb7ba85f874c2efca25cf1f72cdfb541051ad7da21352e2a7",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/docs.inventree.org-2763504601.md",
+    "fetched_at": "2026-09-06"
+  },
+  {
+    "url": "https://v1.vinous.com/statics/vinous-liv-ex-api",
+    "capture_sha256": "5e53b85c2c3ec2b3876026126a57221a12bb3014fff949574b8249b2350b46d9",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/v1.vinous.com-2460453121.md"
+  },
+  {
+    "url": "https://vinous.com/statics/vinous-liv-ex-api",
+    "capture_sha256": "fa3c87186e6d7a83280417d5e02c4eb02d937ee12be39e43a6dcf0f0fc58c11b",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/vinous.com-1107210808.md"
+  },
+  {
+    "url": "https://vinous.com/statics/commercial_subscriptions_july_2023_update",
+    "capture_sha256": "0caaef91c310082619bffe20ea264ff491475ab183790fe85b78107b1259a1bb",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/competitors/vinous.com-53810569.md"
+  },
+  {
+    "url": "https://huggingface.co/facebook/dinov2-small",
+    "capture_sha256": "4074e0624e4e1a25804a980b6e9bfebbb0319dde43638811e35c96b9ae523bc3",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/huggingface/huggingface.co-3824151614.md"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "license.txt",
+      "sha": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7",
+      "html_url": "https://github.com/frappe/erpnext/blob/develop/license.txt",
+      "license": {
+        "key": "gpl-3.0",
+        "name": "GNU General Public License v3.0",
+        "spdx_id": "GPL-3.0",
+        "url": "https://api.github.com/licenses/gpl-3.0",
+        "node_id": "MDc6TGljZW5zZTk="
+      }
+    },
+    "capture_sha256": "9bf0c1dfd5cfb5f7c14eb92ab56866f93072281ac255f2e2a130fa381b5d3e90",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/frappe-erpnext-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE.md",
+      "sha": "55d9061a6572ab19ca4c3bf3c14c0301f3bdf1f7",
+      "html_url": "https://github.com/graphile/worker/blob/main/LICENSE.md",
+      "download_url": "https://raw.githubusercontent.com/graphile/worker/main/LICENSE.md",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      }
+    },
+    "capture_sha256": "58a6fdfb57b15fcbb6235a557874e21e51bef75e4f6cea4363cee12390cc3d33",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/graphile-worker-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE",
+      "sha": "3a4626c1c4cd5afcd036830160c224a4027b6f0b",
+      "html_url": "https://github.com/inventree/InvenTree/blob/master/LICENSE",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      }
+    },
+    "capture_sha256": "acd6b7d3ded789895d55fb201c67cb4c6763fcdc0cbdb0408866c24a6b40740b",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/inventree-InvenTree-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE.txt",
+      "sha": "1e8acbb54fa7baddc844377507cc5a79353174fb",
+      "html_url": "https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt",
+      "download_url": "https://raw.githubusercontent.com/maplibre/maplibre-gl-js/main/LICENSE.txt",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    "capture_sha256": "3dab86a5aab020906e9b8989638cff739312cd85c532f0bde45b89017e7e9ebf",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/maplibre-maplibre-gl-js-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE",
+      "sha": "2bc747bf4b0a88864584b033fdeab86012a44c79",
+      "html_url": "https://github.com/medusajs/medusa/blob/develop/LICENSE",
+      "download_url": "https://raw.githubusercontent.com/medusajs/medusa/develop/LICENSE",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    "capture_sha256": "42160665b64d22da6119df0fc9e38d3967204b9de465fd2b289ad2d1d19626a5",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/medusajs-medusa-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE",
+      "sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "html_url": "https://github.com/open-telemetry/opentelemetry-js/blob/main/LICENSE",
+      "download_url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-js/main/LICENSE",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      }
+    },
+    "capture_sha256": "32909a476312c37eaa8bab4270e8d8b23d87978193a91fbffbe7e30d7cd2c4ba",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/open-telemetry-opentelemetry-js-license.txt.json"
+  },
+  {
+    "kind": "GitHub license API receipt",
+    "metadata": {
+      "path": "LICENSE",
+      "sha": "e37b5797983fa2c3bbab44c9aa4291956253e142",
+      "html_url": "https://github.com/timgit/pg-boss/blob/master/LICENSE",
+      "download_url": "https://raw.githubusercontent.com/timgit/pg-boss/master/LICENSE",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      }
+    },
+    "capture_sha256": "14d3b144f0b9788b6425897c878ce7b666dce8e3456741b427b994807caadf5c",
+    "capture_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/architecture-research/harvest/root/timgit-pg-boss-license.txt.json"
+  }
+]

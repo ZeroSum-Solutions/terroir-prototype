@@ -1,0 +1,22 @@
+{
+  "allow_auto_merge": false,
+  "allow_merge_commit": true,
+  "allow_rebase_merge": true,
+  "allow_squash_merge": true,
+  "default_branch": "main",
+  "delete_branch_on_merge": false,
+  "full_name": "ZeroSum-Solutions/terroir",
+  "owner": {
+    "login": "ZeroSum-Solutions",
+    "type": "Organization"
+  },
+  "permissions": {
+    "admin": true,
+    "maintain": true,
+    "pull": true,
+    "push": true,
+    "triage": true
+  },
+  "private": false,
+  "visibility": "public"
+}

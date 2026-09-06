@@ -1,0 +1,94 @@
+{
+  "artifact": "terroir-rebuild-v2-independent-verification",
+  "verdict": "planning_artifact_verified_for_owner_gate_1_consideration",
+  "gate_1": "NOT_APPROVED",
+  "full_release_f_14_day": "NO_GO",
+  "narrowed_s": "CONDITIONAL_FORECAST_ONLY",
+  "implementation_tests_run": false,
+  "current_390px_bug_fixed": false,
+  "snapshot": {
+    "root": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild",
+    "core_file_count": 14,
+    "filename_delimited_sha256": "b01d71871c3207e4685fcaaf7d2c5883f256c0c591599fa295add5934676ae77"
+  },
+  "verification_methods": [
+    "read-only Python csv/json assertions for scope, test mapping, active S ownership, and DAG acyclicity",
+    "shasum -a 256 for fable-v2, fable-closure, gemini-v2, and gemini-closure packets",
+    "jq parse validation for verification and ledger JSON"
+  ],
+  "structure": {
+    "errors": [],
+    "scope_rows": 68,
+    "unique_scope_ids": 68,
+    "r_requirements": 35,
+    "s_must_ship_requirements": 15,
+    "deferred_r_requirements": 20,
+    "test_rows": 57,
+    "test_requirement_set_equals_r": true,
+    "s_test_requirement_set_equals_s": true,
+    "all_s_tests_have_active_owner_and_slice": true,
+    "test_statuses": ["SPECIFIED; NOT EXECUTED"],
+    "database_disposition_rows": 44,
+    "dag_nodes": 15,
+    "dag_edges": 21,
+    "dag_acyclic": true,
+    "s_landing_count": 7
+  },
+  "capacity_hours": {
+    "author": [34, 69],
+    "review_integration": [10.5, 17.5],
+    "qualification_max": 2,
+    "total": [46.5, 88.5],
+    "assumed_capacity": 88,
+    "upper_overrun": 0.5,
+    "scope_reduction_estimate": [7, 12],
+    "scope_reduction_measured": false,
+    "deadline_go": false
+  },
+  "boundary_checks": {
+    "rls_route_identity_limitation_explicit": true,
+    "direct_authenticated_candidate_writes_withheld": true,
+    "narrow_actor_scope_validating_rpc_required": true,
+    "service_role_bypass_explicit": true,
+    "privileged_capabilities_must_be_enumerated": true,
+    "candidate_credentials_excluded_from_legacy_adapters": true,
+    "candidate_lookup_owner": "R",
+    "identity_package_schema_owner": "D",
+    "candidate_restore_required_for_s": true,
+    "legacy_restore_and_transformation_f_only": true,
+    "selected_s_skips_are_failures": true
+  },
+  "review_receipts": {
+    "fable_v2": {
+      "valid": true,
+      "exit": 0,
+      "packet_sha256": "052ff0643a783d1a74762c7717b91607a7664ee332f5ea60253bb9ef9f35924f",
+      "position": "conditional_agreement_with_five_residual_conditions"
+    },
+    "fable_final_reread": {
+      "valid": false,
+      "exit": 1,
+      "packet_sha256": "ed15281d0f0fda60ac45e69e50440037aa9dc35c5dbd30f3b248e2ff3cba0dfb",
+      "reason": "subscription_session_limit",
+      "finder_closure_claimed": false
+    },
+    "gemini_v2": {
+      "valid": true,
+      "exit": 0,
+      "packet_sha256": "b6dd971703732ec9a81d3e1021ee72a55ddf0de2485be50727d796e23d21a136"
+    },
+    "gemini_final_closure": {
+      "valid": true,
+      "exit": 0,
+      "packet_sha256": "8780e70c4ebb179aa11467f4a1ac967f630f094b058fc8a2b235cf8cf2dfece8"
+    }
+  },
+  "limitations": [
+    "planning_only",
+    "no_application_or_implementation_tests_run",
+    "no_measured_delivery_velocity",
+    "no_pilot_readiness_claim",
+    "no_unconditional_deadline_go",
+    "final_fable_reread_unavailable"
+  ]
+}

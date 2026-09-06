@@ -1,0 +1,8 @@
+{
+  "lane": "claude",
+  "exit": 0,
+  "seconds": 6,
+  "stdout_chars": 1690,
+  "contains_lane_ok": true,
+  "stderr_tail": ""
+}

@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "verdict": "PASS",
+  "verified_at": "2026-09-06T01:32:54Z",
+  "draft": {
+    "path": "work/architecture-research/draft.md",
+    "sha256": "10f47399936c3a7d16d4e258f3b2407f120e7dd1221bf675290991525e8aa02f"
+  },
+  "reviewer": {
+    "role": "independent evidence and architecture verifier",
+    "requested_model": "gpt-5.6-sol",
+    "requested_reasoning_effort": "xhigh",
+    "identity_basis": "parent collaboration dispatch record; not model self-report"
+  },
+  "canonical_inputs": [
+    {
+      "path": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md",
+      "sha256": "99ee10287e79762bc7013a479d6fcba3dbb7880850692a469a9735b894f61287"
+    },
+    {
+      "path": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/scope.csv",
+      "sha256": "006113433354908c859a59b41c1e4b34ce1db0582c1dcdbc00b87b273ef37e62"
+    }
+  ],
+  "checked_artifacts": [
+    {
+      "path": "work/architecture-research/checked/claims.jsonl",
+      "sha256": "3d0fb324681d4b614a73cb9fed3d49f27d0405e5806d4c85d84917e6f44817f3"
+    },
+    {
+      "path": "work/architecture-research/checked/sources.json",
+      "sha256": "1c6fd10165ee81f4b578b72ed4ec89b479c0a0a9e2e8d6318ee690dc6dad0503"
+    },
+    {
+      "path": "work/architecture-research/checked/checks.json",
+      "sha256": "2fddeafa4f98c011cdcfe58f232ab5c2a6a20680ac4e5609a9e3503cd1bb1bca"
+    }
+  ],
+  "claim_checks": {
+    "total": 38,
+    "exact_quote_matches": 38,
+    "missing_source_files": 0,
+    "duplicate_ids": 0,
+    "ledgers": {
+      "competitors": 9,
+      "huggingface": 9,
+      "infrastructure": 8,
+      "root": 12
+    },
+    "source_attribution": {
+      "checked_source_catalog_matches": 38,
+      "failures": 0
+    }
+  },
+  "criteria": [
+    {
+      "id": "quote_attribution",
+      "status": "PASS",
+      "evidence": "38/38 exact quote matches; all source files and source attributions resolved"
+    },
+    {
+      "id": "source_dates",
+      "status": "PASS",
+      "evidence": "unsupported Vivino and Bevly dates changed to unknown; supported Vinous 2015 and WineSensed 2025 dates retained"
+    },
+    {
+      "id": "competitor_private_backends",
+      "status": "PASS",
+      "evidence": "draft.md:9,15-20,130"
+    },
+    {
+      "id": "model_accuracy",
+      "status": "PASS",
+      "evidence": "draft.md:72-78,108,130"
+    },
+    {
+      "id": "license_artifact_classes",
+      "status": "PASS",
+      "evidence": "draft.md:57-62,72-76"
+    },
+    {
+      "id": "queue_delivery_vs_business_effect",
+      "status": "PASS",
+      "evidence": "draft.md:60,104,121"
+    },
+    {
+      "id": "current_grants_at_execution",
+      "status": "PASS",
+      "evidence": "draft.md:51,87-94,104,116; canonical 02-architecture-data.md:11,58,60"
+    },
+    {
+      "id": "lifecycle_replay_vs_reconciliation",
+      "status": "PASS",
+      "evidence": "draft.md:30,51,91-97,121; scope.csv:E-022"
+    },
+    {
+      "id": "s_scope_and_gate1",
+      "status": "PASS",
+      "evidence": "draft.md:3,60-64,82,112-124,138"
+    },
+    {
+      "id": "fable_opus_endorsement",
+      "status": "PASS",
+      "evidence": "draft.md:136 explicitly denies certification or new agreement"
+    },
+    {
+      "id": "research_only_boundary",
+      "status": "PASS",
+      "evidence": "Terroir HEAD abdc661abde43b0ac70a81f740b61d21da7e414b; only existing planning directory untracked"
+    }
+  ],
+  "resolved_findings": [
+    {
+      "id": "RV-001",
+      "severity": "blocking",
+      "status": "RESOLVED",
+      "summary": "Toast lifecycle history was separated from desired-state projection reconciliation"
+    },
+    {
+      "id": "RV-002",
+      "severity": "blocking",
+      "status": "RESOLVED",
+      "summary": "Receipt now checks current grants and cannot create or expand them"
+    },
+    {
+      "id": "RV-003",
+      "severity": "material",
+      "status": "RESOLVED",
+      "summary": "Unsupported competitor source dates were removed"
+    },
+    {
+      "id": "RV-004",
+      "severity": "material",
+      "status": "RESOLVED",
+      "summary": "Code, model weights, training data, datasets, and upstream-content rights are distinguished"
+    },
+    {
+      "id": "RV-005",
+      "severity": "material",
+      "status": "RESOLVED",
+      "summary": "The addendum disclaims new Fable or Opus endorsement"
+    }
+  ],
+  "remaining_unverified": [
+    "current private competitor backend architecture",
+    "vendor integration contracts and replay guarantees",
+    "Terroir-specific model accuracy",
+    "deployment compatibility and runtime behavior",
+    "latency, memory pressure, cost, and quantified savings"
+  ],
+  "non_blocking_observations": [
+    "Packaged claim capture paths are absolute and source-catalog matched; raw full-page captures remain scratch evidence."
+  ],
+  "highest_priority_fix": null
+}

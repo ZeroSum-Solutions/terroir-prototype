@@ -1,0 +1,13 @@
+{
+  "lane": "gemini",
+  "original_session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+  "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+  "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+  "requested_model": "gemini-3.8-flash-low",
+  "reported_models": [],
+  "exit": 0,
+  "status": "SUCCESS",
+  "seconds": 13,
+  "has_verification": true,
+  "bounded_fix_round": 1
+}

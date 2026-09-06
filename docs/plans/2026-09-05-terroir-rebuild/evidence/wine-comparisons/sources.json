@@ -1,0 +1,72 @@
+[
+  {
+    "file": "harvest/cerebras/inference-docs.cerebras.ai-1107859680.md",
+    "url": "https://inference-docs.cerebras.ai/integrations/milvus",
+    "sha256": "a817f5cb40bfbcd00e0c0a3487a4a3f1dec495e89bbeba7bf11710cec58deec1",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/cerebras/inference-docs.cerebras.ai-2926728854.md",
+    "url": "https://inference-docs.cerebras.ai/llms.txt",
+    "sha256": "7ab66f3489510839a62f2d39a2944eebbe6391824356d3ee1265f8b7ce49fbfa",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/cerebras/inference-docs.cerebras.ai-3026725416.md",
+    "url": "https://inference-docs.cerebras.ai/models/overview",
+    "sha256": "0c3d3c0f981d70df321e912fe297aef3a2769187b6b9bbf97254affd87d5e3cc",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/climate/doi.org-381809152.md",
+    "url": "https://doi.org/10.20870/oeno-one.2018.52.2.2208",
+    "sha256": "146f95f12b26dab36b11e1ab42a4b3900a6b2e8033a11384688e318984413fff",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/climate/ncei.noaa.gov-1826532416.md",
+    "url": "https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily",
+    "sha256": "28b2fbeb433366e8f63d3f242a0b8e78cfff88c2d88bd1328f3d4083cf0a3047",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/climate/oeno-one.eu-3410290970.md",
+    "url": "https://oeno-one.eu/article/view/7921",
+    "sha256": "31fdb834cc7f5458d8ebca63294c0d2401896edaa4d46b5e5b2f353414d4a26f",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/climate/power.larc.nasa.gov-1897738893.md",
+    "url": "https://power.larc.nasa.gov/docs/services/api/temporal/daily/",
+    "sha256": "fa7082f8904f1b352f52c882d0f9d3e05cc313e0c0de7a5f67705b0d68920f5f",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/literature/mdpi.com-479759141.md",
+    "url": "https://www.mdpi.com/2304-8158/8/6/190",
+    "sha256": "e413a262b0b1759878bf71936b02b74559b50424f035ae13d23dfe59d0a6c43e",
+    "access": "full page captured",
+    "substantive_full_text": true
+  },
+  {
+    "file": "harvest/literature/sciencedirect.com-1450634410.md",
+    "url": "https://www.sciencedirect.com/science/article/pii/S0950329313000104",
+    "sha256": "762b9cc9bb8b1211d5ac48d376a7b84ce1cd1ac68d61b7badb6c694b18050e72",
+    "access": "blocked or unusable full-text capture; publisher preview used where specified in literature-sources.json",
+    "substantive_full_text": false
+  },
+  {
+    "file": "harvest/literature/sciencedirect.com-346879710.md",
+    "url": "https://www.sciencedirect.com/science/article/pii/S0950329315002025",
+    "sha256": "3d3c3f996cf056940142424593f500320687dd51af0bef9b865e9a5908784797",
+    "access": "blocked or unusable full-text capture; publisher preview used where specified in literature-sources.json",
+    "substantive_full_text": false
+  }
+]

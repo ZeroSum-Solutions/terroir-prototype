@@ -1,0 +1,130 @@
+{
+  "fetched_at": "2026-09-06T01:58:27.351418+00:00",
+  "repos": [
+    {
+      "full_name": "pgvector/pgvector",
+      "html_url": "https://github.com/pgvector/pgvector",
+      "default_branch": "master",
+      "archived": false,
+      "pushed_at": "2026-08-20T03:47:50Z",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "license_receipt": {
+        "html_url": "https://github.com/pgvector/pgvector/blob/master/LICENSE",
+        "sha": "fc5f177fa5d9c0d20a949f4b4faa028999977008",
+        "license": {
+          "key": "other",
+          "name": "Other",
+          "spdx_id": "NOASSERTION",
+          "url": null,
+          "node_id": "MDc6TGljZW5zZTA="
+        }
+      }
+    },
+    {
+      "full_name": "mem0ai/mem0",
+      "html_url": "https://github.com/mem0ai/mem0",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-09-04T16:32:10Z",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "license_receipt": {
+        "html_url": "https://github.com/mem0ai/mem0/blob/main/LICENSE",
+        "sha": "d20d5102c3cf97ecbee54afd65893de4a11d26fe",
+        "license": {
+          "key": "apache-2.0",
+          "name": "Apache License 2.0",
+          "spdx_id": "Apache-2.0",
+          "url": "https://api.github.com/licenses/apache-2.0",
+          "node_id": "MDc6TGljZW5zZTI="
+        }
+      }
+    },
+    {
+      "full_name": "getzep/graphiti",
+      "html_url": "https://github.com/getzep/graphiti",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-09-04T17:52:53Z",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "license_receipt": {
+        "html_url": "https://github.com/getzep/graphiti/blob/main/LICENSE",
+        "sha": "5feb0d9d299a1107adfa8331306b13cc0eff2d78",
+        "license": {
+          "key": "apache-2.0",
+          "name": "Apache License 2.0",
+          "spdx_id": "Apache-2.0",
+          "url": "https://api.github.com/licenses/apache-2.0",
+          "node_id": "MDc6TGljZW5zZTI="
+        }
+      }
+    },
+    {
+      "full_name": "letta-ai/letta",
+      "html_url": "https://github.com/letta-ai/letta",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-08-23T19:05:43Z",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "license_receipt": {
+        "html_url": "https://github.com/letta-ai/letta/blob/main/LICENSE",
+        "sha": "f75c3422907f55d71685ae59afdc28498cde5a40",
+        "license": {
+          "key": "apache-2.0",
+          "name": "Apache License 2.0",
+          "spdx_id": "Apache-2.0",
+          "url": "https://api.github.com/licenses/apache-2.0",
+          "node_id": "MDc6TGljZW5zZTI="
+        }
+      }
+    },
+    {
+      "full_name": "vercel/ai",
+      "html_url": "https://github.com/vercel/ai",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-09-05T23:20:53Z",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "license_receipt": {
+        "html_url": "https://github.com/vercel/ai/blob/main/LICENSE",
+        "sha": "6c16c29f41168411dbf6e3ba3a063ce789c27334",
+        "license": {
+          "key": "other",
+          "name": "Other",
+          "spdx_id": "NOASSERTION",
+          "url": null,
+          "node_id": "MDc6TGljZW5zZTA="
+        }
+      }
+    }
+  ]
+}

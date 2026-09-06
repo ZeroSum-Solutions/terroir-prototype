@@ -1,0 +1,69 @@
+id,original_phase,outcome,day14_S,slice_requirements,owner,full_release_status,s_bound
+E-001,R,One personal identity with separate personal and work contexts,MUST-SHIP bounded subset; not full outcome,S1,C,OPEN; historical baseline not target acceptance,Invited work context only; personal/context switching deferred
+E-002,R,Group to operating-business to venue hierarchy with simple single-business setup,MUST-SHIP bounded subset; not full outcome,S1,C,OPEN; historical baseline not target acceptance,Group/business/venue model; minimal fixed setup
+E-003,R,"Scoped invitations, delegated venue permissions and offboarding",MUST-SHIP bounded subset; not full outcome,"S1,S6",C,OPEN; historical baseline not target acceptance,Scoped invite/revoke; delegated setup UI deferred
+E-004,P,Explicit consolidated reporting across authorized venues and businesses,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-005,R,"One producer, wine, vintage and package identity across every intake path",MUST-SHIP bounded subset; not full outcome,S2,D,OPEN; historical baseline not target acceptance,Approved identity/package picklist only
+E-006,R,Review ambiguous matches and safely correct duplicate identity,DEFERRED,,R; later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-007,R,"Search wine by label, spelling, vintage, producer and format",MUST-SHIP bounded subset; not full outcome,S2,R,OPEN; historical baseline not target acceptance,Candidate approved catalog lookup; label scanning deferred
+E-008,R,"Invoice/photo/manual receiving with reviewed identity, quantities and costs",MUST-SHIP manual receiving subset only; automated invoice/photo extraction DEFERRED,S3,R,OPEN; historical baseline not target acceptance,Manual typed reviewed receipt only
+E-009,R,Purchase orders on behalf of a named operating business,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-010,R,"Partial receipt, substitution, damage, returns and invoice discrepancies",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-011,R,"Resumable imports with preview, source lineage and safe correction",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-012,R,Authoritative exact-unit stock ledger with auditable balances,MUST-SHIP bounded subset; not full outcome,S4,D,OPEN; historical baseline not target acceptance,Evaluation receipt ledger only; not operational stock authority
+E-013,R,"Venue, room and bin placement with lot traceability",MUST-SHIP bounded subset; not full outcome,S5,C then R,OPEN; historical baseline not target acceptance,Venue-level cellar read; room/bin editor deferred
+E-014,R,Accountable within-business venue transfers,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-015,R,Physical counts reconcile against stock at a defined cutoff,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-016,R,"Open bottles, pours, comps, waste and closeout with reasons",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-017,R,Availability and 86 state inside Terroir,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-018,R,"Wine lists, branding, public menus and exports",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-019,R,Pricing guidance and operational performance with honest money totals,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-020,R,Connect each Toast location with explicit consent and scoped credentials,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-021,R,"Map Toast products, vintages and pour recipes with effective dates",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-022,R,Reconcile inbound Toast order lifecycle into inventory exactly once per effect,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-023,R,"Visible Toast sync, shadow comparison, exceptions and recovery",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-024,R,"Public wine search and useful linked wine, producer and region pages",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-025,R,Interactive geographic discovery alongside search,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-026,R,"Evidence-controlled publication with provenance, rights, exceptions and rollback",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-027,R,Attributed producer claims and corrections without automatic override,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-028,R,Fast accessible mobile tasks with explicit work context,MUST-SHIP bounded subset; not full outcome,S5,C then R,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open
+E-029,R,"Offline read cache and pending photo, note and count drafts",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-030,R,"Support console, bounded publishing throughput and operational alerts",MUST-SHIP bounded subset; not full outcome,S6,O,OPEN; historical baseline not target acceptance,"Operator runbook, revoke/pause and evidence only; console/publication/alert suite deferred"
+E-031,R,"Deployment parity, backup/restore and release rollback",MUST-SHIP bounded subset; not full outcome,S7,Q,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open
+E-032,R,"Export, private-asset retention and account/workspace exit",MUST-SHIP bounded subset; not full outcome,S6,O,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open
+E-033,P,Subscription entitlements and usage budgets,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-034,E,Centrally owned inventory and redistribution between businesses,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-035,P,Conditional transfer approvals and broader transfer policy,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-036,C,"Everyday collection home, scan/import, drink history and acquisition records",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-037,C,Private invited cellar collaboration,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-038,C,Edit/delete personal tasting notes with source-separated reference notes,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-039,C,"Drinking windows, cellar health and snoozable reminders",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-040,C,"Wishlist, intended purchases and expected deliveries",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-041,C,Permissioned copy of selected nonconfidential work tasting notes,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-042,P,"Advanced custody, condition, provenance and third-party storage",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-043,P,Photo-backed cellar representation,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-044,C,Conversational wine explanations and recommendations with optional private context,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-045,P,Voice lookup and hands-free interaction,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-046,S,Verified company representation and reusable producer/product portfolio,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-047,S,"Account-specific availability, prices, terms and quotes to restaurants",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-048,S,"Coordinate orders, allocations, shipment status and exceptions",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-049,P,Low-friction document or scoped-link participation,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-050,P,Attributed withdrawal notices and affected-lot inquiry,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-051,B,Scan/search a bottle and compare exact product alternatives,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-052,B,Find physical and online sellers with observed offers,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-053,B,Pickup and delivery eligibility with transparent total-price components,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-054,B,Connected-seller request/status and clear external-store handoff,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-055,B,"Saved comparisons, follows on wines and price/availability alerts",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-056,G,Private invited tasting groups and explicit shared discussions/lists,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-057,G,"Opt-in public profiles, follows, posts and interaction",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-058,G,"Report, block, moderation appeal and disclosure of commercial content",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-059,P,"ABV, ingredients, low/no alcohol and packaging assertions",DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-060,P,Opt-in customer feedback and shared demand insights,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-061,P,Clearly separated labeled sponsorship without ranking influence,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-062,P,Country-by-country European rollout after USA validation,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-063,X,"Terroir merchant checkout, payment capture and alcohol fulfillment",EXCLUDED,,later admission,OPEN; historical baseline not target acceptance,EXCLUDED; no merchant checkout/payment/fulfillment scope
+E-064,P,Outbound Toast availability updates,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-065,R,"Real pilot feedback, investor evidence and release acceptance record",MUST-SHIP bounded subset; not full outcome,S7,O,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open
+E-066,R,Measured performance and capacity within the operating budget,MUST-SHIP bounded subset; not full outcome,S7,Q,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open
+E-067,R,Permissioned venue and single-business operational reports,DEFERRED,,later admission,OPEN; historical baseline not target acceptance,No S implementation
+E-068,R,Basic pilot access and entitlement administration,MUST-SHIP bounded subset; not full outcome,"S1,S6",C,OPEN; historical baseline not target acceptance,Bounded S subset as specified in03-delivery; full outcome remains open

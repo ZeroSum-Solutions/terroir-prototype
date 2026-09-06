@@ -1,0 +1,121 @@
+[
+  {
+    "source_url": "https://api.github.com/repos/gorse-io/gorse",
+    "full_name": "gorse-io/gorse",
+    "html_url": "https://github.com/gorse-io/gorse",
+    "pushed_at": "2026-08-28T14:08:26Z",
+    "updated_at": "2026-09-05T23:46:00Z",
+    "archived": false,
+    "default_branch": "master",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "capture_sha256": "8b5ab30ab6ec20c9336f8ba32a7658a67f232de7b74b935971b9d7a157fd29fb"
+  },
+  {
+    "source_url": "https://api.github.com/repos/tensorflow/recommenders",
+    "full_name": "tensorflow/recommenders",
+    "html_url": "https://github.com/tensorflow/recommenders",
+    "pushed_at": "2026-07-08T08:57:55Z",
+    "updated_at": "2026-08-31T16:54:33Z",
+    "archived": false,
+    "default_branch": "main",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "capture_sha256": "48411b3495b44c6efc41b7ffe82291ec0b10e1dd9e690139ec762a9252300ef0"
+  },
+  {
+    "source_url": "https://api.github.com/repos/RUCAIBox/RecBole",
+    "full_name": "RUCAIBox/RecBole",
+    "html_url": "https://github.com/RUCAIBox/RecBole",
+    "pushed_at": "2025-02-24T07:16:41Z",
+    "updated_at": "2026-09-04T03:11:06Z",
+    "archived": false,
+    "default_branch": "master",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "capture_sha256": "6b6198839d0e7eb6c3d0764b51f7c416a1278bf31dcfdf4a7ccf62c9ba6fccc0"
+  },
+  {
+    "source_url": "https://api.github.com/repos/benfred/implicit",
+    "full_name": "benfred/implicit",
+    "html_url": "https://github.com/benfred/implicit",
+    "pushed_at": "2026-05-08T19:01:37Z",
+    "updated_at": "2026-09-01T08:59:37Z",
+    "archived": false,
+    "default_branch": "main",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "capture_sha256": "960e61bf98dae9e2adc179664efcf30d709590b425c5b6ffba9665a82df9a3e8"
+  },
+  {
+    "source_url": "https://api.github.com/repos/recommenders-team/recommenders",
+    "full_name": "recommenders-team/recommenders",
+    "html_url": "https://github.com/recommenders-team/recommenders",
+    "pushed_at": "2026-09-05T08:03:04Z",
+    "updated_at": "2026-09-05T19:01:09Z",
+    "archived": false,
+    "default_branch": "main",
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "capture_sha256": "2851cbf993b7d4b5baa291c19266d780295cc58c6445709f1f243234699ffe24"
+  },
+  {
+    "source_url": "https://api.github.com/repos/lyst/lightfm",
+    "full_name": "lyst/lightfm",
+    "html_url": "https://github.com/lyst/lightfm",
+    "pushed_at": "2024-07-24T18:48:54Z",
+    "updated_at": "2026-09-02T10:33:00Z",
+    "archived": false,
+    "default_branch": "master",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "capture_sha256": "259fe619a893b0098b163ebd90d05a7d9a9c2102a6f6cee0f0e88141538204e2"
+  },
+  {
+    "source_url": "https://api.github.com/repos/MTSWebServices/RecTools",
+    "full_name": "MTSWebServices/RecTools",
+    "html_url": "https://github.com/MTSWebServices/RecTools",
+    "pushed_at": "2026-09-03T05:04:58Z",
+    "updated_at": "2026-08-22T09:42:43Z",
+    "archived": false,
+    "default_branch": "main",
+    "license": {
+      "key": "apache-2.0",
+      "name": "Apache License 2.0",
+      "spdx_id": "Apache-2.0",
+      "url": "https://api.github.com/licenses/apache-2.0",
+      "node_id": "MDc6TGljZW5zZTI="
+    },
+    "capture_sha256": "97fc085aef4b1f12eb198e87cc38e97fd67ca8d65744b68f7a8df4ddafa3eea1"
+  }
+]

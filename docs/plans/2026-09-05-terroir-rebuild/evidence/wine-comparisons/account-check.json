@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-09-06T03:04:31.170945+00:00",
+  "surface": "Cerebras Cloud existing Chrome session, Get started Usage card",
+  "organization_display_name": "ZeroSumSolutions",
+  "current_balance_usd": 25.0,
+  "inference_calls_made": 0,
+  "key_exported": false,
+  "vault_search_found": false,
+  "shell_key_present": false,
+  "balance_is_snapshot": true,
+  "expiry_verified": false,
+  "api_usability_tested": false,
+  "public_models_API_probe": "HTTP403; docs and visible UI used instead"
+}

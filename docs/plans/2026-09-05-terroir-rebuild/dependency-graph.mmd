@@ -1,0 +1,28 @@
+flowchart LR
+  G1 --> V0
+  V0 --> M1
+  M1 --> V1
+  V1 --> M2
+  M2 --> V2
+  V2 --> V3
+  V3 --> V4
+  V4 --> G2
+  M1 --> K
+  M2 --> T
+  M2 --> STOCK
+  M1 --> STOCK
+  M2 --> P
+  STOCK --> P
+  M1 --> OF
+  M2 --> OF
+  K --> FULL
+  T --> FULL
+  STOCK --> FULL
+  P --> FULL
+  OF --> FULL
+  K[Public knowledge - F]
+  T[Toast - F]
+  STOCK[Counts transfers pours - F]
+  P[Reports menus - F]
+  OF[Full lifecycle - F]
+  FULL[Full release gates - separate admission]

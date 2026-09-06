@@ -1,0 +1,442 @@
+[
+  {
+    "path": "/Users/zero/projects/terroir",
+    "exists": true,
+    "children": [
+      ".claude",
+      ".env.example",
+      ".env.local",
+      ".env.local.example",
+      ".git",
+      ".github",
+      ".gitignore",
+      ".railwayignore",
+      ".tmp",
+      ".wine-imagery",
+      ".zeroforge",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "DESIGN.md",
+      "README.md",
+      "app_spec.txt",
+      "claude-progress.txt",
+      "docs",
+      "e2e",
+      "eslint.config.mjs",
+      "fixtures",
+      "init.sh",
+      "instrumentation-client.ts",
+      "instrumentation.ts",
+      "next-env.d.ts",
+      "next.config.ts",
+      "package.json",
+      "playwright.config.ts",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "postcss.config.mjs",
+      "public",
+      "railway.toml",
+      "railway.worker.toml",
+      "scratchpad",
+      "scripts",
+      "sentry.edge.config.ts",
+      "sentry.server.config.ts",
+      "src",
+      "supabase",
+      "test-invoices",
+      "test-results",
+      "tsconfig.json",
+      "tsconfig.tsbuildinfo",
+      "vitest.config.ts",
+      "vitest.global-setup.ts",
+      "vitest.setup.ts"
+    ],
+    "root": {
+      "exit": 0,
+      "output": "/Users/zero/projects/terroir",
+      "error": ""
+    },
+    "head": {
+      "exit": 0,
+      "output": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+      "error": ""
+    },
+    "branch": {
+      "exit": 0,
+      "output": "main",
+      "error": ""
+    },
+    "status": {
+      "exit": 0,
+      "output": "",
+      "error": ""
+    }
+  },
+  {
+    "path": "/Users/zero/projects/terroir-vw",
+    "exists": true,
+    "children": [
+      ".claude",
+      ".env.example",
+      ".env.local",
+      ".env.local.example",
+      ".git",
+      ".github",
+      ".gitignore",
+      ".railwayignore",
+      ".zeroforge",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "DESIGN.md",
+      "README.md",
+      "app_spec.txt",
+      "claude-progress.txt",
+      "docs",
+      "e2e",
+      "eslint.config.mjs",
+      "fixtures",
+      "init.sh",
+      "instrumentation-client.ts",
+      "instrumentation.ts",
+      "next-env.d.ts",
+      "next.config.ts",
+      "package.json",
+      "playwright.config.ts",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "postcss.config.mjs",
+      "public",
+      "railway.toml",
+      "railway.worker.toml",
+      "scripts",
+      "sentry.edge.config.ts",
+      "sentry.server.config.ts",
+      "src",
+      "supabase",
+      "test-invoices",
+      "test-results",
+      "tsconfig.json",
+      "tsconfig.tsbuildinfo",
+      "vitest.config.ts",
+      "vitest.global-setup.ts",
+      "vitest.setup.ts"
+    ],
+    "root": {
+      "exit": 0,
+      "output": "/Users/zero/projects/terroir-vw",
+      "error": ""
+    },
+    "head": {
+      "exit": 0,
+      "output": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+      "error": ""
+    },
+    "branch": {
+      "exit": 0,
+      "output": "",
+      "error": ""
+    },
+    "status": {
+      "exit": 0,
+      "output": "",
+      "error": ""
+    }
+  },
+  {
+    "path": "/Users/zero/projects/terroir-worktrees",
+    "exists": true,
+    "children": [
+      "g1-4",
+      "g1-8",
+      "mobile-demo-production-readiness"
+    ],
+    "root": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "head": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "branch": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "status": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "subdirectories": [
+      {
+        "path": "/Users/zero/projects/terroir-worktrees/g1-4",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-30T17:09:03.930877+00:00",
+        "children": [
+          "supabase"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-worktrees/g1-8",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-30T17:09:04.026293+00:00",
+        "children": [
+          "supabase"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-worktrees/mobile-demo-production-readiness",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-30T17:09:03.959181+00:00",
+        "children": [
+          "supabase"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/zero/projects/terroir-data",
+    "exists": true,
+    "children": [
+      ".venv",
+      "join_analysis.py",
+      "lwin_catalog.csv",
+      "spike01-stt",
+      "spike02-capture",
+      "spike05-ddgs",
+      "spike06-latency",
+      "spike07-lightglue",
+      "spike09-voice-retrieval",
+      "winesensed",
+      "xwines"
+    ],
+    "root": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "head": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "branch": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "status": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "subdirectories": [
+      {
+        "path": "/Users/zero/projects/terroir-data/spike01-stt",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T04:33:46.852915+00:00",
+        "children": [
+          ".venv",
+          "__pycache__",
+          "audio",
+          "audit-gpt56sol-findings.md",
+          "keyterm_lists.json",
+          "manifest.json",
+          "per_entity.json",
+          "render.py",
+          "resolver_replay.json",
+          "resolver_replay.py",
+          "results.jsonl",
+          "run_stt.py",
+          "score.py",
+          "utterances.json"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/spike02-capture",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T04:14:46.127427+00:00",
+        "children": []
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/spike05-ddgs",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T04:15:26.121035+00:00",
+        "children": [
+          ".venv",
+          "queries.json",
+          "results.jsonl",
+          "soak.py"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/spike06-latency",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T05:32:58.399896+00:00",
+        "children": [
+          "bench_latency.py",
+          "bench_results.json",
+          "build_index.py",
+          "run_log.txt"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/spike07-lightglue",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T05:32:50.388884+00:00",
+        "children": [
+          "survival.py",
+          "survival_results.json"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/spike09-voice-retrieval",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-26T04:17:46.438087+00:00",
+        "children": [
+          "baseline.py",
+          "baseline_results.json",
+          "build_eval.py",
+          "cases.jsonl",
+          "fixture_inventory.json",
+          "mapping_report.json"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/winesensed",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-25T20:44:44.087615+00:00",
+        "children": [
+          "images_reviews_attributes.csv",
+          "metadata.zip",
+          "napping.csv",
+          "participants.csv",
+          "readme.txt"
+        ]
+      },
+      {
+        "path": "/Users/zero/projects/terroir-data/xwines",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-25T20:30:19.030805+00:00",
+        "children": [
+          "INFO_Hashing.txt",
+          "XWines_Full_100K_wines.csv",
+          "XWines_Full_21M_ratings.csv",
+          "XWines_Slim_150K_ratings.csv",
+          "XWines_Slim_1K_wines.csv",
+          "XWines_Test_100_wines.csv",
+          "XWines_Test_1K_ratings.csv"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/zero/Desktop/01 Projects/Terroir",
+    "exists": true,
+    "children": [
+      "Inventory",
+      "Planning",
+      "Research Notes",
+      "Review Screenshots"
+    ],
+    "root": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "head": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "branch": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "status": {
+      "exit": 128,
+      "output": "",
+      "error": "fatal: not a git repository (or any of the parent directories): .git"
+    },
+    "subdirectories": [
+      {
+        "path": "/Users/zero/Desktop/01 Projects/Terroir/Inventory",
+        "git_metadata_exists": false,
+        "mtime": "2026-09-04T05:24:50.569386+00:00",
+        "children": [
+          "Consolidated Inventory.csv"
+        ]
+      },
+      {
+        "path": "/Users/zero/Desktop/01 Projects/Terroir/Planning",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-22T19:32:08.912744+00:00",
+        "children": [
+          ".DS_Store",
+          "00-README.md",
+          "01-terroir-architecture-map.md",
+          "02-bevrly-route-and-feature-map.md",
+          "03-capability-matrix.md",
+          "04-terroir-product-spec.md",
+          "05-feature-backlog.md",
+          "06-data-api-frontend-architecture.md",
+          "07-design-system-and-responsive.md",
+          "08-cross-cutting-requirements.md",
+          "09-grok-4.6-audit.md",
+          "10-gemini-3.7-flash-audit.md",
+          "11-gauntlet-implementation-plan.md",
+          "12-owner-decision-log.md",
+          "13-product-north-star.md",
+          "14-gpt-5.6-sol-audit.md",
+          "15-model-refresh-and-pricing.md",
+          "16-eval-gate-results.md",
+          "17-bevrly-baseline-audit.md",
+          "18-terroir-top10-product-spec.md",
+          "evidence",
+          "screenshots"
+        ]
+      },
+      {
+        "path": "/Users/zero/Desktop/01 Projects/Terroir/Research Notes",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-23T15:44:46.616277+00:00",
+        "children": [
+          ".DS_Store",
+          "01-mobile-review-scan-cellar-lists.md"
+        ]
+      },
+      {
+        "path": "/Users/zero/Desktop/01 Projects/Terroir/Review Screenshots",
+        "git_metadata_exists": false,
+        "mtime": "2026-08-30T01:11:53.674235+00:00",
+        "children": [
+          "IMG_7587.HEIC",
+          "IMG_7596.PNG",
+          "IMG_7597.PNG",
+          "IMG_7598.PNG",
+          "IMG_7599.PNG",
+          "IMG_7600.PNG",
+          "IMG_7601.PNG",
+          "IMG_7602.PNG",
+          "IMG_7603.PNG",
+          "IMG_7604.PNG",
+          "IMG_7605.PNG",
+          "IMG_7606.PNG",
+          "IMG_7607.PNG",
+          "IMG_7608.PNG",
+          "IMG_7609.PNG",
+          "IMG_7610.PNG",
+          "IMG_7611.PNG",
+          "Screenshot 2026-08-29 at 6.01.24\u202fPM.png",
+          "Screenshot 2026-08-29 at 6.01.51\u202fPM.png",
+          "Screenshot 2026-08-29 at 6.03.50\u202fPM.png",
+          "Screenshot 2026-08-29 at 6.11.51\u202fPM.png"
+        ]
+      }
+    ]
+  }
+]

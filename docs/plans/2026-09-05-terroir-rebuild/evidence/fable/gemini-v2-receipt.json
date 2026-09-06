@@ -1,0 +1,15 @@
+{
+  "lane": "gemini",
+  "requested_model": "gemini-3.8-flash-high",
+  "effort": "high",
+  "reported_models": [],
+  "session_id": "a2c98f83-1448-4a38-bebd-947f8073c969",
+  "fresh_session": true,
+  "harness": "Antigravity agy",
+  "packet_sha256": "b6dd971703732ec9a81d3e1021ee72a55ddf0de2485be50727d796e23d21a136",
+  "exit": 0,
+  "status": "SUCCESS",
+  "seconds": 63,
+  "has_response": true,
+  "api_equivalent_estimate_not_subscription_invoice": null
+}

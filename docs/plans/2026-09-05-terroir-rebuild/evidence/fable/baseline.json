@@ -1,0 +1,30 @@
+{
+  "root": {
+    "exit": 0,
+    "output": "/Users/zero/projects/terroir"
+  },
+  "remote": {
+    "exit": 0,
+    "output": "git@github.com:ZeroSum-Solutions/terroir.git"
+  },
+  "branch": {
+    "exit": 0,
+    "output": "main"
+  },
+  "head": {
+    "exit": 0,
+    "output": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  "status": {
+    "exit": 0,
+    "output": "?? docs/plans/2026-09-05-terroir-rebuild/"
+  },
+  "worktrees": {
+    "exit": 0,
+    "output": "worktree /Users/zero/projects/terroir\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\nbranch refs/heads/main\n\nworktree /Users/zero/projects/terroir-vw\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\ndetached"
+  },
+  "open_prs": {
+    "exit": 0,
+    "output": "[]"
+  }
+}

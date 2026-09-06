@@ -1,0 +1,10 @@
+{
+  "root": "/Users/zero/projects/terroir",
+  "remote": "git@github.com:ZeroSum-Solutions/terroir.git",
+  "head": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "branch": "main",
+  "status": "?? docs/plans/2026-09-05-terroir-rebuild/",
+  "branches": "feat/high-leverage-loops-2026-09-04 2846f067a4d9dba32121654796ddee72557d75be\nmain abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "worktrees": "worktree /Users/zero/projects/terroir\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\nbranch refs/heads/main\n\nworktree /Users/zero/projects/terroir-vw\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\ndetached",
+  "open_prs": "[]"
+}

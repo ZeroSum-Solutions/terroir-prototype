@@ -1,0 +1,1133 @@
+[
+  {
+    "number": 224,
+    "title": "chore: run five high-leverage quality loops",
+    "createdAt": "2026-09-04T23:17:46Z",
+    "mergedAt": "2026-09-04T23:27:45Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 27,
+    "files": {
+      "nodes": [
+        {
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "path": ".github/workflows/e2e-full.yml"
+        },
+        {
+          "path": "AGENTS.md"
+        },
+        {
+          "path": "README.md"
+        },
+        {
+          "path": "docs/LOCAL-SUPABASE.md"
+        },
+        {
+          "path": "docs/runbooks/local-stack.md"
+        },
+        {
+          "path": "docs/runbooks/prodshape-tenant.md"
+        },
+        {
+          "path": "e2e/cellar-config-keyboard.spec.ts"
+        },
+        {
+          "path": "e2e/demo-critical-journeys.test.ts"
+        },
+        {
+          "path": "e2e/mobile-wine-detail.test.ts"
+        },
+        {
+          "path": "e2e/no-skips-reporter.ts"
+        },
+        {
+          "path": "e2e/one-row-rule.test.ts"
+        },
+        {
+          "path": "e2e/producer-shown-once.test.ts"
+        },
+        {
+          "path": "package.json"
+        },
+        {
+          "path": "playwright.config.ts"
+        },
+        {
+          "path": "pnpm-lock.yaml"
+        },
+        {
+          "path": "pnpm-workspace.yaml"
+        },
+        {
+          "path": "src/app/(app)/cellar/cellar-grid.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/config/page.mobile.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/config/page.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/config/sortable-section-item.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/sections.test.ts"
+        },
+        {
+          "path": "src/app/(app)/cellar/sections.ts"
+        },
+        {
+          "path": "src/components/wine-thumb.test.tsx"
+        },
+        {
+          "path": "src/components/wine-thumb.tsx"
+        },
+        {
+          "path": "src/test/contracts/playwright-safety.test.ts"
+        },
+        {
+          "path": "supabase/config.toml"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 9.983333333333333,
+    "cohort": "other"
+  },
+  {
+    "number": 223,
+    "title": "feat: compose the wine page from three resolvers",
+    "createdAt": "2026-09-04T01:10:46Z",
+    "mergedAt": "2026-09-04T01:16:52Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 24,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/drink-window-block.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/drink-window-block.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/operational-badges.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/operational-badges.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/reference-notes.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/score-pair.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/score-pair.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/taste-axes-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/taste-block.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/taste-block.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/tasting-note-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/types.ts"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/vintage-rail.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/vintage-rail.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/page.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/page.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/wine-detail-view.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/wine-detail-view.tsx"
+        },
+        {
+          "path": "src/domains/wine-profile/badges.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/badges.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-cellar-context.db.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-cellar-context.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-cellar-context.ts"
+        },
+        {
+          "path": "src/test/render.tsx"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.1,
+    "cohort": "other"
+  },
+  {
+    "number": 222,
+    "title": "docs: cut the rating ramp, and record what was measured before cutting",
+    "createdAt": "2026-09-03T19:18:26Z",
+    "mergedAt": "2026-09-03T19:26:05Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-09-03-wine-page-design.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 7.65,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 221,
+    "title": "feat: resolve the sourced reference profile",
+    "createdAt": "2026-09-03T19:04:52Z",
+    "mergedAt": "2026-09-03T19:11:55Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 5,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/domains/notes/load-wine-notes.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-reference-profile.db.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-reference-profile.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-reference-profile.ts"
+        },
+        {
+          "path": "src/lib/team/restaurant-member-names.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 7.05,
+    "cohort": "other"
+  },
+  {
+    "number": 220,
+    "title": "feat: resolve the house taste profile",
+    "createdAt": "2026-09-03T18:53:19Z",
+    "mergedAt": "2026-09-03T18:59:14Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 8,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-09-03-wine-page-design.md"
+        },
+        {
+          "path": "src/domains/notes/load-wine-notes.ts"
+        },
+        {
+          "path": "src/domains/notes/note-list.test.tsx"
+        },
+        {
+          "path": "src/domains/notes/note-list.tsx"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-house-profile.db.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-house-profile.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/resolve-house-profile.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.916666666666667,
+    "cohort": "other"
+  },
+  {
+    "number": 219,
+    "title": "feat: migrate the legacy tasting-note field into the house corpus",
+    "createdAt": "2026-09-03T16:37:48Z",
+    "mergedAt": "2026-09-03T16:45:21Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 9,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-08-24-visual-wine-platform-spec-list.md"
+        },
+        {
+          "path": "src/app/(app)/cellar/edit-metadata-modal.tsx"
+        },
+        {
+          "path": "src/domains/notes/load-wine-notes.ts"
+        },
+        {
+          "path": "src/domains/notes/note-list.test.tsx"
+        },
+        {
+          "path": "src/domains/notes/note-list.tsx"
+        },
+        {
+          "path": "src/types/database.ts"
+        },
+        {
+          "path": "supabase/migrations/0150_seed_notes_from_tasting_notes.sql"
+        },
+        {
+          "path": "supabase/migrations/down/0150_seed_notes_from_tasting_notes.down.sql"
+        },
+        {
+          "path": "supabase/schema.snapshot.sql"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 7.55,
+    "cohort": "other"
+  },
+  {
+    "number": 218,
+    "title": "Merge remote-tracking branch 'origin/main' into feat/note-composer",
+    "createdAt": "2026-09-03T16:27:01Z",
+    "mergedAt": "2026-09-03T16:34:08Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 13,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/api-route-inventory.json"
+        },
+        {
+          "path": "docs/api-route-reconciliation.json"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/page.test.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/page.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/wine-detail-view.tsx"
+        },
+        {
+          "path": "src/app/api/wines/[id]/notes/suggest/route.ts"
+        },
+        {
+          "path": "src/domains/notes/load-wine-notes.ts"
+        },
+        {
+          "path": "src/domains/notes/note-composer.test.tsx"
+        },
+        {
+          "path": "src/domains/notes/note-composer.tsx"
+        },
+        {
+          "path": "src/domains/notes/note-list.test.tsx"
+        },
+        {
+          "path": "src/domains/notes/note-list.tsx"
+        },
+        {
+          "path": "src/domains/notes/notes-section.tsx"
+        },
+        {
+          "path": "src/lib/api-route-inventory/verify-api-contract.test.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 7.116666666666666,
+    "cohort": "other"
+  },
+  {
+    "number": 217,
+    "title": "feat: suggest descriptors from note prose",
+    "createdAt": "2026-09-03T16:16:15Z",
+    "mergedAt": "2026-09-03T16:26:42Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 4,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/domains/notes/descriptor-extraction.test.ts"
+        },
+        {
+          "path": "src/domains/notes/descriptor-extraction.ts"
+        },
+        {
+          "path": "src/lib/ai/models.contract.test.ts"
+        },
+        {
+          "path": "src/lib/ai/models.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 10.45,
+    "cohort": "other"
+  },
+  {
+    "number": 216,
+    "title": "Merge remote-tracking branch 'origin/main' into feat/stop-inferred-writes",
+    "createdAt": "2026-09-03T16:06:51Z",
+    "mergedAt": "2026-09-03T16:13:19Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 7,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "src/app/api/wines/[id]/enrich/route.ts"
+        },
+        {
+          "path": "src/app/api/wines/enrich/route.test.ts"
+        },
+        {
+          "path": "src/lib/wine-intelligence/batch.ts"
+        },
+        {
+          "path": "src/lib/wine-intelligence/enrich-claude.blocks.test.ts"
+        },
+        {
+          "path": "src/lib/wine-intelligence/enrich-claude.test.ts"
+        },
+        {
+          "path": "src/lib/wine-intelligence/enrich-claude.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.466666666666667,
+    "cohort": "other"
+  },
+  {
+    "number": 215,
+    "title": "feat: note write path with confirmed descriptors",
+    "createdAt": "2026-09-03T15:51:41Z",
+    "mergedAt": "2026-09-03T16:05:46Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 6,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/api-route-inventory.json"
+        },
+        {
+          "path": "docs/api-route-reconciliation.json"
+        },
+        {
+          "path": "src/app/api/wines/[id]/notes/route.ts"
+        },
+        {
+          "path": "src/domains/notes/note-service.test.ts"
+        },
+        {
+          "path": "src/domains/notes/note-service.ts"
+        },
+        {
+          "path": "src/lib/api-route-inventory/verify-api-contract.test.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 14.083333333333334,
+    "cohort": "other"
+  },
+  {
+    "number": 214,
+    "title": "feat: seed the descriptor vocabulary",
+    "createdAt": "2026-09-03T15:42:48Z",
+    "mergedAt": "2026-09-03T15:48:08Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 6,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-08-24-visual-wine-platform-spec-list.md"
+        },
+        {
+          "path": "src/domains/notes/descriptor-families.test.ts"
+        },
+        {
+          "path": "src/domains/notes/descriptor-families.ts"
+        },
+        {
+          "path": "supabase/migrations/0149_seed_descriptors.sql"
+        },
+        {
+          "path": "supabase/migrations/down/0149_seed_descriptors.down.sql"
+        },
+        {
+          "path": "supabase/schema.snapshot.sql"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.333333333333333,
+    "cohort": "other"
+  },
+  {
+    "number": 211,
+    "title": "Merge remote-tracking branch 'origin/main' into feat/wine-notes-0148",
+    "createdAt": "2026-09-03T13:09:55Z",
+    "mergedAt": "2026-09-03T15:40:34Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 7,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-08-24-visual-wine-platform-spec-list.md"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "src/domains/notes/wine-notes-rls.test.ts"
+        },
+        {
+          "path": "src/types/database.ts"
+        },
+        {
+          "path": "supabase/migrations/0148_wine_notes.sql"
+        },
+        {
+          "path": "supabase/migrations/down/0148_wine_notes.down.sql"
+        },
+        {
+          "path": "supabase/schema.snapshot.sql"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 150.65,
+    "cohort": "other"
+  },
+  {
+    "number": 213,
+    "title": "feat: five operational badge rules, pure and boundary-tested",
+    "createdAt": "2026-09-03T15:34:37Z",
+    "mergedAt": "2026-09-03T15:40:00Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/domains/wine-profile/badges.test.ts"
+        },
+        {
+          "path": "src/domains/wine-profile/badges.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.383333333333334,
+    "cohort": "other"
+  },
+  {
+    "number": 212,
+    "title": "feat: provenance types and the one basis label",
+    "createdAt": "2026-09-03T13:16:57Z",
+    "mergedAt": "2026-09-03T13:22:35Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 3,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/lib/provenance/basis-label.test.tsx"
+        },
+        {
+          "path": "src/lib/provenance/basis-label.tsx"
+        },
+        {
+          "path": "src/lib/provenance/sourced.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.633333333333334,
+    "cohort": "other"
+  },
+  {
+    "number": 210,
+    "title": "fix: pay down the font-mono debt the split exposed",
+    "createdAt": "2026-09-03T13:02:32Z",
+    "mergedAt": "2026-09-03T13:08:39Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 13,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "scripts/design-typography-baseline.json"
+        },
+        {
+          "path": "scripts/file-size-baseline.json"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/cellar-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/corpus-notes.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/facts-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/hero-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/pairing-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/taste-axes-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/tasting-note-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/types.ts"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/blocks/vintage-section.tsx"
+        },
+        {
+          "path": "src/app/(app)/cellar/[wineId]/wine-detail-view.tsx"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.116666666666666,
+    "cohort": "other"
+  },
+  {
+    "number": 209,
+    "title": "docs: wine page implementation plan, 19 slices with acceptance evidence",
+    "createdAt": "2026-09-03T12:49:41Z",
+    "mergedAt": "2026-09-03T12:55:44Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/superpowers/plans/2026-09-03-wine-page.md"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-09-03-wine-page-design.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.05,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 208,
+    "title": "docs: display-rail model from the cellar photographs",
+    "createdAt": "2026-09-03T04:13:17Z",
+    "mergedAt": "2026-09-03T04:18:52Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 1,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.583333333333333,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 207,
+    "title": "docs: record the 2026-08-28 cellar scan as a second fixture for the scan-to-layout generator",
+    "createdAt": "2026-09-03T04:06:58Z",
+    "mergedAt": "2026-09-03T04:12:30Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 3,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/assets/cellar-scan-2026-08-28-plan.png"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/assets/cellar-scan-2026-08-28-rack-wall.png"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.533333333333333,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 206,
+    "title": "docs: cellar photographs as the display-rail reference for the scan-to-layout generator",
+    "createdAt": "2026-09-03T04:06:55Z",
+    "mergedAt": "2026-09-03T04:11:55Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/assets/cellar-2026-08-28-corner.jpg"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/assets/cellar-2026-08-28-rack-detail.jpg"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.0,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 205,
+    "title": "docs: Vivino iOS app section from owner screenshots; phone shelf-scan fixture recorded for the 3D layout programme",
+    "createdAt": "2026-09-03T04:01:14Z",
+    "mergedAt": "2026-09-03T04:06:39Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 3,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/assets/shelf-scan-2026-08-30-front.png"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/vivino.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.416666666666667,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 204,
+    "title": "docs: Delectable web sign-in finding; plan access table updated for the logged-in walkthroughs",
+    "createdAt": "2026-09-03T03:40:53Z",
+    "mergedAt": "2026-09-03T03:46:38Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 3,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/delectable.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/invintory.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.75,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 203,
+    "title": "docs: Vinous logged-in walkthrough addendum",
+    "createdAt": "2026-09-03T03:20:25Z",
+    "mergedAt": "2026-09-03T03:25:19Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 1,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/vinous.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 4.9,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 202,
+    "title": "docs: Vivino logged-in web walkthrough addendum",
+    "createdAt": "2026-09-03T02:45:10Z",
+    "mergedAt": "2026-09-03T02:50:12Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 1,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/vivino.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.033333333333333,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 201,
+    "title": "docs: Bevrly logged-in walkthrough (read-only) and plan addendum",
+    "createdAt": "2026-09-03T02:38:18Z",
+    "mergedAt": "2026-09-03T02:43:36Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/bevrly.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.3,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 200,
+    "title": "docs: add the Bevrly audit brief and fold it into the adoption plan",
+    "createdAt": "2026-09-02T21:12:34Z",
+    "mergedAt": "2026-09-02T21:19:46Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 2,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/bevrly.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 7.2,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 199,
+    "title": "docs: competitor audit briefs and adoption plan (Vivino, Delectable, Vinous, InVintory, Bevly)",
+    "createdAt": "2026-09-02T20:53:53Z",
+    "mergedAt": "2026-09-02T21:00:44Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 6,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-02-competitor-audit-adoption-plan.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/bevly.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/delectable.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/invintory.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/vinous.md"
+        },
+        {
+          "path": "docs/plans/competitor-audit-2026-09-02/vivino.md"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.85,
+    "cohort": "docs-only"
+  },
+  {
+    "number": 198,
+    "title": "docs: demo-day runbook and record; hosted demo-tenant polish script",
+    "createdAt": "2026-09-02T14:33:24Z",
+    "mergedAt": "2026-09-02T14:38:40Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 3,
+    "files": {
+      "nodes": [
+        {
+          "path": "docs/plans/2026-09-01-demo-release-record.md"
+        },
+        {
+          "path": "docs/runbooks/investor-demo.md"
+        },
+        {
+          "path": "scripts/polish-demo-tenant-hosted.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.266666666666667,
+    "cohort": "other"
+  },
+  {
+    "number": 197,
+    "title": "fix: settle stalled invoice scans; retry the types generator once in CI",
+    "createdAt": "2026-09-02T14:31:19Z",
+    "mergedAt": "2026-09-02T14:38:12Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 7,
+    "files": {
+      "nodes": [
+        {
+          "path": "scripts/check-types-drift.mjs"
+        },
+        {
+          "path": "src/app/(app)/scans/page.tsx"
+        },
+        {
+          "path": "src/domains/scanning/stalled-scans.test.ts"
+        },
+        {
+          "path": "src/domains/scanning/stalled-scans.ts"
+        },
+        {
+          "path": "src/lib/scanner/scan-status-reason.stalled.test.ts"
+        },
+        {
+          "path": "src/lib/scanner/scan-status-reason.ts"
+        },
+        {
+          "path": "src/test/contracts/check-types-drift.test.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 6.883333333333334,
+    "cohort": "other"
+  },
+  {
+    "number": 196,
+    "title": "feat: invoice scanning without Azure \u2014 extract straight from the photo",
+    "createdAt": "2026-09-02T14:21:09Z",
+    "mergedAt": "2026-09-02T14:27:05Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 9,
+    "files": {
+      "nodes": [
+        {
+          "path": "src/adapters/llm/anthropic-invoice-extraction.ts"
+        },
+        {
+          "path": "src/app/api/scan/route.test.ts"
+        },
+        {
+          "path": "src/domains/scanning/invoice-extraction-stage.test.ts"
+        },
+        {
+          "path": "src/domains/scanning/invoice-extraction-stage.ts"
+        },
+        {
+          "path": "src/domains/scanning/invoice-scan-service.test.ts"
+        },
+        {
+          "path": "src/domains/scanning/invoice-scan-service.ts"
+        },
+        {
+          "path": "src/lib/scanner/ai-extract-vision.test.ts"
+        },
+        {
+          "path": "src/lib/scanner/ai-extract.ts"
+        },
+        {
+          "path": "src/lib/scanner/ocr-service.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.933333333333334,
+    "cohort": "other"
+  },
+  {
+    "number": 195,
+    "title": "feat: bottle scan on Gemini 3.7 Flash, measured; bottle-label eval harness",
+    "createdAt": "2026-09-02T04:28:42Z",
+    "mergedAt": "2026-09-02T04:33:53Z",
+    "author": {
+      "login": "wiggdevin"
+    },
+    "changedFiles": 6,
+    "files": {
+      "nodes": [
+        {
+          "path": ".gitignore"
+        },
+        {
+          "path": "docs/plans/2026-09-01-demo-release-record.md"
+        },
+        {
+          "path": "docs/plans/2026-09-02-bottle-scan-model-eval.md"
+        },
+        {
+          "path": "scripts/eval-bottle-labels.ts"
+        },
+        {
+          "path": "src/lib/ai/models.contract.test.ts"
+        },
+        {
+          "path": "src/lib/ai/models.ts"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false
+      }
+    },
+    "cycle_minutes": 5.183333333333334,
+    "cohort": "other"
+  }
+]

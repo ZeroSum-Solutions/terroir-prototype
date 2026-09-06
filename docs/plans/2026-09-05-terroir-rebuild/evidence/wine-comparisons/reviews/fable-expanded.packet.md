@@ -1,0 +1,20 @@
+```json
+{
+  "verdict": "AGREE",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "low",
+      "claim": "Source fidelity: the draft states the 2018 soil/terroir review describes 'nonlinear responses to water deficit.' The supplied climate evidence says only that 'sugar response to water deficit varies with deficit severity' and that there is no universal rainfall-to-acidity function. 'Nonlinear' is an interpretation not present in the supplied evidence summary.",
+      "required_change": "Replace 'including nonlinear responses to water deficit' with 'including sugar responses that vary with the severity of water deficit' (or another phrasing limited to the verified evidence). Non-blocking editorial correction; the section's conclusion (no simple weather-to-taste rule) is unaffected."
+    },
+    {
+      "id": "F2",
+      "severity": "low",
+      "claim": "Release gate ambiguity: SIM-06/07/08 are labeled 'AI-3/catalog navigation' and the prose says users 'can browse producer/region relationships without a personal profile' and that navigation 'reuses E-024/E-027/E-046 foundations,' while the companion artifacts are said to supplement 'without changing their release classifications.' Exact producer/origin joins need no AI, so the dual label leaves undefined whether they wait for AI-3 admission or are deliverable as non-AI catalog navigation. Not a contradiction, but the gate is unresolved.",
+      "required_change": "Add one sentence stating that exact same-producer/same-region navigation is not gated on AI-3 admission and any pilot inclusion would be a separate, explicit scope decision (or, alternatively, that it is deferred with AI-3). Either resolution is acceptable; the draft should pick one rather than carry both labels."
+    }
+  ],
+  "agreement_scope": "Checked within the supplied packet only. Sensory-literature table is faithful to the evidence JSON: Torri 2013 (11 Italian reds; expert separation quality-driven, consumer separation clearer in liking, DA vs mapping spaces differ), Liu 2016 (Pinot Blanc base, training improved Napping, qualitative vs quantitative capture differs, blind duplicates), Zamora 2006 (nine trained assessors, tartaric/fructose interaction, medium-dependent), Laguna 2019 (six model wines, eight trained/nine experts, separate body/astringency/bitterness/alcohol scoring, viscosity–body not significant, one saliva donor). Access status (three abstract/preview, one full text), the statement that none validates a recommendation algorithm, and the labeling of application fields as design inferences are correct. Corbières 2024 summary, NOAA GHCN-Daily and NASA POWER descriptions, and their 'candidate inputs, not validated feeds' status match the supplied evidence. Cerebras section is unchanged from the previously agreed version and remains consistent with the supplied docs (no verified embedding endpoint, Milvus placeholder vectors, 403 probe, no spend). Design proposals are correctly separated from study findings throughout. Producer/region/vintage additions are internally consistent: producer/brand/importer/parent roles distinguished, address ≠ grape origin, appellation level explicit, vintage record keyed by scope/year/metric version with windows/units/geometry/hemisphere handling, radiation vs sunshine duration kept distinct, weather as context not bottle trait, regional vintage comparison correctly marked a separately estimated outcome (SIM-09) rather than a free addition. Feasibility floor now scoped to the frozen sensory query set with per-mode reporting, edition coverage recorded separately, freeze-before-measure ordering, disjoint development vs held-out acceptance labelers, and all recruitment marked proposed (G1–G3 closed). Storage/retrieval contract, fallback scan with measured sizing, invalidation, typed-tool ownership, and the Postgres/Next.js/optional-pgvector architecture are unchanged and consistent. No pilot-scope, clock, runtime-approval or model-performance change is implied; no test results or superiority claims are asserted."
+}
+```

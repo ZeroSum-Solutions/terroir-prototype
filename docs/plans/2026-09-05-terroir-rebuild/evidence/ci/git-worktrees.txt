@@ -1,0 +1,10 @@
+command: git worktree list --porcelain
+exit: 0
+worktree /Users/zero/projects/terroir
+HEAD abdc661abde43b0ac70a81f740b61d21da7e414b
+branch refs/heads/main
+
+worktree /Users/zero/projects/terroir-vw
+HEAD abdc661abde43b0ac70a81f740b61d21da7e414b
+detached
+

@@ -1,0 +1,16 @@
+{
+  "status": "TEMPLATE",
+  "slice_id": null,
+  "author": null,
+  "head_sha": null,
+  "base_sha": null,
+  "packet_hash": null,
+  "reviewers": [],
+  "findings": [],
+  "steward": null,
+  "non_author_lander": null,
+  "closure_rule": "original finder or objective test evidence; author cannot close",
+  "round_limit": 1,
+  "land_go": false,
+  "gate2_approved": false
+}

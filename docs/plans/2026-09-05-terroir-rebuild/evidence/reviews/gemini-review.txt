@@ -1,0 +1,63 @@
+### Independent Audit Verdict: CONDITIONAL PASS WITH BLOCKING CORRECTIONS (NO-GO FOR EXECUTION UNTIL P1 FINDINGS CLOSED)
+
+The planning packet provides an honest, disciplined de-escalation from an unsupportable 35-outcome restaurant rebuild to an evaluation candidate ($S$). However, several structural defects in feasibility arithmetic, review closure authority, and dependency ordering must be bounded before Gate 1 approval.
+
+---
+
+### Packet Limitations & Grounding Notice
+This audit evaluated only the provided planning packet (`START-HERE.md`, `01-evidence.md`, `02-architecture-data.md`, `03-delivery.md`, `04-ownership.md`, `05-ci-tests.md`, `06-capacity.md`, `07-protocol.md`, `08-risks-cleanup.md`, `scope.csv`, `tests.csv`). No tools, repository inspection, file writes, subagents, commands, or cloud environments were accessed. Historical references and prior CI receipts were treated as unverified author claims.
+
+---
+
+### Audit Findings
+
+#### Finding 1 (P1): Review Closure Authority Violates Independent Governance Requirement
+- **Evidence**: `07-protocol.md` ("Independent review contract", para 5): *"Non-author Q/ledger steward consolidates findings... In this run the database explorer is the ledger steward... external original finders verify closure."* vs `START-HERE.md` ("Read the package"): Author self-reports `09-review.md` and `verification.json` as completed artifacts within its own authoring package.
+- **Consequence**: An authoring session generating its own review artifacts creates an unverified self-approval loop. While `07-protocol.md` specifies that original finders must close findings, the author packet packages its own verification receipt without distinct harness verification signatures.
+- **Bounded Fix**: Enforce that the ledger steward cannot be an internal agent within the authoring harness. Mandate that review closure receipts (`verification.json`) require explicit signed exit blocks from the external review harnesses (`Claude Code` / `agy`), with closure blocked until finder verification is registered out-of-band.
+- **Closure Condition**: An independent review log signed by Claude and Gemini harness sessions affirming closure of all P0/P1 items without author override.
+
+#### Finding 2 (P1): Critical Feasibility Deficit in Staffing & PR Integration Arithmetic
+- **Evidence**: `03-delivery.md` ("Capacity calculation" & "Estimated tracks"): Total effort for $S$ is estimated at 60–92 contributor hours across 11 delivery days (88 productive hours assuming 8h/day). The critical path requires 9 serialized PRs. `06-capacity.md` ("Measured capacity"): MacBook Pro is explicitly excluded, leaving only *one active builder on Mac Mini initially*.
+- **Consequence**: With a single active builder, serialized integration of 9 distinct PRs (each requiring authoring, running local tests, submitting, 2 independent vendor reviews, and 1 fix round) yields an effective cycle time of 10–14 hours per PR (90–126 total hours). An 88-hour budget with a single contributor cannot absorb 92 hours plus 12–20 hours of review/integration overhead, causing an immediate schedule slip past Day 11 into the 20% contingency buffer.
+- **Bounded Fix**: Either (a) re-scope $S$ to a maximum of 6 integration PRs (e.g., merging C+D contracts/schema in Wave 1 and Q-defects into baseline setup), or (b) formally lower estimated PR cycle times by enabling concurrent drafting on Mac Mini across decoupled paths while strictly keeping integration serialized.
+- **Closure Condition**: Recalculated capacity model proving that 9 PRs (or a compressed PR set) plus the 12–20h review overhead can be completed in $\le 88$ hours by 1 active builder, leaving Days 12–14 (21.4%) untouched.
+
+#### Finding 3 (P1): Scope S Retains Fragile Dependency on Uncharacterized Inbound Extraction
+- **Evidence**: `03-delivery.md` ("S: MUST-SHIP evaluation slice", para 2): *"Automated extraction is included only through an already authorized working adapter... S may ship manual receiving alone only if recorded as an approved Day3 descope within the selected S option."* vs `01-evidence.md`: No verified invoice extraction adapter was characterized or tested during discovery.
+- **Consequence**: Carrying automated extraction into $S$ as a default creates a Day 1–3 distraction on third-party OCR/parsing integration, threatening Wave 1 and Wave 2 deliveries.
+- **Bounded Fix**: Flip the default: explicitly baseline $S$ as *manual receiving only*. Make automated invoice/photo extraction an opt-in stretch slice admitted only if Wave 2 finishes ahead of schedule.
+- **Closure Condition**: `scope.csv` and `03-delivery.md` updated to classify automated intake extraction as DEFERRED in the Day-14 $S$ baseline.
+
+#### Finding 4 (P2): Candidate Staging Parity and Branch Protection Gaps
+- **Evidence**: `05-ci-tests.md` ("Safe integration path", para 1 & 2): *"Main auto-deploys... Verify actual Railway branch routing and disable unintended candidate production routing only with explicit authorization... candidate protections, queue... requires owner enablement"*.
+- **Consequence**: If candidate branch protections or Railway deploy isolation cannot be configured before Day 3, reviewed PRs will either sit unmerged or risk deploying candidate code to production infrastructure.
+- **Bounded Fix**: Designate a hard Gate 1 checkpoint requiring explicit proof of Railway deploy decoupling and candidate branch protection rules *before* W1 implementation branches are cut.
+- **Closure Condition**: Written confirmation in Gate 1 minutes of candidate branch isolation and verification that merges to `rebuild/integration` do not trigger production Railway deployments.
+
+#### Finding 5 (P2): Ambiguous Backup Storage Object Inventory vs Database Snapshot
+- **Evidence**: `02-architecture-data.md` ("Retention and transformation proposal", item 2): *"Existing Storage metadata is not the bytes. Restore into the approved recovery environment; prove private asset access and revoked access."*
+- **Consequence**: While the database restore rehearsal is well-specified, the object storage (Supabase Storage invoice photos/assets) restore procedure lacks a concrete validation script specification in `tests.csv`.
+- **Bounded Fix**: Add an explicit storage-object byte reconciliation check into EV-06/EV-12 ensuring bucket checksums and access policies match production before destructive testing.
+- **Closure Condition**: EV-06 in `tests.csv` updated to include object storage byte-level reconciliation metrics alongside database row counts.
+
+#### Finding 6 (P3): Unanchored Performance Baseline Budgets
+- **Evidence**: `05-ci-tests.md` ("Test/eval artifacts", provisional workload): Target budgets specified as *p95 ≤ 750ms search/cellar*, *p95 ≤ 1s receipt commit*.
+- **Consequence**: These budgets are speculative targets without historical baseline measurements from the existing codebase, creating a risk of false gate failures or arbitrary acceptance.
+- **Bounded Fix**: Clarify that Day 2 characterization tests (W0) must measure and record the *existing* system's latency on identical synthetic fixtures to calibrate the target thresholds.
+- **Closure Condition**: `tests.csv` EV-11 updated to require current-system baseline recording prior to enforcing target SLA gates.
+
+---
+
+### Summary Checklist Audit Against Governing Requirements
+
+| Requirement Item | Status | Notes |
+|---|---|---|
+| **14 Deliverables present** | **PASS** | Evidence, target architecture, scope, schedule, ownership, CI, tests, capacity, protocol, cleanup, docs, risks, availability, and GO/NO-GO verdict are explicitly structured. |
+| **Feasibility Arithmetic** | **DEFECT (P1)** | 60–92h work + 12–20h review exceeds 1-builder capacity (88h) across 11 days (Finding 2). |
+| **Ownership / Dependency Paths** | **PASS** | Disjoint path sets and single-owner wave assignments prevent merge collisions. |
+| **Production-Data Safety** | **PASS** | Strict containment: zero production data on Macs or general AWS; same-account/region restore only. |
+| **Single-Writer & Rollback** | **PASS** | Explicit point of no return identified; single-writer transaction enforced; dual write rejected. |
+| **Review Closure Authority** | **DEFECT (P1)** | External reviewer verification loop must be strictly separated from authoring artifacts (Finding 1). |
+| **Smaller Slice ($S$) Safety** | **PASS** | $S$ isolates evaluation from operational stock authority; manual fallback documented. |
+| **Honest Verdict** | **PASS** | Clear NO-GO for full 35-outcome restaurant rebuild; conditional GO for candidate $S$. |

@@ -1,0 +1,49 @@
+{
+  "hardware": {
+    "exit": 0,
+    "output": "Mac16,10\n17179869184\n10\n10\n10"
+  },
+  "memory": {
+    "exit": 0,
+    "output": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                   132964.\nPages active:                                 332278.\nPages inactive:                               253580.\nPages speculative:                             80367.\nPages throttled:                                   0.\nPages wired down:                             143486.\nPages purgeable:                                7671.\n\"Translation faults\":                      570141979.\nPages copy-on-write:                         8474938.\nPages zero filled:                         224272509.\nPages reactivated:                         133648384.\nPages purged:                                3707645.\nFile-backed pages:                            257862.\nAnonymous pages:                              408363.\nPages stored in compressor:                   515974.\nPages occupied by compressor:                  71544.\nDecompressions:                            142990586.\nCompressions:                              159013957.\nPageins:                                    20928242.\nPageouts:                                     250209.\nSwapins:                                    10197311.\nSwapouts:                                   11537615."
+  },
+  "swap": {
+    "exit": 0,
+    "output": "vm.swapusage: total = 4096.00M  used = 3096.44M  free = 999.56M  (encrypted)"
+  },
+  "uptime": {
+    "exit": 0,
+    "output": "16:36  up 1 day, 18:52, 1 user, load averages: 3.60 3.34 2.66"
+  },
+  "disk": {
+    "exit": 0,
+    "output": "Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s1   228Gi   151Gi    37Gi    81%    1.8M  391M    0%   /System/Volumes/Data"
+  },
+  "os": {
+    "exit": 0,
+    "output": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.2\nBuildVersion:\t\t25F84"
+  },
+  "process_counts": {
+    "node": 36,
+    "Chromium": 0,
+    "claude": 2,
+    "codex": 8,
+    "Docker": 0,
+    "OrbStack": 2
+  },
+  "cli_paths": {
+    "aws": null,
+    "ssh": "/usr/bin/ssh",
+    "agy": "/Users/zero/.local/bin/agy",
+    "claude": "/Users/zero/.local/bin/claude",
+    "codex": "/Users/zero/.nvm/versions/node/v24.18.0/bin/codex",
+    "gh": "/opt/homebrew/bin/gh",
+    "blacksmith": null,
+    "docker": "/Users/zero/.orbstack/bin/docker",
+    "supabase": "/opt/homebrew/bin/supabase",
+    "node": "/Users/zero/.nvm/versions/node/v24.18.0/bin/node",
+    "pnpm": "/opt/homebrew/bin/pnpm",
+    "codegraph": "/Users/zero/.nvm/versions/node/v24.18.0/bin/codegraph"
+  },
+  "ssh_host_aliases": []
+}

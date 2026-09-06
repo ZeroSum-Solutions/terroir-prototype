@@ -1,0 +1,54 @@
+## VERDICT
+
+**Package is substantially sound and honest in posture — but not approvable as-is.** The NO-GO on the full 35-outcome release is well supported and the safety architecture (no production data on Macs/AWS, no destructive work in the 14-day scope, no `zs-land`, protected candidate branch, first-post-cutover-write point of no return) is credible. However, the "Conditional GO" for slice **S** rests on capacity arithmetic that is internally inconsistent, and three structural gaps (restore-rehearsal critical path, review/landing authority collision, real-pilot data governance) are unresolved. **Recommend: NO-GO for S as scheduled; re-issue with F1–F4 closed. Gate 1 may still approve architecture, retention policy and Wave 0.**
+
+## PACKET LIMITATIONS (recorded, not findings)
+
+Supplied: START-HERE, 01–08, scope.csv, tests.csv. **Not supplied and therefore unverified:** `evidence/` (all six explorer tables, `ci/pr-cycle-statistics.json`, `cleanup-summary.md`), `dependency-graph.mmd`, `09-review.md`, `verification.json`. I cannot verify any repository SHA, CI median, PR-cycle sample, hardware measurement, model probe, or the claimed prior independent review. I cannot confirm the package was written to `docs/plans/<date>-terroir-rebuild/`. All findings below rest only on internal consistency of the supplied text. No author rebuttal was available.
+
+## FINDINGS
+
+**1. [P1] Capacity model multiplies WIP against single-builder productive hours; the adopted 9-PR plan is not supported by its own numbers.**
+Evidence: 03-delivery.md §Capacity calculation — "Eleven planned days ×8 productive hours/day=88 hours"; "At 2PR WIP and effective 12/16/24 productive hours per PR, upper bounds are 14/11/7 merges." 06-capacity.md §Measured capacity — "one builder on Mini is the capacity baseline"; MacBook "Unavailable for committed capacity."
+Defect: 88 h is a *single-stream productive-hour* budget. Multiplying by WIP=2 double-counts a builder who cannot author two PRs simultaneously. Divided correctly, 88 ÷ 12–24 h = **3.7–7.3 PRs**, below the adopted 9. Independently, the track table's own total (60–92 h) implies 6.7–10.2 h/PR across 9 PRs — below the 12/16/24 band used in the same section. And the upper estimate (92 h) exceeds the 88 h budget before any contingency.
+Consequence: the Conditional GO is issued against a capacity figure roughly 2× the supportable one; S predictably overruns into buffer by Day 7–8, and the deadline verdict is not honest as stated.
+Fix: restate Little's law with elapsed hours in the numerator or drop the WIP multiplier; publish one unit (productive hours). Re-derive the PR count from the corrected bound and reduce S (manual-receipt-only fallback is already specified in 03-delivery.md §S).
+Closure: revised §Capacity where PR count ≤ (available productive hours ÷ low-end per-PR hours), and total track hours ≤ available hours at the *high* estimate, with staffing hours confirmed by the owner.
+
+**2. [P1] The restore rehearsal sits on Day 11 of the critical path and depends on infrastructure with explicitly unbounded lead time and no fallback.**
+Evidence: 03-delivery.md §Days and waves, Day 11 "W5 protected restore rehearsal … Gate2 readiness"; 03-delivery.md §Estimated tracks "External approval lead time is unbounded until verified"; 02-architecture-data.md §Environments — recovery environment requires "Owner-approved destination and access"; 01-evidence.md conflict 2 — the only drill is a historical Aug 22 PASS.
+Consequence: if owner provisioning of the recovery environment slips past ~Day 8, Gate 2 cannot be met inside 14 days, and buffer Days 12–14 (Day 14 also holds the owner Gate 2 decision) cannot absorb it. Day-3 fallbacks in 06-capacity.md cover AWS/MacBook/Blacksmith/queue but **not** the recovery environment.
+Fix: move recovery-environment provisioning and a first restore attempt to Wave 0/Day 1–3 as a hard prerequisite; add an explicit Day-3 fallback (rehearsal unavailable → S ships as synthetic demonstration, deadline NO-GO) mirroring the existing Day-3 rule.
+Closure: schedule shows rehearsal start ≤ Day 5 with a named owner-provisioning date, plus a written fallback branch.
+
+**3. [P1] Track C authors, integrates, holds LAND-GO and owns the state ledger; no non-author findings-ledger owner is named for C- or Q-authored slices.**
+Evidence: 04-ownership.md — C owns contracts *and* "repository state ledger"; PRs 1,2,4,8,9 are authored by C or Q. 05-ci-tests.md — "One integrator locks landing… LAND-GO requires… explicit integration authority." 07-protocol.md — "Non-author Q/ledger steward consolidates findings"; "Authors may respond with evidence but may not close their own findings."
+Consequence: for the 5 of 9 PRs authored by C or Q, the findings steward is the author, and C effectively self-lands. This breaks the governing requirement's closure-authority rule at exactly the contract/schema boundary where cross-tenant defects would appear.
+Fix: name a steward per authoring track (e.g. D stewards C/Q slices, Q stewards D/R/U/O), and separate LAND-GO authority from authorship — the integrator may not land a PR they authored.
+Closure: 07-protocol.md table mapping every planned PR → author, steward, lander, with no cell repeating the author.
+
+**4. [P1] Real pilot data is admitted to the candidate environment with no classification, region/account constraint, backup, retention or deletion plan.**
+Evidence: 02-architecture-data.md §Environments — candidate is "synthetic or demonstrably anonymized… new pilot accounts only after Gate2. Real pilot data subsequently treated as production-sensitive"; §Retention covers only *existing* environments. START-HERE §Decision options — S includes "reviewed manual/invoice receipt" for a named business/venue.
+Consequence: real invoices, supplier terms and staff identities land in a project provisioned as a test environment, with no stated backup, no retention clock, no deletion path if the pilot is abandoned, and no approved account/region — a data-handling exposure the plan otherwise guards carefully for production.
+Fix: extend §Environments and §Retention to the pilot: named account/region, encrypted backup, retention window, deletion-on-abandon procedure, and Gate 2 checklist rows for each.
+Closure: Gate 2 checklist contains pilot-data backup/retention/deletion items with a named owner.
+
+**5. [P2] Production data classification was not performed and it is not recorded whether inspection was attempted or blocked.**
+Evidence: 02-architecture-data.md §Environments — "treat as sensitive until classified"; "No payment-card need is identified; verify schema/asset classification rather than asserting payment data is absent." 01-evidence.md — "This turn verified local code only."
+Consequence: the governing requirement mandates classification; Gate 1 is asked to approve a retention policy over data of unknown class. Fix: record explicitly what access was attempted, what was refused, and what authorization the classification requires. Closure: an access-attempt log plus either the classification or a named blocker.
+
+**6. [P2] The six required explorer tables are absent from the package and the substitute table lacks the mandated Confidence column.**
+Evidence: START-HERE.md links "[Evidence and conflicts](01-evidence.md), including six explorer tables"; 01-evidence.md — "The six summary tables in `evidence/`"; its own table is Finding | Current evidence | Planning implication. Consequence: no reviewer can weigh claims by confidence or audit the ≤800-word bound. Fix: inline the six tables in `Claim | Evidence | Confidence | Effect on plan` form. Closure: six tables present, each with a resolving path/line or command result.
+
+**7. [P2] The known CI failure has no owner under the file-ownership matrix, and ledger-mediated path delegation contradicts the disjointness rule.**
+Evidence: 03-delivery.md Day 2 — "current CI defect repro… CI defect fixed"; 01-evidence.md — "one 390px insights failure"; 04-ownership.md — Q's set is "no business implementation"; insights routes belong to P (deferred, unassigned); "C temporarily delegates exact root test-config paths through ledger" vs. "Shared ownership is forbidden within a wave." Consequence: PR1 either stalls or is landed by an owner outside their file set. Fix: assign the insights fix to a named owner (or descope the test with a logged requirement decision) and replace delegation with a formal single-owner transfer recorded before the wave opens. Closure: PR1 owner named with its exact file list.
+
+**8. [P2] "Demonstrably anonymized" candidate fixtures have no defined anonymization pipeline, executor or validation.**
+Evidence: 02-architecture-data.md §Environments (candidate row); §Retention step 4 permits real-source rehearsal "in approved recovery boundary only" but does not bind the anonymized-fixture export path. Consequence: production-derived rows could leave the approved boundary under an unverified anonymization claim. Fix: require anonymization to execute inside the recovery boundary, with a re-identification check and only the transformed artifact exported, or forbid anonymized data entirely and use synthetic fixtures only (S needs no backfill). Closure: named procedure + validation test, or an explicit synthetic-only rule.
+
+**9. [P3] Runner-minute and full-suite cost bases are optimistic.**
+Evidence: 03-delivery.md — "18 gates… about 107.6 Blacksmith runner-minutes"; full-suite figure uses "21.475-minute median among eight noncancelled failures." Assumes one run per PR despite a planned fix round, and prices passing runs from failing-run timings. Fix: add a retry factor and re-baseline once a full run passes. Closure: cost table with stated runs-per-PR assumption ≥2.
+
+## NOT FINDINGS (suspicion without support)
+
+The Gate 2 checklist, cutover/rollback design, single-stock-writer rule, dead-code five-bucket proof rule, protocol/adapter drift check and AWS safeguard script contracts appear complete and consistent; I found no defect in them from the supplied text. AWS arithmetic ($14.73 / $30.73) and the derived rates (19.1 merges/hour; 14/11/7; 0.82 and 2.0–2.73 PR/day; 21.4% contingency) check out. Whether the *inputs* are real is unverifiable here.

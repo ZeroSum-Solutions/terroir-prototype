@@ -1,0 +1,38 @@
+{
+  "requested_model": "claude-fable-5-1",
+  "reported_models": [],
+  "effort": "high",
+  "harness": "Claude Code Max OAuth; API-key env removed",
+  "session_id": "c65856ac-1bec-4869-84a8-c23f49f7b94f",
+  "resumed_session": null,
+  "packet_sha256": "14fbab4a9ed74b170bd7302bee239d05f82864bb6f8db192db26ceb28edb42c1",
+  "output_sha256": "4abf7b825f897267abfffcf8537976d04092e5ac09a5d74c481af4cf68e43b21",
+  "exit": 1,
+  "status": "success",
+  "is_error": true,
+  "seconds": 1.27,
+  "usable_response": false,
+  "usage": {
+    "output_tokens_details": {
+      "thinking_tokens": 0
+    },
+    "input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 0,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [],
+    "speed": "standard"
+  },
+  "model_usage": {},
+  "api_cost_estimate_not_subscription_invoice": 0
+}

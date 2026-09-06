@@ -1,0 +1,14 @@
+{
+  "requested_model": "gemini-3.8-flash-high",
+  "reported_models": [],
+  "harness": "Antigravity agy",
+  "session_id": "a2c98f83-1448-4a38-bebd-947f8073c969",
+  "original_session_id": "a2c98f83-1448-4a38-bebd-947f8073c969",
+  "fresh_session": false,
+  "purpose": "original finder closes bounded correction",
+  "packet_sha256": "8780e70c4ebb179aa11467f4a1ac967f630f094b058fc8a2b235cf8cf2dfece8",
+  "exit": 0,
+  "status": "SUCCESS",
+  "has_response": true,
+  "seconds": 21
+}

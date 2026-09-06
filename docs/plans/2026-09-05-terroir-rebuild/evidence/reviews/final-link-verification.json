@@ -1,0 +1,598 @@
+{
+  "schema_version": 1,
+  "verification_kind": "hash-scoped link and table recheck only; not model finding closure or approval",
+  "started_at": "2026-09-06T00:14:31.348903+00:00",
+  "completed_at": "2026-09-06T00:14:31.357579+00:00",
+  "package": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild",
+  "previous_structural_manifest_sha256": "5aa96752da8c9e825bd4ccd395981913a5fe47ee4b9bab1f9b9603f80e6541ec",
+  "package_manifest_sha256": "6a800d8dc2e943cbf7d3c44dd9bfb18dd5370fd1c4d37b452de7a2e217f836d8",
+  "file_hashes_start": {
+    "01-evidence.md": "457cdf0c2803eece9e7c873d34a3aa13c5bd8330b9e8905eda09e51d9503556e",
+    "02-architecture-data.md": "958fb3b6b082591280f70c63a779759584da93d5d72c2af5081450f9377ef94e",
+    "03-delivery.md": "236f0ee45ccd17abdbe1eb4aa2fb740f9176412427e6c14550c6e94ddae90126",
+    "04-ownership.md": "c4eceb0286ae192363f8c4a617560d7704eacfc04a0ed5297feb197821d7868a",
+    "05-ci-tests.md": "8b56b2d97c33df6fa4d3d44fbf50f9c6119ef94e6d58234eaf93b9ecca17f55c",
+    "06-capacity.md": "a1be5c0dd8334ca36ed6825344334f0ccdc225848f72e66669fdea2235b8cb58",
+    "07-protocol.md": "def484effff477d59923b2424251c7c3ea333ed2f1f05439313cd278b086b088",
+    "08-risks-cleanup.md": "9234ca324fac3eb5e62b834e3c9d6cf865a5d717f3738e0f1303c9042c3c1045",
+    "09-review.md": "02ce0a59933e77d21c4085122c31069eaa9f259b21ec1fdebd70a9ac315d3a45",
+    "START-HERE.md": "18fdd8461be0fd85775a207acb311704e5cc75b2d2d453abb246d324a3866e68",
+    "database-dispositions.csv": "d34a1b1def76b780e4463493f825ea789e8db664d8b1bc7dcae1b44e1b7f819c",
+    "dependency-edges.json": "4091bd96e0ab92086b7996f0b845a0be8ddd010a4db42e9e3e87ce32a52c8338",
+    "dependency-graph.mmd": "6d489da809468c0e699342581ae95829e25bf49bb508bc93ed3bfac43394fccb",
+    "evidence/architecture-summary.md": "aa49a3e4bcacadb258cab5226e819882a76052b247c46cdd1af77ebcb65eaa49",
+    "evidence/ci/branch-rules.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/git-branches.txt": "3aa239726c936a6943859ea33980adefbf4fee31959e3b89b6ebd2049ec5b6af",
+    "evidence/ci/git-worktrees.txt": "163540e6d6a35dadcb36ee735eb8dfac82f81b2b1ecc0ec8d1bc294c30026ec7",
+    "evidence/ci/guarded-e2e-files.json": "4c3e990e0977ddabf96f5d6505e8e9d87a51a21f675ff64a2b324fc4eacdc24e",
+    "evidence/ci/merge-queue.json": "befa607ae1486cbc47ea791878eb06e4e0d80c41af74eef6f375f6c164860238",
+    "evidence/ci/merged-pr-cycles.json": "9d9b3eca472cf3887b6e11b9f4555d2cfb7f85f74b706ab0aa2b1f31ca540544",
+    "evidence/ci/open-prs.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/owned-territory.json": "5230ccfd5d1b8b68bc57d9b95f3e14c37b3bab0892fc1ce82bee7661083fefbc",
+    "evidence/ci/pr-cycle-statistics.json": "c71f6a58a8ead7f7bf5a7cd73cb69be97cb903366beac2bf94148a901b7d58b0",
+    "evidence/ci/protection.json": "24a4bfa652f8f76ffce3c72b6c7f953c5751630a685b3878ca5c5233dee1e521",
+    "evidence/ci/repository-capabilities.json": "a7641787bc5967ba3e7afde2d0a6e74b11193a040ff0cc1b403735a0bc004700",
+    "evidence/ci/rulesets.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/sample.json": "d97d47c17560f9595b3f695962a332005a45bbfc77d659729b09f14f2c636724",
+    "evidence/ci/statistics.json": "16ef9b3c0a2c52552c3c041258864f8ca8afe3b044c456fef4153799499ae747",
+    "evidence/ci-summary.md": "33f6239037aba55dd377b691c0f7cd74529e6e35397eaa0549f69a5c7909a0ca",
+    "evidence/claude-lane-smoke.json": "6eda3e3ad2ad91a5f12b1f99afda10a1e2d0c4bde05f76337b9412e3d835c6c9",
+    "evidence/cleanup-summary.md": "f229f3a04c1ead54929ce9087cdb46e23a3c7db2543686dd148178a006929b43",
+    "evidence/database-summary.md": "e7233b02bdefa13aaf60e3476bdd3561d904120bb27ac8892f227606f4cd1f5d",
+    "evidence/focused-test-selection.md": "55278e44bf62aa0e72c857f7865d00c4d37595da1a8813b323ab9047520dc0ed",
+    "evidence/gemini-lane-smoke.json": "8bf321e14269745aa1efe52a974f79878790265b62aab864a05aa6a7890ec890",
+    "evidence/git-refs.json": "3b0270f408235cda511c380ab19b7751ab4dffb9486961613a47dc81db9ce5f1",
+    "evidence/harness-evidence.md": "14e6c86ec84aa11ca1b5e16b4c7d69f59512a429f1fb1e4eb4620d60381d7bd9",
+    "evidence/journeys-summary.md": "c13b3436735c682e1b654121061615476e87e463ae1f73e552e3bf414c754e9c",
+    "evidence/local-capacity.json": "f46c3c34c48a5109e73f46855d138d2dce3c0b965a58e3cccaee714ba8e092e1",
+    "evidence/prior-database-contracts.md": "c563e1b932afc14037c12dbf61bf8375e026331e7ce6184fae544f227cefdbde",
+    "evidence/prior-product-decisions.json": "2891c1ed81fe636874593277fdc42406e898628d4e70e33121ea79f6fdca0e65",
+    "evidence/sol-lane-smoke.json": "c510993b84b475cf28c83c5323cd971813882cdf3c39eb21f0a8f1c1f2be4ffe",
+    "evidence/tooling-availability.json": "f05583c3ba902bd57b7aa7a1da129a675733320de323b533bc4f973ce6f84c38",
+    "scope.csv": "3ac45c28a8838d95038ec0de8443813c260ea7494734eb1f73dc4249954578b0",
+    "tests.csv": "2c744cb71eb7bd28038508ea9d699df129a95095946657c86f4dabba99a88569",
+    "verification.json": "79aa4109e130bcb7dc4916459927df5e04e4610852ef7c1cca7248008daf2012"
+  },
+  "file_hashes_end": {
+    "01-evidence.md": "457cdf0c2803eece9e7c873d34a3aa13c5bd8330b9e8905eda09e51d9503556e",
+    "02-architecture-data.md": "958fb3b6b082591280f70c63a779759584da93d5d72c2af5081450f9377ef94e",
+    "03-delivery.md": "236f0ee45ccd17abdbe1eb4aa2fb740f9176412427e6c14550c6e94ddae90126",
+    "04-ownership.md": "c4eceb0286ae192363f8c4a617560d7704eacfc04a0ed5297feb197821d7868a",
+    "05-ci-tests.md": "8b56b2d97c33df6fa4d3d44fbf50f9c6119ef94e6d58234eaf93b9ecca17f55c",
+    "06-capacity.md": "a1be5c0dd8334ca36ed6825344334f0ccdc225848f72e66669fdea2235b8cb58",
+    "07-protocol.md": "def484effff477d59923b2424251c7c3ea333ed2f1f05439313cd278b086b088",
+    "08-risks-cleanup.md": "9234ca324fac3eb5e62b834e3c9d6cf865a5d717f3738e0f1303c9042c3c1045",
+    "09-review.md": "02ce0a59933e77d21c4085122c31069eaa9f259b21ec1fdebd70a9ac315d3a45",
+    "START-HERE.md": "18fdd8461be0fd85775a207acb311704e5cc75b2d2d453abb246d324a3866e68",
+    "database-dispositions.csv": "d34a1b1def76b780e4463493f825ea789e8db664d8b1bc7dcae1b44e1b7f819c",
+    "dependency-edges.json": "4091bd96e0ab92086b7996f0b845a0be8ddd010a4db42e9e3e87ce32a52c8338",
+    "dependency-graph.mmd": "6d489da809468c0e699342581ae95829e25bf49bb508bc93ed3bfac43394fccb",
+    "evidence/architecture-summary.md": "aa49a3e4bcacadb258cab5226e819882a76052b247c46cdd1af77ebcb65eaa49",
+    "evidence/ci/branch-rules.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/git-branches.txt": "3aa239726c936a6943859ea33980adefbf4fee31959e3b89b6ebd2049ec5b6af",
+    "evidence/ci/git-worktrees.txt": "163540e6d6a35dadcb36ee735eb8dfac82f81b2b1ecc0ec8d1bc294c30026ec7",
+    "evidence/ci/guarded-e2e-files.json": "4c3e990e0977ddabf96f5d6505e8e9d87a51a21f675ff64a2b324fc4eacdc24e",
+    "evidence/ci/merge-queue.json": "befa607ae1486cbc47ea791878eb06e4e0d80c41af74eef6f375f6c164860238",
+    "evidence/ci/merged-pr-cycles.json": "9d9b3eca472cf3887b6e11b9f4555d2cfb7f85f74b706ab0aa2b1f31ca540544",
+    "evidence/ci/open-prs.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/owned-territory.json": "5230ccfd5d1b8b68bc57d9b95f3e14c37b3bab0892fc1ce82bee7661083fefbc",
+    "evidence/ci/pr-cycle-statistics.json": "c71f6a58a8ead7f7bf5a7cd73cb69be97cb903366beac2bf94148a901b7d58b0",
+    "evidence/ci/protection.json": "24a4bfa652f8f76ffce3c72b6c7f953c5751630a685b3878ca5c5233dee1e521",
+    "evidence/ci/repository-capabilities.json": "a7641787bc5967ba3e7afde2d0a6e74b11193a040ff0cc1b403735a0bc004700",
+    "evidence/ci/rulesets.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/sample.json": "d97d47c17560f9595b3f695962a332005a45bbfc77d659729b09f14f2c636724",
+    "evidence/ci/statistics.json": "16ef9b3c0a2c52552c3c041258864f8ca8afe3b044c456fef4153799499ae747",
+    "evidence/ci-summary.md": "33f6239037aba55dd377b691c0f7cd74529e6e35397eaa0549f69a5c7909a0ca",
+    "evidence/claude-lane-smoke.json": "6eda3e3ad2ad91a5f12b1f99afda10a1e2d0c4bde05f76337b9412e3d835c6c9",
+    "evidence/cleanup-summary.md": "f229f3a04c1ead54929ce9087cdb46e23a3c7db2543686dd148178a006929b43",
+    "evidence/database-summary.md": "e7233b02bdefa13aaf60e3476bdd3561d904120bb27ac8892f227606f4cd1f5d",
+    "evidence/focused-test-selection.md": "55278e44bf62aa0e72c857f7865d00c4d37595da1a8813b323ab9047520dc0ed",
+    "evidence/gemini-lane-smoke.json": "8bf321e14269745aa1efe52a974f79878790265b62aab864a05aa6a7890ec890",
+    "evidence/git-refs.json": "3b0270f408235cda511c380ab19b7751ab4dffb9486961613a47dc81db9ce5f1",
+    "evidence/harness-evidence.md": "14e6c86ec84aa11ca1b5e16b4c7d69f59512a429f1fb1e4eb4620d60381d7bd9",
+    "evidence/journeys-summary.md": "c13b3436735c682e1b654121061615476e87e463ae1f73e552e3bf414c754e9c",
+    "evidence/local-capacity.json": "f46c3c34c48a5109e73f46855d138d2dce3c0b965a58e3cccaee714ba8e092e1",
+    "evidence/prior-database-contracts.md": "c563e1b932afc14037c12dbf61bf8375e026331e7ce6184fae544f227cefdbde",
+    "evidence/prior-product-decisions.json": "2891c1ed81fe636874593277fdc42406e898628d4e70e33121ea79f6fdca0e65",
+    "evidence/sol-lane-smoke.json": "c510993b84b475cf28c83c5323cd971813882cdf3c39eb21f0a8f1c1f2be4ffe",
+    "evidence/tooling-availability.json": "f05583c3ba902bd57b7aa7a1da129a675733320de323b533bc4f973ce6f84c38",
+    "scope.csv": "3ac45c28a8838d95038ec0de8443813c260ea7494734eb1f73dc4249954578b0",
+    "tests.csv": "2c744cb71eb7bd28038508ea9d699df129a95095946657c86f4dabba99a88569",
+    "verification.json": "79aa4109e130bcb7dc4916459927df5e04e4610852ef7c1cca7248008daf2012"
+  },
+  "changes_since_structural_check": [
+    {
+      "file": "01-evidence.md",
+      "previous_sha256": "666adecb971cf0578b9cd08118e98f29a9375f22ff3a7f753d23e8e104ca215b",
+      "current_sha256": "457cdf0c2803eece9e7c873d34a3aa13c5bd8330b9e8905eda09e51d9503556e"
+    },
+    {
+      "file": "02-architecture-data.md",
+      "previous_sha256": "61589097495fa7d982af2e8bb699a8623a425a242f7570e0f9829d40f89cf82d",
+      "current_sha256": "958fb3b6b082591280f70c63a779759584da93d5d72c2af5081450f9377ef94e"
+    },
+    {
+      "file": "03-delivery.md",
+      "previous_sha256": "fc2535f74bdb3a866e414374a0fe0acda795db24ce408b06b0f21c6437a049f0",
+      "current_sha256": "236f0ee45ccd17abdbe1eb4aa2fb740f9176412427e6c14550c6e94ddae90126"
+    },
+    {
+      "file": "04-ownership.md",
+      "previous_sha256": "ffce53093839455f5f45208c9f58d8230b594a755f60bd188ca8cfb1ed8cbb55",
+      "current_sha256": "c4eceb0286ae192363f8c4a617560d7704eacfc04a0ed5297feb197821d7868a"
+    },
+    {
+      "file": "05-ci-tests.md",
+      "previous_sha256": "ebf4998cc46ee70a0daf8d6ebdec9acce6361e7e033f7a0095ee0c3c37eb94ca",
+      "current_sha256": "8b56b2d97c33df6fa4d3d44fbf50f9c6119ef94e6d58234eaf93b9ecca17f55c"
+    },
+    {
+      "file": "06-capacity.md",
+      "previous_sha256": "21b915c3e0661e96c05db1f5a046fb8b936b14c19792e36b41802969e24a40e9",
+      "current_sha256": "a1be5c0dd8334ca36ed6825344334f0ccdc225848f72e66669fdea2235b8cb58"
+    },
+    {
+      "file": "07-protocol.md",
+      "previous_sha256": "39cb51da3bd5627efe4f27ffe97aca94b88be76c92017f019eac8421124ecf24",
+      "current_sha256": "def484effff477d59923b2424251c7c3ea333ed2f1f05439313cd278b086b088"
+    },
+    {
+      "file": "08-risks-cleanup.md",
+      "previous_sha256": "07221b945d277c9835523a8269d0289e562df1516e90050b050189e51a588d27",
+      "current_sha256": "9234ca324fac3eb5e62b834e3c9d6cf865a5d717f3738e0f1303c9042c3c1045"
+    },
+    {
+      "file": "evidence/ci-summary.md",
+      "previous_sha256": "d54559124033f266c023e650074fcd13b8f0169980ab23b0bef2ea5a2e0b01e6",
+      "current_sha256": "33f6239037aba55dd377b691c0f7cd74529e6e35397eaa0549f69a5c7909a0ca"
+    },
+    {
+      "file": "evidence/ci/sample.json",
+      "previous_sha256": null,
+      "current_sha256": "d97d47c17560f9595b3f695962a332005a45bbfc77d659729b09f14f2c636724"
+    },
+    {
+      "file": "evidence/focused-test-selection.md",
+      "previous_sha256": null,
+      "current_sha256": "55278e44bf62aa0e72c857f7865d00c4d37595da1a8813b323ab9047520dc0ed"
+    }
+  ],
+  "checks": [
+    {
+      "check": "current_local_markdown_links_resolve",
+      "status": "PASS",
+      "count": 28,
+      "missing": []
+    },
+    {
+      "check": "local_markdown_links_stay_inside_package",
+      "status": "PASS",
+      "external_package_links": []
+    },
+    {
+      "check": "six_evidence_tables_at_most_800_words_and_exact_header",
+      "status": "PASS",
+      "tables": [
+        {
+          "file": "evidence/database-summary.md",
+          "sha256": "e7233b02bdefa13aaf60e3476bdd3561d904120bb27ac8892f227606f4cd1f5d",
+          "words": 568,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/architecture-summary.md",
+          "sha256": "aa49a3e4bcacadb258cab5226e819882a76052b247c46cdd1af77ebcb65eaa49",
+          "words": 552,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/ci-summary.md",
+          "sha256": "33f6239037aba55dd377b691c0f7cd74529e6e35397eaa0549f69a5c7909a0ca",
+          "words": 627,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/cleanup-summary.md",
+          "sha256": "f229f3a04c1ead54929ce9087cdb46e23a3c7db2543686dd148178a006929b43",
+          "words": 582,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/journeys-summary.md",
+          "sha256": "c13b3436735c682e1b654121061615476e87e463ae1f73e552e3bf414c754e9c",
+          "words": 550,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/harness-evidence.md",
+          "sha256": "14e6c86ec84aa11ca1b5e16b4c7d69f59512a429f1fb1e4eb4620d60381d7bd9",
+          "words": 590,
+          "within_800": true,
+          "exact_header_present": true
+        }
+      ]
+    },
+    {
+      "check": "snapshot_stable",
+      "status": "PASS",
+      "files_changed_during_check": []
+    }
+  ],
+  "result_counts": {
+    "PASS": 4
+  },
+  "links": [
+    {
+      "from": "01-evidence.md",
+      "line": 13,
+      "target": "https://github.com/ZeroSum-Solutions/terroir/actions/runs/33962752544",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "02-architecture-data.md",
+      "line": 37,
+      "target": "database-dispositions.csv",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "05-ci-tests.md",
+      "line": 9,
+      "target": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request-with-a-merge-queue?tool=webui",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "05-ci-tests.md",
+      "line": 33,
+      "target": "https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "05-ci-tests.md",
+      "line": 33,
+      "target": "https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "05-ci-tests.md",
+      "line": 33,
+      "target": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 19,
+      "target": "https://aws.amazon.com/ec2/instance-types/c7i/",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 27,
+      "target": "https://aws.amazon.com/ebs/pricing/?nc=nsb&pg=faq",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 29,
+      "target": "https://www.blacksmith.sh/pricing",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 33,
+      "target": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 33,
+      "target": "https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-instance-permissions.html",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "06-capacity.md",
+      "line": 37,
+      "target": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/UsingAlarmActions.html",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 37,
+      "target": "01-evidence.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/01-evidence.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 38,
+      "target": "02-architecture-data.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 38,
+      "target": "database-dispositions.csv",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 39,
+      "target": "03-delivery.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/03-delivery.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 39,
+      "target": "scope.csv",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/scope.csv",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 40,
+      "target": "04-ownership.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/04-ownership.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 40,
+      "target": "dependency-graph.mmd",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/dependency-graph.mmd",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 41,
+      "target": "05-ci-tests.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 41,
+      "target": "tests.csv",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/tests.csv",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 42,
+      "target": "06-capacity.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/06-capacity.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 43,
+      "target": "07-protocol.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/07-protocol.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 44,
+      "target": "08-risks-cleanup.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/08-risks-cleanup.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 45,
+      "target": "09-review.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/09-review.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "START-HERE.md",
+      "line": 45,
+      "target": "verification.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/verification.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 3,
+      "target": "ci/sample.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/sample.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 4,
+      "target": "ci/statistics.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/statistics.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 5,
+      "target": "ci/merged-pr-cycles.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merged-pr-cycles.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 6,
+      "target": "focused-test-selection.md",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/focused-test-selection.md",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 7,
+      "target": "https://github.com/ZeroSum-Solutions/terroir/actions/runs/33962752544",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 10,
+      "target": "ci/protection.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/protection.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/ci-summary.md",
+      "line": 11,
+      "target": "ci/merge-queue.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merge-queue.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 3,
+      "target": "ci/git-worktrees.txt",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-worktrees.txt",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 3,
+      "target": "ci/open-prs.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/open-prs.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 4,
+      "target": "ci/owned-territory.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/owned-territory.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 5,
+      "target": "ci/git-branches.txt",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-branches.txt",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 5,
+      "target": "ci/merged-pr-cycles.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merged-pr-cycles.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 10,
+      "target": "ci/repository-capabilities.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/repository-capabilities.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 10,
+      "target": "ci/merge-queue.json",
+      "kind": "local",
+      "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merge-queue.json",
+      "exists": true,
+      "outside_package": false
+    },
+    {
+      "from": "evidence/harness-evidence.md",
+      "line": 10,
+      "target": "https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-a-pull-request-with-a-merge-queue",
+      "kind": "web",
+      "syntax_valid": true,
+      "HTTP_verified": false
+    }
+  ],
+  "limitations": [
+    "Other structural checks were not repeated; their scope and file hashes are in structural-verification.json.",
+    "No external HTTP status or source semantics checked.",
+    "Subsequently added review records and links require root final packaging validation.",
+    "No model findings closed; root owns final packaging manifest."
+  ],
+  "author_reported_change_scope": {
+    "source": "root agent message after link-check snapshot",
+    "statement": "Top-level Markdown changes since structural check normalize presentation spacing only; root reports no semantic, path or figure changes and raw review outputs retained verbatim.",
+    "verification_note": "Current hashes recorded; this bounded recheck does not independently close substantive/model findings."
+  }
+}

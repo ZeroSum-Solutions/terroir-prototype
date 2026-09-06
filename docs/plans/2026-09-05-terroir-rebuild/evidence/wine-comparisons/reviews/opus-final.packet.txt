@@ -1,0 +1,100 @@
+Targeted closure only. Your previous review accepted the architecture/evidence/gates and left wording/recordkeeping corrections. Verify these exact replacements and qualified finding IDs close those remaining findings. Do not repeat a general research audit. Return JSON verdict AGREE or REVISE, findings (empty if closed), agreement_scope, max200 words. No forced agreement: flag an incorrectly applied correction. Root confirms these are the ONLY changes to your previously read document/matrix, with the matrix unchanged. Final document digest below binds the amended artifact, not an implementation acceptance.
+DRAFT SHA256 de66e52db6457cfe1f8ab8e34eaa24f02f23f7a476c5e7464dd8f0a1dd09f411
+EXACT REPLACEMENT LINES
+| Regional vintage comparison | Compare harvest-year conditions within a region or explicitly compare matched region/year contexts | Rainfall timing, temperature/heat, radiation, source coverage and attributed vintage assessments; sunshine duration only after source verification |
+AI-2 records provenance and repeat occasions without adding a new business taste-profile contract. AI-3 now explicitly includes **choose comparison mode → compare wines/producers/vintages → choose → feedback** journeys, using exact catalog relationships or the appropriate structured baseline before optional embeddings. The supplemental matrix is authoritative for reused-outcome mappings, including E-005/E-024/E-025/E-027/E-046 across producer/origin navigation. Exact same-producer and same-region browsing are non-AI catalog outcomes and do not wait for AI-3 admission; the concierge can expose those same capabilities later. Any pilot inclusion requires a separate explicit scope decision. Related-producer comparison remains in AI-3; regional vintage comparisons require their catalog/weather/source-rights contracts and are separately estimated outcomes, not a cost-free addition. Weather-derived taste prediction is not promised. AI-4's passage retrieval remains distinct. AI-6 owns learned behavioral similarities and metric-learning challengers if warranted by evidence. This clarifies the proposed AI work and the existing non-AI catalog outcomes it reuses; it grants no approval, pilot admission or Day-14 estimate.
+QUALIFIED FINDINGS
+[
+  {
+    "finding": "Opus refinement F1",
+    "disposition": "Qualified: synthetic/public trials distinct from live-user and profile-derived data; not every parsing prompt is necessarily private."
+  },
+  {
+    "finding": "Opus refinement F2",
+    "disposition": "Reject unsupported inference that inspectable logs prove raw prompt retention; accept written tier/retention/training/deletion determination as private-data precondition."
+  },
+  {
+    "finding": "Opus refinement F3",
+    "disposition": "Accept coverage census and abstention gating; add explicit proposed 80% representative-query feasibility floor for ratification, never a benchmark result."
+  },
+  {
+    "finding": "Opus refinement F4",
+    "disposition": "Accept named planning owners and independent labeling/overlap agreement protocol; participants not claimed recruited."
+  },
+  {
+    "finding": "Opus refinement F5 / Fable refinement F4",
+    "disposition": "Accept separate ingest, extract/embed/store, audience/display, retention rights."
+  },
+  {
+    "finding": "Opus refinement F6",
+    "disposition": "Specify constrained-set exact-scan fallback; measured eligible-size/latency gate, no unsupported numeric capacity guarantee."
+  },
+  {
+    "finding": "Opus refinement F7 / Fable refinement F3",
+    "disposition": "Point-in-time index/catalog conclusion, live authenticated capability gate, account credit mechanics unverified beyond local dashboard balance."
+  },
+  {
+    "finding": "Fable refinement F1",
+    "disposition": "Qualified: permit generic cuvee layer only if source claim is intentionally cuvee-general, with precedence/provenance. Unknown-year tasting is not generic; NV distinct. Reject unmeasured assertion that most editions lack coverage."
+  },
+  {
+    "finding": "Fable refinement F2",
+    "disposition": "Accept author/normalized/inferred origin, model/prompt/schema revisions and sample extraction accuracy gate."
+  },
+  {
+    "finding": "Opus closure G1",
+    "disposition": "Accepted: freeze population/query sampling, mode and coverage definitions before census; sensory query answerability and edition trait coverage recorded separately. Proposed floor explicitly means at least one qualified candidate and remains unmeasured."
+  },
+  {
+    "finding": "Opus closure G2",
+    "disposition": "Accepted: development/schema/extraction reviewers and final acceptance labelers disjoint; samples separate and final labels held out."
+  },
+  {
+    "finding": "Opus closure G3",
+    "disposition": "Accepted: all recruitment future/proposed; no completed recruitment claimed."
+  },
+  {
+    "finding": "User expanded similarity dimensions",
+    "disposition": "Added same and related producers, grape origin/appellation, region/harvest-year weather context, multi-dimensional sensory schema and four bounded sensory studies. Mode-specific retrieval, independent liking evaluation and no weather-to-taste shortcut."
+  },
+  {
+    "finding": "Opus expanded H1",
+    "disposition": "Rejected after primary publisher verification: Torri abstract explicitly describes Italian red wines; Wine samples states eleven wines. Retain 11 Italian reds. Reviewer packet omitted color in one sample subfield, but main source and other fields included it."
+  },
+  {
+    "finding": "Opus expanded H2 / Fable expanded F1",
+    "disposition": "Qualified: full 2018 review explicitly calls berry sugar response non-linear, so evidence exists. Narrowed draft to sugar responses varying with severity for precision."
+  },
+  {
+    "finding": "Opus expanded H3",
+    "disposition": "Not a factual error in the reported null correlation. Added positive astringency correlation at 100 inverse seconds and six-formulation scope to give fuller context."
+  },
+  {
+    "finding": "Opus expanded H4",
+    "disposition": "Accepted clarification: no sunshine-duration candidate source verified; field unavailable until source/variable verification."
+  },
+  {
+    "finding": "Opus expanded H5",
+    "disposition": "Body list was a subset, not a contradictory mapping. Marked matrix authoritative and expanded indicative catalog list."
+  },
+  {
+    "finding": "Opus expanded H6",
+    "disposition": "Accepted: non-sensory mode coverage/accuracy criteria not proposed; ratify before estimating/admitting these outcomes; sensory feasibility proposal not reused across modes."
+  },
+  {
+    "finding": "Fable expanded F2",
+    "disposition": "Accepted: exact producer/region browsing independent non-AI catalog outcomes; later AI-3 exposes same tools. Related-producer similarity remains AI-3. No pilot admission. Matrix labels updated."
+  },
+  {
+    "finding": "Opus signed J1",
+    "disposition": "Accepted: comparison table itself now marks sunshine duration pending source verification."
+  },
+  {
+    "finding": "Opus signed J2 / Fable signed F1",
+    "disposition": "Accepted: scope sentence includes reused non-AI catalog outcomes and expressly grants no pilot admission."
+  },
+  {
+    "finding": "Fable signed F2",
+    "disposition": "Accepted: reused model finding identifiers qualified by review round."
+  }
+]

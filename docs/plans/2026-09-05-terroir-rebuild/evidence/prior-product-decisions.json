@@ -1,0 +1,283 @@
+{
+  "prepared_at": "2026-09-05",
+  "answers": {
+    "long_term_transaction_role": {
+      "selection": "B — Order coordination",
+      "user_answer": "yes b is perfect",
+      "decision": "Buyers and sellers arrange purchases and track order status within Terroir; sellers handle payment and fulfillment.",
+      "scope": "Long-term product responsibility; launch scope remains undecided."
+    },
+    "first_complete_job": {
+      "user_answer": "A then B then D then C in that order",
+      "priority_order": [
+        "Restaurant operations",
+        "Collector management",
+        "Supplier sales",
+        "Consumer discovery"
+      ],
+      "decision": "Restaurant operations is the anchor workflow. Collector management follows, then producer/distributor supplier sales, then consumer discovery.",
+      "scope": "Product priority order; phase depth, exit criteria and launch commitments remain undecided."
+    },
+    "restaurant_initial_segment": {
+      "user_answer": "I want to build it out to be ready for restaurant groups from day one: multiple venues, centralized purchasing, transfers and location-specific permissions.",
+      "decision": "Restaurant groups are day-one product scope, including multiple venues, centralized purchasing, transfers and location-specific permissions. Preserve simple daily staff workflows.",
+      "scope": "Supersedes single-location-first. Resolved through group_operating_structure, centralized_purchasing and within-business transfer decisions below; detailed permission and accounting contracts remain implementation proposals."
+    },
+    "toast_launch_dependency": {
+      "user_answer": "Required for the complete release: A supervised pilot can begin with receiving and cellar management while we validate Toast mappings and deductions.",
+      "selection": "B",
+      "decision": "Automatic Toast sales reconciliation is required for the complete restaurant release. A supervised receiving/cellar pilot may precede it while mappings and proposed deductions are validated.",
+      "scope": "No assumption that Toast access is already granted or automated deductions are proven."
+    },
+    "group_operating_structure": {
+      "user_answer": "B, with a simple setup for groups that only need A. Central oversight should not automatically pool inventory or expose every venue’s costs and supplier terms to everyone.",
+      "selection": "B",
+      "decision": "Support a parent group with separate operating businesses and venues from day one, with a simple setup for a single operating business. Inventory, financial records, supplier terms and permissions remain separately scoped; cross-business visibility requires explicit authorization.",
+      "scope": "Resolved: purchase on behalf of each named operating business at launch, same-business venue transfers only; central-owned redistribution is committed early expansion. No automatic group-wide costs/terms access."
+    },
+    "central_purchasing_buyer": {
+      "user_answer": "A with the expectation to build out B very completely and quickly after launch. Plan for it now; defer implementation because it needs substantial testing, interviews and iteration based on real use feedback.",
+      "selection": "A at launch; B committed early expansion",
+      "decision": "Launch centralized purchasing on behalf of each operating business. Plan now for a complete centrally owned stock and cross-business distribution workflow as a prioritized early post-launch expansion. Use interviews, testing and pilot feedback to validate that expansion.",
+      "scope": "B is committed direction, not an optional someday feature. No fixed date or untested accounting/ownership policy is inferred. Model ownership, custody and ordering responsibilities explicitly without promising no future migrations."
+    },
+    "launch_transfer_scope": {
+      "selection": "A",
+      "user_answer": "A — Within one operating business: Move wine between that business’s venues.",
+      "decision": "Launch stock transfers are limited to venues within the same operating business. Cross-business transfers for service are not a launch commitment.",
+      "scope": "This does not alter day-one multi-business group structure or the committed early centrally owned stock expansion. No timing for cross-business service transfers is inferred."
+    },
+    "transfer_authorization": {
+      "selection": "B at launch; allow future C",
+      "user_answer": "B. Keep routine transfers straightforward and accountable, but leave the door open to grow into C.",
+      "decision": "Delegate launch transfers to designated venue managers within their permissions, with dispatch, receipt and audit records. Preserve a path to business-defined conditional approval rules later.",
+      "scope": "No conditional approval engine, thresholds or delivery date approved for launch. Parent-group role does not automatically grant business-level access."
+    },
+    "wine_inventory_authority": {
+      "selection": "A",
+      "user_answer": "A. One clear inventory record for receiving, cellar and transfers, with calculated stock checked against physical counts and imports/exports supporting migration.",
+      "decision": "Terroir is the primary operational record for wine stock quantities and movements. Toast supplies sales events; physical counts remain observations used for reconciliation; financial accounting remains in its existing system. Support imports/exports for migration.",
+      "scope": "No automatic Toast menu/availability write-back, general-ledger replacement, unnamed vendor two-way synchronization or expansion beyond wine is inferred."
+    },
+    "first_market": {
+      "selection": "A — one country with focused pilot region",
+      "user_answer": "Agrees with focused pilot geography while retaining multi-venue and separate-business capabilities. Adds global wine search and learning for any user, covering region, wine and producer.",
+      "decision": "Concentrate initial restaurant interviews and operational validation in one country and a focused region. The specific country and region remain unanswered.",
+      "scope": "Does not geographically limit global wine discovery and education. No country inferred.",
+      "resolved_by": {
+        "country": "first_market_location",
+        "region": "us_pilot_region"
+      }
+    },
+    "first_market_location": {
+      "user_answer": "The first country should be USA and then Europe.",
+      "decision": "United States is the first restaurant operational market. European expansion follows.",
+      "scope": "Europe is an expansion region; specific countries and their order remain undecided. Initial US pilot region remains undecided. Global wine discovery is not restricted to operational markets."
+    },
+    "us_pilot_region": {
+      "user_answer": "Yes the city is Los Angeles.",
+      "decision": "Los Angeles is the initial restaurant-group pilot location in the United States.",
+      "scope": "No named or committed pilot group, provider entitlement or validated regional operating rules inferred. USA first and European expansion next remain accepted; global discovery remains separate."
+    },
+    "global_discovery_access": {
+      "selection": "A",
+      "user_answer": "A. Someone looking up a bottle can immediately explore its producer and region. Public content uses information we have permission to publish; private cellar and business records remain protected.",
+      "decision": "Allow signed-out public wine search and reading of publishable wine, producer and region knowledge. Private cellar/business records remain access-controlled.",
+      "scope": "Does not approve anonymous uploads/AI scans, unlimited search, public personal notes, checkout, or a launch date. Rights and source coverage must be verified."
+    },
+    "global_discovery_interface": {
+      "selection": "C",
+      "user_answer": "C as the product direction. Interactive geographic discovery, with map-data and interaction work to validate; timing separately; search remains available alongside map.",
+      "decision": "Provide region-page geographic context and an interactive map for exploring regions, producers and wines by place, alongside searchable linked pages.",
+      "scope": "Product direction approved; launch timing, verified geographic coverage, granularity, source rights and map implementation remain to define. No private cellar locations become public."
+    },
+    "global_discovery_release_timing": {
+      "selection": "B",
+      "user_answer": "B — The full experience: Search, knowledge pages and the interactive map are all required.",
+      "decision": "The first complete restaurant release must include public global wine search, useful wine/producer/region knowledge pages, region context maps and interactive geographic exploration, alongside the complete restaurant scope and Toast reconciliation.",
+      "scope": "Supersedes recommendations to defer the interactive map. Earlier supervised pilot is still permitted. No release date, exhaustive worldwide data coverage, source access or named provider rights inferred."
+    },
+    "knowledge_publication_authority": {
+      "selection": "A",
+      "user_answer": "A for launch. Editorial approval with source quality/contributor verification, planned reviewer capacity and correction turnaround, attributed producer contributions that do not automatically override independent ratings or regional facts.",
+      "decision": "External human contributor changes require Terroir editor approval before public publication at launch. Preserve attribution and independent-source authority; plan reviewer responsibility and turnaround.",
+      "scope": "No editor staffing or response-time SLA established. AI editorial authority and automated trusted-source imports remain unresolved. No producer direct-publication scope approved for launch.",
+      "clarification_from_q15": "Terroir editorial review may be automated for routine prose under defined source/evidence rules; human reviewers handle exceptions. Contributor review-before-publication remains required."
+    },
+    "ai_public_knowledge_publication": {
+      "selection": "B",
+      "user_answer": "B — Controlled automated publication. Routine content can publish under defined source-and-evidence rules. Exceptions require human review, with ongoing sampling and rollback.",
+      "decision": "Allow routine standing public explanatory content to publish through controlled automated editorial review at launch. Defined exceptions require human review, with ongoing sampling and rollback. Applies to the publication-authority question covering both AI drafts and contributor drafts.",
+      "scope": "Human approval of every prose item is not required. Does not permit raw unreviewed contributor publishing, arbitrary AI confidence gates, or automatic changes to private operational records. Source/evidence rules, exception classes, ownership, review capacity and sampling/rollback procedures must be specified and validated."
+    },
+    "collector_primary_outcome": {
+      "selection": "A",
+      "user_answer": "Everyday collecting first, centered on managing and enjoying wine. Account for deeper documentation in the design; its full workflow remains a deliberate scope decision.",
+      "decision": "Prioritize everyday collecting in the collector phase: holdings, locations, drinking choices, tasting memory and purchase planning, retaining acquisition costs and receipts. Consider deeper provenance/condition/custody documentation in design without making the complete advanced workflow a collector-release requirement.",
+      "scope": "No commitment to valuation feeds, investment/insurance capabilities, mandatory per-bottle tracking, or a date for advanced documentation. Collector phase remains after restaurant phase."
+    },
+    "personal_business_identity": {
+      "selection": "A",
+      "user_answer": "17A",
+      "decision": "One lasting Terroir identity with separated personal and business contexts and scoped memberships. Leaving a business revokes its work access while personal cellar continuity remains.",
+      "scope": "Business admins receive no automatic personal-data access. Work-note portability, exact identity-provider/recovery rules and employer-managed login compatibility remain separate."
+    },
+    "collector_collaboration": {
+      "selection": "B",
+      "user_answer": "18B",
+      "decision": "Personal cellars are private by default. Owners may invite chosen people with scoped viewing or management access.",
+      "scope": "No automatic public sharing, stock ownership transfer, blanket cost/receipt visibility or unrestricted export/delete permission inferred. Exact permission defaults require specification."
+    },
+    "supplier_primary_workflow": {
+      "selection": "A",
+      "user_answer": "19A",
+      "decision": "The first supplier phase prioritizes selling to restaurants: account-specific availability, quotes and order coordination linked to restaurant purchasing/receiving.",
+      "scope": "Workflow priority rather than company-type exclusion; producers/importers/distributors may participate where applicable. No supplier ERP, forced price disclosure, trading entitlement or validated adoption inferred."
+    },
+    "work_note_portability": {
+      "selection": "B",
+      "user_answer": "20B",
+      "decision": "Work notes remain in their business context by default. Add a business-controlled mechanism to permit personal copies of selected tasting notes, excluding confidential business information and recording the grant.",
+      "scope": "No automatic author entitlement, unrestricted export, retrospective access after membership removal or legal/IP ownership claim. Grant roles, allowed fields, revocation/copy semantics and audit must be specified."
+    },
+    "ai_wine_guide_scope": {
+      "selection": "B",
+      "user_answer": "21B",
+      "decision": "Add an optional conversational advisory guide for explanations, comparisons and recommendations using public knowledge and preference/cellar information the user explicitly makes available under their permissions. Show sources and uncertainty; it cannot purchase, publish or change inventory.",
+      "scope": "Timing/access resolved by ai_guide_release_timing and ai_guide_access: required at collector release; anonymous general guidance plus explicit authorized private context. No real-time availability, medical safety or investment authority implied."
+    },
+    "consumer_purchase_coverage": {
+      "selection": "A",
+      "user_answer": "22A",
+      "decision": "For the consumer buying phase, support mixed seller coverage: connected sellers offer in-app coordination; other permitted listings clearly link out to the seller. Distinguish external orders Terroir cannot manage or observe.",
+      "scope": "Both physical and online sellers remain in scope. Source rights, exact product matching, freshness and actual connection capabilities need verification. Does not introduce Terroir checkout/payment/fulfillment or move consumer commerce into restaurant launch."
+    },
+    "ai_guide_release_timing": {
+      "selection": "B",
+      "user_answer": "21aB",
+      "decision": "The advisory wine guide is required for the first complete collector release. Public search, knowledge pages and interactive map remain required for the preceding complete restaurant release.",
+      "scope": "No calendar date, extra action authority or automatic expansion of the supervised pilot inferred."
+    },
+    "ai_guide_access": {
+      "selection": "B",
+      "user_answer": "21bB",
+      "decision": "Signed-out visitors can ask general wine-knowledge questions under usage controls. Signed-in users may explicitly enable authorized personal or selected business context.",
+      "scope": "Login alone does not grant or activate private retrieval. Pricing/quotas/providers remain to specify; guide remains advisory and cannot execute purchases, publishing or inventory edits."
+    },
+    "community_primary_value": {
+      "selection": "A initially, with additional social-profile requirement",
+      "user_answer": "Private tasting groups initially; also wants individuals including wine reviewers, sommeliers and producers to follow profiles, post and interact.",
+      "decision": "Begin community with private invited tasting groups and explicit sharing. Include individual profiles, following, posting and interaction as an explicit product capability for enthusiasts and wine professionals.",
+      "scope": "Visibility/timing resolved: opt-in public profiles and posts after initial private groups as committed expansion. No automatic private/work publication or professional affiliation verification inferred."
+    },
+    "social_profile_visibility": {
+      "selection": "B",
+      "user_answer": "23aB",
+      "decision": "Users may opt into public individual profiles and choose public posts/interactions alongside private groups. Private cellar and work records are never published automatically.",
+      "scope": "Public professional affiliation, producer representation and badges require distinct verification. No compulsory public profile, automatic work-note sharing or universal public visibility inferred."
+    },
+    "social_profile_timing": {
+      "selection": "B",
+      "user_answer": "23bB",
+      "decision": "Ship private invited groups first, then richer profiles, following and posting as a committed community expansion. Basic group-member identity exists in the initial group experience.",
+      "scope": "No calendar date or restaurant-launch community requirement inferred. Expanded social layer remains required direction, not optional someday."
+    },
+    "revenue_model": {
+      "selection": "A",
+      "user_answer": "24A",
+      "decision": "Subscriptions are Terroir’s primary revenue model.",
+      "scope": "Exact payer tiers, prices, free/paid feature packaging, billing units and secondary revenue streams remain to validate/specify. This does not automatically settle ranking or advertising policy."
+    },
+    "ranking_commercial_influence": {
+      "selection": "B",
+      "user_answer": "25B",
+      "decision": "Permit clearly labeled sponsorship in separate areas. Payment must not alter organic rankings, ratings or advisory-guide recommendations.",
+      "scope": "Permitted policy, not a requirement to implement ads at launch. Subscriptions remain primary. No paid targeting/tracking contract, factual endorsement, verification outcome or sponsorship supplier inferred."
+    },
+    "toast_writeback_scope": {
+      "selection": "A",
+      "user_answer": "26A",
+      "decision": "First complete restaurant release reads Toast data for reconciliation; staff update Toast availability themselves. Evaluate outbound availability updates afterward.",
+      "scope": "Live inbound integration remains required target, not currently implemented. No first-release outbound writes, arbitrary menu/price editing, actual write entitlement or fixed later delivery date inferred."
+    },
+    "offline_critical_workflows": {
+      "selection": "B",
+      "user_answer": "27B",
+      "decision": "Support cached viewing and offline capture of photos, tasting notes and physical count observations as visibly pending drafts, validated/reconciled on reconnection.",
+      "scope": "No full offline consumption/receiving/transfers, offline AI requirement, native-app commitment, silent stock overwrite or guarantee of synchronization before reconnection. Local-data protection and permission recheck required."
+    },
+    "knowledge_coverage_acceptance": {
+      "selection": "A",
+      "user_answer": "28A",
+      "decision": "Public search may show identified wines with explicit background-information gaps. Publish richer knowledge only where supported by permitted sources; useful knowledge pages and the interactive map remain release requirements.",
+      "scope": "No invented narratives, implied vineyard precision, universal coverage guarantee or permission to replace all useful pages with empty stubs. Coverage and source quality need measured acceptance."
+    },
+    "pilot_partner_access": {
+      "user_answer": "Yes we have some to pilot.",
+      "decision": "Owner reports access to restaurant groups available for pilot participation.",
+      "scope": "Specific names, agreements, locations, operating-business structure, actual Toast authorization and participation schedules are not supplied or independently verified. No outreach authorized."
+    },
+    "editorial_support_capacity": {
+      "user_answer": "Me and my partner Rohan initially.",
+      "decision": "The owner and partner Rohan will initially handle human escalation coverage for the pilot.",
+      "scope": "Exact responsibility split, availability windows and response-time expectations remain unspecified; no24/7 coverage or staffing beyond those two inferred."
+    },
+    "delivery_time_constraint": {
+      "user_answer": "31- 5 ai agent build weeks",
+      "decision": "Owner sets a target of five AI-agent build weeks.",
+      "scope": "Resolved: complete first restaurant release by five build weeks; functioning pilot/investor candidate on2026-09-19, fourteen days after2026-09-05. No agent-count, capacity estimate or permission to reduce scope inferred."
+    },
+    "build_budget_resources": {
+      "user_answer": "32 AI will build with me as the reviewer- budget is $800/month in coding subscriptions and 100/month for miscelaneous",
+      "decision": "AI-led implementation with owner reviewing; monthly envelope of USD800 coding subscriptions plus USD100 miscellaneous.",
+      "scope": "No human developer team inferred. Product hosting, data/map licensing and runtime models must be assessed against miscellaneous envelope unless clarified; no unlimited spend, new subscription purchase or change to provider billing authorization inferred."
+    },
+    "migration_continuity": {
+      "user_answer": "33- there are no accounts we need to preserve, no one is relying on the application today",
+      "decision": "Interpret numbered33 as answer to pendingQ34: no current accounts require preservation and no current users depend on the application.",
+      "scope": "Does not establish every wine/reference record or source document is disposable, grant deletion permission or itself decide fresh rebuild versus iteration. Existing data retained pending explicit cutover decisions; safe new isolated build can be considered."
+    },
+    "launch_success_measure": {
+      "user_answer": "Complete release needs finished; supervised restaurant pilot in two weeks so feedback by week4; shopping to investors at pilot/startweek2; everything functioning ready for production testing.",
+      "decision": "Complete first restaurant release is required by five build weeks. A functioning restaurant pilot and investor demonstration are required earlier, with real feedback available by week4.",
+      "scope": "Preserve all agreed complete restaurant-release requirements, including multi-business operations, inbound Toast and public search/knowledge/map. Early candidate must function for production testing on2026-09-19. Feedback byweek4 and validated complete release byweek5 remain targets; no feasibility or completed implementation claimed. Later phases remain later."
+    }
+  },
+  "additional_product_requirements": {
+    "global_wine_discovery_learning": {
+      "user_request": "Any user can search wines through a global view and learn about the region, wine, producer, etc.; information overlaps with other features.",
+      "decision": "Global wine discovery and education for all user types, with signed-out search, linked wine/producer/region knowledge, region-page maps and interactive geographic exploration. Shared knowledge supports all persona experiences; private data remains protected.",
+      "open_questions": [
+        "Expected depth of region/producer content and source rights"
+      ],
+      "boundaries": [
+        "Global learning is distinct from global commerce, merchant availability, or operational validation.",
+        "No claim of comprehensive global data coverage, source licences, or current implementation.",
+        "Do not infer paid provider access or publish private tenant data."
+      ]
+    },
+    "social_profiles_following_posts": {
+      "user_request": "People can follow individual profiles so wine reviewers, sommeliers, producers and others can follow, post and interact.",
+      "decision": "Explicit social-profile/following/posting capability required in product direction.",
+      "open_questions": [
+        "Public opt-in versus group-scoped social visibility",
+        "Ship with first private-group community release or subsequent expansion"
+      ],
+      "boundaries": [
+        "No private data automatically posted",
+        "Profile, workplace affiliation and producer verification are distinct assertions",
+        "Community opinion does not automatically overwrite reference knowledge or independent scores"
+      ]
+    }
+  },
+  "schedule_clarification": {
+    "status": "resolved",
+    "user_answer": "2 weeks from now",
+    "answered_on": "2026-09-05",
+    "timezone": "America/Los_Angeles",
+    "pilot_and_investor_date": "2026-09-19",
+    "derivation": "2026-09-05 plus14calendar days. Supersedes start-of-week-two wording.",
+    "remaining_targets": "Feedback byweek4; complete first restaurant release byweek5. Schedule feasibility remains unproven."
+  },
+  "status": "Substantive interview and early date clarification complete. Pilot/investor candidate due2026-09-19. Implementation, feasibility and external dependencies remain unverified."
+}

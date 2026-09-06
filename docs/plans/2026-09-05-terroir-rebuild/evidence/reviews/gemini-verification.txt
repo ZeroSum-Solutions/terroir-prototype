@@ -1,0 +1,67 @@
+### Original Finder Verification of Bounded Fix Round
+
+As the original independent reviewer, I have evaluated the one bounded correction round against the updated planning package, the triage assessments, and the governing requirements.
+
+---
+
+### Assessment of Original Findings
+
+#### G-F1 (P1): Review Closure Authority and Separation of Governance Roles
+- **Status**: **VERIFIED FIXED**
+- **Updated Evidence**: [07-protocol.md](file:///07-protocol.md#L30-L55), [09-review.md](file:///09-review.md#L1-L8).
+- **Evaluation**: The updated text explicitly resolves the circularity:
+  1. [07-protocol.md](file:///07-protocol.md#L30-L45) tabulates explicit per-PR authors, non-author findings stewards, and distinct non-author landers (e.g., C-authored PRs 2, 4, 9 have D as steward and O as lander/controller; Q-authored PRs 1, 8 have D as steward and O as lander).
+  2. [07-protocol.md](file:///07-protocol.md#L50-L55) clarifies that physical state-ledger write custody does not confer findings closure authority; the steward records the receipt, but original external finders or objective CI tests close findings.
+  3. [09-review.md](file:///09-review.md#L1-L8) explicitly states that verification is pending and claims no self-closure or implementation acceptance. The demand for cryptographic signatures is withdrawn as an ungrounded requirement.
+
+#### G-F2 (P1): Critical Feasibility Deficit in Staffing & PR Integration Arithmetic
+- **Status**: **VERIFIED FIXED**
+- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L34-L38), [03-delivery.md](file:///03-delivery.md#L20-L46).
+- **Evaluation**: The feasibility model has been structurally repaired:
+  1. Scope reduction (deferring automated extraction) trimmed 4–8 hours from R and U, reducing total contributor-hours from 60–92 to 56–84 hours ([03-delivery.md](file:///03-delivery.md#L28-L34)).
+  2. Review/integration overhead (12–20h) is explicitly accounted for once within the 56–84h total, eliminating the double-count.
+  3. The ungrounded WIP multiplier on labor capacity was eliminated. Single-builder capacity is explicitly modeled as 11 days × 8 productive hours/day = 88 hours ([03-delivery.md](file:///03-delivery.md#L36-L44)).
+  4. At 56–84 hours, the high estimate (84h) now fits within the 88-hour pre-buffer envelope without eroding the 20% contingency (Days 12–14). [START-HERE.md](file:///START-HERE.md#L52-L55) explicitly makes confirming 8h/day staffing a Gate 1 prerequisite, failing which $S$ remains NO-GO.
+
+#### G-F3 (P1): Scope $S$ Retained Fragile Dependency on Uncharacterized Inbound Extraction
+- **Status**: **VERIFIED FIXED**
+- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L38-L41), [03-delivery.md](file:///03-delivery.md#L10-L15), [scope.csv](file:///scope.csv#L10) (row E-008).
+- **Evaluation**: The baseline for $S$ is now explicitly *manual receiving only*. [scope.csv](file:///scope.csv#L10) classifies automated invoice/photo extraction as DEFERRED from the Day-14 $S$ baseline. [03-delivery.md](file:///03-delivery.md#L10-L15) prohibits extraction from consuming reserved buffer or being silently added without a formal scope exchange and authorization.
+
+#### G-F4 (P2): Candidate Staging Parity and Branch Protection Gaps
+- **Status**: **VERIFIED FIXED**
+- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L48-L51), [03-delivery.md](file:///03-delivery.md#L53), [05-ci-tests.md](file:///05-ci-tests.md#L17-L20).
+- **Evaluation**: The operational sequence is now concrete. [05-ci-tests.md](file:///05-ci-tests.md#L17-L20) and [03-delivery.md](file:///03-delivery.md#L53) establish Day 1 (W0) verification of candidate branch protections and Railway routing isolation as a mechanical prerequisite before any W1 feature code lands. Merges remain blocked if protections cannot be enabled, triggering the Day 3 fallback.
+
+#### G-F5 (P2): Ambiguous Backup Storage Object Inventory vs Database Snapshot
+- **Status**: **VERIFIED FIXED**
+- **Updated Evidence**: [05-ci-tests.md](file:///05-ci-tests.md#L61-L64), [tests.csv](file:///tests.csv#L27-L31) (EV-06), [tests.csv](file:///tests.csv#L54-L58) (EV-12).
+- **Evaluation**: EV-06 and EV-12 in [tests.csv](file:///tests.csv#L27-L58) explicitly specify storage-byte count, length, content SHA-256, and access-policy reconciliation alongside database tables. [05-ci-tests.md](file:///05-ci-tests.md#L61-L64) details the exact comparison requirements (100% hashes, extra/missing object reports, permission denial tests).
+
+#### G-F6 (P3): Unanchored Performance Baseline Budgets
+- **Status**: **WITHDRAWN AS UNSUPPORTED**
+- **Updated Evidence**: [05-ci-tests.md](file:///05-ci-tests.md#L58-L60), [tests.csv](file:///tests.csv#L50-L53) (EV-11).
+- **Evaluation**: The triage is correct: [05-ci-tests.md](file:///05-ci-tests.md#L58-L60) already specified capturing current baselines on Day 2 on identical fixtures. The updated [tests.csv](file:///tests.csv#L50-L53) explicitly reinforces the sequencing ("Day 2 current-system same-fixture baseline before target measurement"). The original criticism of absent baseline instructions was unsupported by the text.
+
+---
+
+### Verified Cross-Review Additions (Claude Findings)
+The packet additions addressing Claude's findings were also reviewed and found consistent:
+- **C-F2 / Recovery Rehearsal Schedule**: D/O recovery environment provisioning and first restore attempt are moved forward to Day 1–3 ([03-delivery.md](file:///03-delivery.md#L53-L56)), preventing a late Day 11 surprise.
+- **C-F7 / CI Defect Ownership Exception**: PR1 ownership transfer of `date-range-selector.tsx` and `page.tsx` to Q is explicitly delimited in [04-ownership.md](file:///04-ownership.md#L38-L41).
+- **C-F8 / Synthetic-Only Data Containment**: Ambiguous "anonymized production export" wording was removed; Mac, CI, and general AWS are strictly synthetic-only ([02-architecture-data.md](file:///02-architecture-data.md#L38-L41)).
+- **C-F6 / Supplied Explorer Reports**: All six 800-word explorer tables ([evidence/](file:///evidence/)) and [database-dispositions.csv](file:///database-dispositions.csv) are confirmed present.
+
+---
+
+### Final Verdict
+
+**PLANNING PACKAGE IS DECISION-READY FOR GATE 1.**
+
+1. **Implementation Readiness**: **NO-GO NOW**. Implementation cannot begin in this turn; work begins only after Gate 1 approval, protected candidate configuration, and restore environment verification.
+2. **Fourteen-Day Full Scope ($F$, 35 outcomes)**: **NO-GO**. The full restaurant rebuild is mathematically and architecturally unsupportable within 14 calendar days.
+3. **Reduced Manual-Only Slice ($S$)**: **CONDITIONAL GO FOR GATE 1 APPROVAL**, strictly subject to:
+   - Owner confirming the 8 productive contributor-hours/day staffing assumption;
+   - Baseline limited strictly to manual receiving (automated extraction deferred);
+   - Meeting Day 3 checkpoints (candidate branch protection verified, recovery environment provisioned, initial restore attempted, and measured cycle time confirming capacity);
+   - Preserving Days 12–14 (21.4%) as uncompromised buffer.

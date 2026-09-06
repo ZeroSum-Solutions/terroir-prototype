@@ -1,0 +1,58 @@
+eval_id,owner,release_requirement,slice_requirement,artifact_to_implement,status,s_applicability,implementation_slices,s_owner
+EV-01,"C,D,O",E-001,S1,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-002,S1,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-003,S1 S6,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-028,S5,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-068,S1 S6,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-02,"D,R",E-005,S2,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-006,,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-02,"D,R",E-007,S2,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-008,S3,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-011,,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-03,"D,R",E-012,S4,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-03,"D,R",E-013,S5,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-03,D,E-016,,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-03,D,E-017,,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-007,S2,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,C,R",E-008,S3,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-011,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-013,S5,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-016,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,U,P",E-018,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,U,P",E-019,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-028,S5,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-067,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-05,"D,Q",E-031,S7,S candidate synthetic fixture/replay/parity and backup-manifest verification; legacy transformation parity is F only,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,M2,V4","D,Q"
+EV-05,"D,Q",E-032,S6,S candidate synthetic fixture/replay/parity and backup-manifest verification; legacy transformation parity is F only,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,M2,V4","D,Q"
+EV-06,"D,R,O,Q",E-008,S3,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,R,O,Q",E-012,S4,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,R,O,Q",E-030,S6,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,O",E-031,,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-06,"D,R,O,Q",E-032,S6,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-07,R,E-005,S2,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-008,S3,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-012,S4,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-013,S5,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-028,S5,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-08,"K,P",E-018,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-024,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-025,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-026,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-027,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-020,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-021,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-022,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-023,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-009,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-010,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-014,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-015,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-029,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O,P",E-019,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O",E-066,S7,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V4","Q,O"
+EV-11,"Q,O,P",E-067,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O,P",E-068,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-12,"O,Q",E-030,S6,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-031,S7,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-032,S6,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-065,S7,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"

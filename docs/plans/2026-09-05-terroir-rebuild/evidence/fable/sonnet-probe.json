@@ -1,0 +1,13 @@
+{
+  "requested_model": "claude-sonnet-5",
+  "reported_models": [
+    "claude-sonnet-5"
+  ],
+  "effort": "medium",
+  "harness": "Claude Code Max OAuth",
+  "exit": 0,
+  "seconds": 5.9,
+  "result": "LANE_OK",
+  "session_id": "277a9248-bc73-4c46-9506-b96e7eb7e4c1",
+  "probe_only_not_quality_or_throughput_benchmark": true
+}

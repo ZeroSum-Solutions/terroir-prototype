@@ -1,0 +1,17 @@
+```json
+{
+  "verdict": "AGREE",
+  "final_document_sha256": "a40f637c24413d24cf2e89624b8cd82ee4d27043a863785150d5aeea8752f4e0",
+  "findings": [],
+  "verification_of_corrections": {
+    "FC-01_retention_vs_AI-6": "Closed. AI-6 temporal experiments are explicitly bounded to the retained 90-day window; insufficient history defers the experiment; extension requires a separate decision and fresh consent, never reconstruction. Matrix F08/F13 and AI-3 exit evidence (persist eligible candidate sets or reconstructable snapshots at run creation; missing evidence = permanent AI-6 exclusion) are consistent with the text.",
+    "FC-02_recommender_receipts": "Closed. GitHub API metadata now supplied for all seven repositories; LightFM pushed_at 2024-07-24 supports the 'last push 2024' statement. RecBole MIT-vs-academic-restriction conflict is disclosed and commercial reuse excluded pending clarification. Metadata-only status and pre-install file/package verification are preserved.",
+    "FC-03_edition_grain": "Closed. Edition projection is defined over canonical identity, explicitly distinct from package-grained wine_variants; unknown-vintage aggregation is disclosed in UI. Edition ordering now uses the representative-event key before the limit of nine, removing the prior selection ambiguity.",
+    "OP-CR05_revocation_baseline": "Coherent as stated. Baseline: no external private-data egress exists, so SAFE-REVOKE records it N/A with configuration evidence; admission requires a tested protocol (no new admissions, stale responses suppressed, admitted sends accounted for). Zero-send-after-revocation is correctly framed as a stricter, opt-in policy needing a barrier and provider contract, not implied by ordinary checks. No contradiction with the earlier 'cannot promise zero bytes' statement.",
+    "OP-CR04_erasure": "Coherent. Per-slice SAFE-ERASE coverage of each introduced store plus PRIV-ERASE-ALL-STORES as consolidated integration gate; no conflict with the four-control lifecycle.",
+    "ROOT-C1_scope_edits": "Consistent. Third-party custody gated on separate E-042 admission (not added to AI-1 mapping, correctly); E-040 removed from F05; E-061 added to F13 with text forbidding sponsored influence on organic ranking.",
+    "OP-C4_boundary": "Consistent with S. Only synthetic fixtures leave the production boundary; independently sourced public text requires separate trial admission. Note (non-blocking): the AI-4 'synthetic/owner-authored fixture' should be evaluated inside the boundary or under that separate admission; the text does not contradict this."
+  },
+  "agreement_scope": "My prior AGREE extends to the final document identified by the stated SHA-256, on the basis that the document equals the reviewed v3 plus exactly the diff shown; I could not compute the hash independently (no tools). Agreement covers planning coherence and evidence support only. It does not approve Gate 1, alter S, admit any AI slice, certify runtime state beyond the abdc661 source audit, certify any model, provider, cost, or provider-side deletion behavior, or assert readiness of any prerequisite (E-001/E-005/E-007/E-012/E-013/E-036/E-038/E-042). All retention, erasure, revocation, and corpus policies remain proposals to be ratified and tested at slice admission."
+}
+```

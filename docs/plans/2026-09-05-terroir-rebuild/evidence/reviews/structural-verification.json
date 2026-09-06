@@ -1,0 +1,2073 @@
+{
+  "schema_version": 2,
+  "started_at": "2026-09-06T00:12:56.276534+00:00",
+  "completed_at": "2026-09-06T00:12:56.336515+00:00",
+  "verification_kind": "bounded objective planning artifact structure; not model approval or release acceptance",
+  "repo": "/Users/zero/projects/terroir",
+  "repo_head": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "package": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild",
+  "package_manifest_sha256": "5aa96752da8c9e825bd4ccd395981913a5fe47ee4b9bab1f9b9603f80e6541ec",
+  "file_hashes_start": {
+    "01-evidence.md": "666adecb971cf0578b9cd08118e98f29a9375f22ff3a7f753d23e8e104ca215b",
+    "02-architecture-data.md": "61589097495fa7d982af2e8bb699a8623a425a242f7570e0f9829d40f89cf82d",
+    "03-delivery.md": "fc2535f74bdb3a866e414374a0fe0acda795db24ce408b06b0f21c6437a049f0",
+    "04-ownership.md": "ffce53093839455f5f45208c9f58d8230b594a755f60bd188ca8cfb1ed8cbb55",
+    "05-ci-tests.md": "ebf4998cc46ee70a0daf8d6ebdec9acce6361e7e033f7a0095ee0c3c37eb94ca",
+    "06-capacity.md": "21b915c3e0661e96c05db1f5a046fb8b936b14c19792e36b41802969e24a40e9",
+    "07-protocol.md": "39cb51da3bd5627efe4f27ffe97aca94b88be76c92017f019eac8421124ecf24",
+    "08-risks-cleanup.md": "07221b945d277c9835523a8269d0289e562df1516e90050b050189e51a588d27",
+    "09-review.md": "02ce0a59933e77d21c4085122c31069eaa9f259b21ec1fdebd70a9ac315d3a45",
+    "START-HERE.md": "18fdd8461be0fd85775a207acb311704e5cc75b2d2d453abb246d324a3866e68",
+    "database-dispositions.csv": "d34a1b1def76b780e4463493f825ea789e8db664d8b1bc7dcae1b44e1b7f819c",
+    "dependency-edges.json": "4091bd96e0ab92086b7996f0b845a0be8ddd010a4db42e9e3e87ce32a52c8338",
+    "dependency-graph.mmd": "6d489da809468c0e699342581ae95829e25bf49bb508bc93ed3bfac43394fccb",
+    "evidence/architecture-summary.md": "aa49a3e4bcacadb258cab5226e819882a76052b247c46cdd1af77ebcb65eaa49",
+    "evidence/ci/branch-rules.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/git-branches.txt": "3aa239726c936a6943859ea33980adefbf4fee31959e3b89b6ebd2049ec5b6af",
+    "evidence/ci/git-worktrees.txt": "163540e6d6a35dadcb36ee735eb8dfac82f81b2b1ecc0ec8d1bc294c30026ec7",
+    "evidence/ci/guarded-e2e-files.json": "4c3e990e0977ddabf96f5d6505e8e9d87a51a21f675ff64a2b324fc4eacdc24e",
+    "evidence/ci/merge-queue.json": "befa607ae1486cbc47ea791878eb06e4e0d80c41af74eef6f375f6c164860238",
+    "evidence/ci/merged-pr-cycles.json": "9d9b3eca472cf3887b6e11b9f4555d2cfb7f85f74b706ab0aa2b1f31ca540544",
+    "evidence/ci/open-prs.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/owned-territory.json": "5230ccfd5d1b8b68bc57d9b95f3e14c37b3bab0892fc1ce82bee7661083fefbc",
+    "evidence/ci/pr-cycle-statistics.json": "c71f6a58a8ead7f7bf5a7cd73cb69be97cb903366beac2bf94148a901b7d58b0",
+    "evidence/ci/protection.json": "24a4bfa652f8f76ffce3c72b6c7f953c5751630a685b3878ca5c5233dee1e521",
+    "evidence/ci/repository-capabilities.json": "a7641787bc5967ba3e7afde2d0a6e74b11193a040ff0cc1b403735a0bc004700",
+    "evidence/ci/rulesets.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/statistics.json": "16ef9b3c0a2c52552c3c041258864f8ca8afe3b044c456fef4153799499ae747",
+    "evidence/ci-summary.md": "d54559124033f266c023e650074fcd13b8f0169980ab23b0bef2ea5a2e0b01e6",
+    "evidence/claude-lane-smoke.json": "6eda3e3ad2ad91a5f12b1f99afda10a1e2d0c4bde05f76337b9412e3d835c6c9",
+    "evidence/cleanup-summary.md": "f229f3a04c1ead54929ce9087cdb46e23a3c7db2543686dd148178a006929b43",
+    "evidence/database-summary.md": "e7233b02bdefa13aaf60e3476bdd3561d904120bb27ac8892f227606f4cd1f5d",
+    "evidence/gemini-lane-smoke.json": "8bf321e14269745aa1efe52a974f79878790265b62aab864a05aa6a7890ec890",
+    "evidence/git-refs.json": "3b0270f408235cda511c380ab19b7751ab4dffb9486961613a47dc81db9ce5f1",
+    "evidence/harness-evidence.md": "14e6c86ec84aa11ca1b5e16b4c7d69f59512a429f1fb1e4eb4620d60381d7bd9",
+    "evidence/journeys-summary.md": "c13b3436735c682e1b654121061615476e87e463ae1f73e552e3bf414c754e9c",
+    "evidence/local-capacity.json": "f46c3c34c48a5109e73f46855d138d2dce3c0b965a58e3cccaee714ba8e092e1",
+    "evidence/prior-database-contracts.md": "c563e1b932afc14037c12dbf61bf8375e026331e7ce6184fae544f227cefdbde",
+    "evidence/prior-product-decisions.json": "2891c1ed81fe636874593277fdc42406e898628d4e70e33121ea79f6fdca0e65",
+    "evidence/sol-lane-smoke.json": "c510993b84b475cf28c83c5323cd971813882cdf3c39eb21f0a8f1c1f2be4ffe",
+    "evidence/tooling-availability.json": "f05583c3ba902bd57b7aa7a1da129a675733320de323b533bc4f973ce6f84c38",
+    "scope.csv": "3ac45c28a8838d95038ec0de8443813c260ea7494734eb1f73dc4249954578b0",
+    "tests.csv": "2c744cb71eb7bd28038508ea9d699df129a95095946657c86f4dabba99a88569",
+    "verification.json": "79aa4109e130bcb7dc4916459927df5e04e4610852ef7c1cca7248008daf2012"
+  },
+  "file_hashes_end": {
+    "01-evidence.md": "666adecb971cf0578b9cd08118e98f29a9375f22ff3a7f753d23e8e104ca215b",
+    "02-architecture-data.md": "61589097495fa7d982af2e8bb699a8623a425a242f7570e0f9829d40f89cf82d",
+    "03-delivery.md": "fc2535f74bdb3a866e414374a0fe0acda795db24ce408b06b0f21c6437a049f0",
+    "04-ownership.md": "ffce53093839455f5f45208c9f58d8230b594a755f60bd188ca8cfb1ed8cbb55",
+    "05-ci-tests.md": "ebf4998cc46ee70a0daf8d6ebdec9acce6361e7e033f7a0095ee0c3c37eb94ca",
+    "06-capacity.md": "21b915c3e0661e96c05db1f5a046fb8b936b14c19792e36b41802969e24a40e9",
+    "07-protocol.md": "39cb51da3bd5627efe4f27ffe97aca94b88be76c92017f019eac8421124ecf24",
+    "08-risks-cleanup.md": "07221b945d277c9835523a8269d0289e562df1516e90050b050189e51a588d27",
+    "09-review.md": "02ce0a59933e77d21c4085122c31069eaa9f259b21ec1fdebd70a9ac315d3a45",
+    "START-HERE.md": "18fdd8461be0fd85775a207acb311704e5cc75b2d2d453abb246d324a3866e68",
+    "database-dispositions.csv": "d34a1b1def76b780e4463493f825ea789e8db664d8b1bc7dcae1b44e1b7f819c",
+    "dependency-edges.json": "4091bd96e0ab92086b7996f0b845a0be8ddd010a4db42e9e3e87ce32a52c8338",
+    "dependency-graph.mmd": "6d489da809468c0e699342581ae95829e25bf49bb508bc93ed3bfac43394fccb",
+    "evidence/architecture-summary.md": "aa49a3e4bcacadb258cab5226e819882a76052b247c46cdd1af77ebcb65eaa49",
+    "evidence/ci/branch-rules.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/git-branches.txt": "3aa239726c936a6943859ea33980adefbf4fee31959e3b89b6ebd2049ec5b6af",
+    "evidence/ci/git-worktrees.txt": "163540e6d6a35dadcb36ee735eb8dfac82f81b2b1ecc0ec8d1bc294c30026ec7",
+    "evidence/ci/guarded-e2e-files.json": "4c3e990e0977ddabf96f5d6505e8e9d87a51a21f675ff64a2b324fc4eacdc24e",
+    "evidence/ci/merge-queue.json": "befa607ae1486cbc47ea791878eb06e4e0d80c41af74eef6f375f6c164860238",
+    "evidence/ci/merged-pr-cycles.json": "9d9b3eca472cf3887b6e11b9f4555d2cfb7f85f74b706ab0aa2b1f31ca540544",
+    "evidence/ci/open-prs.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/owned-territory.json": "5230ccfd5d1b8b68bc57d9b95f3e14c37b3bab0892fc1ce82bee7661083fefbc",
+    "evidence/ci/pr-cycle-statistics.json": "c71f6a58a8ead7f7bf5a7cd73cb69be97cb903366beac2bf94148a901b7d58b0",
+    "evidence/ci/protection.json": "24a4bfa652f8f76ffce3c72b6c7f953c5751630a685b3878ca5c5233dee1e521",
+    "evidence/ci/repository-capabilities.json": "a7641787bc5967ba3e7afde2d0a6e74b11193a040ff0cc1b403735a0bc004700",
+    "evidence/ci/rulesets.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "evidence/ci/statistics.json": "16ef9b3c0a2c52552c3c041258864f8ca8afe3b044c456fef4153799499ae747",
+    "evidence/ci-summary.md": "d54559124033f266c023e650074fcd13b8f0169980ab23b0bef2ea5a2e0b01e6",
+    "evidence/claude-lane-smoke.json": "6eda3e3ad2ad91a5f12b1f99afda10a1e2d0c4bde05f76337b9412e3d835c6c9",
+    "evidence/cleanup-summary.md": "f229f3a04c1ead54929ce9087cdb46e23a3c7db2543686dd148178a006929b43",
+    "evidence/database-summary.md": "e7233b02bdefa13aaf60e3476bdd3561d904120bb27ac8892f227606f4cd1f5d",
+    "evidence/gemini-lane-smoke.json": "8bf321e14269745aa1efe52a974f79878790265b62aab864a05aa6a7890ec890",
+    "evidence/git-refs.json": "3b0270f408235cda511c380ab19b7751ab4dffb9486961613a47dc81db9ce5f1",
+    "evidence/harness-evidence.md": "14e6c86ec84aa11ca1b5e16b4c7d69f59512a429f1fb1e4eb4620d60381d7bd9",
+    "evidence/journeys-summary.md": "c13b3436735c682e1b654121061615476e87e463ae1f73e552e3bf414c754e9c",
+    "evidence/local-capacity.json": "f46c3c34c48a5109e73f46855d138d2dce3c0b965a58e3cccaee714ba8e092e1",
+    "evidence/prior-database-contracts.md": "c563e1b932afc14037c12dbf61bf8375e026331e7ce6184fae544f227cefdbde",
+    "evidence/prior-product-decisions.json": "2891c1ed81fe636874593277fdc42406e898628d4e70e33121ea79f6fdca0e65",
+    "evidence/sol-lane-smoke.json": "c510993b84b475cf28c83c5323cd971813882cdf3c39eb21f0a8f1c1f2be4ffe",
+    "evidence/tooling-availability.json": "f05583c3ba902bd57b7aa7a1da129a675733320de323b533bc4f973ce6f84c38",
+    "scope.csv": "3ac45c28a8838d95038ec0de8443813c260ea7494734eb1f73dc4249954578b0",
+    "tests.csv": "2c744cb71eb7bd28038508ea9d699df129a95095946657c86f4dabba99a88569",
+    "verification.json": "79aa4109e130bcb7dc4916459927df5e04e4610852ef7c1cca7248008daf2012"
+  },
+  "checks": [
+    {
+      "check": "scope_all_68_unique_outcomes",
+      "status": "PASS",
+      "row_count": 68,
+      "unique_count": 68,
+      "missing": [],
+      "unexpected": []
+    },
+    {
+      "check": "scope_matches_original_outcome_and_phase",
+      "status": "PASS",
+      "baseline": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/outputs/terroir-expanded-feature-database-matrix.csv",
+      "baseline_sha256": "d8c97800ca53c2e6c982ef3d7c64f2d6e12e26087afa684f34f221f137172d58",
+      "mismatches": []
+    },
+    {
+      "check": "tests_cover_all_35_R_requirements",
+      "status": "PASS",
+      "R_count": 35,
+      "test_rows": 57,
+      "unique_covered_requirements": 35,
+      "missing_R": [],
+      "non_R_without_test_rows": [
+        "E-004",
+        "E-033",
+        "E-034",
+        "E-035",
+        "E-036",
+        "E-037",
+        "E-038",
+        "E-039",
+        "E-040",
+        "E-041",
+        "E-042",
+        "E-043",
+        "E-044",
+        "E-045",
+        "E-046",
+        "E-047",
+        "E-048",
+        "E-049",
+        "E-050",
+        "E-051",
+        "E-052",
+        "E-053",
+        "E-054",
+        "E-055",
+        "E-056",
+        "E-057",
+        "E-058",
+        "E-059",
+        "E-060",
+        "E-061",
+        "E-062",
+        "E-063",
+        "E-064"
+      ],
+      "scope_note": "33 non-R outcomes remain in scope.csv; requirement is all 35 R mappings, not execution or all-product test completeness."
+    },
+    {
+      "check": "test_foreign_keys_and_execution_labels",
+      "status": "PASS",
+      "unknown_requirements": [],
+      "other_statuses": [],
+      "eval_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-03",
+        "EV-04",
+        "EV-05",
+        "EV-06",
+        "EV-07",
+        "EV-08",
+        "EV-09",
+        "EV-10",
+        "EV-11",
+        "EV-12"
+      ],
+      "duplicate_eval_requirement_pairs": []
+    },
+    {
+      "check": "scope_disposition_inventory",
+      "status": "PASS",
+      "counts": {
+        "MUST-SHIP bounded subset; not full outcome": 15,
+        "DEFERRED": 51,
+        "MUST-SHIP manual receiving subset only; automated invoice/photo extraction DEFERRED": 1,
+        "EXCLUDED": 1
+      }
+    },
+    {
+      "check": "six_evidence_tables_format_and_word_limits",
+      "status": "PASS",
+      "files": [
+        {
+          "file": "evidence/database-summary.md",
+          "words": 568,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/architecture-summary.md",
+          "words": 552,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/ci-summary.md",
+          "words": 626,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/cleanup-summary.md",
+          "words": 582,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/journeys-summary.md",
+          "words": 550,
+          "within_800": true,
+          "exact_header_present": true
+        },
+        {
+          "file": "evidence/harness-evidence.md",
+          "words": 590,
+          "within_800": true,
+          "exact_header_present": true
+        }
+      ]
+    },
+    {
+      "check": "dependency_edges_acyclic",
+      "status": "PASS",
+      "nodes": 17,
+      "edges": 30,
+      "topological_order": [
+        "G1",
+        "Q",
+        "C",
+        "D",
+        "K",
+        "A",
+        "U",
+        "T",
+        "V",
+        "OF",
+        "R",
+        "P",
+        "I",
+        "O",
+        "VFY",
+        "FULL",
+        "G2"
+      ],
+      "unresolved_nodes": [],
+      "duplicate_edges": []
+    },
+    {
+      "check": "mermaid_edges_match_json",
+      "status": "PASS",
+      "mermaid_edge_count": 30,
+      "missing_in_mermaid": [],
+      "extra_in_mermaid": []
+    },
+    {
+      "check": "stated_arithmetic",
+      "status": "PASS",
+      "calculations": [
+        {
+          "name": "track_sum_S",
+          "calculated": [
+            56,
+            84
+          ],
+          "stated": [
+            56,
+            84
+          ],
+          "pass": true
+        },
+        {
+          "name": "track_sum_F",
+          "calculated": [
+            264,
+            448
+          ],
+          "stated": [
+            264,
+            448
+          ],
+          "pass": true
+        },
+        {
+          "name": "review_overhead_once",
+          "calculated": [
+            [
+              12,
+              20
+            ]
+          ],
+          "stated": [
+            [
+              12,
+              20
+            ]
+          ],
+          "pass": true
+        },
+        {
+          "name": "planned_plus_buffer_days",
+          "calculated": 14,
+          "stated": 14,
+          "pass": true
+        },
+        {
+          "name": "contingency_fraction",
+          "calculated": 0.21428571428571427,
+          "minimum": 0.2,
+          "pass": true
+        },
+        {
+          "name": "one_builder_productive_hours",
+          "calculated": 88,
+          "stated": 88,
+          "pass": true
+        },
+        {
+          "name": "effort_per_PR",
+          "calculated": [
+            6.22,
+            9.33
+          ],
+          "stated": [
+            6.22,
+            9.33
+          ],
+          "pass": true
+        },
+        {
+          "name": "effort_only_PR_capacity",
+          "calculated": [
+            9.43,
+            14.14
+          ],
+          "stated": [
+            9.43,
+            14.14
+          ],
+          "pass": true
+        },
+        {
+          "name": "half_day_hours",
+          "calculated": 44,
+          "stated": 44,
+          "pass": true
+        },
+        {
+          "name": "slower_PR_capacity",
+          "calculated": 7.33,
+          "stated": 7.33,
+          "pass": true
+        },
+        {
+          "name": "queue_only_ceiling",
+          "calculated": 19.1,
+          "stated": 19.1,
+          "pass": true
+        },
+        {
+          "name": "S_PRs_per_planned_day",
+          "calculated": 0.82,
+          "stated": 0.82,
+          "pass": true
+        },
+        {
+          "name": "F_PRs_per_planned_day",
+          "calculated": [
+            2.0,
+            2.73
+          ],
+          "stated": [
+            2,
+            2.73
+          ],
+          "pass": true
+        },
+        {
+          "name": "baseline_required_runner_minutes",
+          "calculated": "107.6",
+          "stated": "107.6",
+          "pass": true
+        },
+        {
+          "name": "baseline_full_runner_minutes",
+          "calculated": "236.2",
+          "stated": "236.2",
+          "pass": true
+        },
+        {
+          "name": "fix_round_required_runner_minutes",
+          "calculated": "161.3",
+          "stated": "161.3",
+          "pass": true
+        },
+        {
+          "name": "full_run_retry_allowance_minutes",
+          "calculated": "354.3",
+          "stated": "354.3",
+          "pass": true
+        },
+        {
+          "name": "gp3_14day_estimate",
+          "calculated": 3.73,
+          "stated": 3.73,
+          "pass": true
+        },
+        {
+          "name": "AWS_option_B",
+          "calculated": 14.73,
+          "stated": 14.73,
+          "pass": true
+        },
+        {
+          "name": "AWS_option_C",
+          "calculated": 30.73,
+          "stated": 30.73,
+          "pass": true
+        }
+      ],
+      "track_rows": [
+        {
+          "track": "Q, verifier/CI",
+          "S": [
+            8,
+            12
+          ],
+          "F": [
+            20,
+            32
+          ]
+        },
+        {
+          "track": "C, contracts/access",
+          "S": [
+            10,
+            14
+          ],
+          "F": [
+            24,
+            40
+          ]
+        },
+        {
+          "track": "D, schema/stock",
+          "S": [
+            10,
+            14
+          ],
+          "F": [
+            32,
+            48
+          ]
+        },
+        {
+          "track": "R, intake backend",
+          "S": [
+            4,
+            6
+          ],
+          "F": [
+            24,
+            40
+          ]
+        },
+        {
+          "track": "U, cellar/intake UI",
+          "S": [
+            4,
+            6
+          ],
+          "F": [
+            20,
+            32
+          ]
+        },
+        {
+          "track": "K, public identity/knowledge",
+          "S": [
+            0,
+            0
+          ],
+          "F": [
+            24,
+            40
+          ]
+        },
+        {
+          "track": "T, Toast",
+          "S": [
+            0,
+            0
+          ],
+          "F": [
+            24,
+            48
+          ]
+        },
+        {
+          "track": "O, operations/lifecycle",
+          "S": [
+            8,
+            12
+          ],
+          "F": [
+            24,
+            40
+          ]
+        },
+        {
+          "track": "Review/integration overhead",
+          "S": [
+            12,
+            20
+          ],
+          "F": [
+            72,
+            128
+          ]
+        }
+      ],
+      "limitation": "Checks arithmetic only; estimates, staffing, actual model throughput, costs and deadline feasibility are not approved."
+    },
+    {
+      "check": "local_markdown_links_resolve",
+      "status": "FAIL",
+      "checked": 28,
+      "missing": [
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 3,
+          "target": "ci/sample.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/sample.json",
+          "exists": false,
+          "outside_package": false
+        }
+      ],
+      "outside_package_count": 1,
+      "links": [
+        {
+          "from": "01-evidence.md",
+          "line": 13,
+          "target": "https://github.com/ZeroSum-Solutions/terroir/actions/runs/33962752544",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "02-architecture-data.md",
+          "line": 37,
+          "target": "database-dispositions.csv",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "05-ci-tests.md",
+          "line": 9,
+          "target": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request-with-a-merge-queue?tool=webui",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "05-ci-tests.md",
+          "line": 33,
+          "target": "https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "05-ci-tests.md",
+          "line": 33,
+          "target": "https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "05-ci-tests.md",
+          "line": 33,
+          "target": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 19,
+          "target": "https://aws.amazon.com/ec2/instance-types/c7i/",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 27,
+          "target": "https://aws.amazon.com/ebs/pricing/?nc=nsb&pg=faq",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 29,
+          "target": "https://www.blacksmith.sh/pricing",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 33,
+          "target": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 33,
+          "target": "https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-instance-permissions.html",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "06-capacity.md",
+          "line": 37,
+          "target": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/UsingAlarmActions.html",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 37,
+          "target": "01-evidence.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/01-evidence.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 38,
+          "target": "02-architecture-data.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 38,
+          "target": "database-dispositions.csv",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 39,
+          "target": "03-delivery.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/03-delivery.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 39,
+          "target": "scope.csv",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/scope.csv",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 40,
+          "target": "04-ownership.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/04-ownership.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 40,
+          "target": "dependency-graph.mmd",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/dependency-graph.mmd",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 41,
+          "target": "05-ci-tests.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 41,
+          "target": "tests.csv",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/tests.csv",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 42,
+          "target": "06-capacity.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/06-capacity.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 43,
+          "target": "07-protocol.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/07-protocol.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 44,
+          "target": "08-risks-cleanup.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/08-risks-cleanup.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 45,
+          "target": "09-review.md",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/09-review.md",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "START-HERE.md",
+          "line": 45,
+          "target": "verification.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/verification.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 3,
+          "target": "ci/sample.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/sample.json",
+          "exists": false,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 4,
+          "target": "ci/statistics.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/statistics.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 5,
+          "target": "ci/merged-pr-cycles.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merged-pr-cycles.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 6,
+          "target": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/ci-evidence.md",
+          "kind": "local",
+          "resolved": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/ci-evidence.md",
+          "exists": true,
+          "outside_package": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 7,
+          "target": "https://github.com/ZeroSum-Solutions/terroir/actions/runs/33962752544",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 10,
+          "target": "ci/protection.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/protection.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "line": 11,
+          "target": "ci/merge-queue.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merge-queue.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 3,
+          "target": "ci/git-worktrees.txt",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-worktrees.txt",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 3,
+          "target": "ci/open-prs.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/open-prs.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 4,
+          "target": "ci/owned-territory.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/owned-territory.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 5,
+          "target": "ci/git-branches.txt",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-branches.txt",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 5,
+          "target": "ci/merged-pr-cycles.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merged-pr-cycles.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 10,
+          "target": "ci/repository-capabilities.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/repository-capabilities.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 10,
+          "target": "ci/merge-queue.json",
+          "kind": "local",
+          "resolved": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merge-queue.json",
+          "exists": true,
+          "outside_package": false
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "line": 10,
+          "target": "https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-a-pull-request-with-a-merge-queue",
+          "kind": "web",
+          "syntax_valid": true,
+          "http_checked": false
+        }
+      ]
+    },
+    {
+      "check": "explicit_source_anchor_paths_and_line_ranges",
+      "status": "PASS",
+      "checked": 107,
+      "invalid": [],
+      "anchors": [
+        {
+          "from": "01-evidence.md",
+          "path": "src/lib/api/auth.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/api/auth.ts",
+          "start": 15,
+          "end": 15,
+          "exists": true,
+          "line_count": 94,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "src/app/api/inventory/save-scan/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/inventory/save-scan/route.ts",
+          "start": 267,
+          "end": 267,
+          "exists": true,
+          "line_count": 321,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "src/domains/import/batch-service.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/batch-service.ts",
+          "start": 1615,
+          "end": 1615,
+          "exists": true,
+          "line_count": 3149,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "src/domains/pours/pour-service.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/pours/pour-service.ts",
+          "start": 52,
+          "end": 52,
+          "exists": true,
+          "line_count": 191,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "e2e/demo-critical-journeys.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/demo-critical-journeys.test.ts",
+          "start": 30,
+          "end": 30,
+          "exists": true,
+          "line_count": 356,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "e2e/bottle-scan-trust.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/bottle-scan-trust.test.ts",
+          "start": 179,
+          "end": 179,
+          "exists": true,
+          "line_count": 228,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": ".github/workflows/ci.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "start": 65,
+          "end": 65,
+          "exists": true,
+          "line_count": 247,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "src/app/api/export/toast-csv/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/export/toast-csv/route.ts",
+          "start": 12,
+          "end": 12,
+          "exists": true,
+          "line_count": 71,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "docs/RESTORE-DRILL.md",
+          "resolved": "/Users/zero/projects/terroir/docs/RESTORE-DRILL.md",
+          "start": 110,
+          "end": 110,
+          "exists": true,
+          "line_count": 206,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "scripts/build-schema-snapshot.mjs",
+          "resolved": "/Users/zero/projects/terroir/scripts/build-schema-snapshot.mjs",
+          "start": 8,
+          "end": 8,
+          "exists": true,
+          "line_count": 29,
+          "line_range_valid": true
+        },
+        {
+          "from": "01-evidence.md",
+          "path": "src/app/list/[slug]/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/list/[slug]/page.tsx",
+          "start": 36,
+          "end": 36,
+          "exists": true,
+          "line_count": 421,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/docs/ARCHITECTURE.md",
+          "resolved": "/Users/zero/projects/terroir/docs/ARCHITECTURE.md",
+          "start": 3,
+          "end": 3,
+          "exists": true,
+          "line_count": 70,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/inventory/save-scan/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/inventory/save-scan/route.ts",
+          "start": 117,
+          "end": 117,
+          "exists": true,
+          "line_count": 321,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/cellar/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/cellar/page.tsx",
+          "start": 62,
+          "end": 62,
+          "exists": true,
+          "line_count": 475,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/api/auth.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/api/auth.ts",
+          "start": 15,
+          "end": 15,
+          "exists": true,
+          "line_count": 94,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/api/resolve-active-membership.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/api/resolve-active-membership.ts",
+          "start": 36,
+          "end": 36,
+          "exists": true,
+          "line_count": 66,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/types/database.ts",
+          "resolved": "/Users/zero/projects/terroir/src/types/database.ts",
+          "start": 754,
+          "end": 754,
+          "exists": true,
+          "line_count": 3008,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/inventory/save-scan/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/inventory/save-scan/route.ts",
+          "start": 231,
+          "end": 231,
+          "exists": true,
+          "line_count": 321,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/import/batch-service.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/batch-service.ts",
+          "start": 1615,
+          "end": 1615,
+          "exists": true,
+          "line_count": 3149,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/pours/pour-service.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/pours/pour-service.ts",
+          "start": 52,
+          "end": 52,
+          "exists": true,
+          "line_count": 191,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/stock-adjustments/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/stock-adjustments/route.ts",
+          "start": 21,
+          "end": 21,
+          "exists": true,
+          "line_count": 92,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/api/idempotency.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/api/idempotency.ts",
+          "start": 19,
+          "end": 19,
+          "exists": true,
+          "line_count": 262,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/atlas/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/atlas/page.tsx",
+          "start": 11,
+          "end": 11,
+          "exists": true,
+          "line_count": 77,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/search/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/search/route.ts",
+          "start": 249,
+          "end": 249,
+          "exists": true,
+          "line_count": 376,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/export/toast-csv/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/export/toast-csv/route.ts",
+          "start": 12,
+          "end": 12,
+          "exists": true,
+          "line_count": 71,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/wine-list/shapes.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/wine-list/shapes.ts",
+          "start": 34,
+          "end": 34,
+          "exists": true,
+          "line_count": 35,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/context/restaurant.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/lib/context/restaurant.tsx",
+          "start": 5,
+          "end": 5,
+          "exists": true,
+          "line_count": 32,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/scan/scanner.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/scan/scanner.tsx",
+          "start": 514,
+          "end": 514,
+          "exists": true,
+          "line_count": 806,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/architecture-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/cellar/types.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/cellar/types.ts",
+          "start": 24,
+          "end": 24,
+          "exists": true,
+          "line_count": 159,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "start": 65,
+          "end": 65,
+          "exists": true,
+          "line_count": 247,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "e2e/one-row-rule.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/one-row-rule.test.ts",
+          "start": 137,
+          "end": 137,
+          "exists": true,
+          "line_count": 273,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "/Users/zero/projects/terroir/playwright.config.ts",
+          "resolved": "/Users/zero/projects/terroir/playwright.config.ts",
+          "start": 27,
+          "end": 30,
+          "exists": true,
+          "line_count": 44,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "e2e/lists-insights-role.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/lists-insights-role.test.ts",
+          "start": 49,
+          "end": 49,
+          "exists": true,
+          "line_count": 157,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "src/domains/import/import-hardening-live.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/import-hardening-live.test.ts",
+          "start": 362,
+          "end": 362,
+          "exists": true,
+          "line_count": 402,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "start": 79,
+          "end": 86,
+          "exists": true,
+          "line_count": 247,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/ci-summary.md",
+          "path": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "start": 41,
+          "end": 54,
+          "exists": true,
+          "line_count": 247,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/wine-intelligence/enrich.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/wine-intelligence/enrich.ts",
+          "start": 118,
+          "end": 119,
+          "exists": true,
+          "line_count": 166,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/domains/import/dedup-key.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/dedup-key.ts",
+          "start": 5,
+          "end": 19,
+          "exists": true,
+          "line_count": 202,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/wines/[id]/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/wines/[id]/route.ts",
+          "start": 23,
+          "end": 23,
+          "exists": true,
+          "line_count": 144,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/app/(app)/cellar/wine-detail-drawer.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/cellar/wine-detail-drawer.tsx",
+          "start": 400,
+          "end": 407,
+          "exists": true,
+          "line_count": 639,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/insights/enrich-cellar-button.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/insights/enrich-cellar-button.tsx",
+          "start": 27,
+          "end": 35,
+          "exists": true,
+          "line_count": 140,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/src/worker/index.ts",
+          "resolved": "/Users/zero/projects/terroir/src/worker/index.ts",
+          "start": 19,
+          "end": 20,
+          "exists": true,
+          "line_count": 83,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/domains/scanning/invoice-extraction-stage.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/scanning/invoice-extraction-stage.ts",
+          "start": 25,
+          "end": 31,
+          "exists": true,
+          "line_count": 78,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/scripts/build-atlas-geo.ts",
+          "resolved": "/Users/zero/projects/terroir/scripts/build-atlas-geo.ts",
+          "start": 15,
+          "end": 25,
+          "exists": true,
+          "line_count": 98,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/app/(app)/atlas/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/atlas/page.tsx",
+          "start": 12,
+          "end": 42,
+          "exists": true,
+          "line_count": 77,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/wine-intelligence/batch.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/wine-intelligence/batch.ts",
+          "start": 272,
+          "end": 286,
+          "exists": true,
+          "line_count": 352,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/lib/reconcile-ledger/index.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.ts",
+          "start": 312,
+          "end": 399,
+          "exists": true,
+          "line_count": 571,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/docs/superpowers/plans/2026-09-03-wine-page.md",
+          "resolved": "/Users/zero/projects/terroir/docs/superpowers/plans/2026-09-03-wine-page.md",
+          "start": 1442,
+          "end": 1448,
+          "exists": true,
+          "line_count": 1518,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "src/app/api/wines/refresh-retail-batch/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/wines/refresh-retail-batch/route.ts",
+          "start": 40,
+          "end": 49,
+          "exists": true,
+          "line_count": 191,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "/Users/zero/projects/terroir/scripts/verify-feature-ledger.mjs",
+          "resolved": "/Users/zero/projects/terroir/scripts/verify-feature-ledger.mjs",
+          "start": 15,
+          "end": 15,
+          "exists": true,
+          "line_count": 398,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/cleanup-summary.md",
+          "path": "docs/_archive/README.md",
+          "resolved": "/Users/zero/projects/terroir/docs/_archive/README.md",
+          "start": 28,
+          "end": 40,
+          "exists": true,
+          "line_count": 40,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/scripts/build-schema-snapshot.mjs",
+          "resolved": "/Users/zero/projects/terroir/scripts/build-schema-snapshot.mjs",
+          "start": 8,
+          "end": 12,
+          "exists": true,
+          "line_count": 29,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/AGENTS.md",
+          "resolved": "/Users/zero/projects/terroir/AGENTS.md",
+          "start": 57,
+          "end": 60,
+          "exists": true,
+          "line_count": 208,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "docs/runbooks/production-migrations.md",
+          "resolved": "/Users/zero/projects/terroir/docs/runbooks/production-migrations.md",
+          "start": 16,
+          "end": 19,
+          "exists": true,
+          "line_count": 138,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/supabase/migrations/0001_auth_boundary.sql",
+          "resolved": "/Users/zero/projects/terroir/supabase/migrations/0001_auth_boundary.sql",
+          "start": 24,
+          "end": 48,
+          "exists": true,
+          "line_count": 158,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/supabase/migrations/0002_phase2_schema.sql",
+          "resolved": "/Users/zero/projects/terroir/supabase/migrations/0002_phase2_schema.sql",
+          "start": 93,
+          "end": 103,
+          "exists": true,
+          "line_count": 391,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "docs/RESTORE-DRILL.md",
+          "resolved": "/Users/zero/projects/terroir/docs/RESTORE-DRILL.md",
+          "start": 139,
+          "end": 139,
+          "exists": true,
+          "line_count": 206,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/docs/runbooks/database-backup-restore.md",
+          "resolved": "/Users/zero/projects/terroir/docs/runbooks/database-backup-restore.md",
+          "start": 145,
+          "end": 167,
+          "exists": true,
+          "line_count": 359,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "docs/RESTORE-DRILL.md",
+          "resolved": "/Users/zero/projects/terroir/docs/RESTORE-DRILL.md",
+          "start": 110,
+          "end": 129,
+          "exists": true,
+          "line_count": 206,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/.github/workflows/db-backup.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/db-backup.yml",
+          "start": 167,
+          "end": 205,
+          "exists": true,
+          "line_count": 411,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "docs/RESTORE-DRILL.md",
+          "resolved": "/Users/zero/projects/terroir/docs/RESTORE-DRILL.md",
+          "start": 187,
+          "end": 191,
+          "exists": true,
+          "line_count": 206,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/import/dedup-key.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/dedup-key.ts",
+          "start": 45,
+          "end": 59,
+          "exists": true,
+          "line_count": 202,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "src/lib/pricing-recommendations/recompute.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/pricing-recommendations/recompute.ts",
+          "start": 108,
+          "end": 108,
+          "exists": true,
+          "line_count": 337,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.ts",
+          "start": 312,
+          "end": 399,
+          "exists": true,
+          "line_count": 571,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/identity/tenant-isolation.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/identity/tenant-isolation.test.ts",
+          "start": 144,
+          "end": 171,
+          "exists": true,
+          "line_count": 470,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "src/domains/cellar/wine-ownership-write-policies.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/cellar/wine-ownership-write-policies.test.ts",
+          "start": 18,
+          "end": 49,
+          "exists": true,
+          "line_count": 180,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/database-summary.md",
+          "path": "src/test/live-db-target.ts",
+          "resolved": "/Users/zero/projects/terroir/src/test/live-db-target.ts",
+          "start": 15,
+          "end": 38,
+          "exists": true,
+          "line_count": 40,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": "/Users/zero/projects/terroir/CLAUDE.md",
+          "resolved": "/Users/zero/projects/terroir/CLAUDE.md",
+          "start": 1,
+          "end": 1,
+          "exists": true,
+          "line_count": 1,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": "AGENTS.md",
+          "resolved": "/Users/zero/projects/terroir/AGENTS.md",
+          "start": 24,
+          "end": 24,
+          "exists": true,
+          "line_count": 208,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": ".claude/launch.json",
+          "resolved": "/Users/zero/projects/terroir/.claude/launch.json",
+          "start": 7,
+          "end": 7,
+          "exists": true,
+          "line_count": 11,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": ".claude/skills/playwright-cli/SKILL.md",
+          "resolved": "/Users/zero/projects/terroir/.claude/skills/playwright-cli/SKILL.md",
+          "start": 1,
+          "end": 4,
+          "exists": true,
+          "line_count": 259,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": "/Users/zero/projects/terroir/AGENTS.md",
+          "resolved": "/Users/zero/projects/terroir/AGENTS.md",
+          "start": 52,
+          "end": 52,
+          "exists": true,
+          "line_count": 208,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/harness-evidence.md",
+          "path": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "resolved": "/Users/zero/projects/terroir/.github/workflows/ci.yml",
+          "start": 48,
+          "end": 48,
+          "exists": true,
+          "line_count": 247,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/demo-critical-journeys.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/demo-critical-journeys.test.ts",
+          "start": 138,
+          "end": 138,
+          "exists": true,
+          "line_count": 356,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/team/members/[id]/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/team/members/[id]/route.ts",
+          "start": 73,
+          "end": 73,
+          "exists": true,
+          "line_count": 111,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/api/auth.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/api/auth.test.ts",
+          "start": 134,
+          "end": 134,
+          "exists": true,
+          "line_count": 221,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "e2e/auth-real-provider.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/auth-real-provider.test.ts",
+          "start": 14,
+          "end": 14,
+          "exists": true,
+          "line_count": 162,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/demo-critical-journeys.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/demo-critical-journeys.test.ts",
+          "start": 30,
+          "end": 44,
+          "exists": true,
+          "line_count": 356,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/bottle-scan-trust.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/bottle-scan-trust.test.ts",
+          "start": 179,
+          "end": 190,
+          "exists": true,
+          "line_count": 228,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/scan/scanner.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/scan/scanner.tsx",
+          "start": 550,
+          "end": 550,
+          "exists": true,
+          "line_count": 806,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/api/cellar/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/cellar/route.ts",
+          "start": 44,
+          "end": 44,
+          "exists": true,
+          "line_count": 166,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/scan-bottle/views/manual-view.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/scan-bottle/views/manual-view.tsx",
+          "start": 12,
+          "end": 12,
+          "exists": true,
+          "line_count": 57,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/import-journey.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/import-journey.test.ts",
+          "start": 82,
+          "end": 82,
+          "exists": true,
+          "line_count": 214,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/import/p3-live.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/p3-live.test.ts",
+          "start": 310,
+          "end": 310,
+          "exists": true,
+          "line_count": 781,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/import/tenant-isolation.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/import/tenant-isolation.test.ts",
+          "start": 168,
+          "end": 168,
+          "exists": true,
+          "line_count": 445,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/identity/identity-on-write.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/identity/identity-on-write.test.ts",
+          "start": 164,
+          "end": 164,
+          "exists": true,
+          "line_count": 237,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.test.ts",
+          "start": 191,
+          "end": 191,
+          "exists": true,
+          "line_count": 402,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/bins.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/bins.test.ts",
+          "start": 115,
+          "end": 115,
+          "exists": true,
+          "line_count": 131,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/pour-flow.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/pour-flow.test.ts",
+          "start": 239,
+          "end": 239,
+          "exists": true,
+          "line_count": 343,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/opp-10-partial-bottles.spec.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/opp-10-partial-bottles.spec.ts",
+          "start": 107,
+          "end": 107,
+          "exists": true,
+          "line_count": 156,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/domains/pours/pour-service.test.ts",
+          "resolved": "/Users/zero/projects/terroir/src/domains/pours/pour-service.test.ts",
+          "start": 105,
+          "end": 105,
+          "exists": true,
+          "line_count": 249,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/reconcile-queue.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/reconcile-queue.test.ts",
+          "start": 15,
+          "end": 15,
+          "exists": true,
+          "line_count": 311,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/e2e/lists-insights-role.test.ts",
+          "resolved": "/Users/zero/projects/terroir/e2e/lists-insights-role.test.ts",
+          "start": 25,
+          "end": 25,
+          "exists": true,
+          "line_count": 157,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/list/[slug]/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/list/[slug]/page.tsx",
+          "start": 23,
+          "end": 23,
+          "exists": true,
+          "line_count": 421,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/app/(app)/atlas/page.tsx",
+          "resolved": "/Users/zero/projects/terroir/src/app/(app)/atlas/page.tsx",
+          "start": 11,
+          "end": 11,
+          "exists": true,
+          "line_count": 77,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/playwright.config.ts",
+          "resolved": "/Users/zero/projects/terroir/playwright.config.ts",
+          "start": 27,
+          "end": 42,
+          "exists": true,
+          "line_count": 44,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/src/test/live-db-target.ts",
+          "resolved": "/Users/zero/projects/terroir/src/test/live-db-target.ts",
+          "start": 30,
+          "end": 30,
+          "exists": true,
+          "line_count": 40,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/journeys-summary.md",
+          "path": "/Users/zero/projects/terroir/scripts/local/assert-local-db.sh",
+          "resolved": "/Users/zero/projects/terroir/scripts/local/assert-local-db.sh",
+          "start": 38,
+          "end": 38,
+          "exists": true,
+          "line_count": 91,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/types/database.ts",
+          "resolved": "/Users/zero/projects/terroir/src/types/database.ts",
+          "start": 1138,
+          "end": 1138,
+          "exists": true,
+          "line_count": 3008,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "supabase/migrations/0098_wine_variants.sql",
+          "resolved": "/Users/zero/projects/terroir/supabase/migrations/0098_wine_variants.sql",
+          "start": 6,
+          "end": 21,
+          "exists": true,
+          "line_count": 208,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/types/database.ts",
+          "resolved": "/Users/zero/projects/terroir/src/types/database.ts",
+          "start": 754,
+          "end": 769,
+          "exists": true,
+          "line_count": 3008,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/lib/reconcile-ledger/index.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/reconcile-ledger/index.ts",
+          "start": 108,
+          "end": 154,
+          "exists": true,
+          "line_count": 571,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/app/api/export/toast-csv/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/export/toast-csv/route.ts",
+          "start": 18,
+          "end": 63,
+          "exists": true,
+          "line_count": 71,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/lib/export/toast-csv.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/export/toast-csv.ts",
+          "start": 54,
+          "end": 62,
+          "exists": true,
+          "line_count": 68,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/app/api/scan/route.ts",
+          "resolved": "/Users/zero/projects/terroir/src/app/api/scan/route.ts",
+          "start": 208,
+          "end": 208,
+          "exists": true,
+          "line_count": 355,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/lib/jobs/enqueue.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/jobs/enqueue.ts",
+          "start": 39,
+          "end": 39,
+          "exists": true,
+          "line_count": 55,
+          "line_range_valid": true
+        },
+        {
+          "from": "evidence/prior-database-contracts.md",
+          "path": "src/lib/pricing-recommendations/recompute.ts",
+          "resolved": "/Users/zero/projects/terroir/src/lib/pricing-recommendations/recompute.ts",
+          "start": 108,
+          "end": 108,
+          "exists": true,
+          "line_count": 337,
+          "line_range_valid": true
+        }
+      ],
+      "limitation": "Existence and bounds only; source claim semantic validation is not part of structural verification."
+    },
+    {
+      "check": "repo_changes_limited_to_planning_package",
+      "status": "PASS",
+      "tracked_changed": [],
+      "untracked": [
+        "docs/plans/2026-09-05-terroir-rebuild/01-evidence.md",
+        "docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md",
+        "docs/plans/2026-09-05-terroir-rebuild/03-delivery.md",
+        "docs/plans/2026-09-05-terroir-rebuild/04-ownership.md",
+        "docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md",
+        "docs/plans/2026-09-05-terroir-rebuild/06-capacity.md",
+        "docs/plans/2026-09-05-terroir-rebuild/07-protocol.md",
+        "docs/plans/2026-09-05-terroir-rebuild/08-risks-cleanup.md",
+        "docs/plans/2026-09-05-terroir-rebuild/09-review.md",
+        "docs/plans/2026-09-05-terroir-rebuild/START-HERE.md",
+        "docs/plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+        "docs/plans/2026-09-05-terroir-rebuild/dependency-edges.json",
+        "docs/plans/2026-09-05-terroir-rebuild/dependency-graph.mmd",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/architecture-summary.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci-summary.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/branch-rules.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-branches.txt",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/git-worktrees.txt",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/guarded-e2e-files.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merge-queue.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/merged-pr-cycles.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/open-prs.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/owned-territory.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/pr-cycle-statistics.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/protection.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/repository-capabilities.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/rulesets.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/ci/statistics.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/claude-lane-smoke.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/cleanup-summary.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/database-summary.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/gemini-lane-smoke.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/git-refs.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/harness-evidence.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/journeys-summary.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/local-capacity.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/prior-database-contracts.md",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/prior-product-decisions.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/sol-lane-smoke.json",
+        "docs/plans/2026-09-05-terroir-rebuild/evidence/tooling-availability.json",
+        "docs/plans/2026-09-05-terroir-rebuild/scope.csv",
+        "docs/plans/2026-09-05-terroir-rebuild/tests.csv",
+        "docs/plans/2026-09-05-terroir-rebuild/verification.json"
+      ],
+      "outside_package": []
+    },
+    {
+      "check": "snapshot_stable_during_checks",
+      "status": "PASS",
+      "changed_during_check": []
+    }
+  ],
+  "result_counts": {
+    "PASS": 12,
+    "FAIL": 1
+  },
+  "supersedes": {
+    "manifest_sha256": "e894ee3a52350b23040f4a936b5cfe7992629e7244821368e7b1415c43d5cc22",
+    "completed_at": "2026-09-06T00:08:32.858234+00:00",
+    "result_counts": {
+      "PASS": 12,
+      "FAIL": 1
+    }
+  },
+  "scope_boundaries": [
+    "No model finding closed",
+    "verification.json content remains root-owned pending final provenance; existence checked only",
+    "External URLs syntax-checked only; no HTTP or semantic validation",
+    "Any later file changes require manifest comparison and relevant rechecks"
+  ],
+  "not_performed": [
+    "application audit",
+    "test execution",
+    "database mutation",
+    "external URL HTTP fetch",
+    "closing model findings",
+    "editing planning package",
+    "readiness approval"
+  ]
+}

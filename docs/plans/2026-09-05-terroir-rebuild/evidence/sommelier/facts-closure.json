@@ -1,0 +1,96 @@
+{
+  "verdict": "FAIL_PENDING_ONE_FACT_CORRECTION_AND_ONE_LICENSE_QUALIFICATION",
+  "scope": "Independent verification of draft.md external claims against claims.checked.jsonl capture_path content and the supplied Hugging Face, npm, and root-repository metadata only. No web expansion.",
+  "checks": {
+    "claim_captures": {
+      "records": 28,
+      "capture_sha256_matches": 28,
+      "exact_quotes_present": 28,
+      "semantic_result": "PASS for the 28 narrow claims as written in claims.checked.jsonl"
+    },
+    "hugging_face_metadata": {
+      "artifacts": 7,
+      "result": "PASS",
+      "supports": [
+        "immutable model revisions",
+        "Qwen pair and MiniLM license field apache-2.0",
+        "multilingual-e5-small and both BGE license field mit",
+        "EmbeddingGemma license field gemma and gated=manual",
+        "published parameter counts are metadata, not measured resident memory"
+      ]
+    },
+    "npm_metadata": {
+      "artifacts": 2,
+      "result": "PASS",
+      "supports": [
+        "ai 7.0.93 declares Apache-2.0",
+        "@ai-sdk/provider 4.0.10 declares Apache-2.0"
+      ]
+    },
+    "root_repository_metadata": {
+      "artifacts": 5,
+      "result": "PASS",
+      "supports": [
+        "Mem0, Graphiti, and Letta report Apache-2.0",
+        "Vercel AI and pgvector GitHub license classification is NOASSERTION",
+        "the separately captured Vercel AI LICENSE text states Apache License 2.0",
+        "the separately captured pgvector LICENSE text contains a broad permission grant"
+      ]
+    },
+    "benchmark_language": {
+      "result": "PASS",
+      "evidence": [
+        "draft.md:119 labels 512 dimensions a hypothesis and requires measurement",
+        "draft.md:125 says no model weights were downloaded or run",
+        "draft.md:154 states none of the proposed measurements has been run",
+        "draft.md:160 labels fixed values as test gates rather than universal guarantees",
+        "draft.md:164 calls the work a researched design, not implemented or benchmarked software"
+      ]
+    }
+  },
+  "unsupported_statements": [
+    {
+      "draft_location": "work/sommelier-research/draft.md:107",
+      "exact_statement": "The inspected repository's last push was in 2024",
+      "reason": "Neither claims.checked.jsonl nor the three supplied repository/package metadata files contain LightFM activity metadata. The captured GitHub page has an empty latest-commit/date rendering, so the year cannot be verified from the authorized evidence set.",
+      "required_disposition": "Remove the sentence, or add a captured immutable repository-metadata receipt that establishes the pushed_at value. No live lookup was performed in this closure."
+    }
+  ],
+  "material_license_qualifications": [
+    {
+      "draft_location": "work/sommelier-research/draft.md:110",
+      "exact_statement": "both repositories report MIT",
+      "status": "literally supported but materially incomplete for RecBole",
+      "reason": "The captured RecBole README simultaneously says 'RecBole uses MIT License' and 'All data and code in this project can only be used for academic purposes.' Presenting only the MIT label can imply rights the same inspected source restricts.",
+      "source": "work/sommelier-research/harvest/recommenders/github.com-3035721414.md:470",
+      "required_disposition": "Add the academic-use conflict and require license review before any non-academic use, or omit RecBole from the rights summary."
+    }
+  ],
+  "nonblocking_precision_notes": [
+    {
+      "draft_location": "work/sommelier-research/draft.md:92",
+      "note": "The capture directly supports that post-scan filtering can return fewer matching rows. 'Can reduce recall' is a reasonable technical inference, and the draft presents benchmarking as future work rather than a Terroir measurement. For maximal source fidelity, use 'can return fewer matching rows.'"
+    },
+    {
+      "draft_location": "work/sommelier-research/draft.md:92",
+      "note": "GitHub reports NOASSERTION for pgvector. The captured license text is permissive, but the metadata does not identify an SPDX license. The draft already discloses NOASSERTION, so this is not blocking."
+    }
+  ],
+  "final_closure": {
+    "verdict": "PASS",
+    "scope": "Verification limited to the two requested dispositions; the initial findings above are retained as audit history.",
+    "dispositions": [
+      {
+        "initial_finding": "LightFM activity year unsupported",
+        "status": "CLOSED",
+        "verification": "work/sommelier-research/harvest/recommenders/api-lyst-lightfm.json identifies lyst/lightfm and records pushed_at=2024-07-24T18:48:54Z. Draft line 107 says only that the inspected repository's last push was in 2024, which is supported."
+      },
+      {
+        "initial_finding": "RecBole MIT statement materially incomplete",
+        "status": "CLOSED",
+        "verification": "Draft line 110 now states both the MIT report and RecBole README's academic-use restriction, excludes RecBole code/data from commercial reuse pending clarification, and avoids implying permissive commercial rights."
+      }
+    ],
+    "remaining_blocking_external_fact_findings": 0
+  }
+}

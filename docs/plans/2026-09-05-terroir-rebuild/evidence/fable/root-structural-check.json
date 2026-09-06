@@ -1,0 +1,31 @@
+{
+  "checked_at": "2026-09-06T00:57:40.272964+00:00",
+  "outcomes": 68,
+  "R": 35,
+  "S_bounded_outcomes": 15,
+  "deferred_R": 20,
+  "test_rows": 57,
+  "S_tags_on_deferred": 0,
+  "future_roles_own_active_S": 0,
+  "dag_nodes": 15,
+  "dag_edges": 21,
+  "acyclic": true,
+  "author_hours": [
+    34,
+    69
+  ],
+  "review_hours": [
+    10.5,
+    17.5
+  ],
+  "qualification_max_hours": 2,
+  "total_hours": [
+    46.5,
+    88.5
+  ],
+  "capacity_hours": 88,
+  "upper_overrun_hours": 0.5,
+  "buffer_days": 3,
+  "gate1_approved": false,
+  "application_tests_run": false
+}

@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-09-06T01:34:30.181885+00:00",
+  "type": "research addendum only",
+  "reviewed_brief_sha256": "10f47399936c3a7d16d4e258f3b2407f120e7dd1221bf675290991525e8aa02f",
+  "independent_verdict": "PASS",
+  "baseline_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "unchanged_original_core_files": 17,
+  "relative_links_checked": 8,
+  "canonical_mirror_equal": true,
+  "file_hashes": {
+    "12-architecture-research.md": "10f47399936c3a7d16d4e258f3b2407f120e7dd1221bf675290991525e8aa02f",
+    "README.md": "bf053e4ed530d4941227907724b92b074c99592401ede67e9e59932809e131a6",
+    "evidence/architecture-research/checks.json": "2fddeafa4f98c011cdcfe58f232ab5c2a6a20680ac4e5609a9e3503cd1bb1bca",
+    "evidence/architecture-research/claims.jsonl": "3d0fb324681d4b614a73cb9fed3d49f27d0405e5806d4c85d84917e6f44817f3",
+    "evidence/architecture-research/sources.json": "1c6fd10165ee81f4b578b72ed4ec89b479c0a0a9e2e8d6318ee690dc6dad0503",
+    "evidence/architecture-research/verification.json": "af9ef609719ee6f85d449ae373b15f8b0a0f80d183268e6086a2af4a6ee87ef1",
+    "evidence/architecture-research/verification.md": "e7469a44bee809d06e6879868c6ce09f6459aed7a901d99127720fe075c8072c"
+  },
+  "manifest_excludes_itself": true
+}

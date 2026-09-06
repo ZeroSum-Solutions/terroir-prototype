@@ -1,0 +1,8 @@
+command: git for-each-ref --format=%(refname:short) %(objectname) %(upstream:short) refs/heads refs/remotes/origin
+exit: 0
+feat/high-leverage-loops-2026-09-04 2846f067a4d9dba32121654796ddee72557d75be origin/feat/high-leverage-loops-2026-09-04
+main abdc661abde43b0ac70a81f740b61d21da7e414b origin/main
+origin abdc661abde43b0ac70a81f740b61d21da7e414b 
+origin/feat/high-leverage-loops-2026-09-04 2846f067a4d9dba32121654796ddee72557d75be 
+origin/main abdc661abde43b0ac70a81f740b61d21da7e414b 
+origin/staging a94b196ad7b5947afec76c6174644cd520bfc932 

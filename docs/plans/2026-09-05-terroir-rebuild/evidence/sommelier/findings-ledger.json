@@ -1,0 +1,162 @@
+[
+  {
+    "id": "OP-F1",
+    "status": "accepted",
+    "disposition": "Private inference stays in approved production boundary; private semantic/generative paths disabled until hosted/validated. Batch index and memory jobs included in tickets, revocation and operating cost."
+  },
+  {
+    "id": "OP-F2",
+    "status": "accepted",
+    "disposition": "Four distinct controls; per-store erasure includes exposures, feedback, personal candidate snapshots/links and traces; PRIV-ERASE-ALL-STORES gate."
+  },
+  {
+    "id": "OP-F3",
+    "status": "evidence resolved",
+    "disposition": "Live HF API per-artifact metadata now included with license, immutable revision and gating. Claims supported; not a training-data rights audit."
+  },
+  {
+    "id": "OP-F4",
+    "status": "partly accepted, evidence resolved",
+    "disposition": "Actual npm ai 7.0.93 and @ai-sdk/provider 4.0.10 both declare Apache-2.0; provider-specific adapter unselected. pgvector LICENSE inspected. NOASSERTION disclosed; unsupported inference that this implies monorepo-specific differing terms rejected."
+  },
+  {
+    "id": "OP-F5",
+    "status": "accepted",
+    "disposition": "First admitted prerequisite-ready slice calibrates capacity; AI-2 alternative to AI-1. No AI enters S."
+  },
+  {
+    "id": "OP-F6",
+    "status": "accepted",
+    "disposition": "Legacy grid and resolveCellarContext credited; target authority gap restated; commercial pricing store explicitly excluded from personal taste."
+  },
+  {
+    "id": "OP-F7",
+    "status": "qualified",
+    "disposition": "AI-1..3 cover motivating examples; AI-4..6 separately admitted. Prior user required public knowledge/map/full experience; cannot downgrade those outcomes to optional product scope."
+  },
+  {
+    "id": "FB-F01",
+    "status": "accepted",
+    "disposition": "AI-1 target ledger/placement prerequisite and AI-2 alternative stated. Reviewer old 2026-09-04 scope path corrected to actual 2026-09-05 package."
+  },
+  {
+    "id": "FB-F02",
+    "status": "issue accepted, suggested grain replaced",
+    "disposition": "Last nine wines = distinct canonical+vintage-state editions, stable event ordering and explicit count/window. Explicit linked experience IDs; reject same-date dedup because legitimate same-day events can differ."
+  },
+  {
+    "id": "FB-F03",
+    "status": "qualified",
+    "disposition": "AI-1..3 deterministic acceptance, LLM optional. AI-4/5 generated experience provider-gated, but cited search cards/filtering remain possible without LLM."
+  },
+  {
+    "id": "FB-F04",
+    "status": "accepted with preserved product scope",
+    "disposition": "AI-2 single-actor personal profile; no new household/cross-context grant features. Required group/business/venue authorization remains intact."
+  },
+  {
+    "id": "FB-F05",
+    "status": "accepted",
+    "disposition": "Six named safety gates apply to every slice, including forged profile IDs, record-text injection, field leaks, revocation and erasure."
+  },
+  {
+    "id": "FB-F06",
+    "status": "accepted",
+    "disposition": "Named proposed terroir-reference-v1 with rights manifest; not an existing approved corpus. Synthetic/owner-authored fixture first; no corpus or hosting = no real-text semantic trial/estimate."
+  },
+  {
+    "id": "FB-F07",
+    "status": "accepted",
+    "disposition": "Offline Python batch writes versioned scores/features to Postgres. No new online Python service by default."
+  },
+  {
+    "id": "FB-F08",
+    "status": "evidence resolved",
+    "disposition": "pgvector permissive PostgreSQL LICENSE cited; HF model/runtime/training-rights distinctions retained."
+  },
+  {
+    "id": "FB-F09",
+    "status": "accepted",
+    "disposition": "Zero observed wrong identity/unauthorized location/cost leak for AI-1 and hard-constraint violations/fabricated evidence for AI-3 acceptance, not universal future-input guarantee."
+  },
+  {
+    "id": "DB-C1",
+    "status": "accepted",
+    "disposition": "AI-2 and matrix require E-005 identity/package plus E-007 lookup alongside personal context/history. First-slice readiness updated; no implicit S picklist equivalence."
+  },
+  {
+    "id": "DB-C2",
+    "status": "accepted",
+    "disposition": "Matrix restricts AI-F03/F06 to personal taste profiles and explicit request context; business taste profiles deferred separately."
+  },
+  {
+    "id": "OP-C1",
+    "status": "accepted, already closed as DB-C2",
+    "disposition": "Matrix business-profile overpromise removed/deferred."
+  },
+  {
+    "id": "OP-C2",
+    "status": "qualified and clarified",
+    "disposition": "AI-6 history bounded by 90-day retention. Insufficient history defers experiment; longer retention separately decided with fresh consent. Extension not presumed necessary."
+  },
+  {
+    "id": "OP-C3",
+    "status": "accepted",
+    "disposition": "Edition selection explicitly uses representative-event ordering before limit nine."
+  },
+  {
+    "id": "OP-C4",
+    "status": "accepted",
+    "disposition": "S synthetic-only boundary unchanged; independently sourced public text requires a separate future trial admission and is not production-derived."
+  },
+  {
+    "id": "FACT-C1",
+    "status": "evidence resolved",
+    "disposition": "LightFM pushed_at 2024-07-24T18:48:54Z in harvest/recommenders/api-lyst-lightfm.json. Verifier was not given this lane API file initially; add it to evidence and closure."
+  },
+  {
+    "id": "FACT-C2",
+    "status": "accepted",
+    "disposition": "RecBole MIT label conflicts with README academic-use restriction. Exclude commercial code/data reuse until clarified."
+  },
+  {
+    "id": "ROOT-C1",
+    "status": "corrected",
+    "disposition": "Preserve E-061 no sponsored organic ranking influence; explicitly gate third-party custody on E-042; remove wishlist E-040 as a personal-paid-price dependency."
+  },
+  {
+    "id": "OP-CR01",
+    "status": "accepted",
+    "disposition": "Historical candidate eligibility evidence now in AI-3 creation/exit and F08; absent evidence means permanent exclusion from temporal training/eval."
+  },
+  {
+    "id": "OP-CR02;FB-FC01",
+    "status": "already clarified as OP-C2",
+    "disposition": "90-day temporal window explicit; later longer retention separately consented, never silently extended."
+  },
+  {
+    "id": "OP-CR03",
+    "status": "already clarified as OP-C3",
+    "disposition": "Edition sorting uses same representative-event key before limit."
+  },
+  {
+    "id": "OP-CR04",
+    "status": "accepted",
+    "disposition": "Every slice proves erasure of each introduced store; all-store consolidated gate retained."
+  },
+  {
+    "id": "OP-CR05",
+    "status": "qualified with explicit criterion",
+    "disposition": "No external private egress is evidence-backed N/A. Future admission must test concrete protocol: no new admissions after revocation, suppress stale responses, account for admitted sends. Strict zero-send requires barrier/provider contract only if that stricter policy is chosen; ordinary checks never claim it."
+  },
+  {
+    "id": "FB-FC02",
+    "status": "evidence supplied; installation gate retained",
+    "disposition": "GitHub API receipts for all recommender repositories now in final packet. Claims are repository metadata only; consumed package/file terms must be verified before installation. RecBole conflict separately disclosed."
+  },
+  {
+    "id": "FB-FC03",
+    "status": "accepted",
+    "disposition": "Edition projection explicitly distinct from package-grained wine_variants; unknown-vintage aggregation disclosed."
+  }
+]

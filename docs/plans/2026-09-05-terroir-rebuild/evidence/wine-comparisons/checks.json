@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-09-06T03:28:35.998149+00:00",
+  "cerebras_embedding_endpoint": "NOT VERIFIED in inspected public index/catalog; no universal absence claim",
+  "milvus_example_embedding_provider": "separate provider/local model placeholder",
+  "milvus_exact_quotes": [
+    "used for generating chat completions",
+    "Create embeddings for your documents using your preferred embedding provider and store them in Milvus."
+  ],
+  "quote_words": 20,
+  "capture_sha256": "a817f5cb40bfbcd00e0c0a3487a4a3f1dec495e89bbeba7bf11710cec58deec1",
+  "model_trials_run": false,
+  "inference_calls_to_cerebras": 0,
+  "applications_changed": false,
+  "matrix_rows": 10,
+  "kind": "Planning/source verification, not implementation acceptance",
+  "draft_sha256": "de66e52db6457cfe1f8ab8e34eaa24f02f23f7a476c5e7464dd8f0a1dd09f411",
+  "matrix_sha256": "02cb4a38ab17bcb9bb012bd79aa3837000afdae35b675619cc0bbd9d9b8d586d",
+  "outcome_references_resolve": true,
+  "original_core_files_unchanged": 17,
+  "original_sommelier_document_unchanged": true,
+  "original_outcomes": 68,
+  "new_AI_slices_admitted_to_S": 0,
+  "gate1_approved": false,
+  "baseline_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "scientific_sources": {
+    "sensory_studies": 4,
+    "sensory_full_text": 1,
+    "sensory_abstract_preview": 3,
+    "climate_full_text": 2
+  },
+  "wine_comparison_accuracy_measured": false,
+  "application_tests_or_benchmarks_run": false,
+  "notebooklm_persistence": "Not performed: pinned profile authentication file unavailable. Durable local project and output copies retained."
+}

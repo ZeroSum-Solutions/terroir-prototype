@@ -1,0 +1,212 @@
+Final correction verification. Inspect complete text and matrix below plus the exact dispositions. Return JSON verdict AGREE or REVISE, remaining concrete defects only, agreement_scope. Max 400 words. Prior expanded reviews already accepted architecture and most claims. Do not force agreement. H1 is rejected with fresh PRIMARY publisher evidence: abstract says "high quality Italian red wines" and Wine samples says "Eleven wines served as stimuli" (10 words quoted total), same DOI/article. H2: full 2018 review explicitly calls berry sugar response non-linear at captured line104; narrowed anyway. H3 adds significant astringency correlation with test shear rate/six-formulation scope. H4 sunshine duration unsupported-field label added. H5 body enumeration expanded and matrix authoritative. H6 non-sensory criteria expressly unproposed/future before admission. FableF2 exact producer/region navigation independent non-AI catalog with later AI tool exposure; related-producer comparison remains AI3; no pilot admission. All other evidence/access/limitations from prior packet unchanged. This is planning agreement, not deployment approval.
+DRAFT SHA256 9bebcad1a3e34d7c8991e838912461ce9294515f067cfb83e0864b350c0d1bd0
+# Wine comparisons, taste profiles and Cerebras
+
+**Planning refinement, September 5, 2026.** Companion to the reviewed AI sommelier plan. No implementation, dependencies, inference spending or pilot-scope change. The prior signed document remains intact; this refinement makes AI-3's content-similarity requirement explicit and distinguishes it from AI-6's later behavioral item similarity.
+
+**Decision:** preserve the architecture and strengthen its comparison contract. Support multiple explicit relationships between wines. Sensory resemblance is one view; producer identity, related producers, origin and regional vintage conditions are others. Personal enjoyment and commercial eligibility remain separate. A purchase/rating score alone cannot describe these relationships.
+
+## What similar means in the product
+
+| Comparison mode | Meaning and computation | What the interface must explain |
+|---|---|---|
+| Similar taste profile | Compare evidence-backed taste, aroma and mouthfeel dimensions, then apply the user's requested variation and constraints | Shared traits, important differences, evidence coverage and vintage scope |
+| Same producer | Exact canonical producer relationship with aliases resolved; distinguish producer, brand, importer and parent company roles | Same named producer does not imply the same grapes, vintage, region or style |
+| Similar producers | Compare supported portfolio styles, grape/region footprint and documented winemaking practices; return facet-specific reasons | Similar in which respects, and which wines/claims support it; no inferred shared ownership or blanket quality score |
+| Same region | Explicit grape-origin/appellation relationships at the requested geographic level | Napa versus a named sub-appellation; multiple-origin blends remain explicit; winery address is not grape origin |
+| Regional vintage comparison | Compare harvest-year conditions within a region or explicitly compare matched region/year contexts | Rainfall timing, temperature/heat, radiation or measured sunshine, source coverage, and any attributed vintage assessment |
+| Personal match | Rank eligible choices using current intent, taste anchors, ratings and separately interpreted repeat purchases | Why this person may enjoy it, with actual evidence; a different quantity from wine similarity |
+
+Use a comparison control with these clear names rather than one opaque similarity percentage. A request can combine them: same producer, a different vintage, drier profile and a stated budget. Contradictory combinations prompt a short clarification rather than silently changing the request. The user can browse producer/region relationships without a personal profile. Knowledge-page navigation and contextual explanations should remain available when sensory coverage is insufficient.
+
+## Producer, region and vintage evidence
+
+Add source-attributed producer roles and wine-origin relationships to the shared catalog. Retain claim validity/version and grape-origin share only when known. Related-producer results need evidence from a declared eligible portion of the portfolio, minimum coverage and disclosure of what is missing; one atypical bottle must not silently represent an entire producer. Use relational links and versioned comparison features; this does not require a graph database.
+
+A regional vintage record is keyed by geographic scope, harvest year and metric-definition version. Store source geometry/stations or grid resolution, observation/growing-season windows, units, completeness/quality flags, aggregation method and a defined historical reference period for anomalies. Rainfall total alone hides timing; seasonal and ripening-period conditions require explicitly defined windows. Respect hemispheres, local growing cycles and known variety/harvest differences. Solar radiation and recorded sunshine duration are different measurements and must retain their names and units. No candidate source for sunshine duration has been identified here; that field stays unavailable until source and variable verification.
+
+Observed weather, derived climate summaries, attributed producer/critic vintage commentary and inferred effects on wine are separate evidence types. Regional weather is contextual evidence, not a measured bottle trait or a direct wine-quality verdict. Compare only commensurate metrics; label missing weather rather than inventing it. Even within an appellation, vineyard water supply, soil, irrigation, canopy, harvest decisions, grape blend and winemaking can differ. Keep aged-bottle condition separate from harvest-year weather.
+
+For USA-first data exploration, [NOAA GHCN-Daily](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily) supplies station-based daily temperature and precipitation observations. [NASA POWER's daily API](https://power.larc.nasa.gov/docs/services/api/temporal/daily/) provides solar and meteorological data. These are candidate inputs, not validated vineyard-level feeds. Before ingestion, verify the chosen variables, spatial/temporal coverage, units, revision/quality semantics and reuse terms. No weather ingestion or model has been built in this research.
+
+The [2018 soil/terroir review](https://doi.org/10.20870/oeno-one.2018.52.2.2208) describes interacting water, soil and climate influences, including sugar responses that vary with the severity of water deficit. A [2024 Corbières study](https://doi.org/10.20870/oeno-one.2024.58.3.7921) compared blends across five sub-regions and two vintages using chemistry and descriptive sensory profiles; blend composition and winemaking mattered, and the authors cautioned that the direct terroir effect needed more controlled study. These support contextual, multi-factor comparisons. They do not justify rules such as more sunlight always means a better wine, or wetter means more acidic.
+
+
+## Cerebras's role
+
+The current [Cerebras documentation index](https://inference-docs.cerebras.ai/llms.txt) lists chat/completion, tool calling and structured-output capabilities. The [public model catalog](https://inference-docs.cerebras.ai/models/overview) lists generative models. No hosted embedding endpoint was verified in the inspected documentation. This does not establish that dedicated/custom arrangements can never support one.
+
+Cerebras's own [Milvus RAG example](https://inference-docs.cerebras.ai/integrations/milvus) uses Cerebras for chat completions and leaves embedding generation to a separate provider or local model. Its example includes random placeholder vectors, which must not be copied into a real retrieval system. Integration with a vector database does not mean Cerebras supplies its embeddings.
+
+Therefore, Cerebras is a candidate for request parsing, source-backed descriptor extraction and conversational explanations. Trial data classes are explicit: synthetic requests and independently sourced, rights-approved public evidence may be considered under the current research authorization; real user text, private notes and profile-derived explanations require the approved inference boundary or an explicit amendment before any inference call. This run spends no Cerebras credits. Keep embedding-model selection separate: the existing Qwen3/E5/BGE shortlist remains an evaluation shortlist. An extraction model may propose a descriptor only from cited evidence and must preserve its subjective/source status; it cannot invent missing sensory measurements. Credits do not settle runtime quality, credit expiry, model access, data retention or hosting. Account-specific credit mechanics remain unverified beyond the separately recorded dashboard observation. Before evaluation, verify actual organization/model access through an authenticated model-list or capability check; the public API probe in this run returned HTTP 403. The index/catalog and integration example are inconsistent about some model names, so sample code is not availability evidence. Determine applicable tier, prompt/log retention, training and deletion terms in writing before sending real private text; the existence of a logs UI alone does not establish that raw prompt content is retained. Private-record use still requires the approved inference boundary or an explicit amendment; the current public-document research authorizes no private-data export.
+
+## Wine profiles and similarity
+
+The proposed profile separates these dimensions. Field names and scales still need wine-reviewer calibration; this is a product schema informed by sensory research, not a universally validated wine taxonomy.
+
+| Profile dimension | Representation |
+|---|---|
+| Perceived sweetness | Dry through sweet, with the original descriptor and tasting context; distinct from residual sugar measurements |
+| Perceived acidity | Sourness/tartness and supported intensity; normalize overlapping language without counting tart and acidic twice |
+| Astringency and bitterness | Separate mouth-drying/puckering sensation from bitter taste; retain tannin descriptions without automatically converting chemical tannin content into either intensity |
+| Body and mouthfeel | Supported body/texture descriptors; alcohol warmth and effervescence separately when applicable; no automatic ABV-to-body conversion |
+| Aroma and flavor | Supported fruit, floral, herbal, spice, earth and oak-related descriptors, intensity and persistence where reported; distinguish an oak-like impression from a documented barrel-aging fact |
+| Measured composition | Residual sugar, pH, titratable acidity and ABV when available, preserving units, method, sample/vintage and provenance; no automatic conversion to subjective taste scores |
+
+An ambiguous user phrase such as “too dry” may mean insufficient sweetness or a mouth-drying sensation. Ask a short contextual clarification when that distinction changes the recommendation. Preserve the user's words and confirmed meaning.
+
+### What the sensory literature supports
+
+| Primary study | Bounded finding | Implication for this plan |
+|---|---|---|
+| [Torri et al., 2013](https://www.sciencedirect.com/science/article/pii/S0950329313000104): aroma mapping and descriptive analysis of 11 Italian reds | Expert/consumer groupings and liking did not describe the same relationships; descriptive and mapping spaces differed | Evaluate sensory resemblance separately from enjoyment and quality judgments |
+| [Liu et al., 2016](https://www.sciencedirect.com/science/article/pii/S0950329315002025): controlled aroma changes in a Pinot Blanc base | Training improved projective mapping; different methods captured qualitative versus intensity differences differently | Define attribute scales, familiarization and repeatability checks; include blind duplicates in reviewer work |
+| [Zamora et al., 2006](https://onlinelibrary.wiley.com/doi/10.1111/j.1745-459X.2006.00085.x): nine trained assessors, acid/sugar mixtures in different media | Sweetness and sourness interacted, with responses differing by medium | Keep perceived taste and composition separate; this supplies no universal chemistry-to-taste conversion |
+| [Laguna et al., 2019](https://www.mdpi.com/2304-8158/8/6/190): six model wines, eight trained assessors and nine experts | Body, astringency, bitterness and alcohol sensation were scored separately; instrumental viscosity did not significantly correlate with perceived body, but did correlate with astringency at 100 s⁻¹ across the six formulations | Preserve distinct sensory dimensions and assessor context instead of using one chemical or physical proxy |
+
+These are sensory experiments, not validations of a production recommendation algorithm. The first three were checked through publisher abstracts/previews; the fourth through full text. Their small or constrained wine sets limit generalization; the fourth used one saliva donor for instrumental tests. The proposed application fields and retrieval approach are our design inferences. Wine-specific accuracy still requires the independent evaluation described below.
+
+Build a versioned sensory representation for each resolved wine edition: producer/cuvée plus vintage state, linked to package identities. Preserve vintage-specific evidence; an unknown-vintage record is not evidence for a particular vintage. Cuvée-level evidence may contribute only as an explicitly generic, lower-confidence layer when the source claim actually describes the cuvée generally; show that scope and let vintage-specific evidence take precedence. A tasting of an unknown vintage is not automatically general cuvée evidence. Non-vintage is a distinct product state, not the unknown-year fallback. Coverage and explanations must distinguish these layers. The original “last nine” counting grain remains unchanged. Package and bottle-condition differences remain visible context, not silently assumed sensory equivalence.
+
+Represent body, perceived acidity, tannin, sweetness, oak, fruit character and other supported descriptors with their source, date, scale, confidence and disagreement. Record value origin (author-stated, normalized from a stated descriptor, or extractor-inferred), source span, normalization/schema revision, extractor model/version and prompt revision. Validate extraction against reviewer-labeled samples before inferred values enter shared profiles; an extractor change creates a new revision and invalidates dependents. Preserve inferred status in comparisons and never attribute inferred numeric intensity to the original author. Measured chemistry and subjective tasting impressions remain separate. Grape, region and winemaking facts can help retrieve candidates; shared Napa/Cabernet labels alone do not establish sensory equivalence. Price, prestige, sponsorship, retailer and current stock are excluded from the sensory-similarity calculation. They can constrain availability, purchase mode or budget separately.
+
+Missing is unknown, never zero. A sparsely described wine must not appear especially similar merely because few dimensions are comparable. The first implementation needs a minimum evidence-coverage rule, scale normalization, explicit categorical handling and abstention. Freeze their exact definitions with the schema owner and wine reviewers before implementation and evaluate them against labeled examples; this document does not declare a best metric or universal threshold.
+
+Use structured sensory comparison as the initial baseline. Evaluate text embeddings of evidence-backed tasting descriptions as a separate candidate source, then evaluate a combined method. Exclude brand, price and promotional prose from the sensory text representation. A generic text embedding's cosine similarity is not a calibrated taste similarity or probability of enjoyment. Embedding trials remain subject to corpus, hosting and model-configuration gates. The per-source rights manifest separately determines ingestion, extraction/derived-vector storage, shared-index versus private-overlay use, retention and user-facing display permissions. Permission to cite a source does not imply the other permissions. Resolve these before the embedding trial and before freezing comparison cards.
+
+Offer **Similar in taste** on a wine page, including shared characteristics, meaningful differences and evidence quality. Style groups are overlapping navigation aids, not one fixed class per wine and not a prerequisite for retrieval. Start with nearest neighbors and supported descriptive tags; add clustering only if users find it useful. A user can explore similar wines from other regions or ask for a deliberate variation such as less oak. Explicit style changes alter the task; they should not be portrayed as the closest sensory match.
+
+## Personal taste and repeated purchases
+
+Preserve several liked/disliked wine anchors and request contexts rather than averaging all tastes into one profile vector. A person may enjoy both dry Riesling and full-bodied Cabernet. For a Napa Cabernet request, use the relevant evidence, current constraints and negative preferences, and cite the exact supporting wines.
+
+Store every real acquisition and rating with its existing provenance. Repeated personal purchases are a separate behavioral signal: distinguish separate purchase occasions from bottles within one case, replayed imports, gifts, restaurant procurement and returns. Repeated voluntary personal purchases can increase the evidence of interest, but never silently become an explicit positive rating. A low personal rating is not overridden merely by purchase volume. Proposed recency/strength rules must be calibrated; no arbitrary event-point total is treated as truth.
+
+The nine-distinct-wine explanation and repeat frequency are separate features. Buying one edition repeatedly still contributes one edition to “last nine wines”; its eligible repeat occasions may be disclosed separately. Do not invent a rating or make an explanation imply that nine purchases had nine known prices or nine positive experiences.
+
+Later, AI-6 may learn behavioral item-to-item relationships from appropriately consented, exposure-aware history. Such relationships can mean co-interest or substitution, not necessarily similar taste. Keep them labeled and separate from sensory neighbors. The existing retention, deletion, historical-eligibility, purpose and no-sponsored-ranking rules continue to apply.
+
+## Storage and retrieval contract
+
+Conceptual records, not applied tables:
+
+| Record | Purpose and required boundary |
+|---|---|
+| Wine sensory profile | Edition, trait values, source/scale/confidence, evidence coverage and revision. A shared profile uses rights-approved public evidence only. Private notes form scoped overlays. |
+| Comparison configuration | Mode, feature definitions, distance/matching method, missing-value/coverage rules, source scope and version; embedding configuration separately versioned if used. |
+| Producer/origin links | Canonical producer roles, wine grape-origin/appellation links and claim validity; a producer address cannot substitute for grape origin. |
+| Regional vintage context | Region/harvest-year, metric windows/units, weather-source geometry, coverage, aggregation/reference period and provenance; climate summaries separate from attributed vintage commentary. |
+| Wine neighbors | Optional rebuildable top-k cache: source edition, neighbor, configuration, component comparisons, evidence and revisions. Public and private caches never mix. No full pairwise matrix or graph database required. |
+| Personal anchors and signals | Existing profile-owned ratings, acquisitions, repeat occasions and explicit preferences. Multiple taste contexts remain possible; private behavior never enters shared sensory profiles automatically. |
+| Recommendation decision | Authorized eligible candidate set/snapshot, source modes, profile/source revisions, evidence contributions and exposure/feedback references, as required by the original plan. |
+
+At request time: resolve wine/intent and authorized scope; apply mandatory constraints; route each selected comparison mode to exact producer/origin joins, regional-vintage context or sensory/portfolio comparison as appropriate; personalize only where requested using relevant anchors; revalidate eligibility and privacy; render supported comparisons. Keep exact stock/location on live SQL. Cached global top-k sensory neighbors are not a complete eligible search: when budget/availability filters remove them, fall back to a constrained-set exact scan and rank of structured sensory profiles, or report insufficient evidence. Pre-estimation sizing must measure eligible-set size and p95 latency against the largest proposed launch slice; there is no assumed catalog size at which scanning is guaranteed fast. Use bounded scans only with visible incompleteness; add indexing or narrower explicit filters if the latency budget fails, rather than silently returning a cache-only result. Never relax a hard constraint silently.
+
+Corrections, withdrawal and profile erasure invalidate dependent profiles, vectors, neighbor caches and decision evidence under the existing revision/retention protocol. Model jobs cannot publish private overlays into shared indexes. A typed server tool owns retrieval; an LLM supplies no SQL or authorization.
+
+## Slice refinement and acceptance
+
+AI-2 records provenance and repeat occasions without adding a new business taste-profile contract. AI-3 now explicitly includes **choose comparison mode → compare wines/producers/vintages → choose → feedback** journeys, using exact catalog relationships or the appropriate structured baseline before optional embeddings. The supplemental matrix is authoritative for reused-outcome mappings, including E-005/E-024/E-025/E-027/E-046 across producer/origin navigation. Exact same-producer and same-region browsing are non-AI catalog outcomes and do not wait for AI-3 admission; the concierge can expose those same capabilities later. Any pilot inclusion requires a separate explicit scope decision. Related-producer comparison remains in AI-3; regional vintage comparisons require their catalog/weather/source-rights contracts and are separately estimated outcomes, not a cost-free addition. Weather-derived taste prediction is not promised. AI-4's passage retrieval remains distinct. AI-6 owns learned behavioral similarities and metric-learning challengers if warranted by evidence. This is a scope clarification inside the proposed AI work, not approval or a Day-14 estimate.
+
+Before estimating AI-3, first freeze the intended launch population, a representative query set with its sampling basis, the sensory dimensions/coverage rule and comparison modes. Then census the approved target catalog inside its authorized boundary: sourced applicable trait counts, exact-vintage versus generic-cuvée layers, source rights, missingness and projected abstention across regions/styles/price bands. Devin and Rohan own the launch query set and acceptance policy, with proposed reviewer labelers. Proposed feasibility floor for ratification: at least 80% of the frozen representative query set can produce at least one comparable candidate meeting the ratified evidence-coverage rule after mandatory constraints; queries must not be removed after seeing results. This is an engineering proposal, not a published optimum or measured result. Ratify the rule and freeze the query set before measuring. Record edition-level trait coverage separately from per-query answerability; the proposed 80% floor applies to the frozen sensory-comparison query set, not a blend of easy same-producer queries and harder sensory queries. Report each comparison mode separately. Non-sensory mode coverage/accuracy acceptance criteria have not yet been proposed; set and ratify their mode-specific criteria before estimating/admitting those outcomes. The sensory 80% proposal does not apply to them. Defer the affected AI-3 outcome estimation/admission if its ratified criteria are not met; do not silently narrow the promise. After feasibility, finalize the metric baseline, comparison-card contract and a separate held-out acceptance dataset. Use independently labeled wine pairs/triplets and personal preference cases. Rohan coordinates recruitment and the labeling protocol. Development reviewers assist schema/extraction calibration; the final acceptance labelers are a disjoint group of at least two wine reviewers who did not tune that method or see its predictions. All reviewer roles are proposed and not yet booked. Keep development, extraction-validation and held-out acceptance samples separate; do not tune against the final labels. Reviewers label closeness on defined axes with brand/price hidden where practical, record confidence, and flag insufficient evidence. Measure agreement on the same overlap sample before using it to calibrate model acceptance; retain disagreement and use its measured range as context, not as a guaranteed model-performance ceiling. Include same-region wines with different styles, similar styles across regions, vintage differences, missing/conflicting descriptors, multiple taste preferences, repeated cases versus repeat occasions, low-rated repeat purchases, strict budgets, filtered-out neighbors and private-note deletion. Compare metadata-only, structured sensory, text-only and combined methods on held-out wines/producers/vintages as appropriate. Pair similarity and personal recommendation quality need separate evaluations. No test results or wine-specific superiority claims exist yet.
+
+All original safety gates apply. Explanations must cite the actual matching traits and material differences; abstain when evidence is too thin. Broader collaborative models, graph databases and external recommender services remain unnecessary for the first version. The existing Postgres, TypeScript and later optional pgvector architecture still fits.
+
+Companion artifacts: [ten supplemental feature/data acceptance rows](wine-comparison-matrix.csv), [review record](wine-comparison-review-record.md), and [literature access and limitations](evidence/wine-comparisons/literature-sources.json). These supplement the existing scope and sommelier matrix without changing their release classifications.
+
+MATRIX
+id,user_outcome,slice,existing_mapping,conceptual_data,acceptance
+SIM-01,Show similar wines and meaningful taste differences,AI-3,AI-F06;E-005;E-007;E-044,Versioned edition sensory profiles and source coverage,Same region different style;cross-region similar style;unknown vintage;missing traits;source citations
+SIM-02,Find similar wines within actual budget and availability,AI-3,AI-F06;E-044,Authorized eligible set;sensory neighbor query/cache;decision snapshot,Global top-k filtered empty triggers further authorized retrieval or abstention;no silent constraint relaxation
+SIM-03,Recognize repeat personal purchase occasions honestly,AI-2/AI-3,AI-F05;AI-F08;E-036;E-044,Acquisition source IDs;occasion links;purpose;quantity;refund status,Case quantity versus separate occasions;duplicate imports;gift/business exclusion;low-rated repeated purchase;exact-nine grain unchanged
+SIM-04,Support multiple personal tastes and exploratory variations,AI-3,AI-F03;AI-F06;E-038;E-044,Relevant liked/disliked anchors;explicit current request;source-backed traits,Riesling and Cabernet preferences coexist;less-oak request deliberate variation;no average taste collapse
+SIM-05,Learn behavioral neighbors later with clear meaning,AI-6,AI-F13;E-044;E-060;E-061,Consented exposure-aware history;training manifest;retention and deletion,Behavioral similarity never labeled sensory equivalence;expired/private history excluded;organic ranking not sponsored
+SIM-06,Browse wines from the same producer,Non-AI catalog navigation; later AI-3 tool exposure,E-005;E-024;E-027;E-044;E-046,Canonical producer/brand/importer/parent roles;source validity,Aliases resolve;shared parent not misrepresented as same producer;producer location not grape origin
+SIM-07,Discover related producers by a stated dimension,AI-3,E-024;E-027;E-044;E-046,Rights-approved portfolio evidence;style/grape/region/practice facets;coverage,Explain which dimension matches;one atypical bottle not whole producer;no inferred shared ownership or prestige score
+SIM-08,Explore wines from the same region or subregion,Non-AI catalog navigation; later AI-3 tool exposure,E-005;E-024;E-025;E-044,Grape-origin/appellation hierarchy;multiple-origin blends;source scope,Appellation level explicit;multi-region wines preserved;winery address not origin;unknown shares not invented
+SIM-09,Compare regional vintages and weather context,AI-3 separately estimated outcome,E-024;E-025;E-026;E-044,Region/harvest-year contexts;weather source windows/units/geometry/quality;attributed commentary,Rainfall timing;hemisphere/growing-period alignment;solar radiation versus sunshine hours;missing data;no automatic taste or quality claims
+SIM-10,Compare multidimensional wine taste profiles,AI-3,E-005;E-038;E-044,Perceived sweetness/sourness;aroma;body/astringency;chemistry separately;value-origin provenance,Dryness versus mouth drying;chemistry not perceived acidity;extraction checked;multiple preferences;independent held-out panel
+
+DISPOSITIONS
+[
+  {
+    "finding": "Opus F1",
+    "disposition": "Qualified: synthetic/public trials distinct from live-user and profile-derived data; not every parsing prompt is necessarily private."
+  },
+  {
+    "finding": "Opus F2",
+    "disposition": "Reject unsupported inference that inspectable logs prove raw prompt retention; accept written tier/retention/training/deletion determination as private-data precondition."
+  },
+  {
+    "finding": "Opus F3",
+    "disposition": "Accept coverage census and abstention gating; add explicit proposed 80% representative-query feasibility floor for ratification, never a benchmark result."
+  },
+  {
+    "finding": "Opus F4",
+    "disposition": "Accept named planning owners and independent labeling/overlap agreement protocol; participants not claimed recruited."
+  },
+  {
+    "finding": "Opus F5/Fable F4",
+    "disposition": "Accept separate ingest, extract/embed/store, audience/display, retention rights."
+  },
+  {
+    "finding": "Opus F6",
+    "disposition": "Specify constrained-set exact-scan fallback; measured eligible-size/latency gate, no unsupported numeric capacity guarantee."
+  },
+  {
+    "finding": "Opus F7/Fable F3",
+    "disposition": "Point-in-time index/catalog conclusion, live authenticated capability gate, account credit mechanics unverified beyond local dashboard balance."
+  },
+  {
+    "finding": "Fable F1",
+    "disposition": "Qualified: permit generic cuvee layer only if source claim is intentionally cuvee-general, with precedence/provenance. Unknown-year tasting is not generic; NV distinct. Reject unmeasured assertion that most editions lack coverage."
+  },
+  {
+    "finding": "Fable F2",
+    "disposition": "Accept author/normalized/inferred origin, model/prompt/schema revisions and sample extraction accuracy gate."
+  },
+  {
+    "finding": "Opus G1",
+    "disposition": "Accepted: freeze population/query sampling, mode and coverage definitions before census; sensory query answerability and edition trait coverage recorded separately. Proposed floor explicitly means at least one qualified candidate and remains unmeasured."
+  },
+  {
+    "finding": "Opus G2",
+    "disposition": "Accepted: development/schema/extraction reviewers and final acceptance labelers disjoint; samples separate and final labels held out."
+  },
+  {
+    "finding": "Opus G3",
+    "disposition": "Accepted: all recruitment future/proposed; no completed recruitment claimed."
+  },
+  {
+    "finding": "User expanded similarity dimensions",
+    "disposition": "Added same and related producers, grape origin/appellation, region/harvest-year weather context, multi-dimensional sensory schema and four bounded sensory studies. Mode-specific retrieval, independent liking evaluation and no weather-to-taste shortcut."
+  },
+  {
+    "finding": "Opus H1",
+    "disposition": "Rejected after primary publisher verification: Torri abstract explicitly describes Italian red wines; Wine samples states eleven wines. Retain 11 Italian reds. Reviewer packet omitted color in one sample subfield, but main source and other fields included it."
+  },
+  {
+    "finding": "Opus H2 / Fable F1",
+    "disposition": "Qualified: full 2018 review explicitly calls berry sugar response non-linear, so evidence exists. Narrowed draft to sugar responses varying with severity for precision."
+  },
+  {
+    "finding": "Opus H3",
+    "disposition": "Not a factual error in the reported null correlation. Added positive astringency correlation at 100 inverse seconds and six-formulation scope to give fuller context."
+  },
+  {
+    "finding": "Opus H4",
+    "disposition": "Accepted clarification: no sunshine-duration candidate source verified; field unavailable until source/variable verification."
+  },
+  {
+    "finding": "Opus H5",
+    "disposition": "Body list was a subset, not a contradictory mapping. Marked matrix authoritative and expanded indicative catalog list."
+  },
+  {
+    "finding": "Opus H6",
+    "disposition": "Accepted: non-sensory mode coverage/accuracy criteria not proposed; ratify before estimating/admitting these outcomes; sensory feasibility proposal not reused across modes."
+  },
+  {
+    "finding": "Fable F2",
+    "disposition": "Accepted: exact producer/region browsing independent non-AI catalog outcomes; later AI-3 exposes same tools. Related-producer similarity remains AI-3. No pilot admission. Matrix labels updated."
+  }
+]

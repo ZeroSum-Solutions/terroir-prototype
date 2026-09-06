@@ -1,0 +1,17 @@
+{
+  "local_refs": {
+    "exit": 0,
+    "output": "feat/high-leverage-loops-2026-09-04 2846f067a4d9dba32121654796ddee72557d75be origin/feat/high-leverage-loops-2026-09-04\nmain abdc661abde43b0ac70a81f740b61d21da7e414b origin/main\norigin abdc661abde43b0ac70a81f740b61d21da7e414b \norigin/feat/high-leverage-loops-2026-09-04 2846f067a4d9dba32121654796ddee72557d75be \norigin/main abdc661abde43b0ac70a81f740b61d21da7e414b \norigin/staging a94b196ad7b5947afec76c6174644cd520bfc932 \n",
+    "stderr": ""
+  },
+  "remote_heads": {
+    "exit": 0,
+    "output": "2846f067a4d9dba32121654796ddee72557d75be\trefs/heads/feat/high-leverage-loops-2026-09-04\nabdc661abde43b0ac70a81f740b61d21da7e414b\trefs/heads/main\na94b196ad7b5947afec76c6174644cd520bfc932\trefs/heads/staging\n",
+    "stderr": ""
+  },
+  "worktrees": {
+    "exit": 0,
+    "output": "worktree /Users/zero/projects/terroir\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\nbranch refs/heads/main\n\nworktree /Users/zero/projects/terroir-vw\nHEAD abdc661abde43b0ac70a81f740b61d21da7e414b\ndetached\n\n",
+    "stderr": ""
+  }
+}

@@ -1,0 +1,676 @@
+{
+  "schema_version": 1,
+  "steward": "/root/brownfield_database",
+  "steward_role": "non-author consolidation; no self-closure",
+  "updated_at": "2026-09-06T00:15:07.994794+00:00",
+  "phase": "one bounded correction round verified by both original finders; planning findings closed",
+  "packet_sha256": "4e2cd7298446c83ba4998f65956b8d09b04f0fc1adb383c8cc43fea81b6fc232",
+  "original_reports": {
+    "gemini": {
+      "path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-review.md",
+      "sha256": "4815f9ff5b1bd16bdde4effa92d4fc6e28d0e2c616d40c71ceae86ff91f60a60"
+    },
+    "claude": {
+      "path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-review.md",
+      "sha256": "527d512c471c3a22994039fbf10737a0c2a4434923d6af3cc10965e1760be9cc"
+    }
+  },
+  "findings": [
+    {
+      "id": "G-F1",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 1,
+      "original_severity": "P1",
+      "title": "Review Closure Authority Violates Independent Governance Requirement",
+      "original_finding": "#### Finding 1 (P1): Review Closure Authority Violates Independent Governance Requirement\n- **Evidence**: `07-protocol.md` (\"Independent review contract\", para 5): *\"Non-author Q/ledger steward consolidates findings... In this run the database explorer is the ledger steward... external original finders verify closure.\"* vs `START-HERE.md` (\"Read the package\"): Author self-reports `09-review.md` and `verification.json` as completed artifacts within its own authoring package.\n- **Consequence**: An authoring session generating its own review artifacts creates an unverified self-approval loop. While `07-protocol.md` specifies that original finders must close findings, the author packet packages its own verification receipt without distinct harness verification signatures.\n- **Bounded Fix**: Enforce that the ledger steward cannot be an internal agent within the authoring harness. Mandate that review closure receipts (`verification.json`) require explicit signed exit blocks from the external review harnesses (`Claude Code` / `agy`), with closure blocked until finder verification is registered out-of-band.\n- **Closure Condition**: An independent review log signed by Claude and Gemini harness sessions affirming closure of all P0/P1 items without author override.",
+      "disposition": "unsupported",
+      "evidence_assessment": "07-protocol.md:25 assigns different vendor/harness/session/agent to reviewers, while :29 and :38 separately require a non-author steward and original-finder/objective closure. The governing user brief does not require a different harness for the steward. 09-review.md:3 explicitly says pending; START-HERE.md:45 is a link, not evidence of completed self-approval.",
+      "evidence": [
+        "07-protocol.md:25-29",
+        "07-protocol.md:38",
+        "09-review.md:3",
+        "START-HERE.md:45"
+      ],
+      "bounded_correction": "Preserve external finder verification and non-author recording. At delivery include actual receipts/hashes, not invented signatures or an extra steward-harness mandate.",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F1 (P1): Review Closure Authority and Separation of Governance Roles\n- **Status**: **VERIFIED FIXED**\n- **Updated Evidence**: [07-protocol.md](file:///07-protocol.md#L30-L55), [09-review.md](file:///09-review.md#L1-L8).\n- **Evaluation**: The updated text explicitly resolves the circularity:\n  1. [07-protocol.md](file:///07-protocol.md#L30-L45) tabulates explicit per-PR authors, non-author findings stewards, and distinct non-author landers (e.g., C-authored PRs 2, 4, 9 have D as steward and O as lander/controller; Q-authored PRs 1, 8 have D as steward and O as lander).\n  2. [07-protocol.md](file:///07-protocol.md#L50-L55) clarifies that physical state-ledger write custody does not confer findings closure authority; the steward records the receipt, but original external finders or objective CI tests close findings.\n  3. [09-review.md](file:///09-review.md#L1-L8) explicitly states that verification is pending and claims no self-closure or implementation acceptance. The demand for cryptographic signatures is withdrawn as an ungrounded requirement.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "review-role-assignment",
+      "original_finder_status": "VERIFIED FIXED",
+      "closure_note": "Finder labels policy clarification VERIFIED FIXED and explicitly withdraws cryptographic-signature demand. Original same-harness-steward prohibition remains unsupported; initial steward disposition is unchanged. New per-PR role policy is a clarification/safeguard, not proof original author self-approved."
+    },
+    {
+      "id": "G-F2",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 2,
+      "original_severity": "P1",
+      "title": "Critical Feasibility Deficit in Staffing & PR Integration Arithmetic",
+      "original_finding": "#### Finding 2 (P1): Critical Feasibility Deficit in Staffing & PR Integration Arithmetic\n- **Evidence**: `03-delivery.md` (\"Capacity calculation\" & \"Estimated tracks\"): Total effort for $S$ is estimated at 60\u201392 contributor hours across 11 delivery days (88 productive hours assuming 8h/day). The critical path requires 9 serialized PRs. `06-capacity.md` (\"Measured capacity\"): MacBook Pro is explicitly excluded, leaving only *one active builder on Mac Mini initially*.\n- **Consequence**: With a single active builder, serialized integration of 9 distinct PRs (each requiring authoring, running local tests, submitting, 2 independent vendor reviews, and 1 fix round) yields an effective cycle time of 10\u201314 hours per PR (90\u2013126 total hours). An 88-hour budget with a single contributor cannot absorb 92 hours plus 12\u201320 hours of review/integration overhead, causing an immediate schedule slip past Day 11 into the 20% contingency buffer.\n- **Bounded Fix**: Either (a) re-scope $S$ to a maximum of 6 integration PRs (e.g., merging C+D contracts/schema in Wave 1 and Q-defects into baseline setup), or (b) formally lower estimated PR cycle times by enabling concurrent drafting on Mac Mini across decoupled paths while strictly keeping integration serialized.\n- **Closure Condition**: Recalculated capacity model proving that 9 PRs (or a compressed PR set) plus the 12\u201320h review overhead can be completed in $\\le 88$ hours by 1 active builder, leaving Days 12\u201314 (21.4%) untouched.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "03-delivery.md:19-28 sums48-72 build/check hours plus12-20 review/integration to60-92 total; Gemini double-counted overhead. Its10-14h/PR and six-PR fix have no measured basis. Nevertheless92 exceeds the88-hour staffing assumption in :36, while06-capacity.md:7-13 permits one initial builder and build throughput is unmeasured.",
+      "evidence": [
+        "03-delivery.md:19-38",
+        "03-delivery.md:61-65",
+        "06-capacity.md:7-13"
+      ],
+      "bounded_correction": "Show one-builder hours and dependency-limited admission separately from WIP queue arithmetic. State that the high estimate does not fit the pre-buffer budget. Retain buffer and re-scope/NO-GO if measured remaining effort exceeds confirmed capacity; do not lower estimates or combine PRs solely to fit.",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F2 (P1): Critical Feasibility Deficit in Staffing & PR Integration Arithmetic\n- **Status**: **VERIFIED FIXED**\n- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L34-L38), [03-delivery.md](file:///03-delivery.md#L20-L46).\n- **Evaluation**: The feasibility model has been structurally repaired:\n  1. Scope reduction (deferring automated extraction) trimmed 4\u20138 hours from R and U, reducing total contributor-hours from 60\u201392 to 56\u201384 hours ([03-delivery.md](file:///03-delivery.md#L28-L34)).\n  2. Review/integration overhead (12\u201320h) is explicitly accounted for once within the 56\u201384h total, eliminating the double-count.\n  3. The ungrounded WIP multiplier on labor capacity was eliminated. Single-builder capacity is explicitly modeled as 11 days \u00d7 8 productive hours/day = 88 hours ([03-delivery.md](file:///03-delivery.md#L36-L44)).\n  4. At 56\u201384 hours, the high estimate (84h) now fits within the 88-hour pre-buffer envelope without eroding the 20% contingency (Days 12\u201314). [START-HERE.md](file:///START-HERE.md#L52-L55) explicitly makes confirming 8h/day staffing a Gate 1 prerequisite, failing which $S$ remains NO-GO.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "capacity",
+      "original_finder_status": "VERIFIED FIXED",
+      "closure_note": "Initial total already included12-20 review overhead once; finder double-count premise remains rejected. Closure concerns corrected WIP/labor model and explicit manual-only scope reduction to56-84 hours, not removal of duplicate overhead from the original sum."
+    },
+    {
+      "id": "G-F3",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 3,
+      "original_severity": "P1",
+      "title": "Scope S Retains Fragile Dependency on Uncharacterized Inbound Extraction",
+      "original_finding": "#### Finding 3 (P1): Scope S Retains Fragile Dependency on Uncharacterized Inbound Extraction\n- **Evidence**: `03-delivery.md` (\"S: MUST-SHIP evaluation slice\", para 2): *\"Automated extraction is included only through an already authorized working adapter... S may ship manual receiving alone only if recorded as an approved Day3 descope within the selected S option.\"* vs `01-evidence.md`: No verified invoice extraction adapter was characterized or tested during discovery.\n- **Consequence**: Carrying automated extraction into $S$ as a default creates a Day 1\u20133 distraction on third-party OCR/parsing integration, threatening Wave 1 and Wave 2 deliveries.\n- **Bounded Fix**: Flip the default: explicitly baseline $S$ as *manual receiving only*. Make automated invoice/photo extraction an opt-in stretch slice admitted only if Wave 2 finishes ahead of schedule.\n- **Closure Condition**: `scope.csv` and `03-delivery.md` updated to classify automated intake extraction as DEFERRED in the Day-14 $S$ baseline.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "03-delivery.md:9 already gates extraction on authorized working adapter and offers a manual fallback;01-evidence.md:11 identifies mocked receipt-persistence acceptance. A default working adapter was not verified in discovery. A manual-only baseline is a bounded scope choice, not proof the existing adapter is broken.",
+      "evidence": [
+        "03-delivery.md:7-9",
+        "01-evidence.md:11",
+        "05-ci-tests.md:39-51"
+      ],
+      "bounded_correction": "Make selected S baseline manual receiving, with extraction deferred/conditional on independent access and characterization evidence plus measured capacity. Update scope/test/ownership wording consistently; retain original-app extraction characterization.",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F3 (P1): Scope $S$ Retained Fragile Dependency on Uncharacterized Inbound Extraction\n- **Status**: **VERIFIED FIXED**\n- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L38-L41), [03-delivery.md](file:///03-delivery.md#L10-L15), [scope.csv](file:///scope.csv#L10) (row E-008).\n- **Evaluation**: The baseline for $S$ is now explicitly *manual receiving only*. [scope.csv](file:///scope.csv#L10) classifies automated invoice/photo extraction as DEFERRED from the Day-14 $S$ baseline. [03-delivery.md](file:///03-delivery.md#L10-L15) prohibits extraction from consuming reserved buffer or being silently added without a formal scope exchange and authorization.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "manual-baseline",
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "G-F4",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 4,
+      "original_severity": "P2",
+      "title": "Candidate Staging Parity and Branch Protection Gaps",
+      "original_finding": "#### Finding 4 (P2): Candidate Staging Parity and Branch Protection Gaps\n- **Evidence**: `05-ci-tests.md` (\"Safe integration path\", para 1 & 2): *\"Main auto-deploys... Verify actual Railway branch routing and disable unintended candidate production routing only with explicit authorization... candidate protections, queue... requires owner enablement\"*.\n- **Consequence**: If candidate branch protections or Railway deploy isolation cannot be configured before Day 3, reviewed PRs will either sit unmerged or risk deploying candidate code to production infrastructure.\n- **Bounded Fix**: Designate a hard Gate 1 checkpoint requiring explicit proof of Railway deploy decoupling and candidate branch protection rules *before* W1 implementation branches are cut.\n- **Closure Condition**: Written confirmation in Gate 1 minutes of candidate branch isolation and verification that merges to `rebuild/integration` do not trigger production Railway deployments.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "05-ci-tests.md:5-9 already requires a protected candidate and leaves PRs unmerged if protections unavailable;START-HERE.md:51 makes settings authority explicit. Thus no existing permission to deploy unprotected work. Timing can be more explicit, but requiring actual new-branch configuration before Gate1 approval conflicts with setup occurring after authorization.",
+      "evidence": [
+        "05-ci-tests.md:5-9",
+        "START-HERE.md:51",
+        "03-delivery.md:46-48",
+        "06-capacity.md:49"
+      ],
+      "bounded_correction": "Specify a mechanical post-Gate1 prerequisite before W1 landing/connected deployment: destination branch protection and no production auto-deploy verified. Reversible characterization may precede setup; failure holds PRs and triggers existing Day3 NO-GO, without a third owner gate.",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F4 (P2): Candidate Staging Parity and Branch Protection Gaps\n- **Status**: **VERIFIED FIXED**\n- **Updated Evidence**: [START-HERE.md](file:///START-HERE.md#L48-L51), [03-delivery.md](file:///03-delivery.md#L53), [05-ci-tests.md](file:///05-ci-tests.md#L17-L20).\n- **Evaluation**: The operational sequence is now concrete. [05-ci-tests.md](file:///05-ci-tests.md#L17-L20) and [03-delivery.md](file:///03-delivery.md#L53) establish Day 1 (W0) verification of candidate branch protections and Railway routing isolation as a mechanical prerequisite before any W1 feature code lands. Merges remain blocked if protections cannot be enabled, triggering the Day 3 fallback.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "integration-prerequisites",
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "G-F5",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 5,
+      "original_severity": "P2",
+      "title": "Ambiguous Backup Storage Object Inventory vs Database Snapshot",
+      "original_finding": "#### Finding 5 (P2): Ambiguous Backup Storage Object Inventory vs Database Snapshot\n- **Evidence**: `02-architecture-data.md` (\"Retention and transformation proposal\", item 2): *\"Existing Storage metadata is not the bytes. Restore into the approved recovery environment; prove private asset access and revoked access.\"*\n- **Consequence**: While the database restore rehearsal is well-specified, the object storage (Supabase Storage invoice photos/assets) restore procedure lacks a concrete validation script specification in `tests.csv`.\n- **Bounded Fix**: Add an explicit storage-object byte reconciliation check into EV-06/EV-12 ensuring bucket checksums and access policies match production before destructive testing.\n- **Closure Condition**: EV-06 in `tests.csv` updated to include object storage byte-level reconciliation metrics alongside database row counts.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "02-architecture-data.md:42 explicitly requires separate Storage inventory/checksums and :66 requires Storage bytes verified. EV12 in05-ci-tests.md:56 covers object restore, so the procedure is not absent. tests.csv EV06 is less explicit and lacks a named byte-reconciliation artifact.",
+      "evidence": [
+        "02-architecture-data.md:42",
+        "02-architecture-data.md:66",
+        "05-ci-tests.md:50",
+        "05-ci-tests.md:56",
+        "tests.csv:EV-06",
+        "tests.csv:EV-12"
+      ],
+      "bounded_correction": "Add object manifest/reconciliation specification to EV06/EV12 and tests.csv: key/size/content-checksum match, missing/extra bytes, private/public access, revoked access and account/region proof. Expected intentional policy differences must be recorded rather than blindly matching legacy public policy.",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F5 (P2): Ambiguous Backup Storage Object Inventory vs Database Snapshot\n- **Status**: **VERIFIED FIXED**\n- **Updated Evidence**: [05-ci-tests.md](file:///05-ci-tests.md#L61-L64), [tests.csv](file:///tests.csv#L27-L31) (EV-06), [tests.csv](file:///tests.csv#L54-L58) (EV-12).\n- **Evaluation**: EV-06 and EV-12 in [tests.csv](file:///tests.csv#L27-L58) explicitly specify storage-byte count, length, content SHA-256, and access-policy reconciliation alongside database tables. [05-ci-tests.md](file:///05-ci-tests.md#L61-L64) details the exact comparison requirements (100% hashes, extra/missing object reports, permission denial tests).",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "storage-reconciliation",
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "G-F6",
+      "reviewer": "Gemini 3.8 Flash / agy",
+      "original_id": 6,
+      "original_severity": "P3",
+      "title": "Unanchored Performance Baseline Budgets",
+      "original_finding": "#### Finding 6 (P3): Unanchored Performance Baseline Budgets\n- **Evidence**: `05-ci-tests.md` (\"Test/eval artifacts\", provisional workload): Target budgets specified as *p95 \u2264 750ms search/cellar*, *p95 \u2264 1s receipt commit*.\n- **Consequence**: These budgets are speculative targets without historical baseline measurements from the existing codebase, creating a risk of false gate failures or arbitrary acceptance.\n- **Bounded Fix**: Clarify that Day 2 characterization tests (W0) must measure and record the *existing* system's latency on identical synthetic fixtures to calibrate the target thresholds.\n- **Closure Condition**: `tests.csv` EV-11 updated to require current-system baseline recording prior to enforcing target SLA gates.",
+      "disposition": "unsupported",
+      "evidence_assessment": "05-ci-tests.md:58 already says baseline current and target on identical fixture/environment, cold/warm separately, and explicitly labels thresholds proposed pending Gate1, not measured. The alleged missing baseline instruction is contradicted by the packet.",
+      "evidence": [
+        "05-ci-tests.md:55-58",
+        "03-delivery.md:47",
+        "tests.csv:EV-11"
+      ],
+      "bounded_correction": "Optional traceability clarification: put current-system Day2 baseline and target enforcement order directly in EV11/tests.csv. Do not claim an SLA or change thresholds to pass observed bad performance without an approved requirement decision.",
+      "status": "closed_withdrawn_by_original_finder",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification.md",
+        "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/gemini-verification-receipt.json",
+        "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "original_session_confirmed": true,
+        "harness": "Antigravity agy",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "#### G-F6 (P3): Unanchored Performance Baseline Budgets\n- **Status**: **WITHDRAWN AS UNSUPPORTED**\n- **Updated Evidence**: [05-ci-tests.md](file:///05-ci-tests.md#L58-L60), [tests.csv](file:///tests.csv#L50-L53) (EV-11).\n- **Evaluation**: The triage is correct: [05-ci-tests.md](file:///05-ci-tests.md#L58-L60) already specified capturing current baselines on Day 2 on identical fixtures. The updated [tests.csv](file:///tests.csv#L50-L53) explicitly reinforces the sequencing (\"Day 2 current-system same-fixture baseline before target measurement\"). The original criticism of absent baseline instructions was unsupported by the text.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "group": "performance-traceability",
+      "original_finder_status": "WITHDRAWN AS UNSUPPORTED",
+      "closure_note": "Finder withdraws alleged baseline-instruction omission; initial plan already required same-fixture current/target baselines, with traceability sequencing clarified in tests.csv."
+    },
+    {
+      "id": "C-F1",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 1,
+      "original_severity": "P1",
+      "title": "Capacity model multiplies WIP against single-builder productive hours; the adopted 9-PR plan is not supported by its own numbers.",
+      "original_finding": "**1. [P1] Capacity model multiplies WIP against single-builder productive hours; the adopted 9-PR plan is not supported by its own numbers.**\nEvidence: 03-delivery.md \u00a7Capacity calculation \u2014 \"Eleven planned days \u00d78 productive hours/day=88 hours\"; \"At 2PR WIP and effective 12/16/24 productive hours per PR, upper bounds are 14/11/7 merges.\" 06-capacity.md \u00a7Measured capacity \u2014 \"one builder on Mini is the capacity baseline\"; MacBook \"Unavailable for committed capacity.\"\nDefect: 88 h is a *single-stream productive-hour* budget. Multiplying by WIP=2 double-counts a builder who cannot author two PRs simultaneously. Divided correctly, 88 \u00f7 12\u201324 h = **3.7\u20137.3 PRs**, below the adopted 9. Independently, the track table's own total (60\u201392 h) implies 6.7\u201310.2 h/PR across 9 PRs \u2014 below the 12/16/24 band used in the same section. And the upper estimate (92 h) exceeds the 88 h budget before any contingency.\nConsequence: the Conditional GO is issued against a capacity figure roughly 2\u00d7 the supportable one; S predictably overruns into buffer by Day 7\u20138, and the deadline verdict is not honest as stated.\nFix: restate Little's law with elapsed hours in the numerator or drop the WIP multiplier; publish one unit (productive hours). Re-derive the PR count from the corrected bound and reduce S (manual-receipt-only fallback is already specified in 03-delivery.md \u00a7S).\nClosure: revised \u00a7Capacity where PR count \u2264 (available productive hours \u00f7 low-end per-PR hours), and total track hours \u2264 available hours at the *high* estimate, with staffing hours confirmed by the owner.",
+      "disposition": "supported",
+      "evidence_assessment": "03-delivery.md:36 multiplies WIP by one-builder productive hours while calling per-PR cycle productive hours; it mixes author capacity with elapsed work-in-process. The60-92 total includes review overhead but high92>88. Track table implies6.7-10.2h/PR, inconsistent with using12/16/24 productive hours as the same service-cost unit. The deterministic Day7-8 overrun forecast is not established.",
+      "evidence": [
+        "03-delivery.md:15-38",
+        "06-capacity.md:7-13"
+      ],
+      "bounded_correction": "Separate confirmed one-builder author/review capacity from elapsed cycle/queue occupancy; remove unsupported WIP multiplier from productive capacity. Scope-change any reduced estimate explicitly, retain12-20 review overhead and3-day buffer. Conditional admission requires owner hours and Day3 measured remaining work to fit high estimate.",
+      "group": "capacity",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**1 \u2014 VERIFIED FIXED.** 03-delivery \u00a7Capacity now states \"Keep author effort and elapsed queue time separate\u2026 one builder\u2026 88 hours\u2026 **Do not multiply these productive hours by WIP**\u2026 The earlier 12/16/24 productive-hour WIP multiplication is withdrawn,\" and confines Little's law to queue service. Arithmetic checks: 84\u00f79=9.33 and 56\u00f79=6.22 h/PR; 88\u00f79.33\u22489.43 and 88\u00f76.22\u224814.14 PRs. Both closure conditions met \u2014 9 \u2264 14.14, and high estimate 84 \u2264 88. The 60\u201392 \u2192 56\u201384 change is a genuine scope reduction (extraction deferred, \u22122\u20134 R, \u22122\u20134 U; overhead 12\u201320 explicitly unchanged and counted once), stated as such in START-HERE and 03-delivery, not a compressed estimate. Gate 1 item 5 now requires owner confirmation of 8 productive author-hours/day, with 4 h/day \u2192 NO-GO. **Residual, disclosed not defective:** headroom is 4 hours (~4.5%) and 9.43 vs 9 PRs; the plan's own Day-3 measured-effort trigger and \"if observed effort is 12 hours/PR\u2026 S must be reduced again\" carry that risk correctly.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F2",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 2,
+      "original_severity": "P1",
+      "title": "The restore rehearsal sits on Day 11 of the critical path and depends on infrastructure with explicitly unbounded lead time and no fallback.",
+      "original_finding": "**2. [P1] The restore rehearsal sits on Day 11 of the critical path and depends on infrastructure with explicitly unbounded lead time and no fallback.**\nEvidence: 03-delivery.md \u00a7Days and waves, Day 11 \"W5 protected restore rehearsal \u2026 Gate2 readiness\"; 03-delivery.md \u00a7Estimated tracks \"External approval lead time is unbounded until verified\"; 02-architecture-data.md \u00a7Environments \u2014 recovery environment requires \"Owner-approved destination and access\"; 01-evidence.md conflict 2 \u2014 the only drill is a historical Aug 22 PASS.\nConsequence: if owner provisioning of the recovery environment slips past ~Day 8, Gate 2 cannot be met inside 14 days, and buffer Days 12\u201314 (Day 14 also holds the owner Gate 2 decision) cannot absorb it. Day-3 fallbacks in 06-capacity.md cover AWS/MacBook/Blacksmith/queue but **not** the recovery environment.\nFix: move recovery-environment provisioning and a first restore attempt to Wave 0/Day 1\u20133 as a hard prerequisite; add an explicit Day-3 fallback (rehearsal unavailable \u2192 S ships as synthetic demonstration, deadline NO-GO) mirroring the existing Day-3 rule.\nClosure: schedule shows rehearsal start \u2264 Day 5 with a named owner-provisioning date, plus a written fallback branch.",
+      "disposition": "supported",
+      "evidence_assessment": "The first scheduled recovery rehearsal is Day11 (03-delivery.md:56); recovery access is unverified02:26 and external lead time unbounded03:15. Existing Day3 infrastructure fallback06:49 does not explicitly cover recovery. This leaves a required Gate2 dependency late.",
+      "evidence": [
+        "03-delivery.md:15",
+        "03-delivery.md:46-59",
+        "02-architecture-data.md:26",
+        "06-capacity.md:49"
+      ],
+      "bounded_correction": "Assign D/O recovery destination/readiness and first rehearsal to Day1-3, with named authorization prerequisites. If unavailable or failing at checkpoint, retain synthetic demonstration and mark real-pilot deadline NO-GO; no late unplanned critical-path assumption.",
+      "group": "recovery-critical-path",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**2 \u2014 VERIFIED FIXED.** Recovery work moves to W0: Day 1 \"D/O: approve recovery destination, initiate provisioning/restore\"; Day 2 \"first protected restore attempt\"; Day 3 checkpoint; 02 step 2 repeats the Day1/Day2/Day3 sequence. Fallbacks now exist in two places \u2014 re-plan rules (\"if approved recovery environment is unavailable or a first restore has not been attempted, S becomes synthetic-demo-only and the hosted/real-pilot deadline is NO-GO\") and 06-capacity Day 3 list. Day 11 is now \"repeat/finalize already-started restore.\" Closure condition (start \u2264 Day 5 + written fallback) met.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F3",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 3,
+      "original_severity": "P1",
+      "title": "Track C authors, integrates, holds LAND-GO and owns the state ledger; no non-author findings-ledger owner is named for C- or Q-authored slices.",
+      "original_finding": "**3. [P1] Track C authors, integrates, holds LAND-GO and owns the state ledger; no non-author findings-ledger owner is named for C- or Q-authored slices.**\nEvidence: 04-ownership.md \u2014 C owns contracts *and* \"repository state ledger\"; PRs 1,2,4,8,9 are authored by C or Q. 05-ci-tests.md \u2014 \"One integrator locks landing\u2026 LAND-GO requires\u2026 explicit integration authority.\" 07-protocol.md \u2014 \"Non-author Q/ledger steward consolidates findings\"; \"Authors may respond with evidence but may not close their own findings.\"\nConsequence: for the 5 of 9 PRs authored by C or Q, the findings steward is the author, and C effectively self-lands. This breaks the governing requirement's closure-authority rule at exactly the contract/schema boundary where cross-tenant defects would appear.\nFix: name a steward per authoring track (e.g. D stewards C/Q slices, Q stewards D/R/U/O), and separate LAND-GO authority from authorship \u2014 the integrator may not land a PR they authored.\nClosure: 07-protocol.md table mapping every planned PR \u2192 author, steward, lander, with no cell repeating the author.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "04-ownership.md names C/Q authors for fivePRs while07:29 names non-author Q/steward generically. Per-PR substitute roles are not enumerated. However no actual self-closure is shown; existing07:29/38 prohibits it. Governing brief does not independently prohibit an author performing a mechanically authorized merge, so non-author lander is an additional proposed safeguard, not a quoted requirement.",
+      "evidence": [
+        "04-ownership.md:7-12",
+        "04-ownership.md:22-32",
+        "07-protocol.md:29",
+        "07-protocol.md:38"
+      ],
+      "bounded_correction": "Enumerate eachPR author, distinct non-author steward and chosen lander, including C/Q-authored work, with exclusive role/path handoff recorded. Preserve original-finder/objective closure; adoption of separate lander must be labeled project policy rather than an invented user rule.",
+      "group": "review-role-assignment",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**3 \u2014 VERIFIED FIXED.** 07 \u00a7Per-PR author, steward and landing authority supplies the exact table I required; no row repeats the author across author/steward/lander (Q/D/O, C/D/O, D/Q/C, R/Q/C, U/Q/C, O/Q/C). \"C cannot land its own PR\"; the integration-controller lease transfers to O for C/Q-authored slices; \"The state-ledger writer copies the steward's disposition/closure receipt without changing it; physical custody of the file does not grant findings authority\" closes the ledger-custody loophole. 04 and 05 are aligned (\"One non-author integrator, selected by the per-PR table in 07\"). I accept the steward's point that a non-author *lander* is project policy rather than a quoted user rule; the mandated part \u2014 non-author findings ownership and no author self-closure \u2014 is satisfied either way.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F4",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 4,
+      "original_severity": "P1",
+      "title": "Real pilot data is admitted to the candidate environment with no classification, region/account constraint, backup, retention or deletion plan.",
+      "original_finding": "**4. [P1] Real pilot data is admitted to the candidate environment with no classification, region/account constraint, backup, retention or deletion plan.**\nEvidence: 02-architecture-data.md \u00a7Environments \u2014 candidate is \"synthetic or demonstrably anonymized\u2026 new pilot accounts only after Gate2. Real pilot data subsequently treated as production-sensitive\"; \u00a7Retention covers only *existing* environments. START-HERE \u00a7Decision options \u2014 S includes \"reviewed manual/invoice receipt\" for a named business/venue.\nConsequence: real invoices, supplier terms and staff identities land in a project provisioned as a test environment, with no stated backup, no retention clock, no deletion path if the pilot is abandoned, and no approved account/region \u2014 a data-handling exposure the plan otherwise guards carefully for production.\nFix: extend \u00a7Environments and \u00a7Retention to the pilot: named account/region, encrypted backup, retention window, deletion-on-abandon procedure, and Gate 2 checklist rows for each.\nClosure: Gate 2 checklist contains pilot-data backup/retention/deletion items with a named owner.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "02:27 already calls later pilot data production-sensitive;02:31 requires exact account/project/region before any connection, and Gate2 covers backup/access. The claim of no classification or region constraint at all is too broad. Retention02:35 explicitly covers existing assets, leaving the new pilot lifecycle and promotion boundary insufficiently specific.",
+      "evidence": [
+        "02-architecture-data.md:24-35",
+        "02-architecture-data.md:64-76",
+        "START-HERE.md:33"
+      ],
+      "bounded_correction": "Require candidate promotion to an approved production account/region before real pilot intake, with new-pilot encrypted DB/Auth/Storage backup, named owner, retention and abandonment/deletion-review policy. Add explicit Gate2 evidence; no automatic deletion or third owner gate.",
+      "group": "pilot-data-governance",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**4 \u2014 VERIFIED FIXED.** 02 candidate row now requires: \"Before any real pilot identity or receipt, designate it as production within the approved production account and region, with full backup/retention/access policy; otherwise synthetic-only.\" A dedicated pilot-data paragraph names O accountable / D implementing, daily encrypted DB/Auth/config backups, separate object-byte inventory, restore before admission, retention = pilot + 30 days, abandonment path (revoke, export, inventory, explicit deletion approval, no automatic expiry). Gate 2 gains a matching checklist row with \"synthetic-only before this passes.\" Disabling photo upload/extraction in S reduces sensitive-asset collection as a real side benefit. Closure condition met.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F5",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 5,
+      "original_severity": "P2",
+      "title": "Production data classification was not performed and it is not recorded whether inspection was attempted or blocked.",
+      "original_finding": "**5. [P2] Production data classification was not performed and it is not recorded whether inspection was attempted or blocked.**\nEvidence: 02-architecture-data.md \u00a7Environments \u2014 \"treat as sensitive until classified\"; \"No payment-card need is identified; verify schema/asset classification rather than asserting payment data is absent.\" 01-evidence.md \u2014 \"This turn verified local code only.\"\nConsequence: the governing requirement mandates classification; Gate 1 is asked to approve a retention policy over data of unknown class. Fix: record explicitly what access was attempted, what was refused, and what authorization the classification requires. Closure: an access-attempt log plus either the classification or a named blocker.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "Current package classifies data conservatively by schema and says local-only inspection01:3/34. It does not provide actual data inventory or a specific no-attempt/access-limit log. User forbids reading secret values, so a demanded access attempt cannot override that boundary; log deliberate non-attempt rather than fabricate refusal.",
+      "evidence": [
+        "01-evidence.md:3",
+        "01-evidence.md:34",
+        "02-architecture-data.md:24-31"
+      ],
+      "bounded_correction": "State schema-based potential classes and which actual classes/volumes remain unverified; record no live attempt, permitted metadata tooling status and named authorized-operator prerequisite. Do not inspect secret values or production rows merely to satisfy review.",
+      "group": "classification-evidence",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**5 \u2014 VERIFIED FIXED.** 01 \u00a7Classification and access-attempt record now states plainly that no live connection, secret read, row inspection or dump was attempted and **nothing was refused**, names the limiting boundary, gives provisional schema-based classes, and assigns D a future in-boundary classification job reporting categories/counts without exporting records. R17 restates the block. My closure asked for a log plus classification-or-named-blocker; both present. I agree with the steward that demanding an access attempt would conflict with the no-secret boundary \u2014 my finding asked for the record, which is what was delivered.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F6",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 6,
+      "original_severity": "P2",
+      "title": "The six required explorer tables are absent from the package and the substitute table lacks the mandated Confidence column.",
+      "original_finding": "**6. [P2] The six required explorer tables are absent from the package and the substitute table lacks the mandated Confidence column.**\nEvidence: START-HERE.md links \"[Evidence and conflicts](01-evidence.md), including six explorer tables\"; 01-evidence.md \u2014 \"The six summary tables in `evidence/`\"; its own table is Finding | Current evidence | Planning implication. Consequence: no reviewer can weigh claims by confidence or audit the \u2264800-word bound. Fix: inline the six tables in `Claim | Evidence | Confidence | Effect on plan` form. Closure: six tables present, each with a resolving path/line or command result.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "The six tables exist in evidence/ and each has required header/word bound: database568,architecture552,CI626,cleanup582,journeys550,harness590 words. They were omitted from the initial reviewer packet; Claude correctly lists that packet limitation but incorrectly promotes it to absence from the package.",
+      "evidence": [
+        "evidence/database-summary.md",
+        " evidence/architecture-summary.md",
+        " evidence/ci-summary.md",
+        " evidence/cleanup-summary.md",
+        " evidence/journeys-summary.md",
+        " evidence/harness-evidence.md",
+        " packet.txt"
+      ],
+      "bounded_correction": "Include all six tables and relevant receipt indexes in the bounded verification packet. Preserve package files; no unnecessary inline duplication. Finder should withdraw package-absence claim after verifying the supplied tables.",
+      "group": "review-packet-completeness",
+      "status": "closed_withdrawn_by_original_finder",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**6 \u2014 WITHDRAWN AS UNSUPPORTED (package-absence claim).** The six tables exist and carry the mandated `Claim | Evidence | Confidence | Effect on plan` header with resolving paths/lines or command results (`evidence/database-summary.md`, `architecture-summary.md`, `ci-summary.md`, `cleanup-summary.md`, `journeys-summary.md`, `harness-evidence.md`). My \"absent from the package\" framing was wrong; the correct statement was packet incompleteness, which I had separately recorded. The \u2264800-word bound remains asserted by the steward and unverified by me \u2014 not a defect.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "WITHDRAWN AS UNSUPPORTED",
+      "closure_note": "Finder withdraws absent-package claim; required evidence tables existed, were omitted from initial packet, and supplied in verification. Steward separately verified table headers and word counts; no source artifact removal or duplicate inlining needed."
+    },
+    {
+      "id": "C-F7",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 7,
+      "original_severity": "P2",
+      "title": "The known CI failure has no owner under the file-ownership matrix, and ledger-mediated path delegation contradicts the disjointness rule.",
+      "original_finding": "**7. [P2] The known CI failure has no owner under the file-ownership matrix, and ledger-mediated path delegation contradicts the disjointness rule.**\nEvidence: 03-delivery.md Day 2 \u2014 \"current CI defect repro\u2026 CI defect fixed\"; 01-evidence.md \u2014 \"one 390px insights failure\"; 04-ownership.md \u2014 Q's set is \"no business implementation\"; insights routes belong to P (deferred, unassigned); \"C temporarily delegates exact root test-config paths through ledger\" vs. \"Shared ownership is forbidden within a wave.\" Consequence: PR1 either stalls or is landed by an owner outside their file set. Fix: assign the insights fix to a named owner (or descope the test with a logged requirement decision) and replace delegation with a formal single-owner transfer recorded before the wave opens. Closure: PR1 owner named with its exact file list.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "04:9 prohibits Q business implementation while the Day2 existing390px insights fix lands in deferred P territory04:16. Exact exception ownership is absent. Temporary delegation need not contradict disjointness if original owner relinquishes before edits; its mechanics should be explicit rather than declared impossible.",
+      "evidence": [
+        "04-ownership.md:9",
+        "04-ownership.md:16-20",
+        "03-delivery.md:47",
+        "01-evidence.md:13"
+      ],
+      "bounded_correction": "Name PR1 exact tested insight component path and focused test to the Q owner through a pre-wave exclusive ownership transfer; separately assign root test configuration. Preserve regression requirement; do not descope failing selected behavior just to close a check.",
+      "group": "ownership",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**7 \u2014 VERIFIED FIXED.** 04 adds the W0 exact exception manifest: Q alone owns `src/app/(app)/insights/date-range-selector.tsx` (139\u2013175), `insights/page.tsx` (387\u2013388), `date-range-selector.test.tsx` and `e2e/one-row-rule.test.ts`, with P barred while Q holds the lease and ownership returned only after verified landing. Delegation is replaced by exclusive pre-wave transfer for both the insights files and root test config (\"not permission for C and Q to edit concurrently\"), preserving disjointness. PR1's description now names the transfer. Closure condition met; the regression is fixed, not descoped.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED",
+      "closure_note": "Finder wording \"the regression is fixed\" is read only as correction of planned file ownership and preserving regression requirement. The underlying390px insights application failure has NOT been fixed or retested in this planning run."
+    },
+    {
+      "id": "C-F8",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 8,
+      "original_severity": "P2",
+      "title": "\"Demonstrably anonymized\" candidate fixtures have no defined anonymization pipeline, executor or validation.",
+      "original_finding": "**8. [P2] \"Demonstrably anonymized\" candidate fixtures have no defined anonymization pipeline, executor or validation.**\nEvidence: 02-architecture-data.md \u00a7Environments (candidate row); \u00a7Retention step 4 permits real-source rehearsal \"in approved recovery boundary only\" but does not bind the anonymized-fixture export path. Consequence: production-derived rows could leave the approved boundary under an unverified anonymization claim. Fix: require anonymization to execute inside the recovery boundary, with a re-identification check and only the transformed artifact exported, or forbid anonymized data entirely and use synthetic fixtures only (S needs no backfill). Closure: named procedure + validation test, or an explicit synthetic-only rule.",
+      "disposition": "supported",
+      "evidence_assessment": "02:27 allows demonstrably anonymized candidate fixtures without defining generation/approval or validation.02:44 confines real-source rehearsal but does not govern an anonymized export route. Existing data prohibitions do not establish that a claimed anonymization is effective.",
+      "evidence": [
+        "02-architecture-data.md:27-31",
+        "02-architecture-data.md:44",
+        "06-capacity.md:35"
+      ],
+      "bounded_correction": "Make candidate,CI,Mac and generalAWS fixtures synthetic-only; production-derived transformation/rehearsal remains inside approved production account/region with no row/blob export. Remove ambiguous anonymized-export wording consistently.",
+      "group": "synthetic-only",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**8 \u2014 VERIFIED FIXED.** Candidate environment is now \"Synthetic-only production-shaped schemas/fixtures,\" and 02 \u00a7Retention states \"Only synthetic fixtures may leave the approved production boundary\u2026 **No anonymized production-derived export is proposed or permitted by S**\u2026 'anonymized' is not an escape clause,\" echoed in 06 (\"Fixtures must be synthetic\"). In-boundary real-source rehearsal (step 4) is untouched and remains correct. Closure condition met via the explicit synthetic-only rule.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    },
+    {
+      "id": "C-F9",
+      "reviewer": "Claude Opus5 / Claude Code",
+      "original_id": 9,
+      "original_severity": "P3",
+      "title": "Runner-minute and full-suite cost bases are optimistic.",
+      "original_finding": "**9. [P3] Runner-minute and full-suite cost bases are optimistic.**\nEvidence: 03-delivery.md \u2014 \"18 gates\u2026 about 107.6 Blacksmith runner-minutes\"; full-suite figure uses \"21.475-minute median among eight noncancelled failures.\" Assumes one run per PR despite a planned fix round, and prices passing runs from failing-run timings. Fix: add a retry factor and re-baseline once a full run passes. Closure: cost table with stated runs-per-PR assumption \u22652.",
+      "disposition": "partially_supported",
+      "evidence_assessment": "03:38 explicitly estimates18 baseline required runs before retries/setup and identifies full-suite median as failed-run-derived. It is not presented as guaranteed total cost. Review-fix retries and full-suite reruns need visible sensitivity for budget decision; no evidence proves at least two runs perPR always occur.",
+      "evidence": [
+        "03-delivery.md:34-38",
+        "06-capacity.md:21-29"
+      ],
+      "bounded_correction": "Show1x baseline and2x/3x retry sensitivities, label full-suite timing provisional from failures, and rebaseline after first full successful run. Quote actual account rate/credits before spending; do not recast assumptions as observed costs.",
+      "group": "cost-sensitivity",
+      "status": "closed_verified_planning_correction",
+      "closure_receipt": {
+        "verified_by": "original finder",
+        "recorded_by": "/root/brownfield_database non-author steward",
+        "source_report": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification.md",
+        "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+        "receipt_path": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/brownfield/reviews/claude-verification-receipt.json",
+        "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "original_session_confirmed": true,
+        "harness": "Claude Code",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "bounded_fix_round": 1,
+        "verbatim_verification": "**9 \u2014 VERIFIED FIXED (P3).** 03 now budgets \"two PR gate runs per slice\u2026 plus one integration run: 9\u00d73\u00d75.975=161.3\" and applies \"a provisional 1.5 retry factor\u2026 354.3 runner-minutes,\" with \"Re-baseline from the first passing full suite; failed-suite medians can understate complete execution.\" Arithmetic checks (27\u00d75.975=161.325; 236.2\u00d71.5=354.3). Runs-per-PR \u22652 is stated. A 3\u00d7 column is absent, but that is presentational at P3.",
+        "scope": "planning artifact only; no implementation, test, restore or cutover acceptance"
+      },
+      "author_may_close": false,
+      "original_finder_status": "VERIFIED FIXED"
+    }
+  ],
+  "verification_rule": "Authors may respond/fix but may not close. Original finders verify supported corrections or acknowledge evidence-based rejection; objective tests may verify exact invariants. Non-author steward records actual receipts. All15 planning findings now have original-finder receipts.",
+  "verification_packet_required": [
+    "both original reports",
+    "all15 original finding IDs plus evidence dispositions",
+    "updated proposal diff and file hashes",
+    "six required evidence tables",
+    "capacity arithmetic and selected-scope changes",
+    "no author defense beyond factual evidence/corrections",
+    "original-finder response per own finding"
+  ],
+  "summary": {
+    "original_findings": 15,
+    "initial_supported": 3,
+    "initial_partially_supported": 10,
+    "initial_unsupported": 2,
+    "finder_verified_planning_corrections": 13,
+    "finder_withdrawn": 2,
+    "closed": 15,
+    "open": 0
+  },
+  "verification_reports": {
+    "claude": {
+      "receipt": {
+        "lane": "claude",
+        "original_session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+        "packet_sha256": "350028affe3cfdbc07bf1da9a3b29d3445c962b16db83a56827d3f92156bd4d7",
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "exit": 0,
+        "status": "success",
+        "seconds": 78,
+        "has_verification": true,
+        "bounded_fix_round": 1
+      },
+      "report_sha256": "d3b597c7dfea668ca7baa2a0094a8f5b9122998e98df3a7f3edea5eb78f7bc13",
+      "receipt_sha256": "2d71c6f6cada6062704c5c89495367066ae8c921394e1b881747444313293125",
+      "harness": "Claude Code"
+    },
+    "gemini": {
+      "receipt": {
+        "lane": "gemini",
+        "original_session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "session_id": "da2ebe6d-7b8f-4bdd-a7a9-4fbee9607365",
+        "packet_sha256": "6cb7af3c60e6e6b9b6e52bf75d41191a3744cf56e437be4d5885a6a880946223",
+        "requested_model": "gemini-3.8-flash-low",
+        "reported_models": [],
+        "exit": 0,
+        "status": "SUCCESS",
+        "seconds": 13,
+        "has_verification": true,
+        "bounded_fix_round": 1
+      },
+      "report_sha256": "bafb98a4e836077bf8849ebf90ab41f5e7ff1ec5e4d8e57903aea452a7741c5f",
+      "receipt_sha256": "e6700768659ad2da007900431166a396e07e76df486305769b58a85644880967",
+      "harness": "Antigravity agy"
+    }
+  },
+  "limitations": [
+    "All closures verify planning-document corrections or withdrawals only. No application fix, implementation test, restore rehearsal, production migration or Gate2 acceptance occurred.",
+    "The390px insights application failure remains unfixed/unretested; C-F7 closes ownership specification only.",
+    "Both verification receipts match each original session ID. Claude response calls itself fresh-session, but receipt identity establishes original-finder continuation, not a new independent audit.",
+    "Claude requested and reported claude-opus-5. Gemini CLI requested gemini-3.8-flash-low; its response does not echo model identity, so exact returned-model confirmation is unavailable.",
+    "External reviewers used supplied packets without repository/tool verification; live environment, CI history, hardware and throughput claims remain limited to underlying evidence and stated unknowns.",
+    "Gate1 approval is still required. Full35-outcome release in14days remains NO-GO. Manual-only S remains conditional on confirmed8productive hours/day, early recovery/protection checkpoints, measured capacity and intact3-day buffer."
+  ]
+}

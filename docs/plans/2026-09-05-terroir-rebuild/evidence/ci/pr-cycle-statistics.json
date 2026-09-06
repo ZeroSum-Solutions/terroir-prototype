@@ -1,0 +1,26 @@
+{
+  "all": {
+    "n": 30,
+    "median_min": 5.991666666666667,
+    "min_min": 4.9,
+    "max_min": 150.65
+  },
+  "docs-only": {
+    "n": 12,
+    "median_min": 5.558333333333334,
+    "min_min": 4.9,
+    "max_min": 7.65
+  },
+  "dependabot": {
+    "n": 0,
+    "median_min": null,
+    "min_min": null,
+    "max_min": null
+  },
+  "other": {
+    "n": 18,
+    "median_min": 6.291666666666666,
+    "min_min": 5.183333333333334,
+    "max_min": 150.65
+  }
+}

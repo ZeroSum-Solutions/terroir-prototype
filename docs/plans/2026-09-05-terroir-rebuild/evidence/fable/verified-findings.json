@@ -1,0 +1,34 @@
+{
+  "scope_status": "NOT_APPROVED",
+  "gate1_status": "NOT_APPROVED",
+  "review_mode": "read_only",
+  "application_tests_run": false,
+  "base_paths": {
+    "repository": "/Users/zero/projects/terroir",
+    "plan": "/Users/zero/projects/terroir/docs/plans/2026-09-05-terroir-rebuild",
+    "fable_review": "/Users/zero/Documents/Codex/2026-09-04/what-we-re-going-to-be/work/fable-review"
+  },
+  "findings": [
+    {"id":"F1","classification":"supported","correction":"Replace horizontal contract/schema/backend/UI sequencing with explicit read and write spines; land migrations immediately before first consumer.","evidence":["docs/plans/2026-09-05-terroir-rebuild/04-ownership.md:22-32","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:52-57"]},
+    {"id":"F2","classification":"supported","proposal_disposition":"unsupported_as_written","correction":"Use explicit candidate route isolation, withheld direct authenticated DML, narrow actor/scope-validating RPC capabilities, and an enumerated service-role capability list; do not claim RLS distinguishes routes.","evidence":["src/lib/supabase/server.ts:14-38","src/lib/api/auth.ts:21-31","AGENTS.md:42-45","supabase/migrations/0074_public_api_grants.sql:23-27","supabase/migrations/0143_invoice_scan_deletion.sql:133-146"]},
+    {"id":"F3","classification":"supported","correction":"Separate candidate-project restore required before real pilot admission from legacy production migration restore required only before F/destructive cutover.","evidence":["docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md:27","docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md:43-52","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:69"]},
+    {"id":"F4","classification":"supported","correction":"Assign R a candidate-scoped read-only product lookup domain/route; U consumes it; leave legacy unified search unchanged.","evidence":["scope.csv:E-007","docs/plans/2026-09-05-terroir-rebuild/04-ownership.md:11-13","src/app/api/search/route.ts:248-255"]},
+    {"id":"F5","classification":"supported","correction":"Add separate human-hour and owner-window fields; confirm weekend availability; keep 4-8h labeled as an unverified estimate.","evidence":["docs/plans/2026-09-05-terroir-rebuild/START-HERE.md:47-53","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:15","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:38"]},
+    {"id":"F6","classification":"partial","correction":"Re-estimate after characterization; pre-authorize only optional descopes while retaining isolation, idempotency, mobile and desktop paths, and evaluation labeling.","evidence":["docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:22-23","docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md:50-58"]},
+    {"id":"F7","classification":"partial","correction":"Scale to pilot-shaped workloads but retain minimal performance thresholds because E-066 remains S MUST-SHIP.","evidence":["docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md:58","scope.csv:E-066"]},
+    {"id":"F8","classification":"partial","correction":"Keep one authoritative state writer, exact read/write claims, and landing receipts; timed leases are conditional on more than one mutating session.","evidence":["docs/plans/2026-09-05-terroir-rebuild/07-protocol.md:15-21","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:36","docs/plans/2026-09-05-terroir-rebuild/06-capacity.md:64"]},
+    {"id":"F9","classification":"partial","correction":"Use existing all-PR CI, candidate branch protection/freshness, exact-SHA manual E2E, and zero selected-scope skips; defer queue, aggregator, merge-group, sharding, and WIP3.","evidence":[".github/workflows/ci.yml:41-50",".github/workflows/e2e-full.yml:24-30","docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md:27-35"]},
+    {"id":"F10","classification":"supported","correction":"Blank S slice requirements for deferred outcomes or add s_applicability; validate tests.csv against scope.csv. Fable omitted EV-04/E-011.","cases":["tests.csv:11 EV-02/E-011","tests.csv:14 EV-03/E-016","tests.csv:15 EV-03/E-017","tests.csv:18 EV-04/E-011","tests.csv:20 EV-04/E-016","tests.csv:21 EV-04/E-018","tests.csv:22 EV-04/E-019","tests.csv:24 EV-04/E-067","tests.csv:51 EV-11/E-019","tests.csv:53 EV-11/E-067"]},
+    {"id":"F11","classification":"partial","correction":"Keep minimal group-to-business relationship; defer group-wide grants; test business/venue grants and cost capability.","evidence":["scope.csv:E-002","docs/plans/2026-09-05-terroir-rebuild/03-delivery.md:7"]},
+    {"id":"F12","classification":"unsupported","correction":"Do not infer reviewer weakness or higher-tier availability from disposition counts; keep vendor diversity and record model identity limits.","evidence":["docs/plans/2026-09-05-terroir-rebuild/09-review.md:11","docs/plans/2026-09-05-terroir-rebuild/06-capacity.md:58"]},
+    {"id":"F13","classification":"partial","correction":"Label WIP3, queue/sharding, AWS B/C, and legacy compatibility as F/optional; retain candidate retention and restore decisions for S.","evidence":["docs/plans/2026-09-05-terroir-rebuild/05-ci-tests.md:31-35","docs/plans/2026-09-05-terroir-rebuild/06-capacity.md:21-25","docs/plans/2026-09-05-terroir-rebuild/02-architecture-data.md:35-39"]}
+  ],
+  "schedule_audit": {
+    "listed_landings": 8,
+    "author_hours_math": "46-76 correct for listed rows",
+    "review_hours_math": "12-20 correct for eight listed rows",
+    "missing_work": "Protocol activation is described as a separate first PR; fold into V0 or count a ninth landing plus author and 1.5-2.5 review hours.",
+    "day3": "V0+M1+V1 low estimate is 14 author + 4.5 review hours, before protocol and 2-4 owner hours; stretch, not baseline.",
+    "v2a": "Backend-only ownership/exit cannot support the claimed enter-review-confirm user outcome; include minimal U UI or move first user write to the next integrated landing."
+  }
+}

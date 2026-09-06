@@ -1,0 +1,365 @@
+You are the ORIGINAL FINDER closing the ONE consolidated bounded correction to the revised version2 proposal. No tools, web, files, commands or agents. Verify only your remaining findings and changes; do not start a new open-ended audit. Author may respond but only finder/objectiveproof/non-authorsteward closes. Your previous review and its CLI session are preserved. Nothing implemented/tested/deployed; Gate1notapproved, narrowedSnotselected, clocknotstarted. Unresolvedmaterialissuesmustremainvisible. Return <=650words numbered closures with VERIFIED FIXED / WITHDRAWN WITH EVIDENCE / STILL BLOCKING and final AGREE/DISAGREE: architecture and sevenverticalslices,routing andinactiveprepdecisionready forowner; F14dayNO-GO; narrowedSconditionalforecastonlynotupperboundfit,0.5hupperoverrunand8h/dayunverified,firstV0thenV1calibrationmustfitremainingbudgetbeforedeadlineGO. Do not insist on ownerapproval before finishing the planning artifact.
+
+INDEPENDENT TRIAGE
+Non-author Sol verified: Fable conservative range correction supported (34–69 author +10.5–17.5 reviews +2 qualification=46.5–88.5,upper0.5over88). OtherFable residualsV0load,budgetqualificationseparate,targetonlySbaseline,Lunaunprobed,ownerleaks supported/clarified. Gemini G1 partial: genericEV05 conflatedlegacytransformationwithcandidateparity; retaincandidatefixture/schema/backupvalidationratherthandeletegate. G2 EV04Q/U/P andEV11Pleaks supported; D owningDBtestartifact acrossV2 is not D authoringUI; addexplicit s_owner. G3 controllerprose mismatch supported. G4 explicitlyassignOpusapplicationsecurityV3 despiteexistingROLECARDS. G5 concernboundedlegacybugeffortvalid; doNOTquarantineorweakenrequired/selectedscopegate. G6 unsupported,doublecountreviewalready10.5–17.5;4.5slackwasnottotalreviewbudget;20hthresholdarbitrary. Gemini ownoutcomecountswerewrong15SMUSTand20deferredR(not14/21). Gate1ownerapprovalstillpending; anAIcannotconditionallyauthorizeit.
+
+AUTHOR EVIDENCE RESPONSE
+Appliedyourresiduals:perrowV1broad6–10minus3–4=2–7,V2broad14–22minus3–6=8–19,V3broad6–10minus1–2=4–9,othersunchanged,total34–69;10.5–17.5+2=46.5–88.5. Explicitupperover0.5andno4.5slack/no unconditionaldeadlineGO. V0>8h replan;qualificationcountedonceoutsideV0estimate. Sbaseline target-only;Fbaselinelegacy before replacement. Lunaunprobed,Geminihigh actualsuccessfulCLIreceiptnoecho. Ownerleaksfixed inCSV ands_owner. Verify your five residuals and retain original13closure.
+
+UPDATED ARTIFACTS
+FILE START-HERE.md
+# Terroir rebuild plan, version 2
+
+Prepared September 5, 2026 against main abdc661abde43b0ac70a81f740b61d21da7e414b. Planning only and uncommitted. Gate 1 is not approved and the 14-day clock has not started. No app code, migration, root rule, branch, CI setting, infrastructure or deployment changed.
+
+**Keep the existing repository and modular Next.js/Supabase application. Rebuild the ownership and stock boundaries through complete user workflows.** Fable 5.1 audited the plan; its findings were independently checked against source. Version 2 corrects ownership and matrix gaps, tightens candidate isolation and proposes seven landings instead of nine layers. See09 for review status and10 for findings/dispositions.
+
+| Choice | Day-14 outcome | Verdict |
+|---|---|---|
+| F: full 35 R release | Operational restaurant stock, Toast, full public discovery/map and all required release outcomes | **NO-GO in 14 days**; preserve full target and all68 outcomes |
+| S-broad: earlier evaluation scope | Context setup, identity ambiguity tooling, room/bin placement and richer support | Re-estimated58.5–95.5 hours exceeds the88-hour assumption at the upper end; superseded as recommendation |
+| S: narrowed evaluation | Fixed invited venue, approved-product lookup, manual receipt through ledger to cellar, correction/export/revoke/recovery | **Conditional**46.5–88.5 hours, seven landings, one builder,11 planned days plus3 contingency days; upper envelope exceeds88 hours by0.5 hour; early measured capacity must fit before a deadline GO; explicit scope approval required |
+
+S is a functioning supervised receiving evaluation for one named Los Angeles restaurant venue and investor demonstrations. It is not the full release or the restaurant's stock authority. Group/business/venue structure and cross-business isolation exist from day one; a two-business/two-venue synthetic fixture proves boundaries. Restaurant operational records remain external. All full-release and ecosystem ambitions remain in the matrix. Failure to meet S gates yields a labelled synthetic demonstration and gap report, not a production claim.
+
+Bulk coding starts provisionally with Sol high; Opus high owns sensitive SQL/stock work; Sonnet medium handles bounded routine tasks; Fable high handles architecture/re-planning. Fable low also enters a small qualification screen for bulk tasks. Independent Claude/Codex plus Gemini reviews remain mandatory. This is subscription-first routing, with no measured claim that one lane is universally fastest or cheapest.
+
+## Read and review
+
+- [Schedule, scope reductions and estimates](03-delivery.md).
+- [Fable findings and verified decisions](10-fable-decisions.md), [model routing](11-model-routing.md), [review record](09-review.md).
+- [Current-state evidence](01-evidence.md), [architecture and data safety](02-architecture-data.md), [table dispositions](database-dispositions.csv).
+- [Ownership and seven landings](04-ownership.md), [dependency graph](dependency-graph.mmd), [CI/eval specification](05-ci-tests.md).
+- [All68 product outcomes](scope.csv), [requirement/test matrix](tests.csv).
+- [Machines/AWS/capacity](06-capacity.md), [coordination protocol](07-protocol.md), [risks/cleanup](08-risks-cleanup.md).
+- [Preparation checklist](preparation/ACTIVATION-CHECKLIST.md), [draft protocol](preparation/PROJECT-PROTOCOL.draft.md), [qualification plan](preparation/QUALIFICATION.md), [verification receipt](verification.json).
+
+The governing second prompt permits evidence-based scope reduction, fixes the deadline at14 calendar days after Gate1 and reserves at least20% contingency. Those rules supersede the earlier expectation that the full release was automatically achievable in two weeks. The user has not yet accepted this proposed reduction.
+
+## Exact Gate 1 decisions
+
+1. Approve the target architecture and select the narrowed **S as defined in03**, or retain F with the14-day deadline NO-GO. No silent selection of S-broad or extra feature admission.
+2. Approve preservation of all old environments/backups, clean candidate pilot records, selected reference-content policy, candidate backup/restore and retention proposal. S contains no legacy backfill or destructive cleanup; legacy restoration remains required before any later destructive/cutover work.
+3. Authorize protected candidate integration and isolated synthetic deployment/project after account/region/routing/cost verification; candidate merges must not deploy main. S Gate2 would admit this separate environment as supervised production testing, not replace legacy production.
+4. Select infrastructure A (recommended, existing CI/no AWS) or explicitly fund a priced alternative inside the existing$100/month miscellaneous budget. Confirm the$800/month coding subscriptions; no extra usage or new subscription is implied.
+5. Confirm one-builder88-hour capacity assumption, named pilot venue and4–8 estimated owner/Rohan hours with weekend windows; accept the smaller performance workload and evidence gates. Record exact approval timestamp/deadline. Unknown waits and MacBook capacity remain excluded.
+
+First implementation wave after approval: V0 rails/protocol and characterization, then M1 minimal scope schema. Critical path: invited scoped read → atomic receipt schema → complete manual receiving/cellar → revoke/export/recovery → deployed acceptance and Gate2. Gate1 has not occurred; implementation readiness remains **NO-GO pending approval**. This package prepares the work and stops before activation.
+
+
+FILE 03-delivery.md
+# Scope, vertical slices and 14-day capacity
+
+Version 2 replaces the earlier nine horizontal PRs and 56–84-hour estimate. No scope has been approved. All 68 product outcomes and 35 original R requirements remain in scope.csv; bounded evaluation coverage never completes a full release outcome.
+
+## Scope choices
+
+F is the full restaurant release: operational stock authority, group operations, full intake and stock workflows, real Toast, public discovery/knowledge/map and all other 35 R outcomes. Estimated 264–448 contributor-hours, 22–30 integration PRs, 20–32 critical-path calendar days before contingency and external lead times. These remain planning estimates; F is NO-GO in 14 days.
+
+S-broad is the earlier evaluation proposal, including context selection, ambiguous identity review, editable cellar placement and richer support. Re-estimated author effort is 46–76 hours. Seven landings require 10.5–17.5 review/integration hours, plus up to 2 qualification hours: 58.5–95.5 total. Its upper range exceeds the 88-hour capacity assumption. It is not the recommended 14-day baseline.
+
+**S is the newly narrowed recommendation, requiring explicit Gate 1 selection:** invited owner/staff signs in to a fixed assigned business/venue, sees scoped cellar stock, chooses an approved product/package, enters and reviews a manual receipt, confirms it once, then sees the persisted lot. The operator can make an attributed reversal/correction, export the evaluation records, revoke access and pause/recover the evaluation. Cost visibility remains separately granted. Group → business → venue structure exists from day one; fixture coverage spans two businesses and two venues. One named pilot venue tests the workflow. The restaurant continues its authoritative operational records outside S.
+
+S1 scope/grants; S2 approved product/package selection; S3 reviewed manual receipt and retry; S4 atomic immutable receipt/events/balance/correction; S5 scoped cellar and cost separation; S6 export/revoke/recovery and blocked unsupported writers; S7 real persistence, isolation, performance and deployed recovery evidence.
+
+Explicit reductions from S-broad: fixed context per invitation instead of a context-switching setup UI; approved catalog picklist with a clear unsupported-product state instead of identity merge/ambiguity tooling; venue-level placement instead of room/bin editors; scoped CSV and an operator runbook instead of a support dashboard. These save an estimated 7–12 author-hours, not measured savings. Treat the savings and original estimates as uncertain intervals: 46–76 minus 7–12 gives a conservative 34–69 author-hour envelope. Per changed row: V1 broad6–10 minus3–4 gives2–7; V2 broad14–22 minus3–6 gives8–19; V3 broad6–10 minus1–2 gives4–9. Correlated low/high pairing is not assumed. They remove behavior; they do not lower estimates for unchanged behavior. Unknown vintage remains distinct from NV. No custom identity creation, attachment upload, extraction, photo scan, imports, pours, counts, transfers, purchasing, Toast, public map/knowledge, offline or automated publication enters S. All remain explicit deferred outcomes. The old app remains intact.
+
+## Seven planned landings
+
+Hours cover authoring and focused checks. Reviews/integration are separate. Owner letters identify distinct role sessions, not concurrent builders. Schema author D exclusively owns every migration/generated type; a consumer owner never edits SQL.
+
+| Slice | User-observable result / acceptance | Owner | Dependency | Author hours | Scope bound / fallback |
+|---|---|---|---|---:|---|
+| V0 rails and protocol | Candidate cannot deploy main; existing receipt persistence characterized; required CI and selected canary strategy recorded; protocol/adapters activated together | Q | Gate 1, authorized settings/environment | 4–8 | Existing runner and serialized protected landing; no queue/caching project. Current 390px repair charged here; if it cannot fit, re-plan, never waive a relevant test. |
+| M1 scoped access contract | Applied group/business/venue/grants with owner/staff and foreign-scope deny cases | D | V0 | 4–6 | Minimal metadata; no group-wide cost grant or membership editor. Additive schema immediately before V1. |
+| V1 sign in and view cellar | Invited actor sees a real DB-backed seeded cellar at assigned venue; foreign data and costs denied; logout works | C | M1 | 2–7 | Fixed context per invite. Pilot bootstrap and invited sign-in only; no broad legacy auth rewrite. |
+| M2 receipt contract | Minimal identity/package and transactional receipt/event/balance schema passes replay, concurrency, rollback and correction checks | D | V1 | 6–10 | Only receipt and reversal commands, future stock contracts remain prose. |
+| V2 receive and see the wine | Search approved products → type/review → confirm → persisted cellar lot → reopen/retry/correct; actual SQL E2E at mobile and desktop | R | M2 | 8–19 | One full-stack owner for candidate lookup, receipt API and receiving/cellar UI. Venue placement only; no unsupported product creation. |
+| V3 revoke, export and pause | Revocation takes effect on next mutation; CSV honors grants; operator pauses safely and follows recovery instructions | O | V2 | 4–9 | Runbook and bounded operator actions; no support dashboard/alert suite. |
+| V4 deploy and rehearse | Exact-SHA candidate smoke, selected suite, performance and restore/compatible rollback evidence; Gate 2 packet | Q | V3 | 6–10 | Synthetic-only until every applicable Gate 2 criterion passes. |
+| **Author total** | | | | **34–69** | |
+
+Protocol activation is inside V0, not an uncounted extra PR. V2 includes minimal receiving UI and cellar refresh; no backend-only landing can claim the first user write. Each schema landing has executable contract tests and one immediate consumer; aim to begin that consumer within 24 hours, otherwise stop new admissions and re-plan. D supplies schema changes through M1/M2, never by sharing file ownership with V1/V2. Split a landing only if coherent review requires it, and charge the extra review/integration cost before admission.
+
+## Capacity and cost arithmetic
+
+Assume one builder and 11 planned delivery days × 8 productive contributor-hours/day = 88 hours. This is an unverified availability assumption for sequential author, triage, fix and integration effort, not 88 hours of Devin's typing. Review cloud wait may overlap, but active review/integration effort stays charged. Seven landings × 1.5–2.5 review/integration hours = 10.5–17.5. Add up to 2 qualification hours. Total S = **46.5–88.5 hours**. The conservative upper envelope exceeds 88 hours by 0.5 hour; there is no claimed positive slack. The deadline has no unconditional GO. A conditional evaluation forecast requires early calibration showing the remaining upper estimate fits the remaining planned capacity; otherwise return deadline NO-GO and the synthetic fallback. Estimates are not probabilities or measured agent throughput; scope savings need confirmation on the first two slices. At 4 hours/day only 44 hours are available: S is NO-GO. Unbounded auth, provisioning and owner waits are additional calendar risks, not hidden in the effort range.
+
+Devin/Rohan: separately reserve an estimated **4–8 human hours** across Gate 1/settings approvals (1–2), pilot workflow/fixture acceptance (1–2), Gate 2 and rehearsal attendance (1–2), final review/feedback (1–2), with named weekend windows. This estimate is unverified and does not replace ongoing product review; any additional review enters observed capacity. Record who owns each window. No answer or availability is inferred from elapsed time.
+
+Current measured required CI median is 5.975 minutes. Last 30 merged PRs have median created-to-merged time 5.9917 minutes (18 non-doc median 6.2917); this omits pre-PR development. WIP 2 gives a queue-service ceiling of 19.1 merges/hour, not build capacity. Actual supply must deliver 7/11 = 0.64 accepted slices/day. At 12 contributor-hours/slice, 88/12 = 7.33 slices, before extra qualification; no agent-count multiplier. Initial WIP remains at most two ready PRs, one builder and one serialized landing.
+
+Required-gate compute allowance: 7 × 3 runs × 5.975 = 125.5 runner-minutes (initial, one fix, integration). Eleven full runs × observed noncancelled-failure median 21.475 × 1.5 retry allowance = 354.3 minutes. Total provisional compute 479.8 minutes excludes setup variance and any additional characterization; failed runs may understate passing-suite duration. Verify account rate/credits before spending. See evidence/ci/pr-cycle-statistics.json and 06-capacity.md. CI speed does not establish delivery speed.
+
+## Calendar and re-plan rules
+
+T0 is the Gate 1 approval timestamp, in Los Angeles time. Deadline T0 + 14 calendar days; no fixed September 19 date without a September 5 approval. Day 1 ends T0 + 24 hours. Days 12–14 are contingency: 3/14 = 21.4%, with no scheduled features.
+
+| Planned window | Exit / response |
+|---|---|
+| Days 1–3 | V0 then M1; verify candidate protection/routing and candidate recovery destination, start baseline characterization and qualification. First candidate synthetic restore attempt by Day 3. V1 by Day 3 is only a low-estimate stretch, not baseline. |
+| Days 3–4 | V1 usable invited/scoped read with actual isolation proof. Record measured effort and external waits; reassess all remaining slices. |
+| Days 4–6 | M2 then start V2; schema invariants before API/UI consumer. |
+| Days 6–8 | V2 complete receipt-to-cellar and correction. No deferred feature admission. |
+| Days 8–9 | V3 operational evaluation controls and recovery proof. |
+| Days 10–11 | V4 integrated acceptance, exact-SHA deployment and candidate-data restore rehearsal; Gate 2 only if all applicable checks pass. |
+| Days 12–14 | Reserved defect/recovery/approval contingency. Otherwise prepared demonstration and supervised test readiness. |
+
+These are checkpoints, not guarantees that every high estimate fits its calendar row. V0 is the first calibration point: exceeding its 8-hour author estimate triggers immediate re-plan. Qualification is separate (up to2 hours) and charged once even when run during V0. At V1 completion, no later than Day4, formally recompute cumulative and remaining author/review/fix effort versus remaining planned hours. No arbitrary20-hour cumulative threshold replaces that calculation. At each later landing recompute the same forecast. Re-plan if a wave is over one day late, the same gate fails twice, the bounded fix round leaves a blocker, or remaining high estimate exceeds capacity. If candidate infrastructure/recovery is unavailable by Day 3, declare hosted real-pilot deadline NO-GO; synthetic proof may continue. Legacy production restore is required before any legacy destructive/cutover work, not an S dependency. Candidate backup/restore remains mandatory before real pilot admission.
+
+Failing S after these explicit cuts falls back to a clearly labelled synthetic demonstration and gap report, not an even thinner unannounced real pilot. Do not borrow the buffer for added features, skip relevant tests, widen permissions, or call S the full release. Gate 1 must approve the narrowed S definition and capacity assumptions; implementation remains NO-GO until then.
+
+
+FILE 04-ownership.md
+# Ownership, vertical boundaries and dependency graph
+
+All branches/worktrees below are proposals. None is created by this package. After Gate 1 use an approved new root such as /Users/zero/projects/terroir-rebuild-slices, never the excluded owned directories. One machine owns each branch at a time; the measured Mini is the only committed builder. MacBook handoff requires verified access/capacity and a recorded release.
+
+| Slice / role | Proposed branch; harness | Exclusive ownership specification |
+|---|---|---|
+| V0 / Q | rebuild/rails; Codex | Canonical protocol and thin root adapters, required candidate CI/protection specification, shared fixture and safe test scripts. Exact 390px exception below. No generic business logic. |
+| M1, M2 / D | rebuild/scope-schema then rebuild/receipt-schema; Claude | All numbered SQL/down migrations, schema snapshots/manifests and generated DB types; new candidate stock transaction adapter/domain. Sole schema authority. |
+| V1 / C | rebuild/scoped-cellar; Codex | New candidate scope contract/resolver, invited bootstrap/sign-in, candidate host route policy and initial scoped cellar read/UI. Existing legacy auth consumers remain unchanged. |
+| V2 / R | rebuild/receiving; Codex by default | Candidate-only product lookup domain/API, manual receipt application/API and receiving/cellar UI. C transfers the exact candidate cellar paths before V2. Full-stack ownership prevents a second UI queue. No SQL/generated types. |
+| V3 / O | rebuild/evaluation-operations; Claude | Dedicated candidate revoke/export/pause operations, scoped CSV, recovery runbook and operator actions. D's transaction contract remains unchanged unless a newly estimated schema handoff is admitted. |
+| V4 / Q | rebuild/candidate-verification; Codex | Integration tests/evidence/deployment and recovery documentation. Behavior changes need an explicit file transfer; no miscellaneous catch-all fixes. |
+
+Before every admission replace descriptions with exact tracked files and proposed new directory names. Proposed candidate route roots are /pilot and /api/pilot; resolve actual Next route group and deployment policy in V0/V1 before editing. Shared files never have two current owners. Authors own adjacent tests inside their paths; Q owns shared harness files. Q/C and C/R transfers are explicit and exclusive. One active application builder globally; independent packet reviewers can run concurrently.
+
+Q alone holds the V0 390px repair exception for src/app/(app)/insights/date-range-selector.tsx, src/app/(app)/insights/page.tsx, adjacent date-range-selector.test.tsx and e2e/one-row-rule.test.ts. Charge repair inside V0. If the coherent repair needs another PR or exceeds capacity, re-estimate; do not hide it in stabilization. Preserve the test. A legacy unrelated failure must remain a named failure with scope evidence, never a claimed green full suite.
+
+R owns E-007's **candidate receiving lookup backend and UI**, over an approved catalog projection, not the legacy broad search endpoint. D owns identity/package schema. No public lookup/private inventory join or label scanner is implied. E-006 ambiguity/merge tooling is deferred; S rejects unsupported/ambiguous choices without guessing. Schema D supplies only immediate consumer contracts; no speculative job, Toast or public implementation is scheduled.
+
+Full-release ownership, admitted later: K public identity/knowledge/search/map; T Toast ingress/mapping/jobs; V counts/transfers/pours; P reporting/menus/pricing; U richer cellar placement/context UX; O wider lifecycle/offline. These remain unassigned future tracks, with exact file transfers and estimates required before work. The earlier broad C ownership over 99 legacy auth consumers is withdrawn for S.
+
+See dependency-graph.mmd and dependency-edges.json. The S critical path is G1 → V0 → M1 → V1 → M2 → V2 → V3 → V4 → G2. This intentionally serializes schema and mutation work; two ready PR slots are a ceiling, not a promise of parallel speed. Future dependencies break feature cycles through scoped stock, consumption/count and publication contracts; a DAG edge does not authorize implementation of deferred features.
+
+
+FILE 05-ci-tests.md
+# Branch, landing, CI and verification specification
+
+## Safe integration path
+
+After Gate 1, use a new protected candidate integration branch, proposed `rebuild/integration`, created from verified main. Feature PRs target it. Main auto-deploys under current repository policy, so do not integrate the rebuild into main piecemeal or assume a merge is harmless. Verify actual Railway branch routing and disable unintended candidate production routing only with explicit authorization. No settings change or branch creation occurs now.
+
+Keep at most two ready integration PRs. Drafts may exist but do not count as completed work or available throughput. One non-author integrator, selected by the per-PR table in07, locks landing, verifies exact reviewed head and current base, resolves all blocking findings, and checks actual gate evidence. Advance one base at a time. After each merge, record integration SHA and full-run ownership. Use the approved merge strategy without rebasing, force-pushing, resetting or deleting branch/worktree state. Refresh a feature by fetching and **merging its approved integration base into that branch**; conflicts belong to its single owner, followed by affected review/tests. Refresh integration from main through a reviewed merge PR, not an unreviewed base rewrite.
+
+S uses protected serialized landing with strict latest-base checks and exact reviewed head matching. Queue, merge_group, draft aggregation and CI runner migration are optional F work, excluded from S estimates. The repository is public and organization-owned: GitHub native merge queue is eligible, currently absent. Enable only after required checks and `merge_group` workflow support work on the candidate branch. Start build concurrency1 and one PR per merge group; two ready PRs can await service. If queue enablement is delayed, use a protected serialized landing train with latest-base validation and exact-head matching. Current `strict:false` does not enforce freshness; propose strict-up-to-date checks on the candidate branch. If required protections cannot be enabled, reviewed PRs remain unmerged; an unprotected candidate is not the fallback. [GitHub queue eligibility](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request-with-a-merge-queue?tool=webui).
+
+Do not use `/Users/zero/bin/zs-land`. Its inspected implementation removes worktrees and local/remote branches after merging. No advisory/allow-no-CI mode, history rewriting, shared stash, automatic deletion or hook bypass is permitted. A future landing script must prove refusing stale SHA, absent check, open blocker, wrong base and absent LAND-GO with non-mutating fixtures first. S Gate 2 controls separate candidate production admission; it does not authorize main promotion. F Gate 2 controls final main promotion/migration even if integration is green. Before W1 feature integration, Q records actual candidate protections and Railway routing proof that candidate merges cannot deploy production. Gate 1 authorizes this setup; it does not pretend the evidence exists before approval. Failure stops landing and invokes the Day 3 fallback.
+
+## CI capabilities and proposed changes
+
+| Capability | State | Plan |
+|---|---|---|
+| Required4-vCPU Blacksmith gate | Available now | Keep exact required display name `Typecheck / Lint / Test / Schema`; preserve all existing required gates |
+| Full E2E on GitHub hosted runner | Available now, currently failing | Single verifier owns full integrated runs; record every pass/failure/skip identity |
+| pnpm transparent Blacksmith cache | Available now | Existing cache hit/miss measured; don't replace with deprecated setup-node action |
+| Candidate protections, queue, draft lifecycle, merge_group | Requires owner enablement and reviewed workflow work | Available product capability, not configured yet |
+| Full E2E Blacksmith routing | Requires reviewed canary | Same-SHA/fixture/worker parity before moving routing |
+| Parallel E2E against current shared fixtures | Unavailable safely now | Isolate DB/actors per runner before sharding |
+| Extra Blacksmith slots/free allowance/preview deployment | Unverified; requires account/cost verification | Day 3 fallback keeps existing runner routing, no new dependency |
+
+Builders run focused unit/contract checks for their owned paths plus lint/type checks when needed. They do not each run the full suite. Required CI remains unchanged until an independently verified equivalent gate replaces it. One verifier dispatches full integrated runs; author jobs never reset a shared DB. CI uses ephemeral runner-local DBs. Macs use one verified project/port target with an exclusive heavy lease, if needed; a loopback host alone is not isolation.
+
+F/optional proposal, not part of S: defer heavy work, but keep an always-running fail-closed aggregator named exactly as the required check. It passes only when the heavy predecessor actually succeeds; skipped/cancelled/failed predecessors do not pass. Include PR opened/synchronize/reopened/ready_for_review/converted_to_draft/edited activities, push to approved integration/main branches, and `merge_group: checks_requested`. This requires explicit coverage of draft→ready, retarget, failed prerequisites and merge-group synthetic heads. Preserve unfiltered PR target coverage. Do not copy a branch filter that accidentally excludes integration.
+
+Use cancellation only for superseded PR heads. Do not cancel the integrated/main or merge-group evidence being used for acceptance. Do not duplicate all coverage work in a second job merely to retain its display name. The existing explicit contract subset repeats124 tests included in Vitest; removing that repetition is optional only after proving identical environment, discovery and failure semantics. Keep it while correctness is uncertain.
+
+F/optional runner canary: one existing full suite, identical reviewed SHA, seed, environment and one Playwright worker, once on ubuntu-latest and once on Blacksmith4vCPU. Compare named test inventory, passes/skips/failures, setup/test/total time, cost and cold/warm cache. Repeat only for a specific cache/variance question. Identical red results prove parity only, not release readiness. Sharding canary later splits across two separate runner/DB/auth fixtures and verifies union/disjoint tests and equal outcomes. Require three integrated green runs with no missing tests before adopting two shards. Do not jump to four shards.
+
+Cache only dependency/browser binaries or deterministic build artifacts keyed by OS/architecture/Node/pnpm/lock/browser version. No active DB volumes, Auth sessions, credentials or fixture state. Measure where time goes: dependency install median2s; tests95.5s, Supabase57s and browser setup28s are larger opportunities. [Blacksmith caching](https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions), [GitHub event semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [required-check skip semantics](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks).
+
+S stays at WIP ≤2. F may increase integration WIP from2 to3 only after at least six accepted slices show disjoint ownership, no stale-base landings, passing relevant full coverage, <20% integration rework and available independent reviewers; CI p95 queue+setup under2 minutes across at least10 recent jobs. These are proposed thresholds. Reduce to1 on fixture collisions, twice-failed gate, stale-base incident or review backlog. Source throughput remains separate from runner concurrency.
+
+## Test/eval artifacts before each track starts
+
+The artifact specification below is complete planning work; test implementation/execution begins only after Gate 1. Before a feature author edits its boundary, Q records requirement IDs, fixture seed/schema, current characterization, target expected outputs, negative cases and command/evidence location. Existing defects get an explicit superseded expectation. Authors cannot change acceptance to match their implementation without a logged requirement decision.
+
+`tests.csv` maps all35 R outcomes plus S1–S7 to proposed verification artifacts. owner identifies the artifact lead(s), while s_owner names active S responsibility and implementation_slices identifies where the contract/consumer is exercised; none grants extra write ownership. A broad outcome may have an F-only sub-eval and a different S-bounded eval (for example EV-06/E-031 versus EV-12/E-031). EV-05 S concerns candidate fixture/replay/parity and its backup manifests only; legacy transformation parity remains F-only. Shared fixtures define two businesses, two venues, actor/grant variants,375/750/1500ml formats, unknown/NV vintages, currenciesUSD/EUR, ambiguous producers and crash/replay keys. Unit mocks test parsing; persistence/RLS acceptance must use real isolated SQL.
+
+| Artifact | Concrete expected result | Before track |
+|---|---|---|
+| EV-01 auth/scope characterization and target deny matrix | Existing login/invite/logout outcomes retained; foreign venue/cost access, removed membership and tampered context denied | C/D |
+| EV-02 identity/receipt contract fixtures | Every intake maps selected identity/package; unknown≠NV; same operation+payload once; changed payload fails; failed transaction zero stock | D/R |
+| EV-03 writer inventory and conservation SQL | Opening+events=balance; no orphan references; correction uses reversal; unsupported routes cannot mutate candidate; concurrent receipt replay once | D/R/O |
+| EV-04 browser characterization | Login; invoice/manual/label review; import preview/apply/revert; cellar/bin/detail; pour/undo/closeout; reconcile; pricing/lists/menu publish/withdraw | Q before corresponding F replacement; S exercises only its selected routes, preserves old artifacts |
+| EV-05 candidate or legacy parity, explicitly separate | S: candidate synthetic fixture/replay, row/hash/FK/currency reconciliation and backup manifests. F: legacy row dispositions/transformation/resume parity. S has no legacy migration dependency. | D before candidate contract use; F before transformation |
+| EV-06 failure/recovery rehearsal | Terminate between receipt steps, retry; revoke during request; DB unavailable; object unavailable; object-byte manifest reconciliation and access policy; compatible rollback after new receipt retains it | D/R/O |
+| EV-07 actual receipt-to-cellar E2E | S uses typed manual input; save/ledger/cellar use actual DB. Deterministic extraction pertains only to deferred F characterization. Repeated confirmation does not duplicate; mobile denied-state usable | R |
+| EV-08 permissioned public publication | Signed-out search→wine→producer→region→map; source withdrawal; no private costs/notes/assets; approved menu policy | K/P, deferred S |
+| EV-09 Toast lifecycle fixtures + real connection | Duplicates/revisions/order disorder/mapping changes/refunds/manual overlap produce expected inventory and recoverable exceptions; authorized real venue proof separate | T/V, deferred S |
+| EV-10 count/transfer/offline contracts | Cutoff under concurrent sales, partial receipt/transit conservation, duplicate drafts, permission revoke and conflict preserve observations | V/O, deferred S |
+| EV-11 performance/cost evidence | Synthetic workload below budgets, explains query plans, no false load claim; budget cap/alert tested without dropping durable events | Q/O |
+| EV-12 deployment/cutover packet | Exact SHA+schema health, selected journeys, backup/object restore, compatible rollback, permissions and support readiness | O/Q before Gate 2 |
+
+Provisional S performance workload: three concurrent staff, two businesses/two venues, 250 approved catalog records, 1,000 lots and 5,000 events, all synthetic. Cellar/lookup API p95 ≤1 second; receipt commit p95 ≤1.5 seconds; mobile first-useful view p95 ≤2.5 seconds under a recorded device/network profile. Capture ≥200 requests per operation with errors, cold/warm results and query plans; 1,000 replay attempts must produce zero duplicate effects and isolation breaches remain zero-tolerance. These smaller pilot budgets require Gate 1 acceptance, are not measured results and do not establish large-group scalability. S replaces no surviving legacy route, so S performance acceptance uses target-only budgets and is labelled non-comparable. Q may retain an informational legacy characterization if its logical workload matches, but legacy-to-candidate improvement is not an S gate. Before any F replacement of a surviving path, capture its current baseline using equivalent logical workloads mapped to the appropriate schema, not identical physical tables. Record environment and fixture hash; test the candidate on approved CI/hosting, not production load. Larger 50,000-event/device fleets are deferred, not silently claimed as passed.
+
+Object restore artifact EV-06/EV-12: inside the protected boundary enumerate every selected object key, bucket, byte length, content SHA-256 and source relationship; restore bytes and compare100% counts/lengths/hashes, report missing/extra/mismatched objects. Verify authorized read and denied cross-business/signed-out/revoked access. Metadata-only equality fails. Retain content manifests in protected storage; only redacted aggregate results leave it.
+
+Count test identities and skips, not just exit codes. The current required five E2E include mocked receipt persistence; add the real canary. Current full27 skips must get named scope dispositions; selected S skips are failures. Deferred F tests remain documented and preserved, with no claim of complete coverage. Deployed health must report exact merge SHA and Railway SUCCESS plus actual route/DB smoke evidence; clean Git and passing unit tests do not establish release completion.
+
+
+FILE 07-protocol.md
+# Project protocol and independent review
+
+The draft canonical protocol and harness adapters are in preparation/. They are inactive; root AGENTS.md and CLAUDE.md remain unchanged. V0 must port verified existing safety rules into docs/PROJECT-PROTOCOL.md and update thin adapters in the same reviewed PR after Gate 1. Existing production-env, guarded-start, generated-file, migration/down-file, CI and machine-read artifact rules remain mandatory. Never activate a draft simply because it exists.
+
+## One builder and one claim record
+
+The proposed repository-tracked docs/rebuild/state.json is the one authoritative state file. One integration controller writes it: C normally, O during C-authored V1 and Q-authored V0/V4 admissions. Distinct role sessions perform authorship, findings stewardship and landing. The controller records its identity and every transfer. It persists an exact file claim before acknowledging admission; workers do not claim by editing another branch's copy. All active write claims must be disjoint, and only one application builder is active globally, regardless of model/provider. Parallel packet reviews do not grant write authority.
+
+For this single-builder plan use a simple claim protocol, not a lease service or timed heartbeat system: claim before work, update at pause/handoff, verify ownership before resume, release after verified landing. The controller checks branch/SHA/dirty files and the active session before admitting another worker. No timeout permits stealing a branch. After a lost session, freeze that claim until process/diff ownership is resolved. If the control checkout is unavailable, stop admissions. Persist the record before work; include reviewed snapshots in the next integration PR, never hold all claims until landing. No second journal or competing state authority is needed. More than one mutating builder requires a separately reviewed concurrency/lock/lease protocol and measured capacity; it is outside S.
+
+State records gate/deadline/scope/budget, controller, exact base/head, track/agent/session/model/effort/harness/machine/branch/worktree/files, status, dependencies, test evidence and next action, queue, decisions and findings supplied by the non-author steward. Restart/compaction/quota/model change requires re-reading protocol/state, checking actual repo identity/SHA/diff/process/DB target and open PR/check evidence before continuing. Preserve all owned work; no branch deletion, destructive reset, rebase, shared stash or force-push. Exact-SHA evidence cannot certify a different head.
+
+## Author, findings steward and landing roles
+
+| Slice | Author | Non-author steward | Non-author lander/controller |
+|---|---|---|---|
+| V0 | Q | D | O |
+| M1 | D | Q | C |
+| V1 | C | D | O |
+| M2 | D | Q | C |
+| V2 | R | Q | C |
+| V3 | O | Q | C |
+| V4 | Q | D | O |
+
+Letters are distinct agents/sessions, not aliases the same author adopts. Reviewers are additional independent sessions. Controller transfers occur before admission, with explicit stop/release acknowledgment; only one controller exists. Update the table before a changed or mixed author is admitted. An author cannot land its own work or close findings by renaming its role.
+
+## Review contract
+
+Codex-authored work → fresh Claude plus Gemini. Claude-authored work → fresh GPT-5.6 Sol plus Gemini. Use the verified exact model/effort routing in 11-model-routing.md. Each reviewer differs from every author by vendor, harness, session and agent. Run the pair concurrently on the same immutable requirement/specification/diff/test-evidence packet, without the author's defense. Mixed-vendor coauthorship requires a genuinely independent pair from the remaining vendors or splitting authorship; two same-vendor models never satisfy diversity. Missing vendor means one independent review plus owner adjudication, not silent replacement.
+
+Record requested/reported model, harness/version, session, packet/diff/test hashes, base/head, actual commands/results including named skips, limits and tool use. No production rows/assets or secret/config values enter a model packet. Planning review has no implementation test evidence and must say so. Claude packet review disables tools/MCP; Gemini plan/sandbox receives a packet-only instruction; record enforcement limitations rather than infer them from flags.
+
+The non-author steward consolidates findings by invariant, preserving original wording and evidence. Authors may respond with evidence but cannot close their own findings. The controller only copies steward-approved dispositions into state. P0 data loss/tenant/secret breach blocks immediately; P1 broken required flow, unsupported feasibility or safety/review hole blocks affected work; P2 concrete within-scope weakness is fixed or explicitly owner-adjudicated; P3 optional improvement is nonblocking.
+
+One bounded correction round follows the initial concurrent reviews. The original finder or an objective check verifies each correction; the non-author steward records that receipt. Unsupported assertions may be withdrawn with evidence. Remaining material disagreement returns the slice to planning or owner adjudication; no majority-vote workaround. A diagnostic model consultation can occur inside the same fix round, not restart unlimited coding attempts. Review closure is limited to the original issues unless the fix itself creates a new blocker.
+
+LAND-GO requires exact reviewed head/current base, required checks, selected-scope zero skips, closed blockers, file-claim clearance and a non-author lander with integration authority. Main auto-deploy safety and Gate 2 remain distinct. Use systematic debugging for reproducible failures; senior review for architecture, migration, security and maintainability. Do not write implementation-mirroring tests for prose. The current 390px bug is not fixed by assigning its owner.
+
+## Rules, agents, skills and documentation preparation
+
+preparation/ contains the canonical protocol draft, thin adapter drafts, role cards, task/review/state templates, contract specifications, qualification plan and activation checklist. None is a root configuration or runnable migration. V0 checks adapters load the same protocol/version and preserve existing rules, then tests both harnesses with read-only refusal/allowed-command fixtures. Text/hash equality alone does not establish tool enforcement. Do not change global hooks, install packages/skills, or copy credential configuration.
+
+After implementation, Q/C update architecture/codemaps, guarded README setup and environment/recovery runbooks from actual paths and commands. Preserve app_spec.txt and claude-progress.txt and generator-owned feature records. Correct stale one-DB/adapter-test/restore-history claims only with dated current evidence. Future model changes require exact lane verification and a routing decision recorded in state.
+
+
+FILE 11-model-routing.md
+# Model routing by accepted task
+
+Use existing subscriptions first. Default routing below is a proposed operational policy, not a measured speed/quality ranking. The qualification plan in preparation/QUALIFICATION.md can change a route only after accepted-task evidence; model count and token price do not predict delivered features.
+
+| Task | Initial author / effort / harness | Escalation and boundary |
+|---|---|---|
+| Architecture, vertical slices, high-impact re-plan | claude-fable-5-1 / high / Claude Code Max OAuth | Fable already completed this audit. Use bounded packets and explicit questions; medium for narrow closure when justified. |
+| Most TypeScript, API/UI vertical slices | gpt-5.6-sol / high / Codex OAuth CLI | xhigh for difficult debugging/testing/review. This is the default bulk coding lane. |
+| SQL, RLS, atomic inventory, recovery and application security/revocation (V3) | claude-opus-5 / high / Claude Code Max OAuth | Fable high for unresolved architectural contradictions; D remains sole schema owner regardless of model. |
+| Bounded routine fixtures, docs, mechanical edits | claude-sonnet-5 / medium / Claude Code Max OAuth | Escalate to Sol high or Opus high when scope grows. No auth/stock/security work sent here by default. |
+| Bulk-lane challenger | claude-fable-5-1 / low / Claude Code Max OAuth | Qualify against Sonnet medium and Opus low/medium on small tasks. Promote only if accepted quality and total time/quota use justify it. |
+| Codex-authored independent review | claude-opus-5 / high / Claude Code + gemini-3.8-flash-high / agy | Separate fresh sessions/agents, simultaneous identical packet. Fable high can replace the Claude reviewer for a critical design. |
+| Claude-authored independent review | gpt-5.6-sol / xhigh / Codex + gemini-3.8-flash-high / agy | Same vendor/harness/session independence rules. Gemini medium/low may review simple docs after qualification, never silent substitution. |
+| Trivial classification/title/extraction | gpt-5.6-luna / xhigh / Codex | Unprobed optional lane; no implementation, schema, review or operational authority. Terra is not a default lane. |
+
+After a reproducible failure, isolate the cause before changing models. One bounded review correction round remains the limit. Escalation inside that round must preserve evidence and the author identity; if a second vendor starts authoring, re-evaluate reviewer independence before admission. A quota error checkpoints exact SHA/diff/claim and stops that lane; it does not authorize account switching, a new subscription or extra usage. Verified approved fallbacks must still satisfy independent review or require owner adjudication.
+
+## Dated availability and provenance: September 5, 2026
+
+- Fable: exact requested and reported model claude-fable-5-1, high, Claude Code Max OAuth; real audit completed in 285 seconds, session afd0f4d2-85a7-4f94-a836-d36105e25314. This proves the lane worked for the audit, not coding throughput. OpenRouter uses a different route ID, anthropic/claude-fable-5.1. [Official Fable model ID and capabilities](https://platform.claude.com/docs/en/models/fable-5-1/overview).
+- Sonnet: requested/reported claude-sonnet-5, medium, Max OAuth, LANE_OK in 5.9 seconds. Availability only.
+- Opus and Sol: earlier dated package probes succeeded; Opus also performed the previous real audit. This turn Sol performed the independent source verification. See06 and original receipts; quota/latency is not guaranteed.
+- Antigravity lists gemini-3.8-flash-high, medium and low. Low worked in the previous review. The fresh high review succeeded via the requested CLI selection (63 seconds, session a2c98f83-1448-4a38-bebd-947f8073c969), but did not echo a backend model ID. This is successful CLI selection, not full model attestation.
+- Codex shared weekly snapshot showed 26% used / 74% remaining. It is account-wide, can change, and is not reserved capacity for Terroir. No reset credit was redeemed.
+- Existing local subscription proxies refused connections; none is needed for these working CLIs. MacBook/AWS and paid alternate providers are excluded from promised capacity.
+
+## Qualification, economics and limits
+
+Before changing the bulk route, time-box up to two active contributor-hours in V0. Screen a small synthetic task, then compare at most two finalists per task class on two more independent cases. Retain failed attempts; score correctness/security first, then first-pass acceptance, active author/review/fix time, elapsed time and usage when exposed. At least one case must test ambiguous input, one transactional/permission failure and one UI persistence outcome. This is a screen, not statistical proof; revisit the first two real slices. Do not run every model against the full app or route production data to benchmark prompts.
+
+Compare cost per accepted task: billed incremental spend when known, subscription quota use, total completion time and fix/review overhead. Report separate columns; do not invent a dollar conversion for OAuth quotas. A bigger model at low effort is worth testing rather than assuming a smaller one is cheaper. That is a provider hypothesis, not a Terroir measurement. [Anthropic task-cost guidance](https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence).
+
+Official direct-API reference prices, not our subscription bill: Fable input/output $10/$50 per million tokens, Opus $5/$25, Sonnet $2/$10 in the fetched model guidance; Sol $4/$20 on its official page. Route/catalog prices may differ, so do not mix OpenRouter and direct API numbers. [Claude pricing context](https://platform.claude.com/docs/en/models/fable-5-1/overview), [Sol official pricing](https://developers.openai.com/api/docs/models/gpt-5.6-sol). Fable CLI's $1.145985 cost estimate has unknown cost basis and is explicitly **not a subscription invoice**. No direct billed Anthropic call, fast-mode premium, overage enablement, reset redemption or new subscription is authorized by this plan. Existing $800/month coding and $100/month miscellaneous budgets remain unchanged.
+
+
+FILE tests.csv
+eval_id,owner,release_requirement,slice_requirement,artifact_to_implement,status,s_applicability,implementation_slices,s_owner
+EV-01,"C,D,O",E-001,S1,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-002,S1,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-003,S1 S6,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-028,S5,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-01,"C,D,O",E-068,S1 S6,scope-deny-matrix.json; real SQL access cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,V1,V3","C,D,O"
+EV-02,"D,R",E-005,S2,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-006,,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-02,"D,R",E-007,S2,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-008,S3,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-02,"D,R",E-011,,identity-receipt-fixtures.json; actual transaction cases,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-03,"D,R",E-012,S4,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-03,"D,R",E-013,S5,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2","D,R"
+EV-03,D,E-016,,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-03,D,E-017,,writer-manifest.json; conservation.sql specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-007,S2,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,C,R",E-008,S3,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-011,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-013,S5,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-016,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,U,P",E-018,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,U,P",E-019,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-04,"Q,C,R",E-028,S5,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V1,V2","Q,C,R"
+EV-04,"Q,U,P",E-067,,surviving-journey characterization manifest,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-05,"D,Q",E-031,S7,S candidate synthetic fixture/replay/parity and backup-manifest verification; legacy transformation parity is F only,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,M2,V4","D,Q"
+EV-05,"D,Q",E-032,S6,S candidate synthetic fixture/replay/parity and backup-manifest verification; legacy transformation parity is F only,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M1,M2,V4","D,Q"
+EV-06,"D,R,O,Q",E-008,S3,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,R,O,Q",E-012,S4,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,R,O,Q",E-030,S6,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-06,"D,O",E-031,,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-06,"D,R,O,Q",E-032,S6,failure-matrix.json; restore-rehearsal receipt; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,"M2,V2,V3,V4","D,R,O,Q"
+EV-07,R,E-005,S2,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-008,S3,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-012,S4,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-013,S5,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-07,R,E-028,S5,real-receipt-cellar.e2e specification,SPECIFIED; NOT EXECUTED,S bounded acceptance,V2,R
+EV-08,"K,P",E-018,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-024,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-025,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-026,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-08,"K,P",E-027,,public-policy-canary specification,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-020,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-021,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-022,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-09,"T,V",E-023,,toast-lifecycle fixtures + authorized venue record,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-009,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-010,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-014,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-015,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-10,"V,O,R",E-029,,purchase-transfer-count-draft state fixtures,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O,P",E-019,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O",E-066,S7,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,S bounded acceptance,"V0,V4","Q,O"
+EV-11,"Q,O,P",E-067,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-11,"Q,O,P",E-068,,S target-only pilot workload budgets and recorded environment/fixture; F current comparable baseline before replacing a surviving path,SPECIFIED; NOT EXECUTED,F only; not S acceptance,F deferred,
+EV-12,"O,Q",E-030,S6,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-031,S7,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-032,S6,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+EV-12,"O,Q",E-065,S7,cutover-checklist.json; exact-SHA deployed smoke; storage bytes count/length/SHA-256 and access-policy reconciliation,SPECIFIED; NOT EXECUTED,S bounded acceptance,V4,"O,Q"
+
+
+FILE preparation/QUALIFICATION.md
+# Small routing qualification plan
+
+Status: SPECIFIED, NOT EXECUTED. Existing model probes establish availability only.
+
+Use synthetic isolated workspaces, identical task snapshots and pinned toolchain. First screen each candidate on one representative case; keep at most two candidates per task class for the next two cases. Use work produced for the approved slice where possible instead of a large disconnected benchmark. Time-box qualification to two active contributor hours after Gate1 and charge its effort to the schedule. If the time-box expires, retain the conservative route and report unknowns.
+
+| Case | Candidate task | Acceptance held by non-author verifier |
+|---|---|---|
+| Q-A | Pure receipt-draft validation / exact-unit representation | Reject invalid quantities, wrong formats and unknown keys per approved contract; preserve explicit unknown/NV; deterministic error payloads; no side effects |
+| Q-B | Narrow UI/API read projection with cost visibility | Correct selected venue/actor context, no private fields when grant absent, useful loading/error/empty state; real negative cases independent of author tests |
+| Q-C | Idempotent receipt command / recovery reasoning | One atomic receipt/event/balance, duplicate same key once, altered payload rejected, transaction failure zero partial state, concurrent retry and revoked actor behavior |
+
+Q-C is a higher-risk qualification and does not authorize a cheaper model to own schema merely by passing a toy test. Real SQL/RLS and failure tests remain required for implementation admission. No user/production data leaves the approved production account/region. No production credentials reach a test runner or reviewer.
+
+Record task/model/effort/harness/version, exact prompt/repo/fixture hashes, wall time, active author time, review/fix time, all attempts, first-pass/final acceptance, missed defects and severity, input/output/cache usage if exposed, API-equivalent estimate separately from actual subscription spend, quota/reset snapshot when available, and unresolved limitations. Rejected attempts remain in the denominator. Compare total work and elapsed time per accepted task at equal acceptance; token/sec is not the score.
+
+Promotion: all safety/acceptance checks pass across the class's three cases, no unresolved P0/P1, no more than one bounded fix round per case, and a material time/quota advantage over the current route. Three cases support a provisional local choice only, not a universal best-model claim. Recheck after the first two real slices. Escalate within the same bounded fix round on two diagnostic failures, a repeated reasoning gap, or a missed isolation/replay requirement; change task design before increasing effort again.
+
+Include Fable5.1 low in the comparison with Opus5 low/medium and Sonnet5 medium where appropriate. Keep Sol high as the Codex implementation default and Sol xhigh for correctness review. Do not activate premium fast mode, overage billing, extra subscriptions or quota-reset credits automatically.

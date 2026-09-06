@@ -1,0 +1,63 @@
+{
+  "requested_model": "claude-fable-5-1",
+  "reported_models": [
+    "claude-fable-5-1"
+  ],
+  "effort": "high",
+  "harness": "Claude Code Max OAuth",
+  "session_id": "afd0f4d2-85a7-4f94-a836-d36105e25314",
+  "packet_sha256": "68796b01d3c8d2326af10faebbcf9d8f11d3f2bfac596a4cc2d1fe555357f080",
+  "seconds": 285,
+  "exit": 0,
+  "status": "success",
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 64815,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 19913,
+    "output_tokens_details": {
+      "thinking_tokens": 13368
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 64815,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 19913,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 64815,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 64815
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "model_usage": {
+    "claude-fable-5-1": {
+      "inputTokens": 2,
+      "outputTokens": 19913,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 64815,
+      "webSearchRequests": 0,
+      "costUSD": 1.145985,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "claude-fable-5-1",
+      "provider": "firstParty",
+      "costBasis": "unknown"
+    }
+  },
+  "api_cost_estimate_not_subscription_invoice": 1.145985,
+  "has_response": true
+}

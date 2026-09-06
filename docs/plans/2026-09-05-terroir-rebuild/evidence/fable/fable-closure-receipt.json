@@ -1,0 +1,16 @@
+{
+  "requested_model": "claude-fable-5-1",
+  "reported_models": [
+    "claude-fable-5-1"
+  ],
+  "harness": "Claude Code Max OAuth",
+  "session_id": "afd0f4d2-85a7-4f94-a836-d36105e25314",
+  "original_session_id": "afd0f4d2-85a7-4f94-a836-d36105e25314",
+  "fresh_session": false,
+  "purpose": "original finder closes bounded correction",
+  "packet_sha256": "ed15281d0f0fda60ac45e69e50440037aa9dc35c5dbd30f3b248e2ff3cba0dfb",
+  "exit": 1,
+  "status": "success",
+  "has_response": true,
+  "seconds": 103
+}

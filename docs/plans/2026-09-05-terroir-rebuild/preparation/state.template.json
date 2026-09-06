@@ -1,0 +1,18 @@
+{
+  "protocol_version": "DRAFT-v2",
+  "active": false,
+  "gate1": {
+    "approved": false,
+    "approved_at": null,
+    "deadline": null,
+    "selected_scope": null
+  },
+  "claims": [],
+  "slices": [],
+  "findings": [],
+  "evidence": [],
+  "route_decisions": [],
+  "decision_history": [],
+  "controller": null,
+  "active_builder": null
+}

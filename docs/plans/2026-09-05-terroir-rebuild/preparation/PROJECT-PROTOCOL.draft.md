@@ -1,0 +1,17 @@
+# Terroir project protocol draft v2
+
+INACTIVE. Intended destination after Gate1: docs/PROJECT-PROTOCOL.md. This draft grants no authority. Gate1 scope/retention/capacity/settings and Gate2 production admission are pending. Plan03 is the scope/schedule authority;07 is the coordination/review authority;11 is the routing authority. Record approved versions, not an ambiguous latest document.
+
+Before every resumed task verify canonical root/remote, branch/base/head, dirty files, open work, current controller and exact file claim. Preserve other owned checkouts and all uncommitted work. One builder, one branch owner/machine, one integration controller. Persist claims before edits and pause/handoff states before transfer. Never steal expired/unresponsive work or reconstruct missing control state from guesses.
+
+Production credentials may be present in .env.local: never read/copy/use it for tests. Local start must use the repository's verified guarded scripts/local/dev-local.sh workflow and intended project/port identity. No bare pnpm dev. Credentials stay out of model packets, artifacts and logs. Production rows/assets remain in the approved production account/region; all CI/Mac/AWS fixtures are synthetic.
+
+D exclusively owns numbered migrations with downs, schema snapshots/manifests and generated src/types/database.ts. Other authors consume reviewed contracts. Do not hand-edit generated feature records. No speculative shared schema, broad legacy auth rewrite or disabled permissions to meet a deadline. Gate1 does not authorize destructive data work; a restore rehearsal and explicit scope approval precede it.
+
+Main merges auto-deploy. Use only approved protected candidate integration and verified isolated deployment. Preserve exact required check Typecheck / Lint / Test / Schema, source-size and design/control-row ratchets. Focused author tests plus independent reviews and selected-scope zero skips precede LAND-GO. A non-author lands the exact reviewed head/current base; Gate2 still governs production admission. No zs-land, branch deletion, rebase, force-push, history rewrite, shared stash, destructive reset or review bypass. Merge the approved base to refresh a feature branch and revalidate affected evidence.
+
+Routing: Sol high bulk TS/API/UI, Opus5 high SQL/RLS/stock, Sonnet5 medium bounded routine, Fable5.1 high architecture and low as a measured challenger. Codex author gets independent Claude+Gemini; Claude author gets Sol+Gemini. Fresh vendor/harness/session/agent independence, non-author findings steward, one bounded fix round, original-finder/objective closure. No direct billed Anthropic, premium overage, added subscription or reset redemption. Record exact model IDs and limitations.
+
+Keep supported scope and evaluation limitations visible. No excluded writer can mutate candidate state through a direct endpoint or SQL capability. Re-plan after a wave is one day late, the same gate fails twice or remaining estimate exceeds available planned hours. Preserve Days12–14 contingency. Update actual documentation after behavior changes; keep app_spec.txt and claude-progress.txt machine-read paths. Follow existing conventional commits when commits become authorized.
+
+Before activation Q must compare every existing AGENTS rule with this draft, carry forward all still-applicable rules (including any omitted here) and record factual corrections with dated evidence. Adapter/hash checks plus both-harness read-only behavior probes are required. This draft does not silently replace existing safety rules.

@@ -1,0 +1,12 @@
+{
+  "sha": "fc5f177fa5d9c0d20a949f4b4faa028999977008",
+  "html_url": "https://github.com/pgvector/pgvector/blob/master/LICENSE",
+  "download_url": "https://raw.githubusercontent.com/pgvector/pgvector/master/LICENSE",
+  "license": {
+    "key": "other",
+    "name": "Other",
+    "spdx_id": "NOASSERTION",
+    "url": null,
+    "node_id": "MDc6TGljZW5zZTA="
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "source": "Codex get_usage_limits tool read-only observation",
+  "observed_at_utc": "2026-09-06T00:32:57.221481+00:00",
+  "bucket": "codex",
+  "window_minutes": 10080,
+  "used_percent": 26,
+  "remaining_percent": 74,
+  "resets_at_unix": 1789173287,
+  "plan": "pro",
+  "scope": "shared account, not this task",
+  "subscription_throughput_or_budget_guarantee": false,
+  "reset_redeemed": false
+}

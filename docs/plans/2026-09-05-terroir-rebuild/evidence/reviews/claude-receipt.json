@@ -1,0 +1,16 @@
+{
+  "lane": "claude",
+  "requested_model": "claude-opus-5",
+  "harness": "Claude Code",
+  "packet_sha256": "4e2cd7298446c83ba4998f65956b8d09b04f0fc1adb383c8cc43fea81b6fc232",
+  "exit": 0,
+  "seconds": 171,
+  "session_id": "e39fae4a-c391-40e5-bf67-a68d1efec5f7",
+  "reported_models": [
+    "claude-opus-5"
+  ],
+  "status": "success",
+  "has_review": true,
+  "author": "Codex root",
+  "fresh_session": true
+}
