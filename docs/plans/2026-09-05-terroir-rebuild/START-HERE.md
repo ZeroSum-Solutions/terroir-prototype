@@ -16,6 +16,8 @@ Bulk coding starts provisionally with Sol high; Opus high owns sensitive SQL/sto
 
 ## Read and review
 
+**Provider correction, September 5:** the user meant RunPod for cloud GPU embeddings. [Amendment 16](16-runpod-embeddings.md) records the completed synthetic trial and its integration boundaries; previous Cerebras research remains historical. This does not activate the rebuild or export private data.
+
 - [Schedule, scope reductions and estimates](03-delivery.md).
 - [Fable findings and verified decisions](10-fable-decisions.md), [model routing](11-model-routing.md), [review record](09-review.md).
 - [Current-state evidence](01-evidence.md), [architecture and data safety](02-architecture-data.md), [table dispositions](database-dispositions.csv).

@@ -1,0 +1,883 @@
+{
+  "scope": "Synthetic RunPod hosting and retrieval smoke test; no application or database integration tested",
+  "fixture_sha256": "78b8d0333222ada84618b18588a65accd2f2dc6f579e3dc07701c80d1bfe17e4",
+  "fixture": {
+    "id": "terroir-synthetic-embedding-smoke-v1",
+    "rights": "Agent-authored synthetic text for this trial; no real wine facts, producer data, customer data or ratings.",
+    "model_id": "Qwen/Qwen3-Embedding-0.6B",
+    "model_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+    "query_instruction": "Given a wine preference query, retrieve wine descriptions that match the requested sensory profile.",
+    "output_dimensions": 512,
+    "documents": [
+      {
+        "id": "W01",
+        "sensory_text": "Dry white wine. Light body, high acidity, lemon, lime and green apple. No oak flavor.",
+        "country": "USA",
+        "region": "Napa Valley",
+        "grape": "Chardonnay",
+        "price_usd": 28
+      },
+      {
+        "id": "W02",
+        "sensory_text": "Dry white wine. Light body, high acidity, grapefruit, gooseberry and fresh herbs. No oak flavor.",
+        "country": "France",
+        "region": "Loire",
+        "grape": "Sauvignon Blanc",
+        "price_usd": 25
+      },
+      {
+        "id": "W03",
+        "sensory_text": "Dry red wine. Full body, firm tannins, blackcurrant, dark cherry, cedar and oak.",
+        "country": "USA",
+        "region": "Napa Valley",
+        "grape": "Cabernet Sauvignon",
+        "price_usd": 35
+      },
+      {
+        "id": "W04",
+        "sensory_text": "Dry red wine. Full body, firm tannins, blackcurrant, plum, leather and earthy aromas.",
+        "country": "France",
+        "region": "Bordeaux",
+        "grape": "Cabernet blend",
+        "price_usd": 38
+      },
+      {
+        "id": "W05",
+        "sensory_text": "Dry red wine. Light body, gentle tannins, bright acidity, juicy red cherry and strawberry.",
+        "country": "USA",
+        "region": "Oregon",
+        "grape": "Pinot Noir",
+        "price_usd": 30
+      },
+      {
+        "id": "W06",
+        "sensory_text": "Dry red wine. Medium body, soft tannins, plum, chocolate and round texture.",
+        "country": "USA",
+        "region": "California",
+        "grape": "Merlot",
+        "price_usd": 22
+      },
+      {
+        "id": "W07",
+        "sensory_text": "Sweet white dessert wine. High acidity, apricot, peach, honey and a rich texture.",
+        "country": "Germany",
+        "region": "Mosel",
+        "grape": "Riesling",
+        "price_usd": 32
+      },
+      {
+        "id": "W08",
+        "sensory_text": "Dry white wine. Full body, low acidity, butter, vanilla, toasted oak and a creamy texture.",
+        "country": "USA",
+        "region": "Napa Valley",
+        "grape": "Chardonnay",
+        "price_usd": 40
+      },
+      {
+        "id": "W09",
+        "sensory_text": "Dry rose wine. Light body, bright acidity, strawberry, citrus and a refreshing finish.",
+        "country": "France",
+        "region": "Provence",
+        "grape": "Rose blend",
+        "price_usd": 20
+      },
+      {
+        "id": "W10",
+        "sensory_text": "Dry sparkling white wine. Fine bubbles, high acidity, green apple, lemon and toasted brioche.",
+        "country": "France",
+        "region": "Champagne",
+        "grape": "Sparkling blend",
+        "price_usd": 45
+      },
+      {
+        "id": "W11",
+        "sensory_text": "Dry red wine. Very full body, jammy black fruit, black pepper and pronounced alcohol warmth.",
+        "country": "USA",
+        "region": "Paso Robles",
+        "grape": "Zinfandel",
+        "price_usd": 29
+      },
+      {
+        "id": "W12",
+        "sensory_text": "Dry red wine. Medium body, high acidity, firm tannins, rose petals, red cherry and earthy aromas.",
+        "country": "Italy",
+        "region": "Piedmont",
+        "grape": "Nebbiolo",
+        "price_usd": 42
+      },
+      {
+        "id": "W13",
+        "sensory_text": "Dry red wine. Full body, firm tannins, blackcurrant, dark cherry, cedar and oak.",
+        "country": "USA",
+        "region": "Napa Valley",
+        "grape": "Cabernet Sauvignon",
+        "price_usd": 75
+      },
+      {
+        "id": "W14",
+        "sensory_text": "Dry red wine. Full body, firm tannins, blackcurrant, dark cherry, cedar and oak.",
+        "country": "USA",
+        "region": "Napa Valley",
+        "grape": "Cabernet Sauvignon",
+        "price_usd": null
+      }
+    ],
+    "queries": [
+      {
+        "id": "Q01",
+        "text": "A crisp dry white with high acidity and citrus, without oak.",
+        "relevant_ids": [
+          "W01",
+          "W02"
+        ]
+      },
+      {
+        "id": "Q02",
+        "text": "Un vin blanc sec et vif, avec des agrumes et sans saveur de bois.",
+        "relevant_ids": [
+          "W01",
+          "W02"
+        ]
+      },
+      {
+        "id": "Q03",
+        "text": "Un vino blanco dulce de postre con miel, albaricoque y buena acidez.",
+        "relevant_ids": [
+          "W07"
+        ]
+      },
+      {
+        "id": "Q04",
+        "text": "A light red with gentle tannins, juicy cherry and strawberry.",
+        "relevant_ids": [
+          "W05"
+        ]
+      },
+      {
+        "id": "Q05",
+        "text": "A creamy, buttery, full-bodied white with vanilla and oak.",
+        "relevant_ids": [
+          "W08"
+        ]
+      },
+      {
+        "id": "Q06",
+        "text": "A dry sparkling white with fine bubbles and brioche aromas.",
+        "relevant_ids": [
+          "W10"
+        ]
+      }
+    ],
+    "hard_filter_case": {
+      "query": "Napa Valley Cabernet Sauvignon under 40 USD",
+      "region": "Napa Valley",
+      "grape": "Cabernet Sauvignon",
+      "max_price_usd": 40,
+      "expected_ids": [
+        "W03"
+      ]
+    },
+    "acceptance": {
+      "vector_count": 20,
+      "finite_unit_vectors": true,
+      "dimension": 512,
+      "self_match_top1": true,
+      "hard_filter_exact": true,
+      "wrong_token_rejected": true,
+      "smoke_recall_at_3_min": 0.8
+    },
+    "limits": "Tiny handcrafted sanity check. Labels frozen before embedding; does not establish real wine quality, taste similarity, recommendation accuracy or production authorization."
+  },
+  "image_pin": {
+    "image": "ghcr.io/huggingface/text-embeddings-inference",
+    "tag": "cuda-1.9",
+    "digest": "sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a"
+  },
+  "attempts": [
+    {
+      "attempt": "01",
+      "result": {
+        "status": "FAILED",
+        "trial_max_seconds": 900,
+        "max_accepted_hourly_rate_usd": 0.8,
+        "max_rate_runtime_estimate_usd": 0.2,
+        "budget_usd": 1,
+        "fixture_sha256": "78b8d0333222ada84618b18588a65accd2f2dc6f579e3dc07701c80d1bfe17e4",
+        "pod_id": "61iqyvuq2jfgfp",
+        "cost_per_hour_usd": 0.49,
+        "ready_after_seconds": 341.014,
+        "wrong_token_http_status": 401,
+        "embedding_batch_seconds": 0.1498,
+        "error_type": "AssertionError",
+        "error": "Embedding response mismatch",
+        "termination_verified": true,
+        "elapsed_through_cleanup_seconds": 344.712,
+        "compute_estimate_usd": 0.046919
+      },
+      "termination": {
+        "pod_id": "61iqyvuq2jfgfp",
+        "delete_http_status": 204,
+        "get_http_status": 404,
+        "verified_at": "2026-09-06T05:20:01.211037+00:00"
+      },
+      "model_info": {
+        "model_id": "Qwen/Qwen3-Embedding-0.6B",
+        "model_sha": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+        "model_dtype": "float16",
+        "served_model_name": "Qwen/Qwen3-Embedding-0.6B",
+        "model_type": {
+          "embedding": {
+            "pooling": "last_token"
+          }
+        },
+        "max_concurrent_requests": 2,
+        "max_input_length": 32768,
+        "max_batch_tokens": 32768,
+        "max_batch_requests": null,
+        "max_client_batch_size": 32,
+        "auto_truncate": true,
+        "tokenization_workers": 13,
+        "version": "1.9.3",
+        "sha": "06670157fb6c1523482219bdb2d1660277d38088",
+        "docker_label": "sha-0667015"
+      },
+      "deployment_request_redacted": {
+        "name": "terroir-embedding-smoke-20260906T051418Z-65b1e2aa72f2666e",
+        "imageName": "ghcr.io/huggingface/text-embeddings-inference@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a",
+        "cloudType": "SECURE",
+        "computeType": "GPU",
+        "gpuTypeIds": [
+          "NVIDIA L4"
+        ],
+        "gpuTypePriority": "custom",
+        "gpuCount": 1,
+        "countryCodes": [
+          "US"
+        ],
+        "containerDiskInGb": 10,
+        "volumeInGb": 0,
+        "minRAMPerGPU": 16,
+        "minVCPUPerGPU": 2,
+        "interruptible": false,
+        "ports": [
+          "80/http"
+        ],
+        "supportPublicIp": false,
+        "dockerStartCmd": [
+          "--model-id",
+          "Qwen/Qwen3-Embedding-0.6B",
+          "--revision",
+          "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+          "--dtype",
+          "float16",
+          "--port",
+          "80",
+          "--max-concurrent-requests",
+          "2",
+          "--max-client-batch-size",
+          "32",
+          "--max-batch-tokens",
+          "32768"
+        ],
+        "env": {
+          "API_KEY": "[ephemeral token, never persisted]",
+          "HF_HUB_DISABLE_TELEMETRY": "1",
+          "DO_NOT_TRACK": "1"
+        }
+      },
+      "controller_sha256": "864f2d3f64fc9e12456bceb15ff5b318ad97cc28f4decb4fe96eded4133f8447",
+      "created_pod": {
+        "id": "61iqyvuq2jfgfp",
+        "name": "terroir-embedding-smoke-20260906T051418Z-65b1e2aa72f2666e",
+        "costPerHr": 0.49,
+        "adjustedCostPerHr": null,
+        "gpu": null,
+        "machine": {
+          "dataCenterId": "US-MO-2",
+          "diskThroughputMBps": 7878,
+          "gpuTypeId": "NVIDIA L4",
+          "location": "US",
+          "maxDownloadSpeedMbps": 22753,
+          "maxUploadSpeedMbps": 41975,
+          "secureCloud": true,
+          "supportPublicIp": true,
+          "reservedCountVersion": 264570
+        },
+        "desiredStatus": "RUNNING",
+        "imageName": "ghcr.io/huggingface/text-embeddings-inference@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a",
+        "containerDiskInGb": 10,
+        "volumeInGb": 0
+      }
+    },
+    {
+      "attempt": "02",
+      "result": {
+        "status": "PASS",
+        "trial_max_seconds": 900,
+        "max_accepted_hourly_rate_usd": 0.8,
+        "max_rate_runtime_estimate_usd": 0.2,
+        "budget_usd": 1,
+        "fixture_sha256": "78b8d0333222ada84618b18588a65accd2f2dc6f579e3dc07701c80d1bfe17e4",
+        "pod_id": "otsoaqxizhuy06",
+        "cost_per_hour_usd": 0.49,
+        "ready_after_seconds": 294.252,
+        "wrong_token_http_status": 401,
+        "oversized_batch_http_status": 429,
+        "embedding_batch_seconds": 3.0677,
+        "client_chunk_size": 2,
+        "successful_batches": 10,
+        "self_match_top1_with_ties": true,
+        "vector_count": 20,
+        "dimensions": 512,
+        "finite_unit_vectors": true,
+        "hard_filter_ids": [
+          "W03"
+        ],
+        "queries": [
+          {
+            "id": "Q01",
+            "semantic_top3": [
+              "W02",
+              "W01",
+              "W10"
+            ],
+            "lexical_top3": [
+              "W01",
+              "W02",
+              "W08"
+            ],
+            "relevant_ids": [
+              "W01",
+              "W02"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 1.0
+          },
+          {
+            "id": "Q02",
+            "semantic_top3": [
+              "W02",
+              "W01",
+              "W10"
+            ],
+            "lexical_top3": [
+              "W01",
+              "W02",
+              "W03"
+            ],
+            "relevant_ids": [
+              "W01",
+              "W02"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 1.0
+          },
+          {
+            "id": "Q03",
+            "semantic_top3": [
+              "W07",
+              "W10",
+              "W02"
+            ],
+            "lexical_top3": [
+              "W01",
+              "W02",
+              "W03"
+            ],
+            "relevant_ids": [
+              "W07"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 0.0
+          },
+          {
+            "id": "Q04",
+            "semantic_top3": [
+              "W05",
+              "W09",
+              "W12"
+            ],
+            "lexical_top3": [
+              "W05",
+              "W03",
+              "W09"
+            ],
+            "relevant_ids": [
+              "W05"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 1.0
+          },
+          {
+            "id": "Q05",
+            "semantic_top3": [
+              "W08",
+              "W07",
+              "W10"
+            ],
+            "lexical_top3": [
+              "W08",
+              "W01",
+              "W02"
+            ],
+            "relevant_ids": [
+              "W08"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 1.0
+          },
+          {
+            "id": "Q06",
+            "semantic_top3": [
+              "W10",
+              "W02",
+              "W01"
+            ],
+            "lexical_top3": [
+              "W10",
+              "W08",
+              "W01"
+            ],
+            "relevant_ids": [
+              "W10"
+            ],
+            "recall_at_3": 1.0,
+            "lexical_recall_at_3": 1.0
+          }
+        ],
+        "mean_recall_at_3": 1.0,
+        "lexical_mean_recall_at_3": 0.8333333333333334,
+        "termination_verified": true,
+        "elapsed_through_cleanup_seconds": 302.678,
+        "compute_estimate_usd": 0.041198
+      },
+      "termination": {
+        "pod_id": "otsoaqxizhuy06",
+        "delete_http_status": 204,
+        "get_http_status": 404,
+        "verified_at": "2026-09-06T05:32:15.670123+00:00"
+      },
+      "model_info": {
+        "model_id": "Qwen/Qwen3-Embedding-0.6B",
+        "model_sha": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+        "model_dtype": "float16",
+        "served_model_name": "Qwen/Qwen3-Embedding-0.6B",
+        "model_type": {
+          "embedding": {
+            "pooling": "last_token"
+          }
+        },
+        "max_concurrent_requests": 2,
+        "max_input_length": 32768,
+        "max_batch_tokens": 32768,
+        "max_batch_requests": null,
+        "max_client_batch_size": 32,
+        "auto_truncate": true,
+        "tokenization_workers": 13,
+        "version": "1.9.3",
+        "sha": "06670157fb6c1523482219bdb2d1660277d38088",
+        "docker_label": "sha-0667015"
+      },
+      "deployment_request_redacted": {
+        "name": "terroir-embedding-smoke-20260906T052716Z-7d8f9680974e99a2",
+        "imageName": "ghcr.io/huggingface/text-embeddings-inference@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a",
+        "cloudType": "SECURE",
+        "computeType": "GPU",
+        "gpuTypeIds": [
+          "NVIDIA L4"
+        ],
+        "gpuTypePriority": "custom",
+        "gpuCount": 1,
+        "countryCodes": [
+          "US"
+        ],
+        "containerDiskInGb": 10,
+        "volumeInGb": 0,
+        "minRAMPerGPU": 16,
+        "minVCPUPerGPU": 2,
+        "interruptible": false,
+        "ports": [
+          "80/http"
+        ],
+        "supportPublicIp": false,
+        "dockerStartCmd": [
+          "--model-id",
+          "Qwen/Qwen3-Embedding-0.6B",
+          "--revision",
+          "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+          "--dtype",
+          "float16",
+          "--port",
+          "80",
+          "--max-concurrent-requests",
+          "2",
+          "--max-client-batch-size",
+          "32",
+          "--max-batch-tokens",
+          "32768"
+        ],
+        "env": {
+          "API_KEY": "[ephemeral token, never persisted]",
+          "HF_HUB_DISABLE_TELEMETRY": "1",
+          "DO_NOT_TRACK": "1"
+        }
+      },
+      "controller_sha256": "9c10d386951ea3f99e2f73bb8e1a69b04f264fbafca2cb24a28396ac1e263ccc",
+      "created_pod": {
+        "id": "otsoaqxizhuy06",
+        "name": "terroir-embedding-smoke-20260906T052716Z-7d8f9680974e99a2",
+        "costPerHr": 0.49,
+        "adjustedCostPerHr": null,
+        "gpu": null,
+        "machine": {
+          "dataCenterId": "US-MO-2",
+          "diskThroughputMBps": 7885,
+          "gpuTypeId": "NVIDIA L4",
+          "location": "US",
+          "maxDownloadSpeedMbps": 22834,
+          "maxUploadSpeedMbps": 41584,
+          "secureCloud": true,
+          "supportPublicIp": true,
+          "reservedCountVersion": 264572
+        },
+        "desiredStatus": "RUNNING",
+        "imageName": "ghcr.io/huggingface/text-embeddings-inference@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a",
+        "containerDiskInGb": 10,
+        "volumeInGb": 0
+      }
+    }
+  ],
+  "combined_compute_estimate_usd": 0.088117,
+  "billing_note": "Rate multiplied by controller elapsed time through cleanup; excludes storage and is not an invoice. Account balance movement also includes existing costs and billing timing.",
+  "controller_fault_tests": [
+    {
+      "scenario": "success",
+      "status": "PASS",
+      "actual_trial_status": "PASS",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    },
+    {
+      "scenario": "http500_created",
+      "status": "PASS",
+      "actual_trial_status": "PASS",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    },
+    {
+      "scenario": "timeout_created",
+      "status": "PASS",
+      "actual_trial_status": "PASS",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    },
+    {
+      "scenario": "delayed_http500_created",
+      "status": "PASS",
+      "actual_trial_status": "FAILED",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    },
+    {
+      "scenario": "over_rate",
+      "status": "PASS",
+      "actual_trial_status": "FAILED",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    },
+    {
+      "scenario": "adjusted_over_rate",
+      "status": "PASS",
+      "actual_trial_status": "FAILED",
+      "one_create": true,
+      "only_owned_pod_deleted": true,
+      "unrelated_pod_preserved": true,
+      "tokens_not_saved": true
+    }
+  ],
+  "watchdog_fault_tests": [
+    {
+      "scenario": "main_disappeared",
+      "status": "PASS",
+      "cleanup_verified": true,
+      "exit_code": 0,
+      "unrelated_resource_preserved": true,
+      "scope": "simulated watchdog entry point; no actual host crash or network outage"
+    },
+    {
+      "scenario": "termination_unavailable",
+      "status": "PASS",
+      "cleanup_verified": false,
+      "exit_code": 1,
+      "unrelated_resource_preserved": true,
+      "scope": "simulated watchdog entry point; no actual host crash or network outage"
+    }
+  ],
+  "retry_code_review": {
+    "reviewer": "independent runtime_cleanup_audit agent",
+    "scope": "retry delta against attempts/01/trial.py",
+    "verdict": "PASS; no new blockers",
+    "reviewed_controller_sha256": "9c10d386951ea3f99e2f73bb8e1a69b04f264fbafca2cb24a28396ac1e263ccc",
+    "verification": "Read-only review of exact diff, pinned TEI Rust source, unchanged fixture bytes, saved six fault-injection receipts, and first-attempt deletion receipt. No independent live execution.",
+    "conditions": [
+      "Real retry must satisfy frozen retrieval gate",
+      "Deletion must be verified"
+    ],
+    "recorded_by": "parent transcription of agent response",
+    "recorded_at": "2026-09-06T05:27:37.066546+00:00"
+  },
+  "final_resource_check": {
+    "verified_at": "2026-09-06T05:33:04.749224+00:00",
+    "trial_pods_absent": true,
+    "preexisting_pod": {
+      "id": "bcod3vbu78gcav",
+      "name": "terroir-spike67",
+      "desiredStatus": "EXITED",
+      "volumeInGb": 80,
+      "containerDiskInGb": 50
+    },
+    "pod_count": 1,
+    "endpoint_count": 0
+  },
+  "limitations": [
+    "Handcrafted six-query labels are not a representative wine benchmark.",
+    "Self-similarity is only mathematical sanity.",
+    "Hard-filter fixture asserts the design; application SQL enforcement not tested.",
+    "Cold startup measurements apply to these Pods, not Serverless.",
+    "No live server, vector database writes, private data transfer or app deployment remains."
+  ],
+  "overload_reproduction": {
+    "http_status": 429,
+    "input_count": 20,
+    "max_concurrent_requests": 2,
+    "error": {
+      "error": "Model is overloaded",
+      "error_type": "Overloaded"
+    }
+  },
+  "embedding_batches": [
+    {
+      "offset": 0,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.4434,
+      "error": null
+    },
+    {
+      "offset": 2,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.2871,
+      "error": null
+    },
+    {
+      "offset": 4,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.234,
+      "error": null
+    },
+    {
+      "offset": 6,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.1736,
+      "error": null
+    },
+    {
+      "offset": 8,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.3506,
+      "error": null
+    },
+    {
+      "offset": 10,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.6128,
+      "error": null
+    },
+    {
+      "offset": 12,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.1931,
+      "error": null
+    },
+    {
+      "offset": 14,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.2403,
+      "error": null
+    },
+    {
+      "offset": 16,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.1621,
+      "error": null
+    },
+    {
+      "offset": 18,
+      "input_count": 2,
+      "http_status": 200,
+      "elapsed_seconds": 0.3614,
+      "error": null
+    }
+  ],
+  "lexical_baseline_diagnostic": {
+    "status": "post-hoc diagnostic; not a replacement for the frozen baseline or acceptance gate",
+    "baseline_issue": "Original lexical sort fills top3 even when all scores are zero; ties follow fixture order. A diagnostic alternative abstains when there is no token overlap.",
+    "queries": [
+      {
+        "id": "Q01",
+        "maximum_overlap": 6,
+        "zero_overlap_query": false,
+        "original_top3": [
+          "W01",
+          "W02",
+          "W08"
+        ],
+        "positive_overlap_only_top3": [
+          "W01",
+          "W02",
+          "W08"
+        ],
+        "diagnostic_recall_at_3": 1.0
+      },
+      {
+        "id": "Q02",
+        "maximum_overlap": 0,
+        "zero_overlap_query": true,
+        "original_top3": [
+          "W01",
+          "W02",
+          "W03"
+        ],
+        "positive_overlap_only_top3": [],
+        "diagnostic_recall_at_3": 0.0
+      },
+      {
+        "id": "Q03",
+        "maximum_overlap": 0,
+        "zero_overlap_query": true,
+        "original_top3": [
+          "W01",
+          "W02",
+          "W03"
+        ],
+        "positive_overlap_only_top3": [],
+        "diagnostic_recall_at_3": 0.0
+      },
+      {
+        "id": "Q04",
+        "maximum_overlap": 8,
+        "zero_overlap_query": false,
+        "original_top3": [
+          "W05",
+          "W03",
+          "W09"
+        ],
+        "positive_overlap_only_top3": [
+          "W05",
+          "W03",
+          "W09"
+        ],
+        "diagnostic_recall_at_3": 1.0
+      },
+      {
+        "id": "Q05",
+        "maximum_overlap": 7,
+        "zero_overlap_query": false,
+        "original_top3": [
+          "W08",
+          "W01",
+          "W02"
+        ],
+        "positive_overlap_only_top3": [
+          "W08",
+          "W01",
+          "W02"
+        ],
+        "diagnostic_recall_at_3": 1.0
+      },
+      {
+        "id": "Q06",
+        "maximum_overlap": 7,
+        "zero_overlap_query": false,
+        "original_top3": [
+          "W10",
+          "W08",
+          "W01"
+        ],
+        "positive_overlap_only_top3": [
+          "W10",
+          "W08",
+          "W01"
+        ],
+        "diagnostic_recall_at_3": 1.0
+      }
+    ],
+    "positive_overlap_only_macro_recall_at_3": 0.6666666666666666,
+    "interpretation": "0.6667 is the positive-overlap-only diagnostic score, not a neutral tie expectation. No evaluation labels or trial thresholds were changed."
+  },
+  "opus_reviews": [
+    {
+      "receipt": {
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "session_id": "ee51f56c-af76-468e-a180-2794fcf015e5",
+        "harness": "Claude Code Max OAuth; API-key env removed",
+        "packet_sha256": "a8abb8cbb93a0e5edf9afe3532de7c7a9bf81694e2db165b4c681e48326c67c6",
+        "output_sha256": "4325d23492a63ff8e3b5c8d99a18457b18687c1c6ede996f0d9cc28ec2f434f0",
+        "exit": 0,
+        "usable_response": true,
+        "seconds": 103.66
+      },
+      "raw_review": "I'll verify the supporting files the controller hard-depends on before reviewing.\n\n`★ Insight ─────────────────────────────────────`\n`trial.py` asserts on `fixture.sha256` and `image-pin.json` at startup — if either is missing the run dies before any spend, which is the safe direction, but it also means the packet is incomplete without them.\n`─────────────────────────────────────────────────`\n\n**Verdict: PASS**, gated on the live trial result, which I have not seen and am not treating as evidence.\n\n## Claims I checked\n\nThe amendment's factual load-bearing statements hold. Apache-2.0 / ungated / SHA `97b0c61…` match the stated HF metadata. The TEI quicktour does cover this model on `cuda-1.9`. The Serverless pricing claim is correctly scoped to Serverless (startup + execution + idle) and not smuggled into the Pod cost estimate. Matryoshka 32–1024 and multilingual support are accurately described *and* correctly disclaimed as not establishing wine retrieval quality. `MAX_RATE * 900/3600 = $0.20` is arithmetically right, and calling `$1` an operational target rather than a provider-enforced cap is honest. Supersession of [14] without rewriting history is handled properly.\n\nFixture internals are consistent: 14 + 6 = `vector_count: 20`; the hard-filter expectation `['W03']` is correct (W13 at $75 excluded by price, W14 excluded by null). Query-side `Instruct: …\\nQuery: …` prefixing with unprefixed documents is the correct Qwen3-Embedding convention, and 1024 → first 512 → renormalize is correct Matryoshka usage.\n\n## Findings\n\n**1. The self-match check cannot fail.** `line 143` asserts each doc's self-similarity ≥ `max(...)` over `dv` — but `dv` includes the vector itself, so the comparison is `1.0 >= 1.0 - 1e-6` unconditionally. Tie-awareness was the goal and duplicates W03/W13/W14 make a naive top-1 check genuinely wrong, but the fix over-corrected into a tautology. Compare self-similarity against the max over *distinct-text* documents instead. The amendment lists this as a check; as written it is not one.\n\n**2. The hard-filter case tests no system behavior.** `line 152` filters the fixture dict with a Python comprehension and asserts the result — it can only fail if someone edits `fixture.json`. As an executable statement of the \"typed SQL, not nearest-vector\" principle it's fine; listing it alongside embedding checks slightly overstates what the trial demonstrates. Recommend relabeling it in the doc as a design assertion.\n\n**3. `--dtype float16` on a bf16-trained model.** Qwen3 checkpoints are bf16; L4 (Ada) supports bf16 natively. fp16 risks activation overflow producing NaNs — which the finite-vector check would catch, but only after burning the run. Switch to `bfloat16`.\n\n**4. Rate guard reads the wrong field.** `line 137` asserts on `costPerHr` while `adjustedCostPerHr` is also captured — if a discount or savings plan makes them diverge, the guard checks the unbilled number. Assert on `max()` of both.\n\n**5. No human alarm on `CLEANUP_REQUIRED`.** If both `terminate()` and the watchdog fail, the only signal is a status string in `trial-result.json`. Given an unattended 900s deadline, the runbook should state that this status requires an immediate console check — that is the sole path to unbounded spend.\n\n**6. Ambiguous-create burns the full deadline.** The `finally` reconciliation loop runs to `deadline` regardless of `cleanup_by_name` succeeding. Deliberate per the comment, and correct — an early empty list isn't proof — but it converts a failed create into 15 minutes of wall time. Fine at this budget; note it.\n\n**7. Threshold headroom.** Three byte-identical Cabernet texts occupy three top-3 slots. Q04 (light red, Pinot) competes against that cluster, so a 0.8 macro recall@3 miss is plausible from fixture construction rather than model quality. Since labels are correctly frozen pre-inference, do not retune on failure — record it and diagnose.\n\n**8. Minor.** The RunPod HTTP proxy is publicly reachable for the trial window; `supportPublicIp: False` doesn't change that. The TEI `API_KEY` gate is the real control, and the wrong-token assertion makes it self-verifying — adequate here, worth stating explicitly in the doc. Fault coverage omits terminate-failure and main-process-SIGKILL (watchdog-only cleanup); both are the paths that matter most, though the five existing cases are sound.\n\nScope, privacy boundaries, and the no-production-data line are correctly drawn. None of the above is a blocker for a bounded synthetic trial. Items 1, 3, and 4 are worth fixing before the run; 5 belongs in the runbook."
+    },
+    {
+      "receipt": {
+        "requested_model": "claude-opus-5",
+        "reported_models": [
+          "claude-opus-5"
+        ],
+        "session_id": "ee51f56c-af76-468e-a180-2794fcf015e5",
+        "harness": "Claude Code Max OAuth; API-key env removed",
+        "packet_sha256": "b4a98115b221a119c4cba501cd0647e62bbb3f96117b69ea5ab0bb826100821b",
+        "output_sha256": "1d9a31b1e1f0d89a64cef06f808c9596e8d28dcb85676110f1429da3ea49bf59",
+        "exit": 0,
+        "usable_response": true,
+        "seconds": 53.93
+      },
+      "raw_review": "**PASS** — bounded synthetic smoke test only.\n\n## Arithmetic and measured claims verified\n\nCompute estimates reconcile at the returned $0.49/hr: 344.712s → $0.046919 and 302.678s → $0.041198, summing to $0.088117 (\"about $0.09\"), well under both the $0.20 max-rate estimate and the $1 target. The ten batch timings sum to 3.0584s against a reported 3.0677s, and the 9.3ms delta is correctly attributed to controller/HTTP overhead. Ten pairs × 2 = 20 vectors matches `vector_count`. Semantic recall@3 is 1.0 on all six queries → macro 1.00, clearing the frozen 0.8 gate. Both terminations show DELETE 204 + GET 404 with timestamps.\n\nThe 429 root cause holds: the served commit `06670157` matches `model-info.json`, and the excerpt shows `try_acquire_permit()` called per input inside the loop before `join_all`, so 20 inputs against `max_concurrent_requests: 2` fail deterministically. Declining to assert attempt 1's uncaptured status is the correct call; \"Embedding response mismatch\" is consistent with a non-200 but does not prove 429.\n\n## Disposition of earlier feedback\n\nAccepted correctly. The bfloat16 point is properly rejected — the CLI excerpt lists only `float16`/`float32`, served dtype was `float16`, outputs finite. Self-match and hard-filter relabeling now match what those checks actually do. CLEANUP_REQUIRED runbook, watchdog-only and termination-unavailable cases (the latter correctly failing loudly with `cleanup_verified: false`, exit 1), and the HEALTH_CHECK_PATH correction all land.\n\n## Remaining findings\n\n1. **Lexical baseline 0.8333 is inflated by tie-ordering.** Q02 (French) shares no tokens with any English document, so all scores tie at zero and `sorted` returns W01, W02, W03 by fixture index — scoring 1.0 by position, not overlap. Q03 (Spanish) scores 0.0 only because W07 sits at index 6. Neutral tie handling gives 0.6667. Disclose this, or the multilingual margin reads smaller than it is.\n\n2. **Carry the config mismatch forward:** `max_client_batch_size: 32` with `max_concurrent_requests: 2` means any batch >2 always 429s. Pairing was right here; production should size the permit pool.\n\n3. Supplied receipts omit `created-pod.json`, so the both-rate guard and the eighth fault case aren't independently visible in this packet."
+    }
+  ],
+  "independent_output_verification": {
+    "reviewer": "runtime_cleanup_audit agent",
+    "verdict": "PASS",
+    "method": "Independently recomputed cosine rankings and recalls from actual saved vectors and frozen fixture; compared pins and saved resource receipts. No live credential calls.",
+    "vector_count": 20,
+    "dimensions": 512,
+    "all_finite": true,
+    "maximum_unit_norm_error": 1.11e-16,
+    "macro_recall_at_3": 1.0,
+    "combined_compute_estimate_usd": 0.088117,
+    "recorded_by": "parent transcription of agent response",
+    "limitation": "Lexical French query benefits from zero-overlap catalogue-order ties; report discloses it."
+  }
+}
