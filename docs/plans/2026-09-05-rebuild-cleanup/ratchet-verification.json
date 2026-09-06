@@ -1,0 +1,39 @@
+[
+  {
+    "path": "scripts/file-size-baseline.json",
+    "removed_entries": [
+      "src/app/(app)/cellar/config/page.tsx",
+      "src/app/(app)/scan/[id]/scan-detail-view.tsx",
+      "src/lib/wine-intelligence/enrich-claude.ts"
+    ],
+    "tightened_entries": [
+      "src/app/(app)/cellar/edit-metadata-modal.tsx"
+    ],
+    "no_increase": true,
+    "method": "existing --update generator captures current source counts, including prior reductions"
+  },
+  {
+    "path": "scripts/design-typography-baseline.json",
+    "removed_entries": [
+      "src/app/(app)/cellar/cellar-counters.tsx",
+      "src/app/(app)/cellar/cellar-facet-bar.tsx",
+      "src/app/(app)/scan/[id]/scan-detail-view.tsx"
+    ],
+    "tightened_entries": [
+      "src/app/(app)/cellar/cellar-filter-sheet.tsx",
+      "src/app/(app)/cellar/cellar-list.tsx",
+      "src/app/(app)/cellar/cellar-shell.tsx",
+      "src/app/(app)/cellar/config/page.tsx",
+      "src/app/(app)/cellar/edit-metadata-modal.tsx",
+      "src/app/(app)/cellar/wine-detail-drawer.tsx",
+      "src/app/(app)/insights/date-range-selector.tsx",
+      "src/app/(app)/lists/[id]/components/add-wine-modal.tsx",
+      "src/app/(app)/lists/[id]/components/wine-row.tsx",
+      "src/app/(app)/lists/wine-list-landing.tsx",
+      "src/app/(app)/reconcile-queue/reconcile-queue-client.tsx",
+      "src/app/(app)/scans/page.tsx"
+    ],
+    "no_increase": true,
+    "method": "existing --update generator captures current source counts, including prior reductions"
+  }
+]

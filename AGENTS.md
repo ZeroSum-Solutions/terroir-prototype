@@ -105,7 +105,7 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
-| Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
+| Design contract | `DESIGN.md` (root). `docs/design/README.md` links predecessor history — do not build from those historical versions |
 | Completion status | `docs/feature-ledger.json` — the only authority |
 | Operational procedures | `docs/runbooks/` (see its README index) |
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |

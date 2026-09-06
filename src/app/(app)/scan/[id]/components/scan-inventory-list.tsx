@@ -11,11 +11,9 @@ import { wineDisplayName } from "@/lib/wine-display-name";
  * and until now the page never said so: a somm could commit four bottles and
  * then have no way to reach any of them from the scan that created them.
  *
- * The same block exists, fully written, in `[id]/scan-detail-view.tsx` — a
- * read-only page component that nothing imports. It was not wired up because it
- * has no Save Edits and no Commit to Inventory, so adopting it would have traded
- * this gap for the loss of the whole commit path. Only the part that was
- * missing is ported here.
+ * This committed-inventory list complements ScanReview: invoice line items
+ * remain editable there, and committed wines become navigable here. The live
+ * page preserves Save Edits and Commit to Inventory alongside these links.
  */
 
 export type ScanInventoryItem = {

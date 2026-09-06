@@ -1,0 +1,19 @@
+{
+  "requested_model": "gemini-3.8-flash-high",
+  "effort": "high",
+  "harness": "agy subscription; API key env removed; plan sandbox",
+  "exit": 0,
+  "seconds": 17.38,
+  "packet_sha256": "24ea9a73857d494a4606846e512c71f372928067304d124d8d97fc1729aa5b76",
+  "output_sha256": "6a8d42c9ad0f1dcda5ef6ba8071b88e392ed5de5575449987c31bbd79847a075",
+  "provider_status": "SUCCESS",
+  "conversation_id": "97f9c630-94aa-480e-972a-5eb3297b7918",
+  "model_selection_verified": "agy catalog and explicit gemini-3.8-flash-high CLI selection; response does not expose a separate served-model field",
+  "usage": {
+    "input_tokens": 44265,
+    "output_tokens": 3858,
+    "thinking_tokens": 2179,
+    "cache_read_tokens": 8173,
+    "total_tokens": 48123
+  }
+}

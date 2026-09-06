@@ -16,7 +16,7 @@ Its `global_gates` list is historical and is *not* the current gate set — see
 > machine and is unreachable to anyone else. Do not treat it as a dependency. The
 > in-repo authorities are `vwp-evals.yaml` for the enforced eval contract and
 > `docs/feature-ledger.json` for completion status. Post-implementation audits for
-> the shipped UX-01..10 cluster are archived at `_archive/ux-high-leverage/`.
+> the shipped UX-01..10 cluster are retained in [Git history](https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/evals/_archive/ux-high-leverage); the closed audit copies were removed from the checkout on September 5, 2026.
 
 Rules for any agent (human or autonomous) working an opportunity:
 

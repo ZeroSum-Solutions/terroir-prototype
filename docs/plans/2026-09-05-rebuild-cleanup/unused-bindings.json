@@ -1,0 +1,32 @@
+[
+  {
+    "path": "scripts/local/audit-wine-imagery.mjs",
+    "before_sha256": "57371a27e641967f1541dbf932824f5b4e10c7f90f68185ec262bf285580ea61",
+    "after_sha256": "26c17c5a802c18b1a8c3dc8a14123c96f0366fe894bffdb416317aff13729f8c",
+    "reason": "Lint-proven unused binding; retained hooks, actions and assertions"
+  },
+  {
+    "path": "src/app/(app)/cellar/enrich-control.test.tsx",
+    "before_sha256": "3411c2cce39fe044c197acefa36fb25ac3eecb8faee9c8868b5c256e4bb5f789",
+    "after_sha256": "bad480a049a0b0595cd3e0396d170f4a51f1d0a5e457530d0e6cf6cf7a1c4fab",
+    "reason": "Lint-proven unused binding; retained hooks, actions and assertions"
+  },
+  {
+    "path": "src/app/(app)/lists/[id]/use-section-reorder.test.tsx",
+    "before_sha256": "8c5ff10b6665d06cdc3e8ef654a37868490d30854f930a10e023b3b725cd651c",
+    "after_sha256": "30a7c725bfe7d07c3204f0a00d882715c6a564b2137d90f7dd1814133eb3b0bc",
+    "reason": "Lint-proven unused binding; retained hooks, actions and assertions"
+  },
+  {
+    "path": "src/domains/notes/note-composer.test.tsx",
+    "before_sha256": "eadab9e1ecc410c48b118a172203e5cf0e6af8e57fe873bbe430013ec3a68ef8",
+    "after_sha256": "c11ae031dd29b3132289b1b4662980d564012f0e5da7bc32980d38bb4db4e4a1",
+    "reason": "Lint-proven unused binding; retained hooks, actions and assertions"
+  },
+  {
+    "path": "src/test/fixtures/wine-corpus-double.ts",
+    "before_sha256": "05ded3ee24c148fcfcdb72db151cc015346ecf1f3cf17585852993fc5ed48547",
+    "after_sha256": "f60fbb56c7b39d0f843d5fa4ca9a4c9b8664989c96dac6b8b2e420a2f8818017",
+    "reason": "Lint-proven unused binding; retained hooks, actions and assertions"
+  }
+]

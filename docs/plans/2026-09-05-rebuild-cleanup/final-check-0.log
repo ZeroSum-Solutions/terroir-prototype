@@ -1,0 +1,10 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+$ eslint
+
+/Users/zero/projects/terroir/src/app/(app)/lists/[id]/use-section-reorder.ts
+  57:5  warning  React Hook useCallback has missing dependencies: 'setErrorToast' and 'setSections'. Either include them or remove the dependency array. If 'setSections' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+/Users/zero/projects/terroir/src/app/(app)/lists/[id]/use-wine-item-reorder.ts
+  68:5  warning  React Hook useCallback has missing dependencies: 'setErrorToast' and 'setSections'. Either include them or remove the dependency array. If 'setSections' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+✖ 2 problems (0 errors, 2 warnings)

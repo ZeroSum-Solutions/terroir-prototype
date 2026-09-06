@@ -132,6 +132,8 @@ application modules in `src/lib/`, and database migrations in
 
 ## Documentation
 
+- [`docs/REBUILD.md`](docs/REBUILD.md) is the entry point for rebuild preparation, cleanup evidence and dependency mapping.
+
 - [`AGENTS.md`](AGENTS.md) is the working contract — read it before your first edit.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) owns module and database boundaries.
 - [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) owns verified code conventions.

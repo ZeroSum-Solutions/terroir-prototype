@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-06T04:12:48.032448+00:00",
+  "tracked_files_removed": 40,
+  "tracked_bytes": 414917,
+  "cache_removals": [
+    {
+      "path": ".next/dev/cache",
+      "files": 4886,
+      "logical_bytes_removed": 13251402765,
+      "recovery": "regenerate with existing Next/TypeScript commands"
+    },
+    {
+      "path": ".next/cache",
+      "files": 3,
+      "logical_bytes_removed": 1209336,
+      "recovery": "regenerate with existing Next/TypeScript commands"
+    },
+    {
+      "path": "tsconfig.tsbuildinfo",
+      "files": 1,
+      "logical_bytes_removed": 931773,
+      "recovery": "regenerate with existing Next/TypeScript commands"
+    }
+  ],
+  "history_base": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "mode": "exact path and hash allowlist; no databases, packages, live routes or other worktree removed"
+}

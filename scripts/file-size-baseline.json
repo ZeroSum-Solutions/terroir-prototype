@@ -1,8 +1,7 @@
 {
   "src/app/(app)/cellar/cellar-list.tsx": 566,
   "src/app/(app)/cellar/cellar-shell.tsx": 540,
-  "src/app/(app)/cellar/config/page.tsx": 442,
-  "src/app/(app)/cellar/edit-metadata-modal.tsx": 418,
+  "src/app/(app)/cellar/edit-metadata-modal.tsx": 408,
   "src/app/(app)/cellar/page.tsx": 476,
   "src/app/(app)/cellar/wine-detail-drawer.tsx": 640,
   "src/app/(app)/import/import-client.test.tsx": 2467,
@@ -11,7 +10,6 @@
   "src/app/(app)/lists/[id]/components/add-wine-modal.tsx": 571,
   "src/app/(app)/lists/[id]/components/wine-row.tsx": 467,
   "src/app/(app)/lists/[id]/wine-list-editor.tsx": 789,
-  "src/app/(app)/scan/[id]/scan-detail-view.tsx": 495,
   "src/app/(app)/scan/scanner.test.tsx": 1028,
   "src/app/(app)/scan/scanner.tsx": 807,
   "src/app/(app)/scan/views/results-view.tsx": 530,
@@ -20,7 +18,6 @@
   "src/domains/import/batch-service.ts": 3150,
   "src/domains/import/constants.ts": 524,
   "src/lib/reconcile-ledger/index.ts": 572,
-  "src/lib/wine-intelligence/enrich-claude.ts": 404,
   "src/lib/wine-intelligence/name-resolver.ts": 410,
   "src/lib/wine-intelligence/xwines-profile.ts": 502,
   "src/test/fixtures/validate-bulk-import.test.ts": 2130

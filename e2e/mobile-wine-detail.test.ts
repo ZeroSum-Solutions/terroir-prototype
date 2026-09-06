@@ -771,9 +771,8 @@ test.describe("@mobile-wine-detail tapping a wine shows the wine, at 390px", () 
 
   test("a wine on a committed scan opens the wine", async ({ page }) => {
     // The live route renders ScanReview (scan-review.tsx), whose mobile path
-    // is LineItemCard — a plain <article> of text inputs. The richer
-    // scan-detail-view.tsx, which DOES link to /cellar?wine=, is imported by
-    // nothing.
+    // is LineItemCard — a plain <article> of text inputs. ScanInventoryList
+    // supplies the committed wine links alongside the editable review.
     await page.goto("/scans");
     const scanLink = page
       .locator('a[href^="/scan/"]')
@@ -789,8 +788,7 @@ test.describe("@mobile-wine-detail tapping a wine shows the wine, at 390px", () 
       hrefs,
       "/scan/[id]: the mobile line-item card is a plain <article> " +
         "(src/app/(app)/scan/components/scan-review.tsx:322 → line-item-card.tsx:44) " +
-        "— wines are listed with no way to open any of them. The richer " +
-        "scan-detail-view.tsx, which DOES link to /cellar?wine=, is imported by nothing",
+        "— the committed ScanInventoryList must provide links to the saved wines",
     ).not.toEqual([]);
 
     const wine = wineFacts(wineIdFromHref(hrefs[0]));

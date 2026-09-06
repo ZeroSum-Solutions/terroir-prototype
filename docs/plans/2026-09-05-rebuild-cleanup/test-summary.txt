@@ -1,0 +1,8 @@
+Extracted from the completed full Vitest run (exit 0). Full log retained in task work/rebuild-cleanup/unit-tests.log.
+ Test Files  418 passed | 18 skipped (436)
+      Tests  3833 passed | 122 skipped (3956)
+   Start at  21:14:20
+   Duration  63.28s (transform 2.98s, setup 773ms, import 21.77s, tests 38.84s, environment 39.59s)
+  20 suite(s) skipped themselves because no local Supabase
+
+Follow-up: 3 files / 15 tests passed after five unused-binding removals. See final-check-1.log.

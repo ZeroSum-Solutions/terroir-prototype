@@ -1,5 +1,7 @@
 # Modular Architecture Refactor — Plan
 
+> Cleanup note, September 5, 2026: this remains a historical/partially active plan. Superseded document links now use Git history; the unused browser factory and adapter barrels have been removed. This note does not approve the rebuild or change the remaining phase decisions.
+
 **Status:** ACTIVE — partly executed. Phases 0–2 have **landed** (§3B and the Phase 2 RESULT
 block in §6 record the commits: #152, #154, #155, #156, #157). Later phases are still plan.
 Read each phase's own RESULT block before assuming anything below is unbuilt.
@@ -460,7 +462,7 @@ Nothing structural moves until the safety net covers what the refactor will touc
 | 0.3 | Run the **full** `e2e/` suite in CI, not 2 of 19 files. Keep today's 2 as the PR-blocking subset if runtime matters; add the rest as a `main`/nightly job feeding the existing `ci-main-alert.yml` pattern | 19 specs execute somewhere in CI; the 9 that self-skip under CI either run or carry a dated, justified skip |
 | 0.4 | Wire `assertNoSeriousA11yViolations` into the already-existing but unwired specs — `import-journey`, `insights-drilldown`, `team-mobile`, `scan-intake-mobile` | axe covers the routes owning 8 of the 10 monoliths, which today it does not |
 | 0.5 | Add `eslint-plugin-boundaries` + `max-lines` with today's sizes as the starting baseline; ratchet only | `pnpm lint` green; baseline file committed |
-| 0.6 | Delete `src/lib/supabase/client.ts` (zero importers, verified) | `tsc --noEmit` green |
+| 0.6 | **DONE September 5, 2026:** removed [former browser factory](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/src/lib/supabase/client.ts) (zero importers, verified) | `tsc --noEmit` green |
 | 0.7 | Relocate the three fake lib modules to `scripts/__tests__/` | governance gates still green |
 | 0.8 | Resolve §3.3 — decide the identity spine's fate and record it in `docs/decisions/` | decision recorded |
 
@@ -479,7 +481,7 @@ Headline items:
 - `AGENTS.md` is 327 bytes of generic Next.js boilerplate, last touched **2026-04-17**, containing nothing project-specific. `CLAUDE.md` is one line: `@AGENTS.md`. The agent-instruction layer is effectively empty — rewrite both.
 - `claude-progress.txt` (83KB) self-describes as superseded by `docs/feature-ledger.json` — archive out of the repo root.
 - `app_spec.txt` (34KB) is duplicated at `.zeroforge/prompts/app_spec.txt` — deduplicate.
-- `docs/design/DESIGN-cantina-2026-08-26.md` is the **superseded** predecessor palette; its `gold: #786218` and cream `#E3D9CB` are exactly what `check-design-palette.mjs` now rejects. `docs/design/DESIGN-nocturne-typography-2026-08-29.md` is a same-day intermediate draft whose own frontmatter still describes the direction its body argues against. Neither is marked historical → `docs/design/_archive/`.
+- [DESIGN-cantina-2026-08-26.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-cantina-2026-08-26.md) is the **superseded** predecessor palette; its `gold: #786218` and cream `#E3D9CB` are exactly what `check-design-palette.mjs` now rejects. [DESIGN-nocturne-typography-2026-08-29.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-nocturne-typography-2026-08-29.md) is a same-day intermediate draft whose own frontmatter still describes the direction its body argues against. Neither is marked historical → `docs/design/_archive/`.
 - Plans for shipped work → `docs/plans/_archive/` per the plan-hygiene convention. Move, don't delete.
 - **25MB of committed PNGs** under `docs/screenshots/` — two-thirds of the repo's 37MB. Decide: keep as verification evidence, or move to a release artifact. New screenshots stop being committed either way.
 
@@ -507,9 +509,9 @@ verifiable:
 - `DESIGN.md` frontmatter terminated. **Before:** `design.md lint` returned *"No YAML content found"* with 0 errors and exit 0 — a false pass validating none of the tokens. **After:** it parses and validates 60 colors, 16 typography scales, 5 rounding levels, 9 spacing tokens. All four `pnpm check:design` gates still pass.
 - `AGENTS.md` rewritten from 327 bytes of generic Next.js boilerplate (untouched since 2026-04-17) into a real working contract. `CLAUDE.md` stays a thin `@AGENTS.md` import, which is correct — it just now points at something.
 - `docs/CONVENTIONS.md` created, every claim verified against the tree. Replaces `.planning/codebase/CONVENTIONS.md`, which asserted CVA as the variant convention (CVA is not in this repo) and "no destructive down migrations" (`downs:check` in fact *requires* paired downs).
-- `.planning/` (5 files, generated 2026-05-01, never updated, referenced nowhere) archived to `docs/_archive/planning-codebase-2026-05-01/`.
+- `.planning/` (5 files, generated 2026-05-01, never updated, referenced nowhere) archived to [scaffold history](https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/planning-codebase-2026-05-01).
 - 22 shipped or superseded plans and the 10 UX implementation audits archived, each with a stated verdict. `docs/plans/` drops from 35 files to 14 active.
-- `PROJECT.md` (orphaned tool output) archived; `scratchpad/` untracked and gitignored.
+- [PROJECT.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/PROJECT.md) (orphaned tool output) archived; `scratchpad/` untracked and gitignored.
 - Index pages added: `docs/runbooks/README.md`, `docs/design/README.md`, `docs/_archive/README.md`, `docs/plans/_archive/README.md`.
 - **File-size ratchet** added — `scripts/check-file-size.mjs` + `pnpm check:file-size`, wired into CI. 62 files over 400 lines and 49,156 lines of monolith debt are now frozen in a baseline that can only shrink. Verified to fail on both growth of a baselined file and a new oversized file.
 - **`.github/workflows/e2e-full.yml`** added — runs all 19 e2e specs nightly and on push to `main`, opening an issue on failure. The required PR check keeps its fast 2-spec subset.

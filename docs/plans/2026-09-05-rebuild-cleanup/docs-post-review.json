@@ -1,0 +1,448 @@
+{
+  "review_scope": "actual doc deletions, repairs, new rebuild entrypoint and dependency map",
+  "doc_deletions_match_manifest": true,
+  "docs_removed": 33,
+  "local_link_checks": [
+    {
+      "file": "README.md",
+      "line": 50,
+      "url": "docs/runbooks/local-stack.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 51,
+      "url": "docs/runbooks/investor-demo.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 75,
+      "url": "docs/feature-ledger.json",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 81,
+      "url": "app_spec.txt",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 82,
+      "url": "claude-progress.txt",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 91,
+      "url": "docs/_archive/README.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 93,
+      "url": "docs/PRODUCT-CONTRACT-CONFORMANCE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 98,
+      "url": "docs/LOCAL-SUPABASE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 122,
+      "url": "docs/STAGING-SETUP.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 127,
+      "url": "docs/ARCHITECTURE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 135,
+      "url": "docs/REBUILD.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 137,
+      "url": "AGENTS.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 138,
+      "url": "docs/ARCHITECTURE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 139,
+      "url": "docs/CONVENTIONS.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 140,
+      "url": "docs/runbooks/README.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 141,
+      "url": "docs/LOCAL-SUPABASE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 142,
+      "url": "docs/STAGING-SETUP.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 143,
+      "url": "docs/PRODUCT-CONTRACT-CONFORMANCE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 144,
+      "url": "docs/runbooks/database-backup-restore.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "README.md",
+      "line": 148,
+      "url": "DESIGN.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 11,
+      "url": "plans/2026-09-05-rebuild-cleanup/README.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 12,
+      "url": "plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 13,
+      "url": "plans/2026-09-05-terroir-rebuild/START-HERE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 14,
+      "url": "plans/2026-09-05-terroir-rebuild/scope.csv",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 15,
+      "url": "plans/2026-09-05-terroir-rebuild/database-dispositions.csv",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 16,
+      "url": "plans/2026-09-05-terroir-rebuild/13-ai-sommelier-concierge.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 16,
+      "url": "plans/2026-09-05-terroir-rebuild/wine-comparison-review-record.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 17,
+      "url": "plans/2026-09-05-terroir-rebuild/preparation/ACTIVATION-CHECKLIST.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 18,
+      "url": "ARCHITECTURE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/REBUILD.md",
+      "line": 18,
+      "url": "runbooks/README.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 7,
+      "url": "removal-manifest.json",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 17,
+      "url": "model-review.md",
+      "exists": false,
+      "expected_pending": true
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 23,
+      "url": "verification.json",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 35,
+      "url": "../../REBUILD.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 35,
+      "url": "dependency-map.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/README.md",
+      "line": 35,
+      "url": "outcome-areas.csv",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "line": 3,
+      "url": "../2026-09-05-terroir-rebuild/dependency-graph.mmd",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "line": 7,
+      "url": "../../ARCHITECTURE.md",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "line": 62,
+      "url": "outcome-areas.csv",
+      "exists": true,
+      "expected_pending": false
+    },
+    {
+      "file": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "line": 62,
+      "url": "../2026-09-05-terroir-rebuild/scope.csv",
+      "exists": true,
+      "expected_pending": false
+    }
+  ],
+  "history_link_checks": [
+    {
+      "file": "DESIGN.md",
+      "line": 126,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-cantina-2026-08-26.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "DESIGN.md",
+      "line": 128,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-nocturne-typography-2026-08-29.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/_archive/README.md",
+      "line": 24,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/PROJECT.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/_archive/README.md",
+      "line": 26,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/planning-codebase-2026-05-01",
+      "git_type": "tree",
+      "valid": true
+    },
+    {
+      "file": "docs/design/README.md",
+      "line": 11,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-cantina-2026-08-26.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/design/README.md",
+      "line": 12,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-nocturne-typography-2026-08-29.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/evals/README.md",
+      "line": 19,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/evals/_archive/ux-high-leverage",
+      "git_type": "tree",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/2026-08-29-modular-architecture-refactor.md",
+      "line": 465,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/src/lib/supabase/client.ts",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/2026-08-29-modular-architecture-refactor.md",
+      "line": 484,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-cantina-2026-08-26.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/2026-08-29-modular-architecture-refactor.md",
+      "line": 484,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-nocturne-typography-2026-08-29.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/2026-08-29-modular-architecture-refactor.md",
+      "line": 512,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/planning-codebase-2026-05-01",
+      "git_type": "tree",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/2026-08-29-modular-architecture-refactor.md",
+      "line": 514,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/PROJECT.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 31,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/plans/_archive/2026-04-18-lwin-matching.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 32,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/plans/_archive/2026-08-20-high-leverage-ux-plan-audits.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 33,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/plans/_archive/2026-08-20-high-leverage-ux-portfolio-spec.md",
+      "git_type": "blob",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 34,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/plans/_archive",
+      "git_type": "tree",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 34,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/evals/_archive/ux-high-leverage",
+      "git_type": "tree",
+      "valid": true
+    },
+    {
+      "file": "docs/plans/_archive/README.md",
+      "line": 36,
+      "url": "https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/plans/_archive/2026-08-21-mobile-demo-production-readiness-spec.md",
+      "git_type": "blob",
+      "valid": true
+    }
+  ],
+  "protected_package_count": 176,
+  "protected_package_all_hashes_unchanged": true,
+  "outcome_ids_total": 68,
+  "outcome_ids_unique_and_equal_to_scope": true,
+  "design_yaml_unchanged": true,
+  "findings": [
+    {
+      "id": "DOC-POST-01",
+      "path": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "issue": "Outbound Toast availability incorrectly grouped as excluded; E-064 phase P is deferred, E-063 alone is excluded.",
+      "requested_fix": "Preserve excluded checkout and separately deferred outbound availability.",
+      "status": "corrected and independently verified"
+    },
+    {
+      "id": "DOC-POST-02",
+      "path": "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md",
+      "issue": "Current invoice scanning conflated with CSV/import session-child-batch workflow.",
+      "requested_fix": "Call the retained session-child-batch workflow CSV onboarding.",
+      "status": "corrected and independently verified"
+    }
+  ],
+  "verdict": "PASS",
+  "reviewed_document_sha256": {
+    "docs/REBUILD.md": "4f9f02ebc79e9a461acc983d4fa0143571b692c9aff9929e9b218f71c481fa0d",
+    "docs/plans/2026-09-05-rebuild-cleanup/README.md": "96d3099bcdbd5c150e3016f95a1490e3f8e30444336e8db9d258f92bb19f64ac",
+    "docs/plans/2026-09-05-rebuild-cleanup/dependency-map.md": "ff06f63fbdb41d57bb4cb22fcea81bd117311b402e1a2bfc56181b9de6bd1baa",
+    "docs/plans/2026-09-05-rebuild-cleanup/outcome-areas.csv": "68b8645c9ee91d58b2bbd048c02b211cd4cc7674470fad8da04b84ad1eb2d70e"
+  },
+  "limits": [
+    "Pending model-review.md link is explicitly expected; root owns final receipt/claim verification.",
+    "Original frozen plan intentionally retains historical planning-only status; new entrypoint explains subsequent cleanup authorization without modifying signed evidence.",
+    "No source-code execution/tests or provider calls performed by this documentation reviewer."
+  ]
+}

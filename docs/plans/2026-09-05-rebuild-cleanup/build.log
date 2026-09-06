@@ -1,0 +1,177 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+✓ Lockfile passes supply-chain policies (verified 1d ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+   ╭─────────────────────────────────────────╮
+   │                                         │
+   │   Update available! 11.15.1 → 12.3.4.   │
+   │   Changelog: https://pnpm.io/v/12.3.4   │
+   │    To update, run: pnpm add -g pnpm     │
+   │                                         │
+   ╰─────────────────────────────────────────╯
+
+
+Done in 613ms using pnpm v11.15.1
+$ next build
+▲ Next.js 16.2.12 (Turbopack)
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+(node:81313) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 6.7s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 505ms
+  Running TypeScript ...
+  Finished TypeScript in 8.0s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/71) ...
+  Generating static pages using 9 workers (17/71)
+  Generating static pages using 9 workers (35/71)
+  Generating static pages using 9 workers (53/71)
+✓ Generating static pages using 9 workers (71/71) in 231ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/assistant
+├ ƒ /api/bins
+├ ƒ /api/bins/[id]
+├ ƒ /api/bins/suggest
+├ ƒ /api/brand-kit
+├ ƒ /api/brand-kit/propose
+├ ƒ /api/cellar
+├ ƒ /api/cellar-health/recompute
+├ ƒ /api/cellar/[id]
+├ ƒ /api/cellar/[id]/section
+├ ƒ /api/cellar/batch-section
+├ ƒ /api/cellar/config
+├ ƒ /api/cellar/grid
+├ ƒ /api/cellar/voice-resolve
+├ ƒ /api/dev-login
+├ ƒ /api/export/toast-csv
+├ ƒ /api/health
+├ ƒ /api/import/batches
+├ ƒ /api/import/batches/[id]
+├ ƒ /api/import/batches/[id]/apply
+├ ƒ /api/import/batches/[id]/resolve-all
+├ ƒ /api/import/batches/[id]/revert
+├ ƒ /api/import/batches/[id]/rows/[rowId]
+├ ƒ /api/import/convert
+├ ƒ /api/import/preview
+├ ƒ /api/import/sessions
+├ ƒ /api/import/sessions/[id]
+├ ƒ /api/import/sessions/[id]/revert
+├ ƒ /api/insights
+├ ƒ /api/insights/csv
+├ ƒ /api/insights/drink-window-alerts
+├ ƒ /api/insights/pour
+├ ƒ /api/insights/pricing-review
+├ ƒ /api/insights/snoozed
+├ ƒ /api/inventory/save-bottle-scan
+├ ƒ /api/inventory/save-scan
+├ ƒ /api/member-analytics
+├ ƒ /api/open-bottles
+├ ƒ /api/open-bottles/[id]/close
+├ ƒ /api/open-bottles/close
+├ ƒ /api/pdf
+├ ƒ /api/pour
+├ ƒ /api/pour/undo
+├ ƒ /api/pricing-recommendations/recompute
+├ ƒ /api/reconcile
+├ ƒ /api/reconcile-queue
+├ ƒ /api/reconcile-queue/accept
+├ ƒ /api/reconcile-queue/undo
+├ ƒ /api/restaurant/[id]
+├ ƒ /api/scan
+├ ƒ /api/scan-bottle
+├ ƒ /api/scan-bottle/confirm
+├ ƒ /api/scans/[id]
+├ ƒ /api/scans/[id]/commit
+├ ƒ /api/scans/[id]/image
+├ ƒ /api/scans/[id]/re-extract
+├ ƒ /api/search
+├ ƒ /api/stock-adjustments
+├ ƒ /api/team/accept-invite
+├ ƒ /api/team/invite
+├ ƒ /api/team/invite/[id]
+├ ƒ /api/team/invite/[id]/resend
+├ ƒ /api/team/members
+├ ƒ /api/team/members/[id]
+├ ƒ /api/wine-list-items
+├ ƒ /api/wine-list-items/[id]
+├ ƒ /api/wine-list-items/reorder
+├ ƒ /api/wine-list-sections
+├ ƒ /api/wine-list-sections/[id]
+├ ƒ /api/wine-list-sections/reorder
+├ ƒ /api/wine-lists
+├ ƒ /api/wine-lists/[id]
+├ ƒ /api/wine-lists/[id]/clone
+├ ƒ /api/wine-lists/[id]/csv
+├ ƒ /api/wine-lists/[id]/publish
+├ ƒ /api/wine-lists/[id]/theme
+├ ƒ /api/wines/[id]
+├ ƒ /api/wines/[id]/availability
+├ ƒ /api/wines/[id]/dismiss-pricing-alert
+├ ƒ /api/wines/[id]/enrich
+├ ƒ /api/wines/[id]/image
+├ ƒ /api/wines/[id]/label-photo
+├ ƒ /api/wines/[id]/notes
+├ ƒ /api/wines/[id]/notes/suggest
+├ ƒ /api/wines/[id]/overpaid
+├ ƒ /api/wines/[id]/pricing-suggestion
+├ ƒ /api/wines/[id]/pricing-targets
+├ ƒ /api/wines/[id]/profile
+├ ƒ /api/wines/[id]/refresh-retail
+├ ƒ /api/wines/[id]/snooze-alert
+├ ƒ /api/wines/availability
+├ ƒ /api/wines/create-from-lwin
+├ ƒ /api/wines/enrich
+├ ƒ /api/wines/lwin-search
+├ ƒ /api/wines/merge
+├ ƒ /api/wines/price-comparison
+├ ƒ /api/wines/refresh-retail-batch
+├ ƒ /api/wines/search
+├ ○ /apple-icon.png
+├ ƒ /atlas
+├ ƒ /auth/callback
+├ ƒ /auth/confirm
+├ ƒ /auth/reset-password
+├ ƒ /auth/signout
+├ ƒ /bins
+├ ƒ /catalogue/[source]/[id]
+├ ƒ /cellar
+├ ƒ /cellar/[wineId]
+├ ƒ /cellar/config
+├ ƒ /cellar/open
+├ ƒ /cellar/reconcile
+├ ƒ /cellar/reconcile/history
+├ ○ /icon.png
+├ ƒ /import
+├ ƒ /insights
+├ ƒ /invite/[token]
+├ ƒ /list/[slug]
+├ ƒ /list/[slug]/print
+├ ƒ /lists
+├ ƒ /lists/[id]
+├ ƒ /lists/[id]/preview
+├ ƒ /lists/[id]/print
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /price-comparison
+├ ƒ /reconcile-queue
+├ ƒ /scan
+├ ƒ /scan-bottle
+├ ƒ /scan/[id]
+├ ƒ /scans
+└ ƒ /team
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

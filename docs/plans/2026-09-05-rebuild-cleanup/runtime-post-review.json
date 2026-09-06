@@ -1,0 +1,80 @@
+{
+  "scope": "Post-removal runtime review of actual working-tree diff",
+  "base_sha": "9acee206aa124148c21cb0faab047e78cb64732e",
+  "branch": "chore/rebuild-cleanup",
+  "diff_sha256": "7337a2694d1628bc3f5f72b8e1b4feaffabb393a5efe99b29610c2923fd33841",
+  "deleted_count": 40,
+  "deleted_src_count": 7,
+  "deleted_docs_count": 33,
+  "verdict": "NO_NEW_RUNTIME_FINDINGS_IN_REVIEWED_DIFF",
+  "cleanup_findings": [],
+  "verification": {
+    "source_deletions_match_seven_approved_candidates": true,
+    "tracked_js_ts_scanned_after_deletion": 1133,
+    "new_orphan_modules_after_deletion": [],
+    "remaining_zero_incoming_exclusions": [
+      "src/proxy.ts: Next convention entrypoint",
+      "src/test/mocks/anthropic.ts: retained explanatory fixture documentation"
+    ],
+    "scan_inventory_component_ast_identical_ignoring_comments": true,
+    "e2e_changes": "Only comment and diagnostic string. expect(hrefs).not.toEqual([]), selectors, routes, navigation and follow-on wine assertion unchanged.",
+    "runtime_auth_route_worker_db_dependency_changes": "None; no API routes, proxy/auth runtime, worker, Supabase migrations/generated types, package manifest or lockfile changed.",
+    "ratchets": "Independently parsed both old/current JSON trees; zero added or increased numeric budgets.",
+    "remaining_deleted_file_references": [
+      "claude-progress.txt:601,1336 protected historical machine source",
+      "docs/plans/2026-08-29-modular-architecture-refactor.md:465 pinned GitHub historical source link"
+    ],
+    "unresolved_import_scan": [
+      "No import to one of the seven deleted source files.",
+      "globals.css is a legitimate non-TS asset import.",
+      "Hosted-polish CLI missing enrichment import predates cleanup; see readiness_issue."
+    ],
+    "git_diff_check": "PASS",
+    "tests": "No test/typecheck/lint reruns; root owns running checks. Local code review cannot establish remote merge readiness."
+  },
+  "readiness_issue": {
+    "severity": "MEDIUM",
+    "introduced_by_cleanup": false,
+    "path": "scripts/polish-demo-tenant-hosted.ts",
+    "line": 40,
+    "finding": "Imports missing ../src/lib/wine-intelligence/enrich-claude.ts. The imported module was deleted in edb2ad20 (#216), and import is already present in planning checkpoint9acee20. Running this hosted CLI fails before its intended dry-run or write behavior.",
+    "retirement_decision": "HOLD",
+    "reason": "It also implements corpus links, colour filling, cellar sections and stuck-scan handling; these were not established redundant. Active investor-demo runbook:39 and release record:302 cite completed production repair. No automatic package/CI/script callers found; manual-CLI lifecycle needs an explicit retirement or repair decision.",
+    "proposed_followup": "Do not execute hosted script. Decide to retire this completed demo repair with preserved history links, or separately repair supported deterministic capabilities; do not restore retired inference merely to make import resolve."
+  },
+  "additional_five_binding_edits": {
+    "verdict": "PASS_NO_FINDINGS",
+    "diff_sha256": "64dcfddc5b6162fc2a8ad9d29825bc36e8deadf9e1f5467d827fa8af5c8c5065",
+    "paths": [
+      "scripts/local/audit-wine-imagery.mjs",
+      "src/app/(app)/cellar/enrich-control.test.tsx",
+      "src/app/(app)/lists/[id]/use-section-reorder.test.tsx",
+      "src/domains/notes/note-composer.test.tsx",
+      "src/test/fixtures/wine-corpus-double.ts"
+    ],
+    "evidence": [
+      "scripts/local/audit-wine-imagery.mjs:208 removes an unused locator/filter object only; the actual scroll, evaluate click, wait and audit calls remain byte-identical.",
+      "enrich-control.test.tsx:1 removes only an unused named React import. The React act import remains; no call changed.",
+      "use-section-reorder.test.tsx:165 preserves useState<string|null>(null), hook order, setter and useSectionReorder call; it only omits the unused tuple value.",
+      "note-composer.test.tsx removes only an uncalled selector-helper arrow-function declaration; selectors actually used by tests remain intact.",
+      "wine-corpus-double.ts removes an unused object literal with no calls/getters; exported fixtures remain intact.",
+      "TypeScript AST extraction confirms assertion, hook and act call texts are unchanged in all five files.",
+      "git diff --check passed. No test, typecheck or lint reruns; root owns those gates."
+    ]
+  },
+  "modified_paths_reviewed": [
+    "AGENTS.md",
+    "DESIGN.md",
+    "docs/CONVENTIONS.md",
+    "docs/_archive/README.md",
+    "docs/design/README.md",
+    "docs/evals/README.md",
+    "docs/plans/2026-08-29-modular-architecture-refactor.md",
+    "docs/plans/_archive/README.md",
+    "e2e/mobile-wine-detail.test.ts",
+    "scripts/design-typography-baseline.json",
+    "scripts/file-size-baseline.json",
+    "src/app/(app)/scan/[id]/components/scan-inventory-list.tsx"
+  ],
+  "final_runtime_review_scope": "Seven approved orphan files, two comment/diagnostic repairs, two monotonic ratchet changes, and five unused-binding edits. No hosted-polish or further runtime changes included."
+}

@@ -15,13 +15,15 @@ Current authorities:
 | What does the design system say? | `DESIGN.md` (repo root) |
 | How do I work in this repo? | `AGENTS.md` (repo root) |
 
-## Contents
+## Retained record and retired history
+
+The generated snapshots below were removed from the checkout on September 5, 2026. Their links resolve to the retained Git history. Plain filenames below remain in this directory.
 
 | File | Was | Why archived |
 |---|---|---|
-| `PROJECT.md` | Auto-generated "Project Ledger" | Tool output, not hand-maintained; orphaned — linked from nothing. Redundant with `package.json` and `docs/ARCHITECTURE.md`. |
+| [PROJECT.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/PROJECT.md) | Auto-generated "Project Ledger" | Tool output, not hand-maintained; orphaned — linked from nothing. Redundant with `package.json` and `docs/ARCHITECTURE.md`. |
 | `2026-08-21-camera-first-personal-cellar-inventory.md` | Discovery input | Self-labeled "not yet approved for implementation"; superseded by the same-day PRD and by `docs/plans/2026-08-28-camera-first-decisions-recorded.md`. |
-| `planning-codebase-2026-05-01/` | Machine-generated scaffold snapshot (5 files) | Generated once on 2026-05-01 and never touched. Predates `src/domains/` and `src/adapters/` entirely. Known false claims: describes a `src/lib`-only tree; names class-variance-authority as the variant convention (CVA is not in this repo); states "no destructive down migrations" when `downs:check` in fact *requires* paired downs; gives the dead `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The still-true parts were salvaged into `docs/CONVENTIONS.md` before archiving. |
+| [Generated scaffold snapshot](https://github.com/ZeroSum-Solutions/terroir/tree/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/_archive/planning-codebase-2026-05-01) | Machine-generated scaffold snapshot (5 files) | Generated once on 2026-05-01 and never touched. Predates `src/domains/` and `src/adapters/` entirely. Known false claims: describes a `src/lib`-only tree; names class-variance-authority as the variant convention (CVA is not in this repo); states "no destructive down migrations" when `downs:check` in fact *requires* paired downs; gives the dead `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The still-true parts were salvaged into `docs/CONVENTIONS.md` before archiving. |
 
 ## Deliberately NOT archived
 

@@ -162,7 +162,7 @@ function SameDropHarness({
   onSectionsChange: (sections: WineListEditorSection[]) => void;
 }) {
   const [sections, setSections] = useState(initialSections);
-  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [, setErrorToast] = useState<string | null>(null);
   const { handleSectionDragEnd } = useSectionReorder(sections, setSections, setErrorToast);
 
   onSectionsChange(sections);

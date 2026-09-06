@@ -38,10 +38,11 @@ which was deleted after four months of drift.
 - Icons: `lucide-react` only.
 - **Design tokens are enforced.** `pnpm check:design` runs four gates in CI: palette,
   contrast, token-sync, and a typography ratchet. Colour adoption is near-total;
-  arbitrary `text-[Npx]` sizes carry a frozen baseline of ~1,248 that may only shrink.
+  arbitrary `text-[Npx]` sizes carry a fingerprinted baseline in
+  `scripts/design-typography-baseline.json` that may only shrink.
   Never grow a baseline without `--update --allow-growth` and a reason.
-- `DESIGN.md` at the repo root is the design contract. `docs/design/*` are archived
-  predecessors — do not build from them.
+- `DESIGN.md` at the repo root is the design contract. `docs/design/README.md` links
+  predecessor history — do not build from those historical versions.
 
 ## API routes
 

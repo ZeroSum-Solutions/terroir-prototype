@@ -1,0 +1,37 @@
+[
+  {
+    "id": "OP-F1",
+    "status": "fixed",
+    "evidence": "docs/_archive/README.md explicitly says plain filenames remain"
+  },
+  {
+    "id": "OP-F2",
+    "status": "fixed",
+    "evidence": "Refactor row 0.6 marked DONE with cleanup date"
+  },
+  {
+    "id": "OP-F3",
+    "status": "fixed",
+    "evidence": "Removed stale prose count; current script/baseline authoritative. Actual whole typography count is 1061, not Opus estimated 1122"
+  },
+  {
+    "id": "OP-F4",
+    "status": "recorded",
+    "evidence": "Report clarifies deleted predictor-only tests versus unverified live SQL/RPC behavior"
+  },
+  {
+    "id": "OP-F5",
+    "status": "verified",
+    "evidence": "All 25 pre-packaging added files match staged blobs and 30 local Markdown links resolve. Packaging record itself added afterward; all staged files checked again before commit."
+  },
+  {
+    "id": "DOC-F1",
+    "status": "fixed and independently verified",
+    "evidence": "Outbound Toast availability E-064 deferred; checkout E-063 excluded"
+  },
+  {
+    "id": "DOC-F2",
+    "status": "fixed and independently verified",
+    "evidence": "CSV onboarding sessions/batches distinguished from invoice extraction"
+  }
+]

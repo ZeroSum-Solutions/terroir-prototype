@@ -1,0 +1,50 @@
+{
+  "pre_removal_model": "claude-opus-5",
+  "review": "reviews/opus-pre-removal.packet.md",
+  "condition_resolution": [
+    {
+      "finding": "security-review.json machine glob and findings",
+      "status": "VERIFIED_CLEAR",
+      "evidence": [
+        "Artifact verdict PASS; findings=[]; secrets_scan PASS.",
+        "scripts/run-vwp-evals.mjs:9 reads explicit vwp-evals.yaml; recursive loop235 scans TEST_ROOTS src/e2e and test filename pattern, not docs JSON.",
+        "Whole scripts/.github/src scan for docs/evals, JSON glob and fast-glob finds no archive reader; conformance/feature/API scripts use named JSON paths."
+      ]
+    },
+    {
+      "finding": "Supabase config orphan cascade",
+      "status": "REJECTED_CASCADE",
+      "evidence": [
+        "server.ts:4,16 and public list/print pages still import requireSupabasePublicConfig; preserve helper."
+      ]
+    },
+    {
+      "finding": "RT04 mobile test text",
+      "status": "QUALIFIED",
+      "evidence": [
+        "First reference is comment; second is failure-message string, not selector/fixture/assertion condition. Update explanatory diagnostic only."
+      ]
+    },
+    {
+      "finding": "RT04 baseline shrink",
+      "status": "ACCEPT",
+      "evidence": [
+        "Use existing --update generators; verify no increases or unrelated deltas."
+      ]
+    },
+    {
+      "finding": "RT05 coverage delta",
+      "status": "RECORD_LIMIT",
+      "evidence": [
+        "Removed test invokes only unused predictor, never live RPC; remaining pours service unit tests cover out-of-stock mapping. Do not claim retained unit tests reproduce every SQL cascade transition; DB/E2E validation remains required before release."
+      ]
+    },
+    {
+      "finding": "history/cache boundary",
+      "status": "ACCEPT",
+      "evidence": [
+        "Use fetched abdc661 SHA and ZeroSum-Solutions org. Exact cache paths; repeat process/open-file checks before removal."
+      ]
+    }
+  ]
+}

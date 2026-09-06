@@ -108,8 +108,6 @@ export function thenable(payload: unknown) {
   return { then: (resolve: (value: unknown) => unknown) => resolve(payload) };
 }
 
-const blank = { canonicalWineId: null, producer: "", name: "Benjamin Leroux Vosne-Romanée" };
-
 export const strictHit: MatchRow = {
   wine_id: 119230,
   score: 0.95,

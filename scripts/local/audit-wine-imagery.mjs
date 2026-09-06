@@ -205,7 +205,6 @@ const main = async () => {
 
   // 3 — the wine drawer, opened by clicking a row
   await page.locator("img").first().scrollIntoViewIfNeeded().catch(() => {});
-  const firstRow = page.locator('[href*="/cellar"], button, tr').filter({ hasText: /\d{4}/ });
   await page.evaluate(() => {
     const img = [...document.images].find((i) => i.src.includes("wine-images"));
     const clickable = img?.closest("button,a,tr,li,[role='button']");

@@ -1,0 +1,161 @@
+{
+  "cleanup_status": "Verified local cleanup; no rebuild activation or deployment",
+  "baseline": "abdc661abde43b0ac70a81f740b61d21da7e414b",
+  "planning_checkpoint": "9acee206aa124148c21cb0faab047e78cb64732e",
+  "deleted_tracked_files": 40,
+  "deleted_bytes": 414917,
+  "protected_planning_files_unchanged": 176,
+  "protected_runtime_schema_config_files_unchanged": 440,
+  "whole_unit_suite": {
+    "status": "PASS",
+    "passed_files": 418,
+    "skipped_files": 18,
+    "passed_tests": 3833,
+    "skipped_tests": 122,
+    "receipt": {
+      "argv": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--maxWorkers",
+        "2"
+      ],
+      "exit": 0,
+      "seconds": 63.83,
+      "environment": "no DB/provider credentials supplied; Vitest does not load .env.local; live DB suites expected explicitly skipped"
+    }
+  },
+  "isolated_build": {
+    "argv": [
+      "pnpm",
+      "build"
+    ],
+    "exit": 0,
+    "seconds": 28.73,
+    "source": "Tracked working-tree files copied into isolated build snapshot; tracked environment templates also excluded",
+    "dependencies": "APFS clone of existing node_modules; pnpm performed an automatic up-to-date check with no resolution changes. Verified manifest/workspace/lock hashes match the repository.",
+    "environment": "Allowlisted shell variables plus synthetic loopback public config. No .env files, DB credentials, provider tokens or upload tokens supplied.",
+    "build_log": "build.log"
+  },
+  "post_binding_checks": [
+    {
+      "argv": [
+        "pnpm",
+        "lint"
+      ],
+      "exit": 0,
+      "seconds": 9.97,
+      "log": "final-check-0.log"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--maxWorkers",
+        "2",
+        "src/app/(app)/cellar/enrich-control.test.tsx",
+        "src/app/(app)/lists/[id]/use-section-reorder.test.tsx",
+        "src/domains/notes/note-composer.test.tsx"
+      ],
+      "exit": 0,
+      "seconds": 0.87,
+      "log": "final-check-1.log"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "eval:vwp"
+      ],
+      "exit": 0,
+      "seconds": 2.43,
+      "log": "final-check-2.log"
+    }
+  ],
+  "earlier_post_deletion_checks": [
+    {
+      "command": "pnpm exec tsc --noEmit --incremental false",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm lint",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm check:design",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm check:file-size",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm check:control-rows",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm verify:feature-ledger",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm verify:api-contract",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm verify:product-conformance",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm downs:check",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    },
+    {
+      "command": "pnpm manifest:check",
+      "exit": 0,
+      "evidence": "Observed successful command result during cleanup; no separate log retained"
+    }
+  ],
+  "conformance_limits": {
+    "TER_CF": {
+      "proved": 0,
+      "weak": 23,
+      "unimplemented": 15
+    },
+    "VWP": {
+      "implemented": 4,
+      "pending": 89,
+      "total": 93,
+      "executable_test_files_passed": 4
+    }
+  },
+  "not_performed": [
+    "Live database suites (122 skipped tests)",
+    "Browser E2E",
+    "Hosted repair scripts",
+    "Database/infra changes",
+    "Deployment or production admission"
+  ],
+  "retained_issues": [
+    "Pre-existing hosted demo-polish CLI imports removed enrich-claude module; retains other repair responsibilities, deletion not proven safe",
+    "Two existing React hook dependency lint warnings"
+  ],
+  "security_surface": "Deleted Supabase browser factory had no runtime consumers. API routes, proxy/auth boundaries and schema remain byte-identical; not a new comprehensive security certification.",
+  "final_doc_audit": "PASS after two scope/workflow wording corrections; see docs-post-review.json",
+  "post_binding_test_summary": {
+    "passed_files": 3,
+    "passed_tests": 15
+  },
+  "secret_scan": "gitleaks dir docs/plans/2026-09-05-rebuild-cleanup --redact: exit 0, no leaks at pre-final-review checkpoint",
+  "log_format": "Committed log copies have ANSI color escapes and trailing whitespace removed. Original tool logs remain in task work/rebuild-cleanup."
+}

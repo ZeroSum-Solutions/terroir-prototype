@@ -1,0 +1,482 @@
+[
+  {
+    "path": "docs/_archive/PROJECT.md",
+    "sha256": "64dc9840a296db19ec236e09ceb712b4c9b60cba4634fb9e13c2e5d88168bcbc",
+    "bytes": 3553,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/_archive/planning-codebase-2026-05-01/ARCHITECTURE.md",
+    "sha256": "250a1d643a9926337f0888f23524492dd2bb67e150d726044b8cf44667d89a07",
+    "bytes": 3870,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/_archive/planning-codebase-2026-05-01/CONVENTIONS.md",
+    "sha256": "09abab6bcdf8a5235fb305e6598b3dcce9350635fe2d1bc642c6e1fe69fe1b0e",
+    "bytes": 2795,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/_archive/planning-codebase-2026-05-01/INTEGRATIONS.md",
+    "sha256": "4ce53952b91786f989884ebdf53a11caca68c51c15866c3ffb1cedd263e5231a",
+    "bytes": 2506,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/_archive/planning-codebase-2026-05-01/STACK.md",
+    "sha256": "dad1ee2edd65d29adecfbc3140dcd6754616407eb72e9b240f4d09f24ff45e53",
+    "bytes": 1791,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/_archive/planning-codebase-2026-05-01/STRUCTURE.md",
+    "sha256": "59676c4de7c8140362097e0a616ba08ee9e8d849ba9441e0a73e83c2262524ee",
+    "bytes": 4288,
+    "category": "closed-document",
+    "group": "generated-scaffold",
+    "evidence": [
+      "docs/_archive/README.md:22-24 explicitly identifies orphaned tool output and superseded machine snapshot; durable parts salvaged into current authorities.",
+      "Independent source check: old CONVENTIONS.md:17 and STACK.md:12 prescribe CVA absent from package.json; old INTEGRATIONS.md:9 names dead ANON key; active AGENTS.md:1-126 and docs/ARCHITECTURE.md describe current domains and guards."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-high-leverage-ux-plan-audits.md",
+    "sha256": "833ebc6375b29ed7856e56b38225f5a4af5fc066ac28b18d714e102a69d33b6a",
+    "bytes": 3272,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-high-leverage-ux-portfolio-spec.md",
+    "sha256": "2f310dfbd587ebc9d964410396bee2974f14bd4a0c1ebb4daa82a0dae21b78c1",
+    "bytes": 14949,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-01-reconciliation-truth.md",
+    "sha256": "ada5d78a6f82def7d100fc71b9a759e571d6c329f6ed49dc1a58369bcc1b0306",
+    "bytes": 20159,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-02-honest-data-states.md",
+    "sha256": "62ae0bac4899bc323945aeca6a9f45b5169f9882d48de9ed4775c1fb7a109c08",
+    "bytes": 19584,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-03-cancellable-scan-trust.md",
+    "sha256": "97d5a522075bfe417cae2d243ec70b48d0f2d0ef885fe35760b7de433e1af81f",
+    "bytes": 21643,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-04-mobile-list-editor-survival.md",
+    "sha256": "2b1c3ec6339ee9face50d093dda35c9f7927963a82ba890b5fd8b37617e7ee52",
+    "bytes": 21363,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-05-action-safety-dialogs.md",
+    "sha256": "6ad9f6cff37bcb48c8e7d09a7ab8b951d5e031d5cf009e6b6a6d3e1948a2d7d4",
+    "bytes": 22027,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-06-team-clarity.md",
+    "sha256": "ef9050f45bbe9f52f831581e9d04d81ecf77ee8f2e7c7816bdb83525a7aa8199",
+    "bytes": 19481,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-07-floor-forms-targets.md",
+    "sha256": "3bcdaeb01345858b994702ad3826e825b93f48db19ad582612c7095fcdd9571e",
+    "bytes": 23279,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-08-truthful-insights.md",
+    "sha256": "5ab66132eef0f87c2ec9c789cd4d7f66993a338a0d98320eebae7a24152f9aa5",
+    "bytes": 18264,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-09-guest-menu-clarity.md",
+    "sha256": "09f37593c3efee5484b92a508f007293657c9608968009c92bd9f0a69e316093",
+    "bytes": 15669,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-20-ux-10-restaurant-role-context.md",
+    "sha256": "6c2f374346448f1c909295b2f01f842a31c00b54100be5ede8a37c5d662d3417",
+    "bytes": 13582,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/security-review.json",
+    "sha256": "0699d21ef5c5efa4bb1360de5224e5cbe465eb819c6c660a67e9134f1edaf6d7",
+    "bytes": 71447,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-01-implementation-audit.md",
+    "sha256": "327c849303ba755cda2303b71671a76f1702a8a06a9df8ef74e386c2987065d1",
+    "bytes": 1294,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-02-implementation-audit.md",
+    "sha256": "1eb5f2551075bba2fdb590795b332d10e0067dafa8feb9545c7d5590dadd9b09",
+    "bytes": 1763,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-03-implementation-audit.md",
+    "sha256": "9672af8c1b2481193ab27cca24796f57233d396c66b45ab616c2b98a0174d08e",
+    "bytes": 1948,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-04-implementation-audit.md",
+    "sha256": "e1ab05e2fe87532f69cff408a9d0fc12dcac21ed8265751e12923f9402e27bed",
+    "bytes": 2090,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-05-implementation-audit.md",
+    "sha256": "b0dd93b845a1054de957ccb798f94ffff2b54f3fd52b3efcf1f783d47a85710d",
+    "bytes": 1698,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-06-implementation-audit.md",
+    "sha256": "27cb77827bbff9196842162f0decd7d860a657d6dc678d7972e2c2982e5b9369",
+    "bytes": 2400,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-07-implementation-audit.md",
+    "sha256": "6a33a4bf4442be039002c1be4b2b79e6a1706d9278c28708b44d7407e260e7e2",
+    "bytes": 1467,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-08-implementation-audit.md",
+    "sha256": "79c68f6a4510bc88aebca9e66b48b7523eb199cffa4b4cf26f2fe5c3c22cc974",
+    "bytes": 1887,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-09-implementation-audit.md",
+    "sha256": "073458216dde45cf8e2af4fb7204037ca2b3f1409b190e9ec57b732208055844",
+    "bytes": 2172,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/evals/_archive/ux-high-leverage/ux-10-implementation-audit.md",
+    "sha256": "05828ebff70f1daa91db3105328d4fe8f6ccdcead66c51c3fd926adaf4117ab0",
+    "bytes": 2303,
+    "category": "closed-document",
+    "group": "closed-ux-wave",
+    "evidence": [
+      "docs/plans/_archive/README.md:30-32 marks all 10 moves shipped with matching landing evidence, not backlog.",
+      "All 10 individual implementation audit files record final APPROVE without critical/important findings; full reference scan finds only internal cluster references and two historical README indexes. Executable e2e/mobile-list-editor.test.ts and e2e/team-mobile.test.ts remain; no source/test/script/runtime reader of these narrative paths."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/design/DESIGN-cantina-2026-08-26.md",
+    "sha256": "2f405d097fbebb2f221372f7f5a20338051f5abc45b604ae4fd8d51f7d4d849a",
+    "bytes": 20139,
+    "category": "closed-document",
+    "group": "superseded-design",
+    "evidence": [
+      "docs/design/README.md:3-14 explicitly names both superseded and identifies current DESIGN.md as sole authority.",
+      "scripts/check-design-contrast.mjs:25, check-design-palette.mjs:52, check-design-token-sync.mjs:27 read root DESIGN.md; current DESIGN.md:125-128 explicitly supersedes both. Superseded cream/Cantina palette and renamed typography differ from enforced current tokens."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/design/DESIGN-nocturne-typography-2026-08-29.md",
+    "sha256": "445738a2d487c95ae5feba6845b21d8644e3feb480403f9442b1e6e326465789",
+    "bytes": 16638,
+    "category": "closed-document",
+    "group": "superseded-design",
+    "evidence": [
+      "docs/design/README.md:3-14 explicitly names both superseded and identifies current DESIGN.md as sole authority.",
+      "scripts/check-design-contrast.mjs:25, check-design-palette.mjs:52, check-design-token-sync.mjs:27 read root DESIGN.md; current DESIGN.md:125-128 explicitly supersedes both. Superseded cream/Cantina palette and renamed typography differ from enforced current tokens."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-04-18-lwin-matching.md",
+    "sha256": "76813026d3c78d39aac4220c58085f9a10f90482fd73957ba9a09e91654063fa",
+    "bytes": 12076,
+    "category": "closed-document",
+    "group": "shipped-lwin-plan",
+    "evidence": [
+      "docs/plans/_archive/README.md:29 marks shipped and subsequently evolved by 0078/0079/0097/0127.",
+      "Current migration 0127_match_lwin_deterministic_tiebreak.sql:1-21 implements later behavior and retained route src/app/api/wines/lwin-search/route.ts:17 calls the live RPC; full path/basename/stem scan finds no surviving reader except historical index."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "docs/plans/_archive/2026-08-21-mobile-demo-production-readiness-spec.md",
+    "sha256": "ddc7349522e383914e17f3c79ceaaf80a10a9a1e8c8a214f1f1c23b9dd76855e",
+    "bytes": 8482,
+    "category": "closed-document",
+    "group": "completed-demo-event",
+    "evidence": [
+      "docs/plans/_archive/README.md:34 classifies it as the passed Aug 22 demonstration; original objective explicitly targets tomorrow relative to Aug 21 and preserved PR78.",
+      "Durable mobile rule remains at docs/CONVENTIONS.md:26 and executable viewport checks remain e2e/mobile-list-editor.test.ts:58-59 and e2e/team-mobile.test.ts:60-62. No file path/basename/stem reader beyond historical index. This does not assert the old spec is current proof of readiness."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/adapters/llm/index.ts",
+    "sha256": "dd1702b29bfea5b50f1612664ba1f4bdc74a82959f5270d963ec2ec9be95f765",
+    "bytes": 49,
+    "category": "unused-source",
+    "group": "RT-01",
+    "evidence": [
+      "TypeScript AST import/export/literal dynamic-import resolution across 1,140 tracked JS/TS files finds zero incoming edges for both barrels; full-tree directory and path scans find no directory-barrel imports.",
+      "Live scanning service and extraction stage import concrete adapters directly (src/domains/scanning/invoice-extraction-stage.ts:25,31 and invoice-scan-service.ts:3-4); the one-line barrels export only those same adapters and contain no side effects."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/adapters/ocr/index.ts",
+    "sha256": "2871acd33af0ac64099f1f476a7927059e3c506340d8b87f6c7da2c458dbf7f8",
+    "bytes": 48,
+    "category": "unused-source",
+    "group": "RT-01",
+    "evidence": [
+      "TypeScript AST import/export/literal dynamic-import resolution across 1,140 tracked JS/TS files finds zero incoming edges for both barrels; full-tree directory and path scans find no directory-barrel imports.",
+      "Live scanning service and extraction stage import concrete adapters directly (src/domains/scanning/invoice-extraction-stage.ts:25,31 and invoice-scan-service.ts:3-4); the one-line barrels export only those same adapters and contain no side effects."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/lib/supabase/client.ts",
+    "sha256": "d2003c1092fd287978d7525dc97b0d84921822f5f860f6e038d9f906e69dfed7",
+    "bytes": 345,
+    "category": "unused-source",
+    "group": "RT-02",
+    "evidence": [
+      "No import/reference to this browser factory anywhere in tracked source, scripts, configs, tests or runtime entrypoint graph; full-tree path search only finds its definition and old refactor plan.",
+      "docs/plans/2026-08-29-modular-architecture-refactor.md:463 explicitly identified this exact orphan for deletion; current authentication uses server.ts and proxy.ts, while API handlers own server clients."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/app/(app)/cellar/wine-gallery-card.tsx",
+    "sha256": "c6778c91596be114436aec1f56bcede9195001d79b018adc842dec5227b21473",
+    "bytes": 5790,
+    "category": "unused-source",
+    "group": "RT-03",
+    "evidence": [
+      "No incoming import or symbol references to WineGalleryCard outside its own definition, including literal dynamic imports, scripts, tests and configs; not a Next.js file convention.",
+      "Current cellar render tree uses CellarRow and list/group components (cellar-list.tsx:34-38); current alternative is CellarGridView (cellar-shell.tsx:13,429). This file contributes neither active view."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/app/(app)/scan/[id]/scan-detail-view.tsx",
+    "sha256": "5da769720877dd2f966c4371198847587b38a8c332ad914223cb0147b1a47cb0",
+    "bytes": 20930,
+    "category": "unused-source",
+    "group": "RT-04",
+    "evidence": [
+      "Zero imports/AST incoming references; current /scan/[id]/page.tsx:6-12,114-125 renders ScanReview plus ScanInventoryList and never renders ScanDetailView.",
+      "Current components/scan-inventory-list.tsx:14-18 explicitly explains that the orphan lacks Save Edits and Commit to Inventory and confirms only its missing inventory-link block was ported into the active component."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/lib/pour/predict.ts",
+    "sha256": "76ffde2a2330711c7fcce2e4846fb00495748819dd99cbce5303d4ca1f6e2cda",
+    "bytes": 3351,
+    "category": "unused-source",
+    "group": "RT-05",
+    "evidence": [
+      "Full-tree symbol/path search finds predictOpenBottleAfterPour only in its own module and its focused unit test; runtime/script root reachability excludes it.",
+      "git show ccd03a71 confirms April 26 cellar consolidation deleted src/app/(app)/pour/pour-list.tsx, including the sole runtime import/call. Current live pours use src/domains/pours/pour-service.ts and API routes, not this approximate client state machine."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  },
+  {
+    "path": "src/lib/pour/predict.test.ts",
+    "sha256": "4ec1574ecc1a468c09da95263ca7055c21b788ea6f1b1ad4b124cd40391370d7",
+    "bytes": 4525,
+    "category": "unused-source",
+    "group": "RT-05",
+    "evidence": [
+      "Full-tree symbol/path search finds predictOpenBottleAfterPour only in its own module and its focused unit test; runtime/script root reachability excludes it.",
+      "git show ccd03a71 confirms April 26 cellar consolidation deleted src/app/(app)/pour/pour-list.tsx, including the sole runtime import/call. Current live pours use src/domains/pours/pour-service.ts and API routes, not this approximate client state machine."
+    ],
+    "recovery_sha": "abdc661abde43b0ac70a81f740b61d21da7e414b"
+  }
+]

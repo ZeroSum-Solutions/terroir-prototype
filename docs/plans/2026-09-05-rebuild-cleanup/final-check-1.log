@@ -1,0 +1,95 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(node:81180) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.4 /Users/zero/projects/terroir
+
+ ✓ src/domains/notes/note-composer.test.tsx (9 tests) 42ms
+ ✓ src/app/(app)/cellar/enrich-control.test.tsx (3 tests) 21ms
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > optimistically reorders and persists the new order
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > optimistically reorders and persists the new order
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > optimistically reorders and persists the new order
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > rolls back the order and surfaces an error toast on failure
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > rolls back the order and surfaces an error toast on failure
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > rolls back the order and surfaces an error toast on failure
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > rolls back the order and surfaces an error toast on failure
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > no-ops when dropped on itself or outside a droppable
+The current testing environment is not configured to support act(...)
+
+stderr | src/app/(app)/lists/[id]/use-section-reorder.test.tsx > useSectionReorder > no-ops when dropped on itself or outside a droppable
+The current testing environment is not configured to support act(...)
+
+ ✓ src/app/(app)/lists/[id]/use-section-reorder.test.tsx (3 tests) 14ms
+
+ Test Files  3 passed (3)
+      Tests  15 passed (15)
+   Start at  21:22:25
+   Duration  425ms (transform 47ms, setup 12ms, import 146ms, tests 77ms, environment 256ms)
+
+
+--------------------------------------------------------------------------
+  THIS RUN WAS GREEN WITHOUT THE LIVE-DATABASE SUITES.
+--------------------------------------------------------------------------
+  20 suite(s) skipped themselves because no local Supabase
+  stack was configured. They are not optional coverage — they include
+  the cross-tenant containment tests:
+
+    - src/app/api/search/unified-search-live.test.ts
+    - src/app/api/search/xwines-search-live.test.ts
+    - src/app/api/wines/search/fuzzy-search-live.test.ts
+    - src/domains/cellar/wine-ownership-write-policies.test.ts
+    - src/domains/identity/identity-on-write.test.ts
+    - src/domains/identity/lwin-xwines-links.test.ts
+    - src/domains/identity/merge.test.ts
+    - src/domains/identity/normalize.test.ts
+    - src/domains/identity/producer-backfill-audit.test.ts
+    - src/domains/identity/tenant-isolation.test.ts
+    - src/domains/import/import-hardening-live.test.ts
+    - src/domains/import/p3-live.test.ts
+    - src/domains/import/tenant-isolation.test.ts
+    - src/domains/notes/descriptor-families.test.ts
+    - src/domains/notes/note-service.test.ts
+    - src/domains/notes/wine-notes-rls.test.ts
+    - src/domains/wine-profile/resolve-cellar-context.db.test.ts
+    - src/domains/wine-profile/resolve-house-profile.db.test.ts
+    - src/domains/wine-profile/resolve-reference-profile.db.test.ts
+    - src/lib/jobs/tenant-isolation.test.ts
+
+  To run them, see docs/runbooks/local-stack.md for full bring-up. In
+  short:
+    supabase start
+    pnpm run supabase:seed:local:apply
+
+  Then export NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY into
+  this shell before re-running `pnpm test` — the same way
+  scripts/local/dev-local.sh reads them (from `supabase status`), not by
+  writing them into .env.local. That file holds PRODUCTION credentials
+  (AGENTS.md non-negotiable #1); putting local-stack keys there points
+  every other command at the hosted project instead.
+
+  Use the keys `supabase start` just printed, and nothing else. These
+  suites hold a service-role key that bypasses RLS and they create and
+  delete tenant data on purpose; pointed at a hosted project they would
+  do that to real data. They refuse any non-loopback target outright.
+
+  CI runs them for real and FAILS if the stack is missing, so this is
+  a local-only blind spot. Silence here means everything ran.
+--------------------------------------------------------------------------

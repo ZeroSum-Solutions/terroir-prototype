@@ -39,9 +39,6 @@ async function render(overrides: Partial<Props> = {}) {
   return { el: container, props };
 }
 
-const byText = (el: HTMLElement, text: string) =>
-  [...el.querySelectorAll("button, label")].find((n) => n.textContent?.trim() === text) as HTMLElement | undefined;
-
 const textarea = (el: HTMLElement) => el.querySelector("textarea")!;
 const saveButton = (el: HTMLElement) =>
   [...el.querySelectorAll("button")].find((b) => /save note/i.test(b.textContent ?? ""))!;

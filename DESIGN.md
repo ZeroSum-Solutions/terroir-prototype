@@ -123,9 +123,9 @@ chrome:
 # Terroir — Nocturne
 
 Supersedes **Terroir — Cantina** (2026-08-26), archived at
-`docs/design/DESIGN-cantina-2026-08-26.md`. Revised 2026-08-29 after a
+[DESIGN-cantina-2026-08-26.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-cantina-2026-08-26.md). Revised 2026-08-29 after a
 two-pass system audit; the previous revision is at
-`docs/design/DESIGN-nocturne-typography-2026-08-29.md`.
+[DESIGN-nocturne-typography-2026-08-29.md](https://github.com/ZeroSum-Solutions/terroir/blob/abdc661abde43b0ac70a81f740b61d21da7e414b/docs/design/DESIGN-nocturne-typography-2026-08-29.md).
 
 ## Overview
 
