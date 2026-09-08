@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import { cn } from "@/lib/utils";
+import { wineImageReferenceNote } from "@/lib/wine-intelligence/wine-image-reference";
 
 /**
  * A wine's picture, or a stand-in for one.
@@ -58,13 +59,15 @@ export interface WineThumbProps {
 }
 
 export function WineThumb({ src, producer, name, colour, size, className }: WineThumbProps) {
-  const shared = cn("shrink-0 rounded-md object-cover", className);
+  const referenceNote = wineImageReferenceNote(src);
+  const shared = cn("shrink-0 rounded-md object-contain", className);
 
   if (src) {
     return (
       <Image
         src={src}
-        alt=""
+        alt={referenceNote ?? ""}
+        title={referenceNote ?? undefined}
         width={size * 2}
         height={size * 2}
         unoptimized

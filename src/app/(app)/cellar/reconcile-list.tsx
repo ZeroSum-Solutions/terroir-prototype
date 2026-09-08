@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,14 +12,15 @@ import { cn } from "@/lib/utils";
 import { ML_PER_OZ } from "@/lib/units";
 import { wineTitle } from "@/lib/wine-display-name";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import { ReconcileNavigationGuard } from "./reconcile-navigation-guard";
 
 type ReconcileItem = OpenBottleRow;
 
-const FRACTIONS: Array<{ label: string; value: number }> = [
+const FRACTIONS: Array<{ label: string; value: number; short?: string }> = [
   { label: "Empty", value: 0 },
-  { label: "Quarter", value: 0.25 },
-  { label: "Half", value: 0.5 },
-  { label: "Three Quarter", value: 0.75 },
+  { label: "Quarter", short: "¼", value: 0.25 },
+  { label: "Half", short: "½", value: 0.5 },
+  { label: "Three Quarter", short: "¾", value: 0.75 },
   { label: "Full", value: 1 },
 ];
 
@@ -40,21 +41,31 @@ type PendingChange = { newRemainingMl: number; note?: string };
 export function ReconcileList({
   initialItems,
   varianceThresholdOz = 1.0,
+  onStateChange,
+  inDialog = false,
 }: {
   initialItems: ReconcileItem[];
   varianceThresholdOz?: number;
+  onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
+  inDialog?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<Record<string, PendingChange>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [refreshing, startTransition] = useTransition();
+  const [success, setSuccess] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   const changedCount = Object.keys(pending).length;
+  const busy = saving || refreshing;
+  useEffect(() => { onStateChange?.({ dirty: changedCount > 0, busy }); }, [changedCount, busy, onStateChange]);
 
   const onSaveAll = async () => {
-    if (changedCount === 0) return;
+    if (changedCount === 0 || inFlight.current || refreshing) return;
+    inFlight.current = true;
     setError(null);
+    setSuccess(null);
     setSaving(true);
     const entries = Object.entries(pending).map(([wine_id, p]) => ({
       wine_id,
@@ -69,15 +80,18 @@ export function ReconcileList({
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as
-          | { error?: string; code?: string }
+          | { error?: string | { message?: string }; code?: string }
           | null;
-        throw new Error(payload?.error ?? `Failed (${res.status}).`);
+        const message = typeof payload?.error === "string" ? payload.error : payload?.error?.message;
+        throw new Error(message ?? `Could not save (${res.status}). Your counts are still here; try again.`);
       }
       setPending({});
+      setSuccess(`${entries.length} bottle${entries.length === 1 ? "" : "s"} reconciled.`);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
     } finally {
+      inFlight.current = false;
       setSaving(false);
     }
   };
@@ -92,6 +106,8 @@ export function ReconcileList({
 
   return (
     <div className="pb-[120px]">
+      <ReconcileNavigationGuard dirty={changedCount > 0} busy={busy} interceptLinks={!inDialog} onDiscard={() => setPending({})} />
+      {success && <p role="status" className="mb-md text-[14px] text-ready-ink">{success}</p>}
       {error && (
         <div
           role="alert"
@@ -101,33 +117,37 @@ export function ReconcileList({
         </div>
       )}
 
+      <fieldset disabled={busy} className="min-w-0">
+      <legend className="sr-only">Actual remaining volume for each open bottle</legend>
       <ul className="flex flex-col gap-md">
         {initialItems.map((item) => (
           <ReconcileRow
             key={item.wine_id}
             item={item}
+            inDialog={inDialog}
             pending={pending[item.wine_id] ?? null}
             varianceThresholdOz={varianceThresholdOz}
             onChange={(change) =>
-              setPending((prev) => ({ ...prev, [item.wine_id]: change }))
+              { setSuccess(null); setPending((prev) => ({ ...prev, [item.wine_id]: change })); }
             }
           />
         ))}
       </ul>
+      </fieldset>
 
-      <div className="fixed bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))] left-0 right-0 z-[var(--z-chrome)] border-t border-rule bg-surface px-lg py-sm md:static md:mt-lg md:border-0 md:px-0 md:py-0">
+      <div className={cn("fixed left-0 right-0 z-[var(--z-chrome)] border-t border-rule bg-surface px-lg py-sm md:static md:mt-lg md:border-0 md:px-0 md:py-0", inDialog ? "bottom-0 pb-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))]")}>
         <button
           type="button"
           onClick={onSaveAll}
-          disabled={changedCount === 0 || saving}
+          disabled={changedCount === 0 || busy}
           className={cn(
             "h-[48px] w-full rounded-pill font-medium transition-colors",
-            changedCount > 0 && !saving
+            changedCount > 0 && !busy
               ? "bg-primary text-seal-ink hover:bg-primary-hover"
               : "bg-wash text-grey",
           )}
         >
-          {saving
+          {busy
             ? "Saving..."
             : changedCount > 0
               ? `Save ${changedCount} change${changedCount === 1 ? "" : "s"}`
@@ -143,8 +163,10 @@ function ReconcileRow({
   pending,
   onChange,
   varianceThresholdOz,
+  inDialog,
 }: {
   item: ReconcileItem;
+  inDialog: boolean;
   pending: PendingChange | null;
   onChange: (c: PendingChange) => void;
   varianceThresholdOz: number;
@@ -177,6 +199,9 @@ function ReconcileRow({
           <div className="min-w-0">
             {/* The wine itself opens the wine. Everything else on this card is
                 a counting control, so only the name is the link. */}
+            {inDialog ? <p className="flex min-h-11 items-center font-serif text-body-lg font-medium leading-snug text-ink">
+              {wineTitle(item.producer, item.name)} {item.vintage ?? ""}
+            </p> : (
             <Link
               href={`/cellar?wine=${item.wine_id}`}
               className="flex min-h-11 items-center rounded-md font-serif text-[17px] font-medium text-ink leading-snug transition-colors hover:text-accent focus-ring"
@@ -188,6 +213,7 @@ function ReconcileRow({
                 </span>
               )}
             </Link>
+            )}
             <div className="mt-2xs flex flex-wrap items-center gap-xs text-[12px] text-grey">
               <span className="rounded-pill bg-surface-sunken px-sm py-2xs font-mono">
                 {formatBottleSize(item.size_ml)}
@@ -221,6 +247,7 @@ function ReconcileRow({
             <span>Actual:</span>
             <input
               type="number"
+              inputMode="numeric"
               min={0}
               max={item.size_ml}
               value={currentMl}
@@ -242,7 +269,7 @@ function ReconcileRow({
                   note: pending?.note,
                 });
               }}
-              className="h-11 w-[96px] rounded-pill border border-rule bg-surface px-sm text-[14px] font-mono tabular-nums outline-none focus:border-accent focus-ring"
+              className="h-11 w-[96px] rounded-pill border border-rule bg-surface px-sm text-body-lg font-mono tabular-nums outline-none focus:border-accent focus-ring"
               aria-label="Actual remaining volume in ml"
             />
           </label>
@@ -259,7 +286,7 @@ function ReconcileRow({
         )}
       </div>
 
-      <div className="mb-sm grid grid-cols-5 gap-xs">
+      <div className="mb-sm grid grid-cols-5 gap-2xs sm:gap-xs">
         {FRACTIONS.map((f) => {
           const ml = Math.round(item.size_ml * f.value);
           const isActive = currentMl === ml;
@@ -267,6 +294,8 @@ function ReconcileRow({
             <button
               key={f.label}
               type="button"
+              aria-label={f.label}
+              aria-pressed={isActive}
               onClick={() =>
                 onChange({
                   newRemainingMl: ml,
@@ -280,7 +309,7 @@ function ReconcileRow({
                   : "border-rule bg-surface text-ink hover:bg-wash",
               )}
             >
-              {f.label}
+              {f.short ?? f.label}
             </button>
           );
         })}
@@ -302,7 +331,7 @@ function ReconcileRow({
               })
             }
             placeholder="spill, miscount, etc."
-            className="h-11 flex-1 rounded-pill border border-rule bg-surface px-sm text-[13px] outline-none focus:border-accent focus-ring"
+            className="h-11 min-w-0 flex-1 rounded-pill border border-rule bg-surface px-sm text-body-lg outline-none focus:border-accent focus-ring"
           />
         </label>
       </div>

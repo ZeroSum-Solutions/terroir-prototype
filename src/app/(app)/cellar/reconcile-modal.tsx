@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 import { ReconcileList } from "./reconcile-list";
+import { ActionDialog } from "@/components/action-dialog";
 
 /**
  * Reconcile mode (Phase 2 IA redesign — .council/specs/2026-04-24-ux-ia-redesign.md
@@ -37,11 +38,19 @@ export function ReconcileModal({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingId = "reconcile-modal-heading";
+  const [editState, setEditState] = useState({ dirty: false, busy: false });
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  function close() {
+    if (editState.busy) return;
+    if (editState.dirty) setConfirmDiscard(true);
+    else onClose();
+  }
 
   useFocusTrap({
     containerRef: dialogRef,
-    onEscape: onClose,
+    onEscape: close,
     enabled: open,
+    paused: confirmDiscard,
   });
 
   // Lock body scroll while modal is open. The full-screen overlay
@@ -84,7 +93,8 @@ export function ReconcileModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
+            disabled={editState.busy}
             aria-label="Close reconcile mode"
             className="ml-md flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash"
           >
@@ -93,9 +103,10 @@ export function ReconcileModal({
         </header>
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-md py-md md:px-lg md:py-lg">
-          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} />
+          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog />
         </div>
       </div>
+      <ActionDialog open={confirmDiscard} title="Discard unsaved counts?" description="Your changes to the remaining bottle volumes have not been saved." confirmLabel="Discard changes" cancelLabel="Keep counting" onClose={() => setConfirmDiscard(false)} onConfirm={() => { setConfirmDiscard(false); setEditState({ dirty: false, busy: false }); onClose(); }} />
     </div>
   );
 }

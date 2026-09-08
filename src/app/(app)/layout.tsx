@@ -107,7 +107,7 @@ export default async function AppLayout({
       <Fab />
 
       {/* First-login onboarding — restaurant exists in auth but has no name yet. */}
-      {(restaurantName == null || restaurantName.trim() === "") && (
+      {userRole === "owner" && (restaurantName == null || restaurantName.trim() === "") && (
         <OnboardingModal restaurantId={restaurantId} />
       )}
     </div>

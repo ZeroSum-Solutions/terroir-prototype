@@ -73,21 +73,21 @@ describe("AppLayout shell context", () => {
     );
   });
 
-  it("keeps onboarding and visible fallback context for a null restaurant", async () => {
-    const root = await renderLayout(null);
+  it.each(["owner", "manager", "staff"])("only requires owner naming for a null restaurant (%s)", async (role) => {
+    const root = await renderLayout(null, role);
 
     expect(
       root.querySelector('[data-shell-context="true"]')?.textContent,
     ).toContain("Unnamed restaurant");
-    expect(root.querySelector('[data-onboarding="true"]')).not.toBeNull();
+    expect(root.querySelector('[data-onboarding="true"]') !== null).toBe(role === "owner");
   });
 });
 
-async function renderLayout(restaurantName: string | null) {
+async function renderLayout(restaurantName: string | null, userRole = "manager") {
   mocks.getAuthContext.mockResolvedValue({
     restaurantId: "restaurant-1",
     restaurantName,
-    userRole: "manager",
+    userRole,
     user: { email: "manager@example.com" },
   });
 

@@ -47,6 +47,7 @@ import {
   summarizeDistributorMetrics,
 } from "./distributor-metrics";
 import { wineTitle } from "@/lib/wine-display-name";
+import { fetchInsightsHealth, fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 type NullableDateRange = { range?: string; from?: string; to?: string };
 type SearchParams = Promise<NullableDateRange>;
@@ -144,7 +145,7 @@ export default async function DashboardPage({
       "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
     )
     .eq("restaurant_id", rid)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }).order("id");
 
   if (rangeSince) {
     scanQuery = scanQuery.gte("created_at", rangeSince.toISOString());
@@ -154,23 +155,17 @@ export default async function DashboardPage({
   }
 
   const [
-    { data: scans },
-    { data: inventoryItems },
-    { data: cellarHealthRows, error: cellarHealthError },
+    scans,
+    inventoryItems,
+    cellarHealthRows,
     { count: rawEightysixedCount },
     { count: rawDrinkNowCount },
     initPastDrinkWindow,
   ] =
     await Promise.all([
-      scanQuery,
-      supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, wine_id, wines(varietal)")
-        .eq("restaurant_id", rid),
-      supabase
-        .from("cellar_health")
-        .select("wine_id, segment")
-        .eq("restaurant_id", rid),
+      readInsightsPages((from, to) => scanQuery.range(from, to)),
+      fetchInsightsInventory(supabase, rid),
+      fetchInsightsHealth(supabase, rid),
       // Server-side counts: a .select() read is capped at the PostgREST row
       // limit, which silently truncates on large cellars.
       supabase
@@ -193,7 +188,6 @@ export default async function DashboardPage({
 
   const allScans = scans ?? [];
   const items = inventoryItems ?? [];
-  if (cellarHealthError) throw cellarHealthError;
   const cellarHealthSummary = summarizeCellarHealth(cellarHealthRows ?? [], items);
   const cellarHealthUnscored = summarizeUnscoredStock(cellarHealthRows ?? [], items);
   const pastDrinkWindowWines: PastDrinkWindowRow[] = initPastDrinkWindow;
@@ -303,17 +297,17 @@ export default async function DashboardPage({
             strokeWidth={1.5}
           />
           <p className="text-[15px] font-medium text-ink">
-            Scan your first invoice to start tracking
+            Bring your wine inventory into Terroir
           </p>
           <p className="mt-xs text-[13px] text-grey">
-            Your wine program metrics will appear here after your first scan.
+            Import your stock file or scan an invoice. Your inventory and service activity will build your Insights.
           </p>
           <Link
-            href="/scan"
-            className="mt-lg flex h-[38px] items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
+            href="/get-started"
+            className="mt-lg flex min-h-11 items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
           >
             <ScanLine className="h-4 w-4" strokeWidth={2} />
-            Go to scanner
+            Set up your restaurant
           </Link>
         </div>
       </section>
@@ -923,9 +917,9 @@ function buildTodayExceptions(
   const candidates: TodayException[] = [
     ...drinkWindowAlerts.map((alert) => ({
       wineId: alert.wine_id,
-      kind: "drink-window" as const,
+      kind: alert.drink_window_end != null && alert.drink_window_end < new Date().getFullYear() ? "past-window" as const : "drink-window" as const,
       title: `${wineTitle(alert.producer, alert.name)}${alert.vintage ? ` ${alert.vintage}` : ""}`,
-      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window ends ${alert.drink_window_end ?? "soon"}`,
+      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window end: ${alert.drink_window_end ?? "unknown"}`,
     })),
     ...pastDrinkWindowWines.map((wine) => ({
       wineId: wine.wine_id,
@@ -942,4 +936,3 @@ function buildTodayExceptions(
   ];
   return selectTodayExceptions(candidates);
 }
-

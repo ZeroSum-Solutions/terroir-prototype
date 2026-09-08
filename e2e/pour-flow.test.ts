@@ -247,10 +247,17 @@ test.describe("BND-038 pour → reconcile", () => {
     );
 
     // --- Step 1: land on /cellar and find the wine row ----------------
+    // The RPC carries the guest-list display name, which may differ from the
+    // canonical cellar identity. Search by the identity the cellar renders.
+    const { data: identity, error: identityError } = await adminClient()
+      .from("wines").select("name").eq("id", wine.wine_id)
+      .eq("restaurant_id", await resolveRestaurantId()).single();
+    expect(identityError).toBeNull();
+    expect(identity?.name).toBeTruthy();
     await page.goto("/cellar");
     await page
       .getByPlaceholder("Search name, producer, region…")
-      .fill(wine.name);
+      .fill(identity!.name);
     const lineageHeader = page
       .locator('[data-lineage-header][aria-expanded="false"]', {
         hasText: nameLabel,

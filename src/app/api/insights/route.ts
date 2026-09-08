@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,21 +21,16 @@ async function getInsights() {
   try {
     // Fetch scans and inventory in parallel
     const [
-      { data: scans, error: scansError },
-      { data: inventoryItems, error: inventoryError },
+      scans,
+      inventoryItems,
     ] = await Promise.all([
-      supabase
+      readInsightsPages((from, to) => supabase
         .from("invoice_scans")
         .select("id, distributor_name, item_count, accuracy_score, created_at")
         .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, wine_id, wines(varietal)")
-        .eq("restaurant_id", restaurantId),
+        .order("created_at", { ascending: false }).order("id").range(from, to)),
+      fetchInsightsInventory(supabase, restaurantId),
     ]);
-    if (scansError) throw scansError;
-    if (inventoryError) throw inventoryError;
 
     const allScans = scans ?? [];
     const items = inventoryItems ?? [];

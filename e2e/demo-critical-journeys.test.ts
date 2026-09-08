@@ -247,6 +247,7 @@ test.describe("mobile demo critical journeys", () => {
       await page.getByLabel("Work email").fill(email);
       await page.getByRole("button", { name: "Send reset link" }).click();
       await expect(page.getByText(/If that email is registered/i)).toBeVisible();
+      await page.waitForURL("http://127.0.0.1:3000/login?reset=1");
 
       const resetMail = await waitForMailpitEmail(
         {

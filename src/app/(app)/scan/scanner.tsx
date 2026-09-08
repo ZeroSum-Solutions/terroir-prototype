@@ -732,7 +732,7 @@ export function Scanner({
     router.push("/import");
   };
 
-  if (!hydrated) return <ReadyView onStart={handleStart} onSpreadsheet={handleSpreadsheet} mode={mode} onModeChange={handleModeChange} recentScans={recentScans} savedResult={null} onDismissSaved={() => {}} />;
+  if (!hydrated) return <ReadyView disabled onStart={handleStart} onSpreadsheet={handleSpreadsheet} mode={mode} onModeChange={handleModeChange} recentScans={recentScans} savedResult={null} onDismissSaved={() => {}} />;
 
   return (
     <>

@@ -30,6 +30,22 @@ afterEach(() => {
 });
 
 describe("ReadyView", () => {
+  it("keeps mode and capture controls inactive until the scanner is ready", async () => {
+    const onModeChange = vi.fn();
+    await act(async () => root.render(
+      <ReadyView disabled mode="invoice" onModeChange={onModeChange} onStart={vi.fn()}
+        onSpreadsheet={vi.fn()} recentScans={[]} savedResult={null} onDismissSaved={vi.fn()} />,
+    ));
+    for (const control of container.querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input[type=file]")) {
+      expect(control.disabled).toBe(true);
+    }
+    await act(async () => buttonNamed("Bottle").click());
+    expect(onModeChange).not.toHaveBeenCalled();
+    await renderReady("invoice", onModeChange);
+    await act(async () => buttonNamed("Bottle").click());
+    expect(onModeChange).toHaveBeenCalledWith("bottle");
+  });
+
   it.each([
     ["invoice", "true", "false"],
     ["bottle", "false", "true"],

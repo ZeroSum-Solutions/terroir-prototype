@@ -67,6 +67,7 @@ describe("SettingsDropdown touch targets", () => {
       "Bins",
       "Team",
       "Import",
+      "Setup guide",
       "Sign out",
     ]);
     for (const action of actions) {

@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), pathname: "/cellar" }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/cellar",
+  usePathname: () => navigation.pathname,
   useRouter: () => ({ push: navigation.push }),
 }));
 
@@ -13,7 +13,13 @@ const { Fab } = await import("./fab");
 describe("Fab", () => {
   beforeEach(() => {
     navigation.push.mockReset();
+    navigation.pathname = "/cellar";
     document.body.innerHTML = "";
+  });
+
+  it.each(["/import", "/get-started", "/cellar/reconcile"])("does not cover dedicated form actions on %s", (pathname) => {
+    navigation.pathname = pathname;
+    expect(renderToStaticMarkup(<Fab />)).toBe("");
   });
 
   it("exposes exactly the three working actions and no Voice promise", () => {
