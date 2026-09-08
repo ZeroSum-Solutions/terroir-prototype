@@ -28,9 +28,11 @@ The September 7 OpenRouter balance check was below zero. Verify funded provider
 access before rehearsing real invoice or bottle recognition; mocked upload tests
 do not establish recognition readiness.
 
-Insights reads every page of inventory and health data, including collections
-over 1,000 records. A page-read error fails the snapshot rather than displaying a
-partial total. Past-window alerts distinguish an ended window from its final year
+Insights uses `src/lib/insights/snapshot-data.ts` to read every page of inventory,
+health and scan data, including collections over 1,000 records. The API and CSV
+export also paginate their inputs; CSV money values remain in a single cell and
+formula-leading names are escaped. A page-read error fails the response rather
+than displaying a partial total. Past-window alerts distinguish an ended window from its final year
 and omit unrecognized critic attributions.
 
 ## Start it

@@ -3,19 +3,21 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function escapeField(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  if (/[",\r\n]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 function formatMoney(n: number): string {
-  return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return escapeField("$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 }));
 }
 
 /**
@@ -37,31 +39,25 @@ async function getInsightsCsv() {
   try {
     // Fetch the same data as the insights page
     const [
-      { data: scans, error: scansError },
-      { data: inventoryItems, error: inventoryError },
-      { data: scanItems, error: scanItemsError },
+      scans,
+      inventoryItems,
+      scanItems,
     ] = await Promise.all([
-      supabase
+      readInsightsPages((from, to) => supabase
         .from("invoice_scans")
         .select(
           "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
         )
         .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, wine_id, wines(varietal)")
-        .eq("restaurant_id", restaurantId),
-      supabase
+        .order("created_at", { ascending: false }).order("id").range(from, to)),
+      fetchInsightsInventory(supabase, restaurantId),
+      readInsightsPages((from, to) => supabase
         .from("inventory_items")
         .select(
           "quantity, unit_cost, invoice_scan_id, invoice_scans!inner(distributor_name)",
         )
-        .eq("restaurant_id", restaurantId),
+        .eq("restaurant_id", restaurantId).order("id").range(from, to)),
     ]);
-    if (scansError) throw scansError;
-    if (inventoryError) throw inventoryError;
-    if (scanItemsError) throw scanItemsError;
 
     const allScans = scans ?? [];
     const items = inventoryItems ?? [];

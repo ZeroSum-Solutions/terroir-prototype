@@ -64,6 +64,10 @@ function makeSupabase(
         calls.push({ table, method: "order", args });
         return query;
       },
+      range: (...args: unknown[]) => {
+        calls.push({ table, method: "range", args });
+        return query;
+      },
       or: (...args: unknown[]) => {
         calls.push({ table, method: "or", args });
         return query;
@@ -155,6 +159,19 @@ describe("insights and Toast route-family boundaries", () => {
 describe("GET /api/insights", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("counts inventory beyond the database's first 1,000 rows", async () => {
+    const supabase = allow(makeSupabase({
+      inventory_items: [
+        { data: Array.from({ length: 1000 }, () => ({ quantity: 1, unit_cost: 2, wines: { varietal: "Merlot" } })), error: null },
+        { data: [{ quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } }], error: null },
+      ],
+    }));
+    const response = await getInsights();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ totalBottles: 1017, inventoryValue: 2527 });
+    expect(supabase.calls.filter(call => call.table === "inventory_items" && call.method === "range").map(call => call.args)).toEqual([[0, 999], [1000, 1999]]);
+  });
+
   it.each(["invoice_scans", "inventory_items"])(
     "does not turn a %s query error into empty metrics",
     async (failedTable) => {
@@ -242,6 +259,28 @@ describe("GET /api/insights", () => {
 
 describe("GET /api/insights/csv", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("exports all inventory and keeps thousands separators in one CSV cell", async () => {
+    allow(makeSupabase({ inventory_items: [
+      { data: Array.from({ length: 1000 }, () => ({ quantity: 1, unit_cost: 2, wines: { varietal: "Merlot" } })), error: null },
+      { data: [], error: null },
+      { data: [{ quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } }], error: null },
+    ] }));
+    const response = await getInsightsCsv();
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('Merlot,"$2,527",100%');
+  });
+
+  it("neutralizes formula-leading names and quotes carriage returns", async () => {
+    allow(makeSupabase({ inventory_items: { data: [
+      { quantity: 1, unit_cost: 2, wines: { varietal: "=1+1" } },
+      { quantity: 1, unit_cost: 2, wines: { varietal: "Red\rBlend" } },
+    ], error: null } }));
+    const response = await getInsightsCsv();
+    const csv = await response.text();
+    expect(csv).toContain("'=1+1,$2,50%");
+    expect(csv).toContain('"Red\rBlend",$2,50%');
+  });
 
   it.each([
     { table: "invoice_scans", occurrence: 0 },

@@ -47,7 +47,7 @@ import {
   summarizeDistributorMetrics,
 } from "./distributor-metrics";
 import { wineTitle } from "@/lib/wine-display-name";
-import { fetchInsightsHealth, fetchInsightsInventory } from "./snapshot-data";
+import { fetchInsightsHealth, fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 type NullableDateRange = { range?: string; from?: string; to?: string };
 type SearchParams = Promise<NullableDateRange>;
@@ -145,7 +145,7 @@ export default async function DashboardPage({
       "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
     )
     .eq("restaurant_id", rid)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }).order("id");
 
   if (rangeSince) {
     scanQuery = scanQuery.gte("created_at", rangeSince.toISOString());
@@ -155,7 +155,7 @@ export default async function DashboardPage({
   }
 
   const [
-    { data: scans },
+    scans,
     inventoryItems,
     cellarHealthRows,
     { count: rawEightysixedCount },
@@ -163,7 +163,7 @@ export default async function DashboardPage({
     initPastDrinkWindow,
   ] =
     await Promise.all([
-      scanQuery,
+      readInsightsPages((from, to) => scanQuery.range(from, to)),
       fetchInsightsInventory(supabase, rid),
       fetchInsightsHealth(supabase, rid),
       // Server-side counts: a .select() read is capped at the PostgREST row
