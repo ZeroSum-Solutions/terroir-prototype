@@ -49,12 +49,16 @@ export function BriefingAlertCard({
   const [, startTransition] = useTransition();
 
   const yearsLeft = getYearsUntilWindowClose(alert.drink_window_end);
+  const pastWindow = yearsLeft != null && yearsLeft < 0;
+  const ratingSourceLabel = formatRatingSourceLabel(alert.rating_source);
   // Whole clauses, not ledger fragments — "~— remaining of optimal" shipped
   // to the screen (Kimi audit 2026-08-26). Null window end → say nothing.
   const remainingLabel =
     yearsLeft == null
       ? null
-      : yearsLeft <= 0
+      : pastWindow
+        ? `Optimal window ended in ${alert.drink_window_end}`
+      : yearsLeft === 0
         ? "Final year of the optimal window"
         : `~${yearsLeft} yr${yearsLeft === 1 ? "" : "s"} of optimal window left`;
 
@@ -111,7 +115,7 @@ export function BriefingAlertCard({
               {wineTitle(alert.producer, alert.name, ", ")}
               {alert.vintage ? ` ${alert.vintage}` : ""}
             </em>{" "}
-            {alert.bottle_count === 1 ? "is" : "are"} entering {alert.bottle_count === 1 ? "its" : "their"} final drinking window.
+            {alert.bottle_count === 1 ? "is" : "are"} {pastWindow ? "past" : "entering"} {alert.bottle_count === 1 ? "its" : "their"} {pastWindow ? "drinking window." : "final drinking window."}
           </h3>
           <div className="mt-xs flex flex-wrap items-center gap-sm text-[12px] text-grey">
             {remainingLabel && (
@@ -120,7 +124,7 @@ export function BriefingAlertCard({
                 {remainingLabel}
               </span>
             )}
-            {alert.rating != null && alert.rating_source && (
+            {alert.rating != null && ratingSourceLabel && (
               <span>
                 · last reviewed <span className="tabular">{alert.rating} pts</span>
               </span>
@@ -176,9 +180,9 @@ export function BriefingAlertCard({
           />
           {/* Only cite a source that exists — "Source: Unknown" printed on
               every unattributed alert and eroded trust (Kimi audit). */}
-          {alert.rating_source != null && (
+          {ratingSourceLabel && (
             <p className="mt-xs text-[11px] italic text-grey">
-              Source: {formatRatingSourceLabel(alert.rating_source)}
+              Source: {ratingSourceLabel}
               {alert.rating_source === "claude_inference" && " (estimated)"}
             </p>
           )}
@@ -188,7 +192,7 @@ export function BriefingAlertCard({
   );
 }
 
-function formatRatingSourceLabel(source: string | null): string {
+function formatRatingSourceLabel(source: string | null): string | null {
   switch (source) {
     case "rule_engine":
       return "Rule engine estimate";
@@ -207,6 +211,6 @@ function formatRatingSourceLabel(source: string | null): string {
     case "aggregate":
       return "Multiple critics";
     default:
-      return "Unknown";
+      return null;
   }
 }

@@ -47,6 +47,7 @@ import {
   summarizeDistributorMetrics,
 } from "./distributor-metrics";
 import { wineTitle } from "@/lib/wine-display-name";
+import { fetchInsightsHealth, fetchInsightsInventory } from "./snapshot-data";
 
 type NullableDateRange = { range?: string; from?: string; to?: string };
 type SearchParams = Promise<NullableDateRange>;
@@ -155,22 +156,16 @@ export default async function DashboardPage({
 
   const [
     { data: scans },
-    { data: inventoryItems },
-    { data: cellarHealthRows, error: cellarHealthError },
+    inventoryItems,
+    cellarHealthRows,
     { count: rawEightysixedCount },
     { count: rawDrinkNowCount },
     initPastDrinkWindow,
   ] =
     await Promise.all([
       scanQuery,
-      supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, wine_id, wines(varietal)")
-        .eq("restaurant_id", rid),
-      supabase
-        .from("cellar_health")
-        .select("wine_id, segment")
-        .eq("restaurant_id", rid),
+      fetchInsightsInventory(supabase, rid),
+      fetchInsightsHealth(supabase, rid),
       // Server-side counts: a .select() read is capped at the PostgREST row
       // limit, which silently truncates on large cellars.
       supabase
@@ -193,7 +188,6 @@ export default async function DashboardPage({
 
   const allScans = scans ?? [];
   const items = inventoryItems ?? [];
-  if (cellarHealthError) throw cellarHealthError;
   const cellarHealthSummary = summarizeCellarHealth(cellarHealthRows ?? [], items);
   const cellarHealthUnscored = summarizeUnscoredStock(cellarHealthRows ?? [], items);
   const pastDrinkWindowWines: PastDrinkWindowRow[] = initPastDrinkWindow;
@@ -923,9 +917,9 @@ function buildTodayExceptions(
   const candidates: TodayException[] = [
     ...drinkWindowAlerts.map((alert) => ({
       wineId: alert.wine_id,
-      kind: "drink-window" as const,
+      kind: alert.drink_window_end != null && alert.drink_window_end < new Date().getFullYear() ? "past-window" as const : "drink-window" as const,
       title: `${wineTitle(alert.producer, alert.name)}${alert.vintage ? ` ${alert.vintage}` : ""}`,
-      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window ends ${alert.drink_window_end ?? "soon"}`,
+      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window end: ${alert.drink_window_end ?? "unknown"}`,
     })),
     ...pastDrinkWindowWines.map((wine) => ({
       wineId: wine.wine_id,
@@ -942,4 +936,3 @@ function buildTodayExceptions(
   ];
   return selectTodayExceptions(candidates);
 }
-
