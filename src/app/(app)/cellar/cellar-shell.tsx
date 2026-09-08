@@ -510,7 +510,7 @@ function SearchInput({
         }}
         placeholder="Search name, producer, region…"
         autoFocus={autoFocus}
-        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-[13px] text-ink outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
+        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink md:text-control outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
       />
       {value ? (
         <button

@@ -367,7 +367,7 @@ export function CellarList({
               href="/import"
               className="inline-flex min-h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
             >
-              Import a CSV
+              Import CSV or Excel
             </Link>
           </div>
         </div>

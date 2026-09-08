@@ -40,7 +40,7 @@ describe("CellarList empty state", () => {
     expect(markup).toContain('href="/scan?mode=bottle"');
     expect(markup).toContain("Scan a bottle");
     expect(markup).toContain('href="/import"');
-    expect(markup).toContain("Import a CSV");
+    expect(markup).toContain("Import CSV or Excel");
   });
 });
 

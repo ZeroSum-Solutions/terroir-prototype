@@ -71,6 +71,7 @@ export default async function ReconcilePage() {
         </div>
         <Link
           href="/cellar/reconcile/history"
+          aria-label="Reconciliation history"
           className="flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-sm text-[13px] font-medium text-grey transition-colors hover:bg-wash hover:text-ink"
         >
           <History className="h-4 w-4" strokeWidth={1.5} />

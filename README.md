@@ -4,6 +4,25 @@ Restaurant wine-management SaaS. Photograph an invoice on your phone → Azure D
 
 Single Next.js 16 (App Router) deployable backed by Supabase (Postgres + Auth). No separate microservices.
 
+## Restaurant workflow
+
+Open **Settings → Setup guide** for the restaurant setup and phone-service guide.
+Owners can edit the restaurant name there. Import CSV or Excel (.xlsx), review
+rows, confirm the import, then apply stock; invoice photos and PDFs use Scan.
+Excel reads the first worksheet only. See [CSV import](docs/runbooks/csv-import.md)
+for import safeguards and supported columns.
+
+Continue with bins and unplaced inventory, wine lists, and team access. On the
+floor, search for the correct wine and use Pour or availability controls. After
+service, reconcile open-bottle volumes: failed saves preserve the counts, the
+modal asks before discarding edits, and controls lock during a save. These are
+online workflows; confirm success before leaving the screen. Browser Back/Forward
+can bypass the unsaved-count confirmation; drafts are not persisted.
+
+Open-bottle reconciliation is not a full sealed-stock count. Bin-based stocktake
+sessions, offline write recovery and POS integration are not delivered by this
+prototype improvement.
+
 ## Requirements
 
 - Node.js >= 20

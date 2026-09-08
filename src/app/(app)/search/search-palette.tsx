@@ -315,7 +315,7 @@ export function SearchPalette({ className }: { className?: string }) {
             setActive((i) => (i > 0 ? i - 1 : rows.length - 1));
           }
         }}
-        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-sm text-ink outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
+        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink md:text-control outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
       />
       {query ? (
         <button

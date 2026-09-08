@@ -6,6 +6,7 @@
 // (file selection, spreadsheet conversion, the preview-unit count).
 
 import { AlertTriangle, Loader2, Upload } from "lucide-react";
+import Link from "next/link";
 import { CANONICAL_HEADERS, CLIENT_CHUNK_TARGET_ROWS } from "@/domains/import/constants";
 import { describeWaitEstimate, estimateChunkedPhaseWaitSeconds } from "@/domains/import/wait-estimate";
 
@@ -73,6 +74,7 @@ export function UploadStep({
 }) {
   return (
     <div className="rounded-card card-surface p-lg">
+      <p className="mb-md text-control text-grey">On your phone, choose a file from Files or your cloud drive. Nothing changes in your stock during preview.</p>
       <label
         htmlFor="import-file"
         className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-sm rounded-card border-2 border-dashed border-rule-strong bg-wash px-lg py-xl text-center transition-colors hover:border-risk-ink/40 hover:bg-risk-wash/40 focus-ring"
@@ -88,11 +90,11 @@ export function UploadStep({
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-seal-ink">
           <Upload className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
         </span>
-        <span className="text-[14px] font-medium text-ink">
-          {converting ? "Reading spreadsheet…" : file ? file.name : "Choose a CSV or Excel file, or drag one here"}
+        <span className="text-control font-medium text-ink">
+          {converting ? "Reading spreadsheet…" : file ? file.name : "Choose CSV or Excel"}
         </span>
-        <span className="text-caption text-grey">
-          .csv or .xlsx up to 5 MB per upload — drag one in or paste it — larger files split into {CLIENT_CHUNK_TARGET_ROWS}-row chunks automatically
+        <span className="text-control text-grey">
+          .csv or .xlsx. Large CSV files are split into {CLIENT_CHUNK_TARGET_ROWS}-row parts, with a 5 MB limit per upload.
         </span>
       </label>
 
@@ -140,7 +142,7 @@ export function UploadStep({
         // that ordering staying true.
         disabled={!file || converting || previewing || previewUnitsStatus === "pending"}
         onClick={onPreview}
-        className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
       >
         {previewing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         {previewing ? "Reading file…" : "Preview import"}
@@ -153,6 +155,12 @@ export function UploadStep({
       >
         Download CSV template
       </a>
+      <details className="mt-md border-t border-rule pt-sm text-control text-grey">
+        <summary className="min-h-11 cursor-pointer font-medium text-ink focus-ring">Which file should I use?</summary>
+        <p className="mt-xs">Use the CSV template for column names and examples. Include the wine name, quantity and bottle size; keep the producer and vintage in separate columns when available.</p>
+        <p className="mt-sm">Excel imports read the first worksheet only. Export Apple Numbers, Google Sheets or older .xls workbooks as CSV or .xlsx first.</p>
+        <Link href="/scan" className="mt-sm flex min-h-11 items-center text-ink underline underline-offset-4 focus-ring">Have an invoice photo or PDF? Open Scan</Link>
+      </details>
     </div>
   );
 }

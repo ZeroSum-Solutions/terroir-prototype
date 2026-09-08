@@ -297,17 +297,17 @@ export default async function DashboardPage({
             strokeWidth={1.5}
           />
           <p className="text-[15px] font-medium text-ink">
-            Scan your first invoice to start tracking
+            Bring your wine inventory into Terroir
           </p>
           <p className="mt-xs text-[13px] text-grey">
-            Your wine program metrics will appear here after your first scan.
+            Import your stock file or scan an invoice. Your inventory and service activity will build your Insights.
           </p>
           <Link
-            href="/scan"
-            className="mt-lg flex h-[38px] items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
+            href="/get-started"
+            className="mt-lg flex min-h-11 items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
           >
             <ScanLine className="h-4 w-4" strokeWidth={2} />
-            Go to scanner
+            Set up your restaurant
           </Link>
         </div>
       </section>

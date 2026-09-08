@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Archive, DollarSign, LogOut, Settings, Upload, Users } from "lucide-react";
+import { BookOpen, Archive, DollarSign, LogOut, Settings, Upload, Users } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
 export function SettingsDropdown() {
@@ -125,12 +125,23 @@ export function SettingsDropdown() {
               <Upload className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Import
             </Link>
+            <Link
+              ref={(el) => { itemsRef.current[4] = el; }}
+              href="/get-started"
+              onClick={close}
+              role="menuitem"
+              tabIndex={-1}
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink hover:bg-wash focus-ring"
+            >
+              <BookOpen className="h-4 w-4 text-grey" aria-hidden="true" />
+              Setup guide
+            </Link>
             <div className="mx-md my-xs border-t border-rule" role="separator" />
             <ThemeToggle />
             <div className="mx-md my-xs border-t border-rule" role="separator" />
             <form action="/auth/signout" method="post">
               <button
-                ref={(el) => { itemsRef.current[4] = el; }}
+                ref={(el) => { itemsRef.current[5] = el; }}
                 type="submit"
                 role="menuitem"
                 tabIndex={-1}
