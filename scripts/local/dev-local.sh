@@ -72,6 +72,11 @@ NEXT_PUBLIC_SUPABASE_URL="$API_URL" source scripts/local/assert-local-db.sh
 # that only ever existed locally, because CI already pins this.
 APP_URL="http://127.0.0.1:3000"
 
+# Isolated worktrees do not carry the hosted dotenv file. Supply a local-only
+# signing key so restaurant switching works there too. An explicit shell key
+# stays stable across restarts; otherwise old selection cookies expire on restart.
+LOCAL_COOKIE_SECRET="${ACTIVE_RESTAURANT_COOKIE_SECRET:-$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')}"
+
 # Bottle-label scan (POST /api/scan-bottle) calls the model through OpenRouter
 # with OPENROUTER_API_KEY, which this script does NOT supply: it is a provider
 # key, not a local-stack credential, and it comes from the shell (or .env.local),
@@ -90,4 +95,5 @@ exec env \
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE" \
   SUPABASE_SERVICE_ROLE_KEY="$SERVICE" \
   NEXT_PUBLIC_APP_URL="$APP_URL" \
+  ACTIVE_RESTAURANT_COOKIE_SECRET="$LOCAL_COOKIE_SECRET" \
   pnpm dev "$@"

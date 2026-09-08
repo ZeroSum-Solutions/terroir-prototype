@@ -65,6 +65,7 @@ function pasteHintFor(outcome: Extract<ClipboardReadOutcome, { ok: false }>): st
 }
 
 interface ReadyViewProps {
+  disabled?: boolean;
   onStart: (files: File[]) => void;
   /** A spreadsheet chosen here belongs to /import, not to document
    * intelligence. The parent parks it and navigates rather than refusing it. */
@@ -77,6 +78,7 @@ interface ReadyViewProps {
 }
 
 export function ReadyView({
+  disabled = false,
   onStart,
   onSpreadsheet,
   mode,
@@ -135,6 +137,7 @@ export function ReadyView({
   };
 
   const { isDragging, pasteFromClipboard, canPasteFromClipboard } = useFileIntake({
+    enabled: !disabled,
     onFiles: (files) => {
       setPasteHint(null);
       acceptFiles(files, "drop-or-paste");
@@ -173,6 +176,7 @@ export function ReadyView({
           <button
             type="button"
             onClick={() => onModeChange("invoice")}
+            disabled={disabled}
             aria-pressed={!isBottle}
             className={cn(
               "flex min-h-11 items-center gap-xs rounded-pill px-md py-sm text-[13px] font-medium transition-colors focus-ring",
@@ -187,6 +191,7 @@ export function ReadyView({
           <button
             type="button"
             onClick={() => onModeChange("bottle")}
+            disabled={disabled}
             aria-pressed={isBottle}
             className={cn(
               "flex min-h-11 items-center gap-xs rounded-pill px-md py-sm text-[13px] font-medium transition-colors focus-ring",
@@ -247,6 +252,7 @@ export function ReadyView({
       <button
         type="button"
         onClick={() => beginCapture(cameraRef)}
+        disabled={disabled}
         className="flex min-h-11 w-full flex-col items-center justify-center rounded-card border-2 border-dashed border-rule-strong bg-wash px-lg py-2xl text-center transition-colors hover:border-risk-ink/40 hover:bg-risk-wash/40 focus-ring md:py-3xl"
       >
         <span className="mb-md flex h-14 w-14 items-center justify-center rounded-full bg-primary text-seal-ink md:h-16 md:w-16">
@@ -272,6 +278,7 @@ export function ReadyView({
           <button
             type="button"
             onClick={() => beginCapture(fileRef)}
+            disabled={disabled}
             className="flex h-12 w-full flex-1 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
           >
             <FileUp className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -286,6 +293,7 @@ export function ReadyView({
             <button
               type="button"
               onClick={() => void handlePaste()}
+              disabled={disabled}
               className="flex h-12 shrink-0 items-center justify-center gap-sm rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink hover:bg-wash focus-ring"
             >
               <ClipboardPaste className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -307,6 +315,7 @@ export function ReadyView({
 
       <input
         ref={cameraRef}
+        disabled={disabled}
         type="file"
         accept="image/*"
         capture="environment"
@@ -315,6 +324,7 @@ export function ReadyView({
       />
       <input
         ref={fileRef}
+        disabled={disabled}
         type="file"
         accept={
           isBottle

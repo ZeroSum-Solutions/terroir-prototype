@@ -2,6 +2,37 @@
 
 Written 2026-08-30 on branch `feat/xwines-corpus-and-labels`; revised 2026-09-01 for the unified search box and the two-surface demo.
 
+## September 7 prototype rehearsal
+
+The first build now lives in `ZeroSum-Solutions/terroir-prototype`; the expanded
+build has its own `terroir-rebuild` repository. Railway production and staging
+both follow the prototype's `main`. A local change is not deployed until Railway
+and `/api/health` report its commit.
+
+Rohan needs the hosted link on his own device. Verify his membership in the
+intended restaurant before rehearsal. The September 7 read-only check found only
+the owner's membership in **My Restaurant**, with no pending invitations.
+
+The earlier dataset descriptions below are historical snapshots. The current
+local photo preview and its limits are documented in [Curated bottle photos](curated-bottle-photos.md).
+Those photos require a separate hosted import; a code deployment alone does not
+copy local storage or database rows. Keep their reference-photo captions visible.
+
+Use Node 24 for this Mac's local rehearsal. Node 26 produced storage-related unit
+test failures; Node 24 ran the complete unit and local database suites. The guarded
+startup script generates a local restaurant-cookie signing key when none is
+provided in the shell. With a generated key, select the restaurant again after a
+server restart.
+
+The September 7 OpenRouter balance check was below zero. Verify funded provider
+access before rehearsing real invoice or bottle recognition; mocked upload tests
+do not establish recognition readiness.
+
+Insights reads every page of inventory and health data, including collections
+over 1,000 records. A page-read error fails the snapshot rather than displaying a
+partial total. Past-window alerts distinguish an ended window from its final year
+and omit unrecognized critic attributions.
+
 ## Start it
 
 ```bash
@@ -13,7 +44,7 @@ Bottle-label scan needs `OPENROUTER_API_KEY` in the shell: since 2026-09-01 ever
 model call goes through OpenRouter (the direct Anthropic key is no longer read), and
 `dev-local.sh` pins the local Supabase stack but does not carry a provider key. On
 this machine the shell sources the key from the vault automatically; the script warns
-on start if it is missing, and `.env.local` is the fallback place to put it. Without
+on start if it is missing. Resolve a missing key through ZS Vault. Without
 it `POST /api/scan-bottle` answers a redacted 500 — the dev server logs the real error
 to the terminal outside production, so keep the terminal off the big screen while
 scanning.
@@ -22,7 +53,7 @@ scanning.
 and corrected on 2026-09-01 (cellar sections, scan statuses, guest-menu names). The
 re-seed chain at the bottom of this file takes hours and is for a fresh machine.
 
-Then open http://localhost:3000 and hit **`/api/dev-login`** once — it signs in as
+Then open http://127.0.0.1:3000 and hit **`/api/dev-login`** once — it signs in as
 `DEV_BYPASS_EMAIL` and drops you in *LOCAL SEED - Osteria Scala*, the venue that
 holds the data.
 
