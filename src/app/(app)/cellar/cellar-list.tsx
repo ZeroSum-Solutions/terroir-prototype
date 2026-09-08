@@ -169,8 +169,8 @@ export function CellarList({
     [filteredWithoutFacets, facets],
   );
   const taxonomyGroups = useMemo(
-    () => (groupBy ? groupRows(visibleRows, groupBy) : []),
-    [visibleRows, groupBy],
+    () => (groupBy ? groupRows(filtered, groupBy, visibleRows) : []),
+    [filtered, visibleRows, groupBy],
   );
 
   // A dropped row moves immediately through this override map rather than by

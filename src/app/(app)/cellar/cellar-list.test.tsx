@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-function renderList(rows: CellarWineRow[], sections?: { id: string; name: string }[]) {
+function renderList(rows: CellarWineRow[], sections?: { id: string; name: string }[], groupBy: "producer" | null = null) {
   return renderToStaticMarkup(
     <ToastProvider>
       <CellarList
@@ -18,7 +18,7 @@ function renderList(rows: CellarWineRow[], sections?: { id: string; name: string
         onSelectWine={() => {}}
         onResetFilters={() => {}}
         facets={{}}
-        groupBy={null}
+        groupBy={groupBy}
         sort={null}
         onFacetsChange={() => {}}
         onGroupByChange={() => {}}
@@ -61,6 +61,15 @@ describe("CellarList row thumbnails", () => {
 });
 
 describe("CellarList section groups", () => {
+  it("keeps complete producer totals when only the first page is visible", () => {
+    const markup = renderList(Array.from({ length: 51 }, (_, i) => row({
+      wine_id: `wine-${i}`, name: `Wine ${i.toString().padStart(2, "0")}`, sealed_count: 2,
+    })), undefined, "producer");
+    expect(markup).toContain("51 wines · 102 bottles");
+    expect(markup).not.toContain("Wine 50");
+    expect(markup).toContain("Show 1 more");
+  });
+
   it("renders a configured section that has no wines, so it can be dragged into", () => {
     // CELLAR-04: empty groups used to be filtered out, which made a newly
     // created section impossible to drop the FIRST wine into.

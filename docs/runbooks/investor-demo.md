@@ -35,6 +35,9 @@ formula-leading names are escaped. A page-read error fails the response rather
 than displaying a partial total. Past-window alerts distinguish an ended window from its final year
 and omit unrecognized critic attributions.
 
+Cellar producer and region group totals cover all matching wines, including rows
+behind “Show more”; the list still loads 50 rows at a time.
+
 ## Start it
 
 ```bash

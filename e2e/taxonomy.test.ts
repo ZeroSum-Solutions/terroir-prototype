@@ -181,6 +181,10 @@ test.describe("@opp-4 navigable wine taxonomy", () => {
     const alpha = page.locator("[data-cellar-taxonomy-group]", { hasText: producerA });
     const beta = page.locator("[data-cellar-taxonomy-group]", { hasText: producerB });
     await expect(alpha.locator("[data-group-rollup]")).toHaveText("2 wines · 6 bottles");
+    // Larger demo cellars paginate rows; load the next pages through the UI.
+    for (let pageIndex = 0; pageIndex < 40 && await beta.count() === 0; pageIndex += 1) {
+      await page.getByRole("button", { name: /^Show \d+ more ·/ }).click();
+    }
     await expect(beta.locator("[data-group-rollup]")).toHaveText("1 wine · 1 bottle");
 
     await page.goto(`/cellar?wine=${wineIds[0]}`);

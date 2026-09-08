@@ -137,7 +137,11 @@ test.describe("@opp-8 branded menus", () => {
     // A new logo clears old proposals. Exercise generation with a deterministic
     // model response, then persist and render the chosen theme through real APIs.
     await page.route("**/api/brand-kit/propose", (route) => route.fulfill({
-      status: 200, contentType: "application/json", body: JSON.stringify({ proposals: [THEME] }),
+      status: 200, contentType: "application/json", body: JSON.stringify({ proposals: [
+        THEME,
+        { ...THEME, name: "E2E Paper Reserve" },
+        { ...THEME, name: "E2E Night Service" },
+      ] }),
     }));
     await panel.getByRole("button", { name: "Generate themes", exact: true }).click();
     await panel.getByRole("button", { name: `Apply ${THEME.name}` }).click();

@@ -127,7 +127,9 @@ export function hasSelectableOptions(options: readonly FacetCount[]): boolean {
 export function groupRows<T extends CellarFacetRow>(
   rows: readonly T[],
   groupBy: CellarGroupBy,
+  visibleRows: readonly T[] = rows,
 ): Array<CellarFacetGroup<T>> {
+  const visible = new Set(visibleRows);
   const buckets = new Map<string, { label: string; wines: T[] }>();
   for (const row of rows) {
     const raw = groupValue(row, groupBy);
@@ -143,8 +145,9 @@ export function groupRows<T extends CellarFacetRow>(
       label: bucket.label,
       wineCount: bucket.wines.length,
       totalBottles: bucket.wines.reduce((total, row) => total + row.sealed_count, 0),
-      wines: bucket.wines,
+      wines: bucket.wines.filter(row => visible.has(row)),
     }))
+    .filter(group => group.wines.length > 0)
     .sort((left, right) => compareGroups(left, right, groupBy));
 }
 
