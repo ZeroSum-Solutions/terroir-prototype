@@ -1,5 +1,6 @@
 import { wineDisplayName } from "@/lib/wine-display-name";
 import type { XWinesImageKind } from "./xwines-profile";
+import { wineImageReferenceNote } from "./wine-image-reference";
 
 /**
  * How a corpus photograph is captioned and described, wherever it is shown.
@@ -49,7 +50,7 @@ export function resolveWineHeroImage({
   // full: "Esporão Esporão Reserva Tinto" is the same duplication the visible
   // heading had, said out loud. See src/lib/wine-display-name.ts.
   const ownName = `${producer ?? ""} ${wineDisplayName(producer, name)}`.trim();
-  if (heroImageUrl) return { src: heroImageUrl, alt: ownName, note: null };
+  if (heroImageUrl) return { src: heroImageUrl, alt: ownName, note: wineImageReferenceNote(heroImageUrl) };
   if (!corpusImage) return null;
   const note = CORPUS_IMAGE_NOTE[corpusImage.kind];
   return {

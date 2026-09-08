@@ -6,6 +6,7 @@ import { CORPUS_IMAGE_NOTE } from "@/lib/wine-intelligence/corpus-image";
 import { wineDisplayName } from "@/lib/wine-display-name";
 import type { XWinesProfile } from "@/lib/wine-intelligence/xwines-profile";
 import type { WineRow } from "./types";
+import { wineImageReferenceNote } from "@/lib/wine-intelligence/wine-image-reference";
 
 // The hero's candlelight: a warm pool behind the bottle that reads as a lit
 // alcove. It is drawn with the `mark` — champagne in Nocturne, claret in
@@ -35,6 +36,7 @@ export function HeroSection({
   heroAlt,
   corpusImage,
 }: HeroSectionProps) {
+  const referenceNote = wineImageReferenceNote(wine.hero_image_url);
   return (
     <header
       className="relative mt-md grid gap-xl rounded-card py-2xl md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:gap-2xl md:py-3xl"
@@ -68,7 +70,10 @@ export function HeroSection({
             />
           </div>
         )}
-        {corpusImage !== null && (
+        {referenceNote && (
+          <p className="max-w-[240px] text-center text-caption text-grey md:max-w-full">{referenceNote}</p>
+        )}
+        {!referenceNote && corpusImage !== null && (
           <p className="max-w-[240px] text-center text-caption text-grey md:max-w-full">
             {CORPUS_IMAGE_NOTE[corpusImage.kind]}
             {corpusImage.credit !== null && (
