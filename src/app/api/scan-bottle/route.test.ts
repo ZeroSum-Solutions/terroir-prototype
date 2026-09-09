@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type NextRequest } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 
 const mockRequireMembership = vi.fn();
 const mockGetAnthropicClient = vi.fn();
@@ -303,6 +304,48 @@ describe("POST /api/scan-bottle", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "parse_failed" },
     });
+  });
+
+  // A 402 says the provider account is out of credit. That is not a fault the
+  // sommelier can retry away, and it used to be reported as one: it fell into
+  // the generic APIError branch and came back 502 "Please try again". It was
+  // also the whole of the long-standing "bottle recognition returns 502"
+  // blocker, which stayed open partly because the response named the wrong
+  // thing. 503 with a code that says what happened, and a message that says
+  // who has to act.
+  it("reports an exhausted provider account as 503, not a retryable 502", async () => {
+    const supabase = makeSupabase({ data: null, error: null });
+    allow(supabase);
+    mockGetAnthropicClient.mockReturnValue({
+      messages: {
+        parse: vi.fn().mockRejectedValue(
+          new Anthropic.APIError(
+            402,
+            { error: { message: "This request requires more credits" } },
+            "Payment Required",
+            new Headers(),
+          ),
+        ),
+      },
+    });
+    const form = new FormData();
+    form.append("file", new File(["label"], "label.jpg", { type: "image/jpeg" }));
+
+    const response = await POST(
+      new Request("http://localhost/api/scan-bottle", {
+        method: "POST",
+        body: form,
+      }) as unknown as NextRequest,
+    );
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toMatchObject({ error: { code: "provider_credit_exhausted" } });
+    // The point is not that it avoids the words "try again" — "top it up, then
+    // try again" is fine advice. It is that the message names the CAUSE
+    // instead of the generic upstream fault the old branch reported.
+    expect(body.error.message).toMatch(/out of credit/i);
+    expect(body.error.message).not.toMatch(/encountered an error/i);
   });
 
   it("rejects unsupported label files before client initialization", async () => {

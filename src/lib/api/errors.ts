@@ -74,6 +74,13 @@ export const Errors = {
   badGateway: (message = "Upstream service error.", init?: ApiErrorInit) =>
     apiError(502, "bad_gateway", message, undefined, init),
 
+  // 503, not 502: the upstream did not fault, it refused, and it will keep
+  // refusing until somebody acts. The distinction matters to the caller —
+  // "try again" is the right advice for one and a waste of the operator's
+  // time for the other.
+  serviceUnavailable: (code: string, message: string, init?: ApiErrorInit) =>
+    apiError(503, code, message, undefined, init),
+
   invalidJson: (init?: ApiErrorInit) =>
     apiError(400, "invalid_json", "Invalid JSON.", undefined, init),
 

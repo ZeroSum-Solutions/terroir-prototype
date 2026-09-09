@@ -18,16 +18,17 @@ export function TaxonomyGroup({
     <section
       data-cellar-taxonomy-group
       data-group-value={group.key}
-      className="overflow-hidden rounded-card card-surface"
+      // Concept A — "The Cellar Index": the facet group is a run of the index
+      // on the paper ground, headed by a label and one hairline. It used to be
+      // a white card with a beige header band, which is what SectionGroup was
+      // already moved off; the two render side by side in the same list, so
+      // leaving this one behind read as two different products.
     >
-      <header className="flex items-center justify-between gap-md border-b border-rule-strong bg-surface-sunken px-md py-sm">
-        <h2 className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-ink-soft">
+      <header className="flex items-center justify-between gap-md border-b border-rule-strong px-md py-sm">
+        <h2 className="text-caption font-medium uppercase text-ink-soft">
           {group.label}
         </h2>
-        <span
-          data-group-rollup
-          className="tabular shrink-0 text-[11px] text-ink-soft"
-        >
+        <span data-group-rollup className="tabular shrink-0 text-ledger text-grey">
           {group.wineCount} wine{group.wineCount === 1 ? "" : "s"} · {group.totalBottles}{" "}
           bottle{group.totalBottles === 1 ? "" : "s"}
         </span>

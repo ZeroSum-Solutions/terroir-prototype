@@ -21,7 +21,7 @@ import {
  * hand-forged cookie. See e2e/prodshape.ts.
  */
 
-const DEMO_NAME = "LOCAL SEED - Osteria Scala";
+const DEMO_NAME = "Osteria Scala";
 
 function isLoopbackSupabaseUrl(url: string | undefined): boolean {
   if (!url) return false;

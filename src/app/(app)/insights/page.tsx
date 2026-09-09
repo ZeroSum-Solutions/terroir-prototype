@@ -107,7 +107,7 @@ export default async function DashboardPage({
 }) {
   const sp = await searchParams;
   const auth = (await getAuthContext())!;
-  const { supabase, restaurantId: rid, restaurantName, userRole } = auth;
+  const { supabase, restaurantId: rid, userRole } = auth;
 
   // ── Date range from URL search params ──────────────────────────────
   const { range, from, to } = normalizeInsightsRange(
@@ -283,10 +283,7 @@ export default async function DashboardPage({
     return (
       <section>
         <header className="mb-lg md:mb-xl">
-          <p className="text-caption font-medium uppercase text-grey">
-            {restaurantName}
-          </p>
-          <h1 className="mt-xs font-serif text-heading-sm font-normal text-ink md:text-heading lg:text-display">
+          <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading lg:text-display">
             Insights
           </h1>
         </header>
@@ -316,19 +313,18 @@ export default async function DashboardPage({
 
   return (
     <section>
-      {/* Dawn Hero — the one atmospheric moment on this page, per DESIGN.md's
-          canonical anatomy (gradient hero with glass stat tiles, resolving
-          into a beige bridge band, then the white workspace). Contained
-          within the padded app shell rather than edge-to-edge. Copy is
-          unchanged from the prior "Dashboard" heading — no new marketing
-          copy is introduced here, only the atmospheric surface. */}
-      <div className="dawn-gradient relative mb-xl overflow-hidden rounded-card px-lg py-xl md:mb-3xl md:px-2xl md:py-2xl">
+      {/* Masthead. This was the "Dawn Hero" — a gradient panel with glass stat
+          tiles resolving into a beige bridge band — which was the canonical
+          anatomy of the design Concept A replaced. The gradient is already
+          neutralised in globals.css, so what was left here was an inset,
+          rounded, padded box drawing a box around nothing. The title now sits
+          on the paper like every other route's, and the grey eyebrow
+          repeating the restaurant name goes with it (the app header carries
+          that name on every page already). */}
+      <div className="mb-xl md:mb-3xl">
         <div className="flex flex-wrap items-start justify-between gap-md">
           <div>
-            <p className="text-caption font-medium uppercase text-grey">
-              {restaurantName}
-            </p>
-            <h1 className="mt-xs font-serif text-heading-sm font-normal text-ink md:text-heading lg:text-display">
+            <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading lg:text-display">
               Insights
             </h1>
           </div>
@@ -359,9 +355,8 @@ export default async function DashboardPage({
           </a>
         </div>
 
-        {/* Glass stat tiles — the correct DESIGN.md treatment for stat
-            tiles sitting ON the dawn gradient (solid ivory + hairline is
-            reserved for the same tiles on white surfaces). */}
+        {/* Stat tiles. No longer "glass on the gradient" — there is no
+            gradient to sit on. */}
         <div className="relative mt-xl">
           <div className="mb-sm">
             <InsightScope metric="inventory" kind="snapshot" />

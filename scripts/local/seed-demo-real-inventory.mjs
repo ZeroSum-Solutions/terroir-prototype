@@ -2,7 +2,7 @@
 /**
  * scripts/local/seed-demo-real-inventory.mjs
  *
- * Give the 696 REAL, photographed wines in the LOCAL SEED - Osteria Scala
+ * Give the 696 REAL, photographed wines in the Osteria Scala
  * demo tenant stock, bins and metadata, so the investor demo can run on
  * real bottles with real photography instead of the 250 synthetic
  * "Lot NNN" wines that already carry the tenant's original inventory.
@@ -76,7 +76,7 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 // Hardcoded, not read from argv/env -- this script is not allowed to
 // operate on any other tenant. See requirement #3 in the task brief.
 const RESTAURANT_ID = "de100000-0000-4000-8000-000000000001";
-const RESTAURANT_NAME_EXPECTED = "LOCAL SEED - Osteria Scala";
+const RESTAURANT_NAME_EXPECTED = "Osteria Scala";
 
 const PSQL_BIN = "/opt/homebrew/opt/postgresql@16/bin/psql";
 const CONFIRM = process.argv.slice(2).includes("--confirm");
@@ -511,14 +511,45 @@ function deterministicUuid(...parts) {
 // Bin layout
 // ---------------------------------------------------------------------------
 
-const ZONE_LETTER = {
-  Sparkling: "S",
-  Whites: "W",
-  Rose: "P",
-  "Reds - Old World": "O",
-  "Reds - New World": "N",
-  "Dessert & Fortified": "D",
-};
+// Bins are addressed by their place on the wall -- row letter + column number,
+// "A1" through "L16" -- not by a zone initial.
+//
+// This used to emit S01/W07/O41: a zone letter and a padded index. It read
+// fine on /bins and was wrong everywhere else. The cellar GRID view keys its
+// cells off inventory_items.bin_location and draws a rows x columns lattice
+// out of cellar_config (12 x 16 for this tenant), so a code has to BE a rack
+// address to land on a cell. "S01" is not one -- S is past the twelfth row and
+// the padding does not match either -- so once bin_location agreed with bin_id
+// (which it must, or /cellar and /bins name different bins for the same
+// bottle), every cell on the grid read empty. The production-shaped fixture
+// tenant already uses A1..J14, so this was the demo tenant disagreeing with
+// the rest of the product, not a missing feature in the grid.
+//
+// Zones do not disappear: they stay on bins.zone, which is what /bins groups
+// and labels by. What changes is that a zone is now a BAND OF ROWS on the
+// wall, which is how a cellar is actually laid out.
+const RACK_ROW_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * Lay `count` bins for one zone onto the rack, starting on a fresh row.
+ *
+ * Zones start on their own row rather than packing tight so that a zone reads
+ * as a contiguous band on the grid. Returns the codes plus the next free row.
+ */
+function allocateRackCodes(count, startRow, columns) {
+  const codes = [];
+  for (let i = 0; i < count; i += 1) {
+    const row = startRow + Math.floor(i / columns);
+    const column = (i % columns) + 1;
+    if (row >= RACK_ROW_LETTERS.length) {
+      throw new Error(
+        `bin layout: the rack ran out of rows at bin ${i + 1} of ${count}.`,
+      );
+    }
+    codes.push(`${RACK_ROW_LETTERS[row]}${column}`);
+  }
+  return { codes, nextRow: startRow + Math.ceil(count / columns) };
+}
 
 const BIN_HEADROOM = 1.35; // total capacity target vs. actual bottle demand
 const MIN_BINS_PER_ZONE = 4;
@@ -529,7 +560,7 @@ const TARGET_BOTTLES_PER_BIN = 45; // used only to pick a realistic bin COUNT
 // around 0 so the average across a full cycle is exactly the base.
 const CAPACITY_VARIANTS = [-12, -6, 0, 6, 12, 0];
 
-function buildBinsForZone(zone, totalDemand) {
+function buildBinsForZone(zone, totalDemand, rack) {
   const targetCapacity = Math.max(totalDemand * BIN_HEADROOM, MIN_BINS_PER_ZONE * 18);
   const binCount = Math.min(
     MAX_BINS_PER_ZONE,
@@ -539,41 +570,95 @@ function buildBinsForZone(zone, totalDemand) {
   // `binCount` bins to (at least) targetCapacity before variation is added.
   const baseCapacity = Math.max(12, Math.ceil(targetCapacity / binCount / 6) * 6);
 
-  const bins = [];
+  // Size the zone first, address it second. Always lay down binCount bins (the
+  // realistic, human-sized rack); then, only if rounding left the zone short of
+  // its headroom target (possible when binCount was clamped to
+  // MAX_BINS_PER_ZONE), keep adding bins at the base capacity until the target
+  // is actually met -- capacity must never fall short of demand, "sensible
+  // size" is the secondary goal.
+  const capacities = [];
   let cumCapacity = 0;
   let index = 0;
-  // Always lay down binCount bins first (the realistic, human-sized rack);
-  // then, only if rounding left the zone short of its headroom target
-  // (possible when binCount was clamped to MAX_BINS_PER_ZONE), keep adding
-  // bins at the base capacity until the target is actually met -- capacity
-  // must never fall short of demand, "sensible size" is the secondary goal.
   while (index < binCount || cumCapacity < targetCapacity) {
     index++;
     const variant = CAPACITY_VARIANTS[(index - 1) % CAPACITY_VARIANTS.length];
     const capacity = Math.max(12, baseCapacity + variant);
-    const code = `${ZONE_LETTER[zone]}${String(index).padStart(2, "0")}`;
-    bins.push({
-      id: deterministicUuid("bin", RESTAURANT_ID, zone, code),
-      code,
-      zone,
-      capacity,
-      remaining: capacity,
-      sortOrder: index,
-    });
+    capacities.push(capacity);
     cumCapacity += capacity;
     if (index > MAX_BINS_PER_ZONE + 25) break; // absolute safety valve
   }
-  return bins;
+
+  const { codes, nextRow } = allocateRackCodes(
+    capacities.length,
+    rack.nextRow,
+    rack.columns,
+  );
+  rack.nextRow = nextRow;
+
+  return capacities.map((capacity, i) => ({
+    id: deterministicUuid("bin", RESTAURANT_ID, zone, codes[i]),
+    code: codes[i],
+    zone,
+    capacity,
+    remaining: capacity,
+    sortOrder: i + 1,
+  }));
 }
 
-/** First-fit-decreasing: biggest lots placed first, so the packing is tight. */
+/**
+ * Worst-fit-decreasing: biggest lots first, each into the EMPTIEST bin.
+ *
+ * This used to be first-fit ("so the packing is tight"), which is the right
+ * answer for a warehouse and the wrong one for a cellar. First-fit filled
+ * every bin to capacity in code order and then stopped, so the 35% headroom
+ * BIN_HEADROOM deliberately buys landed entirely at the tail: O31-O41,
+ * S24-S33 and W19-W25 held nothing at all, and /bins rendered a third of the
+ * rack as dead slots. No sommelier packs a wall that way, and on a demo it
+ * reads as data that was never finished rather than as room to grow.
+ *
+ * Choosing the emptiest bin each time spreads the same stock over the same
+ * bins, so every bin carries wine and each sits at roughly the zone's
+ * utilisation (~71%) -- the headroom becomes visible depth in every bin
+ * instead of a block of empties.
+ *
+ * "Emptiest" is proportional, not absolute: capacities vary by +/-12 around
+ * the zone base, and equalising free BOTTLES would leave the small bins
+ * fuller than the large ones. Compared by integer cross-multiplication
+ * (a.remaining/a.capacity > b.remaining/b.capacity) so there is no float
+ * rounding, and ties keep the earlier bin -- placement stays deterministic
+ * across re-runs, which the whole script depends on.
+ */
 function assignBins(zone, bins, items) {
+  // Does `b` beat `best` as the home for a lot of `quantity` bottles?
+  //
+  // Three keys, in order, and the first one is not optional: a bin that can
+  // still take the lot always beats one that cannot, so nothing overflows
+  // while any bin in the zone has room. Only when no bin fits does the choice
+  // fall through to "least overfull", which is the least-bad landing spot.
+  //
+  // The third key exists because of a real failure. Proportional emptiness
+  // alone ties at 1.0 for every bin on the first placement of a zone -- every
+  // bin is empty -- and the tie kept bins[0], which CAPACITY_VARIANTS[0] = -12
+  // makes the SMALLEST bin on the wall. The lots are placed largest-first, so
+  // the zone's biggest lot went into its smallest bin every time: W01 and S01
+  // each ended up holding 40 bottles in 36 slots, a rack rendering at 111%
+  // full. Breaking the tie on absolute room sends the big lots to the big
+  // bins, which is what a human does without thinking about it.
+  const beats = (b, best, quantity) => {
+    const bFits = b.remaining >= quantity;
+    const bestFits = best.remaining >= quantity;
+    if (bFits !== bestFits) return bFits;
+    const cross = b.remaining * best.capacity - best.remaining * b.capacity;
+    if (cross !== 0) return cross > 0;
+    return b.remaining > best.remaining;
+  };
+
   const sorted = [...items].sort((a, b) => b.quantity - a.quantity || a.id.localeCompare(b.id));
   for (const item of sorted) {
-    let bin = bins.find((b) => b.remaining >= item.quantity);
-    if (!bin) {
-      bin = bins.reduce((best, b) => (b.remaining > best.remaining ? b : best), bins[0]);
-    }
+    const bin = bins.reduce(
+      (best, b) => (beats(b, best, item.quantity) ? b : best),
+      bins[0],
+    );
     bin.remaining -= item.quantity;
     item.binId = bin.id;
   }
@@ -920,9 +1005,26 @@ async function main() {
     demandBySection[wine.section] += wine.quantity;
   }
 
+  // The rack the tenant actually has. cellar_config.rows/columns is what the
+  // grid view draws, so the layout has to be planned inside it rather than
+  // invented independently and hoped to match.
+  const [[rackRows, rackColumns]] = psqlRows(
+    `select rows, columns from public.cellar_config
+     where restaurant_id = '${RESTAURANT_ID}'::uuid limit 1;`,
+  );
+  const rack = { nextRow: 0, columns: Number(rackColumns) || 16 };
+  const rackRowCount = Number(rackRows) || 12;
+
   const binsByZone = {};
   for (const zone of SECTION_NAMES) {
-    binsByZone[zone] = buildBinsForZone(zone, demandBySection[zone]);
+    binsByZone[zone] = buildBinsForZone(zone, demandBySection[zone], rack);
+  }
+  if (rack.nextRow > rackRowCount) {
+    throw new Error(
+      `bin layout: the plan needs ${rack.nextRow} rack rows but cellar_config ` +
+        `gives ${rackRowCount}x${rack.columns}. Widen the rack or shrink the plan; ` +
+        "do not emit codes the grid cannot render.",
+    );
   }
 
   for (const zone of SECTION_NAMES) {
@@ -937,6 +1039,36 @@ async function main() {
   const [[existingBinCount]] = psqlRows(
     `select count(*) from public.bins where restaurant_id = '${RESTAURANT_ID}'::uuid;`,
   );
+
+  // Bins this script laid down on an EARLIER run whose zone demand has since
+  // shrunk. The plan is derived from demand every run, so it legitimately gets
+  // smaller -- but the write was upsert-only, so bins that fell out of the plan
+  // were never removed and simply sat there forever holding nothing. That is
+  // where D05, N13-N17, O41 and S33 came from, not a stray test run.
+  //
+  // The predicate is deliberately four-way fenced, and the DELETE below repeats
+  // it verbatim rather than trusting these ids: right tenant, not in the plan
+  // we are about to write, EMPTY (a bin holding stock is never a candidate, no
+  // matter what the plan says), and carrying this script's own zone + code
+  // shape so a bin some other tool created is out of reach.
+  const binPruneWhere = `
+    b.restaurant_id = '${RESTAURANT_ID}'::uuid
+    and b.id not in (${allBins.map((b) => `'${b.id}'::uuid`).join(",")})
+    and b.zone in (${SECTION_NAMES.map((z) => sqlLiteral(z)).join(",")})
+    and b.code ~ '^[A-Z][0-9]{1,2}$'
+    and not exists (select 1 from public.inventory_items i where i.bin_id = b.id)`;
+  // Reported WITHOUT the emptiness test the DELETE applies. Emptiness is a
+  // post-condition of this run, not a pre-condition: the placement steps are
+  // what empty a superseded bin. Testing it here would have printed "0 to
+  // prune" on the very run that retires an entire layout.
+  const supersededBins = psqlRows(
+    `select b.code from public.bins b
+     where b.restaurant_id = '${RESTAURANT_ID}'::uuid
+       and b.id not in (${allBins.map((b) => `'${b.id}'::uuid`).join(",")})
+       and b.zone in (${SECTION_NAMES.map((z) => sqlLiteral(z)).join(",")})
+       and b.code ~ '^[A-Z][0-9]{1,2}$'
+     order by b.code;`,
+  ).filter((row) => row[0]);
   const [[existingNewInvCount]] = psqlRows(`
     select count(*) from public.inventory_items
     where restaurant_id = '${RESTAURANT_ID}'::uuid
@@ -969,7 +1101,23 @@ async function main() {
         `capacity ${capacity}, used ${used} (${Math.round((used / capacity) * 100)}%)`,
     );
   }
+  const overfullBins = allBins.filter((b) => b.remaining < 0);
+  console.log(
+    `bins over capacity:          ${overfullBins.length}` +
+      (overfullBins.length
+        ? ` (${overfullBins.map((b) => `${b.code} +${-b.remaining}`).join(", ")})`
+        : ""),
+  );
+  const emptyPlannedBins = allBins.filter((b) => b.remaining === b.capacity);
+  console.log(`bins left empty by the plan: ${emptyPlannedBins.length}`);
   console.log(`bins already in DB:          ${existingBinCount}`);
+  const supersededPreview = supersededBins.slice(0, 8).map(([code]) => code).join(", ");
+  console.log(
+    `  superseded, to prune:      ${supersededBins.length}` +
+      (supersededBins.length
+        ? ` (${supersededPreview}${supersededBins.length > 8 ? ", …" : ""})`
+        : ""),
+  );
   console.log(`new inventory rows planned:  ${wines.length}`);
   console.log(`  already present (rerun):   ${existingNewInvCount}`);
   console.log(`  low stock (qty<=2) new:    ${lowStockNewCount}`);
@@ -1002,8 +1150,13 @@ async function main() {
     )
     .join(",\n    ");
 
+  // Every legacy row, not only the unplaced ones. The bin PLAN is derived from
+  // all 861 rows' demand every run (see the note above the plan), so applying
+  // it to only the 461 new rows left the other 400 frozen wherever a previous
+  // run's packing happened to drop them -- the DB could not converge on the
+  // plan the script had just printed. The WHERE clause below, not this list,
+  // is what protects a row the script did not place.
   const legacyBinUpdateValues = legacyItems
-    .filter((i) => i.needsBinId)
     .map((i) => `(${sqlLiteral(i.id)}::uuid, ${sqlLiteral(i.binId)}::uuid)`)
     .join(",\n    ");
 
@@ -1058,8 +1211,18 @@ on conflict (id) do update set
   sort_order = excluded.sort_order,
   updated_at = now();
 
--- 2. Backfill bin_id on the 400 legacy rows that had a section but no bin
---    (only where bin_id is currently NULL -- never touches an already-placed row).
+-- 2. Place the legacy rows on the plan written above.
+--    This used to fire only where bin_id was NULL, on the reasoning that an
+--    already-placed row must never be moved. That reads as caution but was
+--    the opposite: the plan is recomputed from ALL rows' demand every run, so
+--    freezing the placed rows meant the tenant could never actually reach the
+--    plan the script had just printed -- the first run's packing became
+--    permanent, and re-running converged on nothing.
+--    The protection that was actually wanted is kept, and stated precisely:
+--    move a row only when it is unplaced, or when the bin it currently sits in
+--    is one this script laid down itself (this tenant, a plan zone, and the
+--    ZONE-LETTER + two-digit code shape buildBinsForZone emits). A bottle
+--    placed anywhere else came from somewhere else and is left exactly alone.
 ${
   legacyBinUpdateValues
     ? `update public.inventory_items i
@@ -1069,7 +1232,17 @@ from (values
 ) as v(id, bin_id)
 where i.id = v.id
   and i.restaurant_id = '${RESTAURANT_ID}'::uuid
-  and i.bin_id is null;`
+  and i.bin_id is distinct from v.bin_id
+  and (
+    i.bin_id is null
+    or exists (
+      select 1 from public.bins own
+      where own.id = i.bin_id
+        and own.restaurant_id = i.restaurant_id
+        and own.zone in (${SECTION_NAMES.map((z) => sqlLiteral(z)).join(",")})
+        and own.code ~ '^[A-Z][0-9]{1,2}$'
+    )
+  );`
     : "-- (nothing to backfill)"
 }
 
@@ -1120,16 +1293,22 @@ where b.id = i.bin_id
   and i.restaurant_id = '${RESTAURANT_ID}'::uuid
   and i.bin_location is null;
 
--- 6. Repoint STALE bin_location strings, and only stale ones.
---    The 400 legacy rows carry codes from a bin scheme that predates the
---    bins table ("I9", "J14", "K3") — none of those strings matches any row
---    in public.bins, so the cellar badge names a bin that does not exist
---    while /bins reports the real one, and the two screens disagree about
---    the same bottle. Rewriting a value rather than filling a NULL is a
---    deliberate exception to step 5's rule, so it is fenced twice: the row's
---    current text must resolve to NO bin in this tenant, and the bin_id it
---    actually points at must resolve to one. A hand-placed location that
---    names a real bin is never touched.
+-- 6. Repoint bin_location that disagrees with the bin the row is actually in.
+--    Two sources of disagreement, and the fence has to admit both:
+--      (a) the 400 legacy rows carry codes from a scheme that predates the
+--          bins table ("I9", "J14", "K3"), matching no row in public.bins; and
+--      (b) step 2 above moves rows between real bins, so a row can be sitting
+--          in O31 while its text still reads O03 — a code that resolves
+--          perfectly well, just not to this bottle's bin.
+--    The original fence ("the current text must resolve to NO bin") caught (a)
+--    and silently passed (b), which is the worse of the two: a badge naming a
+--    bin that exists but holds something else is harder to spot than one
+--    naming a bin that does not exist at all, and /cellar and /bins would
+--    disagree about the same bottle either way.
+--    So the rule is the invariant itself — bin_location follows bin_id — and
+--    what it is fenced on is WHOSE bin the row sits in: only bins this script
+--    laid down (same shape test as step 2). A bottle in a bin from anywhere
+--    else keeps whatever location a human gave it.
 update public.inventory_items i
 set bin_location = b.code, updated_at = now()
 from public.bins b
@@ -1137,11 +1316,25 @@ where b.id = i.bin_id
   and i.restaurant_id = '${RESTAURANT_ID}'::uuid
   and i.bin_location is not null
   and i.bin_location <> b.code
-  and not exists (
-    select 1 from public.bins stale
-    where stale.restaurant_id = i.restaurant_id
-      and stale.code = i.bin_location
-  );
+  and b.restaurant_id = i.restaurant_id
+  and b.zone in (${SECTION_NAMES.map((z) => sqlLiteral(z)).join(",")})
+  and b.code ~ '^[A-Z][0-9]{1,2}$';
+
+-- 6b. Prune bins no longer in the plan, AFTER every row has been moved onto
+--     the bins that are. Order matters: this runs last of the bin steps so a
+--     single run can finish the job. Sited before step 2 it could only ever
+--     delete bins that were ALREADY empty when the run started, which left
+--     the ones this run itself emptied -- every bin from a superseded layout
+--     -- sitting there until somebody ran the script a second time.
+--     Four-way fenced, and the fence is the DELETE's own, not a list of ids
+--     computed earlier: this tenant, absent from the plan written above,
+--     holding nothing, and carrying this script's rack code shape so a bin
+--     some other tool created is out of reach. A row that gained stock while
+--     this transaction ran is protected by the emptiness test itself.
+--     inventory_items.bin_id is ON DELETE SET NULL, so even a miss here could
+--     only unplace a bottle, never delete one -- but "empty" makes it moot.
+delete from public.bins b
+where ${binPruneWhere};
 
 -- 7. "By the Glass" wine_list_items for the real wines being opened below --
 --    /cellar/reconcile (list_open_bottle_items, migration 0017) only lists a

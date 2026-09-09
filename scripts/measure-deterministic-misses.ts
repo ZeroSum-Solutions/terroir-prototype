@@ -46,7 +46,7 @@ const counts: Record<Bucket, number> = { answered: 0, partial: 0, tier2: 0, tier
 for (const r of rows) counts[r.bucket] += 1;
 
 // ── Print the table ────────────────────────────────────────────────────
-console.log("Deterministic miss corpus — 180 cases, LOCAL SEED - Osteria Scala\n");
+console.log("Deterministic miss corpus — 180 cases, Osteria Scala\n");
 console.log("classification".padEnd(16), "count", "pct");
 for (const b of BUCKET_ORDER) {
   console.log(b.padEnd(16), String(counts[b]).padEnd(6), `${((counts[b] / cases.length) * 100).toFixed(1)}%`);
@@ -243,7 +243,7 @@ push(
     "should produce) runs through both parsers via `measureCase()` " +
     "(`src/lib/wine-intelligence/deterministic-coverage.ts`), against " +
     "`src/lib/wine-intelligence/fixtures/demo-tenant-vocabulary.json` — the ACTUAL distinct country/region/" +
-    `grape values of the "LOCAL SEED - Osteria Scala" demo tenant (${(vocabularyFixture as { wineCount: number }).wineCount} wines, ` +
+    `grape values of the "Osteria Scala" demo tenant (${(vocabularyFixture as { wineCount: number }).wineCount} wines, ` +
     `${vocabulary.country.length} countries, ${vocabulary.region.length} regions, ${vocabulary.grape.length} grape values), ` +
     "built exactly the way `GET /api/assistant` builds it, measured on the local loopback stack. A field " +
     "counts as recovered if EITHER parser produces it — the two entry points cover different ground (search " +

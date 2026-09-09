@@ -16,7 +16,7 @@
  *   2. Even once confirmed, the account owned a restaurant of its own —
  *      auto-provisioned by handle_new_user() on first sign-up, and empty.
  *      The 250 seeded wines, 400 inventory items, lists, scans and pour
- *      history all belong to "LOCAL SEED - Osteria Scala"
+ *      history all belong to "Osteria Scala"
  *      (de100000-0000-4000-8000-000000000001), which this account was not a
  *      member of. Logging in would have opened a working app with nothing
  *      in it.

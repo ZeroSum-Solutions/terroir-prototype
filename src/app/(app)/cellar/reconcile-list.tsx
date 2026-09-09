@@ -36,10 +36,13 @@ const badgeToneClasses = {
   neutral: "bg-wash text-grey",
 } as const;
 
-const flaggedCardClasses = {
-  positive: "border-ready-ink/30 bg-ready-wash",
-  negative: "border-risk-ink/40 bg-risk-wash",
-  neutral: "border-rule bg-surface",
+// A flagged count is marked in the margin the way a ledger marks a
+// discrepancy: a rule down the left edge and a wash behind the row. A full
+// bordered card only reads as "flagged" while its neighbours are cards too.
+const flaggedRowClasses = {
+  positive: "border-l-2 border-ready-ink bg-ready-wash",
+  negative: "border-l-2 border-risk-ink bg-risk-wash",
+  neutral: "border-l-2 border-rule-strong bg-wash",
 } as const;
 
 type PendingChange = { newRemainingMl: number; note?: string };
@@ -126,7 +129,7 @@ export function ReconcileList({
 
   if (initialItems.length === 0) {
     return (
-      <div className="rounded-card card-surface px-md py-lg text-center text-[13px] text-grey">
+      <div className="border-y border-rule px-md py-lg text-center text-body-sm text-grey">
         No open bottles to reconcile. Open one by pouring a glass.
       </div>
     );
@@ -156,7 +159,9 @@ export function ReconcileList({
 
       <fieldset disabled={busy} className="min-w-0">
       <legend className="sr-only">Actual remaining volume for each open bottle</legend>
-      <ul className="flex flex-col gap-md">
+      {/* Hairline-divided rows on paper, as on /cellar. Detached cards over a
+          gap-md gutter stretched a twelve-bottle count by half a screen. */}
+      <ul className="-mx-md divide-y divide-rule border-y border-rule md:mx-0">
         {initialItems.map((item) => (
           <ReconcileRow
             key={item.wine_id}
@@ -224,13 +229,7 @@ function ReconcileRow({
   const isVarianceFlagged = pending !== null && Math.abs(varianceOz) > varianceThresholdOz;
 
   return (
-    <li
-      className={`rounded-card p-md ${
-        isVarianceFlagged
-          ? `border ${flaggedCardClasses[tone]}`
-          : "card-surface"
-      }`}
-    >
+    <li className={`px-md py-md ${isVarianceFlagged ? flaggedRowClasses[tone] : ""}`}>
       <div className="mb-sm">
         <div className="flex items-start justify-between gap-sm">
           <div className="min-w-0">

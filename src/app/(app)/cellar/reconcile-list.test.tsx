@@ -88,7 +88,7 @@ describe("ReconcileList variance presentation", () => {
       actual: 130,
       copy: varianceCopy(20, "over expected"),
       badgeTone: "bg-ready-wash",
-      cardClasses: ["card-surface"],
+      rowClasses: [],
     },
     {
       name: "subthreshold under",
@@ -96,7 +96,7 @@ describe("ReconcileList variance presentation", () => {
       actual: 90,
       copy: varianceCopy(-20, "under expected"),
       badgeTone: "bg-risk-wash",
-      cardClasses: ["card-surface"],
+      rowClasses: [],
     },
     {
       name: "exact",
@@ -104,7 +104,7 @@ describe("ReconcileList variance presentation", () => {
       actual: 110,
       copy: varianceCopy(0, "exact"),
       badgeTone: "bg-wash",
-      cardClasses: ["card-surface"],
+      rowClasses: [],
     },
     {
       name: "zero expected without a flagged card",
@@ -112,7 +112,7 @@ describe("ReconcileList variance presentation", () => {
       actual: 20,
       copy: varianceCopy(20, "over expected"),
       badgeTone: "bg-ready-wash",
-      cardClasses: ["card-surface"],
+      rowClasses: [],
     },
     {
       name: "flagged over",
@@ -120,7 +120,7 @@ describe("ReconcileList variance presentation", () => {
       actual: 170,
       copy: varianceCopy(60, "over expected"),
       badgeTone: "bg-ready-wash",
-      cardClasses: ["border-ready-ink/30", "bg-ready-wash"],
+      rowClasses: ["border-l-2", "border-ready-ink", "bg-ready-wash"],
     },
     {
       name: "flagged under",
@@ -128,9 +128,9 @@ describe("ReconcileList variance presentation", () => {
       actual: 50,
       copy: varianceCopy(-60, "under expected"),
       badgeTone: "bg-risk-wash",
-      cardClasses: ["border-risk-ink/40", "bg-risk-wash"],
+      rowClasses: ["border-l-2", "border-risk-ink", "bg-risk-wash"],
     },
-  ])("renders $name truthfully", async ({ expected, actual, copy, badgeTone, cardClasses }) => {
+  ])("renders $name truthfully", async ({ expected, actual, copy, badgeTone, rowClasses }) => {
     const fixture = { ...item, open_remaining_ml: expected };
     await act(async () => root.render(<ReconcileList initialItems={[fixture]} {...ids} />));
     const input = container.querySelector<HTMLInputElement>(
@@ -141,8 +141,13 @@ describe("ReconcileList variance presentation", () => {
     setInputValue(input, actual);
     const badge = findElementByText(container, copy);
     expect(badge.className).toContain(badgeTone);
-    const card = badge.closest("li")!;
-    for (const className of cardClasses) expect(card.className).toContain(className);
+    const row = badge.closest("li")!;
+    for (const className of rowClasses) expect(row.className).toContain(className);
+    // The rows are hairline-divided index entries now, not cards, so the left
+    // margin flag is the ONLY thing separating a flagged row from an ordinary
+    // one. Assert its absence explicitly: without this, the four subthreshold
+    // cases would pass just as happily against a row that shouted.
+    if (rowClasses.length === 0) expect(row.className).not.toContain("border-l-2");
   });
 });
 

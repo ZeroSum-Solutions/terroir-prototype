@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronDown } from "lucide-react";
 import { getAuthContext } from "@/lib/auth-context";
+import { isLocalSupabaseTarget } from "@/lib/local-stack";
 import { RestaurantProvider } from "@/lib/context/restaurant";
 import { SettingsDropdown } from "./settings-dropdown";
 import { AssistantPanel } from "./assistant-panel";
 import { SearchPalette } from "./search/search-palette";
-import { SearchEverywhere } from "./search-everywhere";
 import { DesktopNavLinks, MobileNavLinks } from "./nav-links";
 import { Fab } from "./fab";
 import { ToastWrapper } from "./toast-wrapper";
@@ -21,6 +20,7 @@ export default async function AppLayout({
   if (!auth) redirect("/login");
 
   const { restaurantId, restaurantName, userRole, user } = auth;
+  const onLocalStack = isLocalSupabaseTarget();
 
   return (
     <RestaurantProvider restaurantId={restaurantId} restaurantName={restaurantName} userRole={userRole}>
@@ -52,8 +52,7 @@ export default async function AppLayout({
             not a role pill squeezed into a fixed-px cap: the old ShellContext
             capped this at max-w-[112px] regardless of what the wordmark and
             icon cluster actually left unclaimed, so a real tenant name
-            ("LOCAL SEED - Osteria Scala") truncated to "LOCAL SE…" well
-            short of the row's real width. flex-1/min-w-0 lets it claim
+            truncated well short of the row's real width. flex-1/min-w-0 lets it claim
             whatever space its shrink-0 siblings don't need instead of a
             number picked with neither in view. The role pill is dropped —
             the board doesn't carry one, and the space it cost is exactly
@@ -61,10 +60,31 @@ export default async function AppLayout({
             same string in full is going away with it; see the handoff for
             which routes still carry one outside this file. */}
         <div className="ml-sm flex min-w-0 flex-1 items-center gap-3xs border-l border-rule pl-sm md:ml-md md:pl-md">
-          <span className="min-w-0 truncate text-caption font-medium text-ink md:text-ledger">
+          {/* text-ledger at every width, not text-caption on phones. The
+              caption token carries 0.18em of tracking, which is right for the
+              uppercase eyebrows it was made for and wrong for a proper noun:
+              it spread a 13-character restaurant name over ~112px of a 390px
+              header and truncated it. The same name in ledger, one pixel
+              larger and untracked, is ~85px and fits whole. */}
+          <span className="min-w-0 truncate text-ledger font-medium text-ink">
             {restaurantName?.trim() || "Unnamed restaurant"}
           </span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-grey" strokeWidth={2} aria-hidden />
+          {/* Which database am I looking at? That question used to be answered
+              by the demo tenant's own name — the local seed called itself
+              "LOCAL SEED - Osteria Scala" — which meant the answer only
+              existed if someone had remembered to prefix the row, cost the
+              header its whole width on a phone, and told an investor the
+              prototype was test data. It is derived from the connection now
+              (src/lib/local-stack.ts): it cannot be renamed away, and it can
+              never appear on a hosted deployment. */}
+          {onLocalStack && (
+            <span
+              title="Connected to a local Supabase stack, not hosted data"
+              className="shrink-0 rounded-sm border border-risk-ink/40 px-3xs py-2xs text-micro font-medium uppercase text-risk-ink"
+            >
+              Local
+            </span>
+          )}
         </div>
 
         {/* Desktop nav */}
@@ -72,23 +92,16 @@ export default async function AppLayout({
           <DesktopNavLinks role={userRole} />
         </nav>
 
-        {/* GLOBAL-02 — search reachable from the header on every page.
-            Desktop has room for the field itself, inline, in the header's
-            unclaimed middle. At 390px there is no such room once the brand,
-            the restaurant identity and the icon cluster are placed, so
-            mobile collapses it to the icon in that cluster below
-            (search-everywhere.tsx) — tapping it opens the same palette
-            rather than giving it a permanent full-width band under the
-            header on every route, including the ones with no search need
-            of their own (/bins, /insights) or their own field already
-            (/cellar). */}
+        {/* GLOBAL-02 — the search field is at the top of every page.
+            Desktop has room for it inline, in the header's unclaimed middle;
+            390px does not, so the phone gets the band below the header
+            instead. Both are this same SearchPalette, one per breakpoint. */}
         <SearchPalette className="mx-lg hidden min-w-0 max-w-[360px] flex-1 md:block" />
 
         <div className="ml-auto flex shrink-0 items-center gap-sm md:gap-md">
           <span className="hidden text-ledger font-light tabular text-grey md:inline">
             {user.email}
           </span>
-          <SearchEverywhere />
           {/* In the header, not the FAB: the FAB is mobile-only and hidden on
               /scan, /login and /atlas, and the assistant is useful on all of
               them. The header renders on every authenticated page. */}
@@ -96,6 +109,24 @@ export default async function AppLayout({
           <SettingsDropdown />
         </div>
       </header>
+
+      {/* Mobile placement of the same field, restored. The Cellar Index pass
+          replaced this band with a search ICON in the header cluster, on the
+          reasoning that 390px has no room for a permanent field once the
+          brand, tenant and controls are placed, and that /bins and /insights
+          have no search need of their own. Both points are true and neither
+          is the requirement: GLOBAL-02 asks for search AT THE TOP OF EVERY
+          PAGE, and e2e/global-search.test.ts asserts a visible field under
+          the header on a phone in as many words. An icon that opens the same
+          palette is a menu item, which is the thing that assertion names as
+          the failure. Sticky rather than fixed: in flow it reserves its own
+          height, so nothing downstream has to know its size to clear it. */}
+      <div
+        className="sticky z-[var(--z-sticky)] border-b border-rule bg-canvas px-md py-sm md:hidden"
+        style={{ top: "var(--chrome-header-total)" }}
+      >
+        <SearchPalette />
+      </div>
 
       {/* Content — mobile bottom padding clears the tab bar AND the FAB,
           whose top edge sits ~136px above the viewport bottom (80px offset

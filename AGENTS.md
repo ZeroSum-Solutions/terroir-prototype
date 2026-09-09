@@ -172,7 +172,7 @@ red. Correct their drift in place if you correct it at all; do not relocate them
   That has already happened on this checkout — measured 2026-08-30, full migration
   set applied: the `My Restaurant` tenant holds **1,277 wines with a blank
   `producer`, a null `colour`, and a null `hero_image_url`**, alongside the
-  250-wine `LOCAL SEED - Osteria Scala` demo set. If your local numbers look like
+  250-wine `Osteria Scala` demo set. If your local numbers look like
   the pre-`0137` production ones, that is the expected outcome, not a broken
   checkout — it is the data the import-time guard above was built for, and it
   is still there: the guard stops the NEXT one, it repairs nothing.

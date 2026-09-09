@@ -375,14 +375,29 @@ test.describe("@mobile-wine-detail tapping a wine shows the wine, at 390px", () 
     const restaurantId = await resolveRestaurantId();
     expect(restaurantId).toBe(DEMO_RESTAURANT_ID);
     const admin = adminClient();
-    const { data, error } = await admin
-      .from("wines")
-      .select(
-        "id, name, producer, vintage, region, country, varietal, size_ml, hero_image_url",
-      )
-      .in("restaurant_id", [restaurantId, PRODSHAPE_RESTAURANT_ID]);
-    if (error) throw error;
-    winesById = new Map((data ?? []).map((wine) => [wine.id, wine as WineFacts]));
+    // Page to exhaustion. PostgREST caps one response at db.max_rows (1000 —
+    // supabase/config.toml), and it truncates SILENTLY: no error, just fewer
+    // rows. The two fixture tenants together now hold ~1350 wines, so a single
+    // unranged read dropped ~350 of them and every test here failed as
+    // "wine <id> is not in the dev tenant" — the map was short, not the tenant.
+    // This is the same cap, and the same fix, as the cellar page's own reads
+    // (src/app/(app)/cellar/page.pagination.test.ts).
+    const PAGE = 1000;
+    const wines: WineFacts[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await admin
+        .from("wines")
+        .select(
+          "id, name, producer, vintage, region, country, varietal, size_ml, hero_image_url",
+        )
+        .in("restaurant_id", [restaurantId, PRODSHAPE_RESTAURANT_ID])
+        .order("id")
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      wines.push(...((data ?? []) as WineFacts[]));
+      if ((data ?? []).length < PAGE) break;
+    }
+    winesById = new Map(wines.map((wine) => [wine.id, wine]));
     expect(
       winesById.size,
       "the dev tenant has no wines — seed the local stack first",

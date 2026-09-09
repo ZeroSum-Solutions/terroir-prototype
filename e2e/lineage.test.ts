@@ -123,12 +123,7 @@ test.describe("@opp-1 vintage lineage", () => {
   test("EV-1.1: siblings render as one expandable lineage block with per-vintage rows", async ({ page }) => {
     await login(page);
     await page.goto("/cellar");
-    await page
-      .getByPlaceholder("Search name, producer, region…")
-      .fill(PRODUCER);
-
-    const block = page.locator("[data-lineage-id]", { hasText: PRODUCER });
-    await expect(block).toHaveCount(1);
+    const block = await filterCellarToLineage(page, PRODUCER);
 
     const rollup = block.locator("[data-lineage-rollup]");
     await expect(rollup).toContainText("3 wines");
@@ -164,12 +159,7 @@ test.describe("@opp-1 vintage lineage", () => {
   test("EV-1.2: duplicate suspects are chipped and merge combines stock", async ({ page }) => {
     await login(page);
     await page.goto("/cellar");
-    await page
-      .getByPlaceholder("Search name, producer, region…")
-      .fill(PRODUCER);
-
-    const block = page.locator("[data-lineage-id]", { hasText: PRODUCER });
-    await expect(block).toHaveCount(1);
+    const block = await filterCellarToLineage(page, PRODUCER);
     await expandLineage(block);
     await expect(
       block.locator("[data-duplicate-suspect]").first(),
@@ -240,6 +230,34 @@ test.describe("@opp-1 vintage lineage", () => {
     expect(data).toHaveLength(2);
   });
 });
+
+/**
+ * Type the producer into the cellar search and wait for its lineage block.
+ *
+ * A bare `fill()` here was a race, not a step. /cellar server-renders the whole
+ * cellar and the search input only starts filtering once React has hydrated it;
+ * a fill that lands before that sets the DOM value React then discards on
+ * hydration, so the list never narrows and the block never appears. It went
+ * unnoticed while the demo tenant held a couple of hundred wines and hydration
+ * beat Playwright; at the tenant's real size (~700) it lost often enough that
+ * EV-1.1 and EV-1.2 failed on alternating runs — the same defect, and the same
+ * fix, as the search in pour-flow.test.ts.
+ *
+ * Retry the fill until BOTH halves hold: the value survived in the input, and
+ * the filtered list actually contains the block. Asserting only the second
+ * would pass on a stale full list that happens to contain it anyway.
+ */
+async function filterCellarToLineage(page: Page, producer: string) {
+  const search = page.getByPlaceholder("Search name, producer, region…");
+  await expect(search).toBeVisible();
+  const block = page.locator("[data-lineage-id]", { hasText: producer });
+  await expect(async () => {
+    await search.fill(producer);
+    await expect(search).toHaveValue(producer);
+    expect(await block.count()).toBe(1);
+  }).toPass({ timeout: 20_000 });
+  return block;
+}
 
 async function expandLineage(block: ReturnType<Page["locator"]>) {
   const header = block.locator("[data-lineage-header]");

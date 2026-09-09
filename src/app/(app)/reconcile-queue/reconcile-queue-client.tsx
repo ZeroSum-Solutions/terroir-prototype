@@ -187,16 +187,24 @@ function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueRespo
  *
  * The read-out was the control to lose: "Accept 51 items" already states the
  * selected count, on the button that acts on it, so the standalone span was
- * the same number a second time. Two controls, 305px, one line — and the label
- * only grows one digit at a time from here.
+ * the same number a second time. Two controls, one line — and the label only
+ * grows one digit at a time from here.
+ *
+ * The two survivors then wrapped anyway when the Cellar Index redesign swapped
+ * the sans face for Inter, which sets the same 13px labels wider: 161px + 153px
+ * against the 310px the 390px frame leaves once the page gutter, the rail's own
+ * padding and the gap are taken out. Four pixels. The labels are both load-
+ * bearing (one names what gets selected, the other what gets accepted), so the
+ * padding gave way instead — px-xs on the ghost toggle, px-sm on the primary.
+ * That leaves ~16px of slack, which is what a third digit in either count costs.
  */
 function BulkRail({ busy, selectedCount, readyCount, allReadySelected, accept, toggleAll }: { busy: boolean; selectedCount: number; readyCount: number; allReadySelected: boolean; accept: () => void; toggleAll: () => void }) {
   return (
     <div data-bulk-rail className="glass sticky bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))] z-[var(--z-sticky)] mt-md flex flex-wrap items-center justify-between gap-sm rounded-lg px-sm py-sm md:bottom-md md:px-md">
-      <button type="button" onClick={toggleAll} disabled={busy || readyCount === 0} className="h-11 rounded-pill px-sm text-[13px] font-medium text-grey hover:bg-wash focus-ring disabled:opacity-40">
+      <button type="button" onClick={toggleAll} disabled={busy || readyCount === 0} className="h-11 rounded-pill px-xs text-[13px] font-medium text-grey hover:bg-wash focus-ring disabled:opacity-40">
         {allReadySelected ? "Clear actionable" : `Select actionable (${readyCount})`}
       </button>
-      <button type="button" onClick={accept} disabled={busy || selectedCount === 0} className="flex h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-45">
+      <button type="button" onClick={accept} disabled={busy || selectedCount === 0} className="flex h-11 items-center gap-xs rounded-pill bg-primary px-sm text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-45">
         {busy ? <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.75} aria-hidden /> : <Check className="h-4 w-4" strokeWidth={2} aria-hidden />}
         Accept {selectedCount} item{selectedCount === 1 ? "" : "s"}
       </button>

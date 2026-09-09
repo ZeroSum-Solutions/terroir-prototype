@@ -218,7 +218,7 @@ function buildRows(userIds = DRY_USER_IDS) {
 
   const restaurant = {
     id: RESTAURANT_ID,
-    name: "LOCAL SEED - Osteria Scala",
+    name: "Osteria Scala",
     logo_url: null,
     auto_eightysix_from_inventory: true,
     eightysix_ml_threshold: 180,
@@ -701,7 +701,7 @@ async function ensureUsers(supabase) {
       email_confirm: true,
       user_metadata: {
         full_name: `Local ${seedUser.role}`,
-        restaurant_name: "LOCAL SEED - Osteria Scala",
+        restaurant_name: "Osteria Scala",
       },
     });
     if (error) throw error;

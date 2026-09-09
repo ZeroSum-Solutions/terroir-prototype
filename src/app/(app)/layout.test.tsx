@@ -30,9 +30,6 @@ vi.mock("./search/search-palette", () => ({
     <input data-global-search="true" type="search" className={className} />
   ),
 }));
-vi.mock("./search-everywhere", () => ({
-  SearchEverywhere: () => <button data-search-everywhere="true">Search</button>,
-}));
 vi.mock("./nav-links", () => ({
   DesktopNavLinks: () => <span data-desktop-nav="true">Desktop nav</span>,
   MobileNavLinks: () => <span data-mobile-nav="true">Mobile nav</span>,
@@ -66,7 +63,9 @@ describe("AppLayout header", () => {
     expect(root.querySelector("header")?.textContent).toContain("Bar Norman");
     expect(settings.parentElement?.className).toContain("ml-auto");
     expect(settings.parentElement?.className).toContain("shrink-0");
-    expect(root.querySelector('[data-search-everywhere="true"]')).not.toBeNull();
+    // Search renders twice, once per breakpoint: the header field (md:block)
+    // and the band beneath it (md:hidden). Both are the same SearchPalette.
+    expect(root.querySelectorAll('[data-global-search="true"]')).toHaveLength(2);
     expect(root.querySelector('[data-desktop-nav="true"]')).not.toBeNull();
     expect(root.querySelector('[data-mobile-nav="true"]')).not.toBeNull();
     expect(root.querySelector("header")?.parentElement?.className).toContain(

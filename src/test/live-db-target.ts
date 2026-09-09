@@ -12,20 +12,14 @@
 // An allow-list, not a deny-list of known production hosts: a host this guard
 // has never heard of must still be refused, or it would only protect against
 // the names someone remembered to enumerate.
-const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1"]);
+//
+// The predicate itself lives in src/lib/local-stack.ts because the app now
+// renders a "LOCAL" badge off the same answer. One definition of "local", not
+// two that can drift: the badge and this kill switch must never disagree
+// about which database this process is holding.
+export { isLoopbackDbUrl } from "@/lib/local-stack";
 
-export function isLoopbackDbUrl(rawUrl: string): boolean {
-  let hostname: string;
-  try {
-    // Parse rather than substring-match: "https://evil.test/?h=127.0.0.1"
-    // contains a loopback address but does not point at one.
-    hostname = new URL(rawUrl).hostname;
-  } catch {
-    return false;
-  }
-  // WHATWG URL renders IPv6 hosts bracketed ("[::1]"); compare the address.
-  return LOOPBACK_HOSTNAMES.has(hostname.replace(/^\[|\]$/g, ""));
-}
+import { isLoopbackDbUrl } from "@/lib/local-stack";
 
 export function assertLiveDbTargetIsLocal(rawUrl: string): void {
   if (isLoopbackDbUrl(rawUrl)) return;

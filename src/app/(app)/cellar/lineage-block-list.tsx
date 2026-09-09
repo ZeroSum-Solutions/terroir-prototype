@@ -111,7 +111,11 @@ export function LineageBlockList({
               data-lineage-header
               onClick={() => toggle(block.lineageId)}
               aria-expanded={!collapsed.has(block.lineageId)}
-              className="flex w-full items-center gap-sm px-md py-sm text-left bg-surface-sunken hover:bg-rule-strong/60 transition-colors"
+              // Concept A: the rollup header is a line in the index, not a
+              // beige band across it. No filled surface, one hairline closing
+              // it off from the vintages beneath, and hover tints the paper
+              // rather than darkening a band that was already darker.
+              className="flex w-full items-center gap-sm border-b border-rule px-md py-sm text-left transition-colors hover:bg-wash"
             >
               <ChevronDown
                 className={cn(
@@ -122,16 +126,16 @@ export function LineageBlockList({
                 aria-hidden
               />
               <span className="min-w-0 flex-1">
-                <span className="block text-[10.5px] font-medium uppercase tracking-[0.18em] text-ink-soft">
+                <span className="block text-caption font-medium uppercase text-ink-soft">
                   {block.producer}
                 </span>
-                <span className="block truncate font-serif text-[17px] font-medium text-ink">
+                <span className="block truncate font-serif text-body-lg font-medium text-ink">
                   {wineDisplayName(block.producer, block.name)}
                 </span>
               </span>
               <span
                 data-lineage-rollup
-                className="tabular inline-flex shrink-0 items-center rounded-pill bg-surface/70 px-sm py-2xs text-[11px] font-medium text-ink-soft"
+                className="tabular shrink-0 text-ledger text-grey"
               >
                 {block.rows.length} wines
                 {block.span ? ` · ${block.span[0]}–${block.span[1]}` : ""}

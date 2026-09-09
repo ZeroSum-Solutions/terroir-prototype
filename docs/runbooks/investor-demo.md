@@ -59,7 +59,7 @@ and corrected on 2026-09-01 (cellar sections, scan statuses, guest-menu names). 
 re-seed chain at the bottom of this file takes hours and is for a fresh machine.
 
 Then open http://127.0.0.1:3000 and hit **`/api/dev-login`** once — it signs in as
-`DEV_BYPASS_EMAIL` and drops you in *LOCAL SEED - Osteria Scala*, the venue that
+`DEV_BYPASS_EMAIL` and drops you in *Osteria Scala*, the venue that
 holds the data.
 
 ### Two surfaces, one script
