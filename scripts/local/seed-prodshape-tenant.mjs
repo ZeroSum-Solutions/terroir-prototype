@@ -4,7 +4,7 @@
  *
  * ── WHY ────────────────────────────────────────────────────────────────────
  *
- * `scripts/seed-local-supabase.mjs` builds `LOCAL SEED - Osteria Scala`, and
+ * `scripts/seed-local-supabase.mjs` builds `Osteria Scala`, and
  * that tenant is the best case on every axis a wine renders on: 250 wines,
  * 250 hero photographs, 0 blank producers, 250 spine links. Production is the
  * worst case on all four — 1,385 wines, ONE photograph, 321 blank producers,
@@ -93,7 +93,7 @@ const DEMO_RESTAURANT_ID =
 const RESTAURANT_ID = "de200000-0000-4000-8000-000000000001";
 const RESTAURANT_NAME = "LOCAL PRODSHAPE - Trattoria Bianca";
 
-/** Older than any `LOCAL SEED` membership, which the base seeder writes at now(). */
+/** Older than any `Osteria Scala` membership, which the base seeder writes at now(). */
 const MEMBERSHIP_CREATED_AT = "2026-01-05T00:00:00.000Z";
 
 const UUID_PREFIX = {

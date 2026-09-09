@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth-context";
 import { DollarSign, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { RouteDataEmpty } from "@/components/route-data-state";
+import { PriceComparisonMasthead } from "./price-comparison-masthead";
 import { SortControls } from "./sort-controls";
 import {
   ExportCsvButton,
@@ -42,7 +43,7 @@ export default async function PriceComparisonPage({
     ? Math.min(500, Math.max(25, Math.floor(rawLimit)))
     : 25;
   const auth = (await getAuthContext())!; // AppLayout redirects when null
-  const { supabase, restaurantId: rid } = auth;
+  const { supabase, restaurantId: rid, restaurantName } = auth;
 
   // Fetch inventory items with wine retail data + invoice scan details
   const { data: items, error: itemsError } = await supabase
@@ -226,14 +227,7 @@ export default async function PriceComparisonPage({
   if (comparisons.length === 0) {
     return (
       <section>
-        <header className="mb-xl">
-          <h1 className="font-serif text-heading-sm text-ink">
-            Distributor Pricing
-          </h1>
-          <p className="mt-xs text-body text-grey">
-            Compare prices across suppliers
-          </p>
-        </header>
+        <PriceComparisonMasthead tenant={restaurantName} />
         <RouteDataEmpty
           icon={<DollarSign className="h-6 w-6" strokeWidth={1.5} />}
           title="Scan invoices to compare prices"
@@ -254,25 +248,17 @@ export default async function PriceComparisonPage({
 
   return (
     <section>
-      <header className="mb-xl md:mb-3xl">
-        <div className="flex items-start justify-between gap-md">
-          <div>
-            <h1 className="font-serif text-heading-sm text-ink">
-              Distributor Pricing
-            </h1>
-            <p className="mt-xs text-body text-grey">
-              Compare prices across suppliers
-            </p>
-          </div>
-          <ExportCsvButton rows={csvRows} />
-        </div>
-      </header>
+      <PriceComparisonMasthead
+        tenant={restaurantName}
+        count={comparisons.length}
+        action={<ExportCsvButton rows={csvRows} />}
+      />
 
       {retailError && (
         <div
           role="status"
           aria-live="polite"
-          className="mb-lg rounded-card card-surface px-md py-sm text-body-sm text-grey"
+          className="glass mb-lg rounded-card px-md py-sm text-body-sm text-grey"
         >
           Market benchmarks are temporarily unavailable. Distributor pricing
           remains available.
@@ -285,7 +271,7 @@ export default async function PriceComparisonPage({
       {comparable.length > 0 && (
         <div className="mb-xl md:mb-3xl">
           <div className="mb-md flex items-center justify-between">
-            <h2 className="text-body font-semibold text-ink">Price comparisons</h2>
+            <h2 className="text-caption font-medium uppercase text-grey">Price comparisons</h2>
             <SortControls current={{ field: sf, dir: so }} />
           </div>
 
@@ -297,7 +283,7 @@ export default async function PriceComparisonPage({
       {/* Single-source wines */}
       {singleSource.length > 0 && (
         <div>
-          <h2 className="mb-md text-body font-medium text-grey">
+          <h2 className="mb-md text-caption font-medium uppercase text-grey">
             Single source ({singleSource.length})
           </h2>
 
@@ -308,7 +294,7 @@ export default async function PriceComparisonPage({
       {hasMoreComparisons && (
         <Link
           href={`/price-comparison?${showMoreParams.toString()}`}
-          className="mt-lg inline-flex min-h-11 w-full items-center justify-center rounded-pill border border-rule bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
+          className="mt-lg inline-flex min-h-11 w-full items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
         >
           Show {Math.min(25, comparisons.length - visibleComparisonCount)} more ·{" "}
           {visibleComparisonCount} of {comparisons.length}

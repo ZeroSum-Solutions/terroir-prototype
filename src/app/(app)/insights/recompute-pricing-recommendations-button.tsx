@@ -54,12 +54,12 @@ export function RecomputePricingRecommendationsButton({
         type="button"
         onClick={recompute}
         disabled={busy || blocked}
-        className="inline-flex h-11 items-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-60"
+        className="inline-flex h-11 items-center rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring disabled:opacity-60"
       >
         {busy ? "Recomputing…" : "Recompute"}
       </button>
-      {blocked && <p className="text-[11px] text-grey">{blockedReason}</p>}
-      {error && <p role="alert" className="text-[12px] text-risk-ink">{error}</p>}
+      {blocked && <p className="text-ledger text-grey">{blockedReason}</p>}
+      {error && <p role="alert" className="text-ledger text-risk-ink">{error}</p>}
     </div>
   );
 }

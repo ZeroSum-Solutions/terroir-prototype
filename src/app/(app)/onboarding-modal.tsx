@@ -1,73 +1,19 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRef } from "react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { RestaurantNameForm } from "./restaurant-name-form";
 
-export function OnboardingModal({
-  restaurantId,
-}: {
-  restaurantId: string;
-}) {
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
+export function OnboardingModal({ restaurantId }: { restaurantId: string }) {
   const trapRef = useRef<HTMLDivElement>(null);
-  useFocusTrap({ containerRef: trapRef, onEscape: () => router.refresh() });
-
-  const submit = useCallback(async () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/restaurant/${restaurantId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      if (res.ok) {
-        router.refresh();
-      }
-    } finally {
-      setSaving(false);
-    }
-  }, [name, restaurantId, router]);
-
+  useFocusTrap({ containerRef: trapRef, onEscape: () => {} });
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim px-md"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="onboarding-title"
-    >
-      <div ref={trapRef} className="w-full max-w-[400px] rounded-card card-surface p-lg">
-        <h2 id="onboarding-title" className="font-serif text-[22px] font-normal text-ink">
-          Name your restaurant
-        </h2>
-        <p className="mt-xs text-[13px] font-light text-grey">
-          You can change this later in settings.
-        </p>
-        <input
-          autoFocus
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-          placeholder="Tartine Cellar…"
-          className="mt-lg h-11 w-full rounded-pill border border-edge bg-canvas px-md text-[14px] text-ink placeholder:text-grey focus-visible:border-accent focus-ring"
-        />
-        <div className="mt-lg flex justify-end">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving || !name.trim()}
-            className="h-[38px] rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Continue"}
-          </button>
-        </div>
+    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-end justify-center overflow-y-auto bg-scrim p-md sm:items-center" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div ref={trapRef} className="glass w-full rounded-t-card p-lg pb-[calc(var(--safe-bottom)+var(--spacing-lg))] sm:max-w-[400px] sm:rounded-card sm:pb-lg">
+        <p className="text-micro uppercase tracking-[0.12em] text-accent">Step 1</p>
+        <h2 id="onboarding-title" className="font-serif text-subheading font-normal leading-tight text-ink">Name your restaurant</h2>
+        <p className="mt-xs text-body-sm text-ink-soft">Next, bring in your wines and get ready for service. You can change this name later in the setup guide.</p>
+        <RestaurantNameForm restaurantId={restaurantId} onboarding />
       </div>
     </div>
   );

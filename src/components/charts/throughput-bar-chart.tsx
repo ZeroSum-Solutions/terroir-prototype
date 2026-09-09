@@ -11,13 +11,16 @@ export function ThroughputBarChart({ data }: { data: { weekLabel: string; count:
         return (
           <div
             key={i}
-            className="group relative flex flex-1 flex-col items-center justify-end"
+            className="relative flex flex-1 flex-col items-center justify-end"
           >
             <div
               className="w-full rounded-t-sm bg-accent/70 transition-colors hover:bg-accent"
               style={{ height: Math.max(barH, 2), minWidth: 4 }}
             >
-              <div className="invisible absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-surface-inverse px-1.5 py-0.5 font-mono text-[11px] text-on-inverse opacity-0 transition-opacity group-hover:visible group-hover:opacity-100">
+              {/* Values render unconditionally — a hover-only reveal never
+                  shows on a touch phone, so it read as a chart with no
+                  numbers on the mobile demo. */}
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-surface-inverse px-1.5 py-0.5 font-mono text-[11px] text-on-inverse">
                 {d.count}
               </div>
             </div>

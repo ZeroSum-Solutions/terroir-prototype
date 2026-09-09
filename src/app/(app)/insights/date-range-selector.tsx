@@ -137,9 +137,13 @@ export default function DateRangeSelector() {
     // `relative` so the custom editor can hang off the row instead of being a
     // second row inside it — see the comment on the panel below.
     <div ref={containerRef} className="relative">
+      {/* A segmented pill in the glass material (DESIGN.md — Components,
+          Glass Panel / Border Radius): one panel edge instead of six button
+          edges, which is also what pays for the panel's own border in the
+          390px budget measured below. */}
       <div
         data-date-range-row
-        className="flex flex-wrap items-center gap-2xs"
+        className="glass inline-flex flex-wrap items-center gap-2xs rounded-pill p-3xs"
         role="radiogroup"
         aria-label="Date range"
       >
@@ -162,10 +166,10 @@ export default function DateRangeSelector() {
                 }
               }}
               className={
-                "min-h-11 min-w-11 rounded-pill border px-sm py-2xs text-[12px] font-medium transition-colors " +
+                "min-h-11 min-w-11 rounded-pill px-xs py-2xs text-ledger font-medium transition-colors focus-ring-inset " +
                 (isActive
-                  ? "border-ink bg-ink text-on-inverse"
-                  : "border-edge text-ink hover:bg-wash")
+                  ? "bg-primary text-seal-ink"
+                  : "text-ink-soft hover:text-ink")
               }
             >
               {opt.label}
@@ -195,10 +199,10 @@ export default function DateRangeSelector() {
       {showCustom && (
         <div
           data-date-range-custom
-          className="absolute left-0 top-full z-[var(--z-overlay)] mt-xs w-[min(320px,100%)] rounded-card card-surface p-md"
+          className="glass absolute left-0 top-full z-[var(--z-overlay)] mt-xs w-[min(320px,100%)] rounded-card p-md"
         >
-          <p className="flex items-center gap-xs text-ledger font-medium text-ink">
-            <Calendar className="h-4 w-4 shrink-0 text-grey" strokeWidth={1.5} aria-hidden />
+          <p className="flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-accent">
+            <Calendar className="h-4 w-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
             Custom range
           </p>
           <label className="mt-sm block text-caption font-medium uppercase text-grey" htmlFor="dr-from">
@@ -214,7 +218,7 @@ export default function DateRangeSelector() {
                 ? draftTo
                 : localToday
             }
-            className="mt-2xs h-11 w-full rounded-pill border border-edge bg-surface px-sm text-body-sm text-ink focus-ring"
+            className="mt-2xs h-11 w-full rounded-pill border border-edge bg-surface-sunken px-sm text-body-sm text-ink focus-ring"
           />
           <label className="mt-sm block text-caption font-medium uppercase text-grey" htmlFor="dr-to">
             To
@@ -226,7 +230,7 @@ export default function DateRangeSelector() {
             onChange={function (e) { setDraftTo(e.target.value); }}
             min={draftFrom || ""}
             max={localToday}
-            className="mt-2xs h-11 w-full rounded-pill border border-edge bg-surface px-sm text-body-sm text-ink focus-ring"
+            className="mt-2xs h-11 w-full rounded-pill border border-edge bg-surface-sunken px-sm text-body-sm text-ink focus-ring"
           />
           <button
             onClick={function () {
@@ -235,7 +239,7 @@ export default function DateRangeSelector() {
               }
             }}
             disabled={!canApplyCustom}
-            className="mt-md min-h-11 w-full rounded-pill bg-primary px-sm text-body-sm font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            className="mt-md min-h-11 w-full rounded-pill bg-primary px-sm text-control font-semibold text-seal-ink hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-opacity focus-ring"
           >
             Apply
           </button>

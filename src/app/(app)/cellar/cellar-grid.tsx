@@ -44,10 +44,10 @@ export function CellarSetup({ restaurantName: _restaurantName }: { restaurantNam
           className="mx-auto mb-md h-10 w-10 text-grey"
           strokeWidth={1.5}
         />
-        <h2 className="text-[18px] font-serif font-medium text-ink">
+        <h2 className="font-serif text-subheading font-normal text-ink">
           Set up your cellar grid
         </h2>
-        <p className="mt-xs text-[13px] text-grey">
+        <p className="mt-xs text-body-sm text-grey">
           Choose a grid size that matches your storage layout. You can change
           this later.
         </p>
@@ -70,7 +70,7 @@ export function CellarSetup({ restaurantName: _restaurantName }: { restaurantNam
             onChange={(e) =>
               setSetupRows(Math.max(1, Math.min(26, +e.target.value)))
             }
-            className="tabular mt-xs w-full rounded-pill border border-edge bg-surface px-md py-sm text-center text-[16px] text-ink"
+            className="tabular mt-xs w-full rounded-pill border border-edge bg-surface px-md py-sm text-center text-body-lg text-ink"
           />
         </div>
         <div>
@@ -89,7 +89,7 @@ export function CellarSetup({ restaurantName: _restaurantName }: { restaurantNam
             onChange={(e) =>
               setSetupCols(Math.max(1, Math.min(30, +e.target.value)))
             }
-            className="tabular mt-xs w-full rounded-pill border border-edge bg-surface px-md py-sm text-center text-[16px] text-ink"
+            className="tabular mt-xs w-full rounded-pill border border-edge bg-surface px-md py-sm text-center text-body-lg text-ink"
           />
         </div>
       </div>
@@ -108,10 +108,10 @@ export function CellarSetup({ restaurantName: _restaurantName }: { restaurantNam
               setSetupRows(preset.r);
               setSetupCols(preset.c);
             }}
-            className={`flex-1 rounded-pill border px-sm py-xs text-[13px] font-medium transition-colors ${
+            className={`min-h-11 flex-1 rounded-pill border px-sm py-xs text-body-sm font-medium transition-colors ${
               setupRows === preset.r && setupCols === preset.c
-                ? "border-risk-ink/40 bg-risk-wash text-risk-ink"
-                : "border-edge bg-surface text-grey hover:border-rule-strong"
+                ? "border-accent text-accent"
+                : "border-rule-strong text-grey hover:border-accent/40"
             }`}
           >
             {preset.label}
@@ -123,7 +123,7 @@ export function CellarSetup({ restaurantName: _restaurantName }: { restaurantNam
         type="button"
         onClick={createCellar}
         disabled={creating}
-        className="flex h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
+        className="flex h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary text-control font-semibold text-seal-ink hover:bg-primary-hover disabled:opacity-60"
       >
         {creating && (
           <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
@@ -168,8 +168,7 @@ export function CellarGridView({
                 x={LABEL_OFFSET + c * (CELL_SIZE + GAP) + CELL_SIZE / 2}
                 y={LABEL_OFFSET - 8}
                 textAnchor="middle"
-                className="fill-grey"
-                style={{ fontSize: 11, fontFamily: "var(--font-sans)" }}
+                className="fill-grey text-micro"
               >
                 {c + 1}
               </text>
@@ -182,8 +181,7 @@ export function CellarGridView({
                   x={LABEL_OFFSET - 8}
                   y={LABEL_OFFSET + r * (CELL_SIZE + GAP) + CELL_SIZE / 2 + 4}
                   textAnchor="end"
-                  className="fill-grey"
-                  style={{ fontSize: 11, fontFamily: "var(--font-sans)" }}
+                  className="fill-grey text-micro"
                 >
                   {String.fromCharCode(65 + r)}
                 </text>
@@ -192,15 +190,19 @@ export function CellarGridView({
                   const data = gridData[binId];
                   const total = data?.totalBottles ?? 0;
 
-                  // Contract tokens only: beige-deep (empty), amber (low), sage (in stock).
-                  // --t-* runtime vars so both themes retint the SVG; the
-                  // canvas color reads on amber and sage in both modes.
-                  let fill = "var(--t-rule-strong)"; // empty
-                  const textFill = "var(--t-canvas)";
+                  // Obsidian Glass: a rack cell is a small glass tile, not a
+                  // painted swatch. Occupancy is carried by the hairline and
+                  // the depth of the fill, in the one metal — an empty cell is
+                  // glass on a rule, a filled one takes a copper hairline and
+                  // an in-stock one a copper wash behind it. --t-* runtime
+                  // vars so both rooms retint the SVG.
+                  let fill = "var(--t-glass)"; // empty
+                  let stroke = "var(--t-rule-strong)";
                   if (total > 0 && total <= 2) {
-                    fill = "var(--t-risk-ink)"; // low
+                    stroke = "var(--t-accent)"; // low: the hairline alone
                   } else if (total > 2) {
-                    fill = "var(--t-ready)"; // in stock
+                    fill = "color-mix(in srgb, var(--t-accent) 22%, transparent)";
+                    stroke = "var(--t-accent)";
                   }
 
                   const isSelected = selectedBin === binId;
@@ -212,10 +214,10 @@ export function CellarGridView({
                         y={LABEL_OFFSET + r * (CELL_SIZE + GAP)}
                         width={CELL_SIZE}
                         height={CELL_SIZE}
-                        rx={4}
+                        rx={10}
                         fill={fill}
-                        stroke={isSelected ? "var(--t-mark)" : "transparent"}
-                        strokeWidth={isSelected ? 2 : 0}
+                        stroke={isSelected ? "var(--t-ink)" : stroke}
+                        strokeWidth={isSelected ? 2 : 1}
                         role="button"
                         tabIndex={0}
                         aria-label={`Bin ${binId}${total > 0 ? `, ${total} bottles` : ", empty"}`}
@@ -230,32 +232,25 @@ export function CellarGridView({
                           }
                         }}
                       />
+                      {/* The tile says which bin it is, which is what someone
+                          reading a rack needs first. Both labels are painted
+                          OVER the clickable rect as its siblings, so without
+                          pointer-events-none an SVG <text> swallows the click
+                          and tapping the middle of a bin does nothing. */}
+                      <text
+                        x={LABEL_OFFSET + c * (CELL_SIZE + GAP) + CELL_SIZE / 2}
+                        y={LABEL_OFFSET + r * (CELL_SIZE + GAP) + 20}
+                        textAnchor="middle"
+                        className="pointer-events-none fill-ink-soft text-micro"
+                      >
+                        {binId}
+                      </text>
                       {total > 0 && (
                         <text
-                          x={
-                            LABEL_OFFSET +
-                            c * (CELL_SIZE + GAP) +
-                            CELL_SIZE / 2
-                          }
-                          y={
-                            LABEL_OFFSET +
-                            r * (CELL_SIZE + GAP) +
-                            CELL_SIZE / 2 +
-                            4
-                          }
+                          x={LABEL_OFFSET + c * (CELL_SIZE + GAP) + CELL_SIZE / 2}
+                          y={LABEL_OFFSET + r * (CELL_SIZE + GAP) + 37}
                           textAnchor="middle"
-                          fill={textFill}
-                          style={{
-                            fontSize: 12,
-                            fontFamily: "var(--font-sans)",
-                            fontWeight: 500,
-                            // The count is painted OVER the clickable rect and
-                            // is its sibling, not its child, so without this an
-                            // SVG <text> swallows the click and clicking the
-                            // middle of a full bin — right on the number, the
-                            // obvious target — does nothing at all.
-                            pointerEvents: "none",
-                          }}
+                          className="pointer-events-none fill-ink text-ledger tabular"
                         >
                           {total}
                         </text>
@@ -272,7 +267,7 @@ export function CellarGridView({
         {selectedBin && (
           <div className="w-full shrink-0 rounded-card card-surface p-lg md:w-[280px]">
             <div className="mb-md flex items-center justify-between">
-              <h3 className="tabular text-[18px] font-medium text-ink">
+              <h3 className="tabular font-serif text-subheading font-normal text-ink">
                 Bin {selectedBin}
               </h3>
               <button
@@ -287,7 +282,7 @@ export function CellarGridView({
 
             {selectedData ? (
               <>
-                <div className="mb-md text-[12px] text-grey">
+                <div className="mb-md text-ledger text-grey">
                   {selectedData.totalBottles} bottle
                   {selectedData.totalBottles !== 1 ? "s" : ""}
                 </div>
@@ -304,20 +299,23 @@ export function CellarGridView({
                       type="button"
                       data-bin-wine={w.wineId}
                       onClick={() => onSelectWine(w.wineId)}
-                      className="flex w-full items-center gap-sm rounded-md border border-rule px-sm py-sm text-left transition-colors hover:bg-wash focus-ring"
+                      className="flex w-full items-center gap-sm rounded-lg border border-glass-edge px-sm py-sm text-left transition-colors hover:bg-wash focus-ring"
                     >
-                      <WineThumb
-                        src={w.heroImageUrl}
-                        producer={w.producer}
-                        name={w.name}
-                        colour={w.colour}
-                        size={40}
-                      />
+                      <span className="relative block h-12 w-8 shrink-0 overflow-hidden rounded-lg border border-glass-edge">
+                        <WineThumb
+                          src={w.heroImageUrl}
+                          producer={w.producer}
+                          name={w.name}
+                          colour={w.colour}
+                          size={48}
+                          className="absolute left-1/2 top-0 -translate-x-1/2 rounded-none object-cover"
+                        />
+                      </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-serif text-[17px] font-medium leading-snug text-ink">
+                        <span className="block font-serif text-body-lg font-normal leading-snug text-ink">
                           {wineTitle(w.producer, w.name, ", ")}
                         </span>
-                        <span className="mt-2xs flex items-center gap-sm text-[12px] font-light text-grey">
+                        <span className="mt-2xs flex items-center gap-sm text-ledger text-grey">
                           <span className="tabular">
                             {w.vintage ?? "NV"}
                           </span>
@@ -335,7 +333,7 @@ export function CellarGridView({
                   className="mb-sm h-8 w-8 text-grey"
                   strokeWidth={1.5}
                 />
-                <p className="text-[13px] text-grey">
+                <p className="text-body-sm text-grey">
                   This bin is empty
                 </p>
               </div>
@@ -349,17 +347,17 @@ export function CellarGridView({
           legend quietly described a map that no longer existed. One of them
           was a brown, which is exactly what check-design-palette now catches
           in source as well as in DESIGN.md. */}
-      <div className="mt-lg flex items-center gap-lg text-[12px] text-grey">
+      <div className="mt-lg flex items-center gap-lg text-ledger text-grey">
         <div className="flex items-center gap-xs">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: "var(--t-ready)" }} />
+          <span className="inline-block h-3 w-3 rounded-sm border border-accent bg-accent/20" />
           In stock (3+)
         </div>
         <div className="flex items-center gap-xs">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: "var(--t-risk-ink)" }} />
+          <span className="inline-block h-3 w-3 rounded-sm border border-accent" />
           Low (1-2)
         </div>
         <div className="flex items-center gap-xs">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: "var(--t-rule-strong)" }} />
+          <span className="inline-block h-3 w-3 rounded-sm border border-rule-strong" />
           Empty
         </div>
       </div>

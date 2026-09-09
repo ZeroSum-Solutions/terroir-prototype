@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { WineThumb } from "@/components/wine-thumb";
-import { Archive, ArrowUpRight, ChevronDown, Pencil, Plus, Search, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Plus, Search, X } from "lucide-react";
 import { IconButton } from "@/components/icon-button";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +11,8 @@ import {
 } from "@/lib/bins";
 import { BinForm, type BinDraft } from "./bin-form";
 import type { BinViewModel } from "./bin-view-model";
+import { MobileBinList } from "./bin-mobile-list";
+import { BinActions, BinThumb, OccupancyMeter } from "./bin-row-parts";
 import { useBinEditor, useBinRequests } from "./use-bin-manager";
 import { wineDisplayName } from "@/lib/wine-display-name";
 
@@ -47,7 +48,7 @@ export function BinManager({ bins, inventory, canManage, unplacedCount }: Props)
 }
 
 function ManagerToolbar({ query, onQueryChange, canManage, onCreate }: { query: string; onQueryChange: (value: string) => void; canManage: boolean; onCreate: () => void }) {
-  return <div className="mb-lg grid gap-sm md:grid-cols-[minmax(0,1fr)_auto]"><SearchBox query={query} onChange={onQueryChange} />{canManage && <button type="button" onClick={onCreate} className="flex h-11 items-center justify-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"><Plus className="h-4 w-4" strokeWidth={2} aria-hidden />Create bin</button>}</div>;
+  return <div className="mb-lg grid gap-sm md:grid-cols-[minmax(0,1fr)_auto]"><SearchBox query={query} onChange={onQueryChange} />{canManage && <button type="button" onClick={onCreate} className="flex h-11 items-center justify-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink hover:bg-primary-hover focus-ring"><Plus className="h-4 w-4" strokeWidth={1.9} aria-hidden />Create bin</button>}</div>;
 }
 
 /**
@@ -68,7 +69,7 @@ function UnplacedInventoryLink({ count }: { count: number }) {
     <Link
       href="/reconcile-queue"
       data-unplaced-link
-      className="group mb-lg flex min-h-11 items-center justify-between gap-md rounded-md border border-rule bg-wash px-md py-sm text-[13px] text-ink no-underline hover:bg-surface focus-ring"
+      className="glass group mb-lg flex min-h-11 items-center justify-between gap-md rounded-pill px-md py-sm text-control text-ink no-underline focus-ring"
     >
       <span className="font-medium">Unplaced inventory</span>
       <span className="flex shrink-0 items-center gap-xs">
@@ -83,14 +84,16 @@ function SearchBox({ query, onChange }: { query: string; onChange: (value: strin
   return (
     <label className="relative block">
       <span className="sr-only">Find a bottle</span>
-      <Search className="absolute left-md top-1/2 h-4 w-4 -translate-y-1/2 text-grey" aria-hidden />
+      <Search className="absolute left-md top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
       <input
         type="search"
         aria-label="Find a bottle"
         value={query}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Find a bottle by wine or producer"
-        className="h-11 w-full rounded-pill border border-rule bg-surface pl-[40px] pr-sm text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+        // 17px keeps iOS from zooming the page on focus; 14px once there is
+        // a pointer (see search-palette.tsx / cellar-shell.tsx).
+        className="glass h-11 w-full rounded-pill pl-[40px] pr-sm text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
       />
     </label>
   );
@@ -100,9 +103,9 @@ type Match = ReturnType<typeof findBottleMatches>[number];
 
 function SearchResults({ matches }: { matches: Match[] }) {
   return (
-    <div className="mb-lg overflow-hidden rounded-card card-surface">
+    <div className="mb-lg border-y border-rule">
       {matches.length === 0 ? (
-        <p className="px-md py-md text-[13px] text-grey">No placed bottles match.</p>
+        <p className="px-md py-md text-body-sm text-grey">No placed bottles match.</p>
       ) : (
         matches.map((match) => (
           <div key={`${match.wineId}:${match.binId}`} data-bottle-match className="border-b border-rule last:border-b-0">
@@ -110,22 +113,16 @@ function SearchResults({ matches }: { matches: Match[] }) {
                 hunting for a bottle" path, so the whole row opens the wine. */}
             <Link
               href={`/cellar?wine=${match.wineId}`}
-              className="flex min-h-11 items-center justify-between gap-md px-md py-sm transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center justify-between gap-sm px-md py-sm transition-colors hover:bg-wash focus-ring"
             >
-              <WineThumb
-                src={match.heroImageUrl}
-                producer={match.producer}
-                name={match.name}
-                colour={match.colour}
-                size={36}
-              />
+              <BinThumb src={match.heroImageUrl} producer={match.producer} name={match.name} colour={match.colour} />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-serif text-[17px] font-medium text-ink">{wineDisplayName(match.producer, match.name)}</p>
-                <p className="truncate text-[12px] text-grey">{match.producer}</p>
+                <p className="truncate text-caption font-medium uppercase text-grey">{match.producer}</p>
+                <p className="truncate font-serif text-body-lg font-normal text-ink">{wineDisplayName(match.producer, match.name)}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-mono text-[12px] text-ink">{match.binZone ? `${match.binZone} › ` : ""}{match.binCode}</p>
-                <p className="text-[12px] tabular text-grey">{match.quantity} {match.quantity === 1 ? "bottle" : "bottles"}</p>
+                <p className="font-mono text-micro tracking-[0.12em] text-accent">{match.binZone ? `${match.binZone} › ` : ""}{match.binCode}</p>
+                <p className="text-ledger tabular text-grey">{match.quantity} {match.quantity === 1 ? "bottle" : "bottles"}</p>
               </div>
             </Link>
           </div>
@@ -176,45 +173,52 @@ function BinTable(props: TableProps) {
   // clickable but Edit and Retire. Someone sent to Bin A5 for one of ten
   // bottles could not tell which was which. Opening a row now shows what is
   // in it, with the bottle's picture, and each wine goes to its own detail.
+  //
+  // Shared between the mobile list and the desktop table below (defect 8,
+  // 2026-09-08 demo screenshots) — only one is ever visible at a width, but
+  // there is no reason a bin expanded on one layout should collapse on the
+  // other if the viewport is resized.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const onToggle = (id: string) => setExpandedId(expandedId === id ? null : id);
   return (
-    <div className="overflow-hidden rounded-card card-surface">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-[13px]">
-          <thead><tr className="bg-wash text-[11px] font-medium uppercase tracking-[0.18em] text-grey"><th className="px-md py-sm text-left">Code</th><th className="px-md py-sm text-left">Zone</th><th className="px-md py-sm text-left">Occupancy</th><th className="px-md py-sm text-right">Capacity</th><th className="px-md py-sm text-right">Priority</th>{props.canManage && <th className={cn(ACTIONS_CELL, "bg-wash")} />}</tr></thead>
+    <div>
+      <MobileBinList {...props} expandedId={expandedId} onToggle={onToggle} />
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[720px] text-body-sm">
+          <thead><tr className="border-b border-rule-strong text-caption font-medium uppercase text-grey"><th className="px-md py-sm text-left">Code</th><th className="px-md py-sm text-left">Zone</th><th className="px-md py-sm text-left">Occupancy</th><th className="px-md py-sm text-right">Capacity</th><th className="px-md py-sm text-right">Priority</th>{props.canManage && <th className={cn(ACTIONS_CELL, "border-l-0")} />}</tr></thead>
           <tbody>
             {props.bins.map((bin) => (
               <BinRow
                 key={bin.id}
                 bin={bin}
                 expanded={expandedId === bin.id}
-                onToggle={() => setExpandedId(expandedId === bin.id ? null : bin.id)}
+                onToggle={() => onToggle(bin.id)}
                 {...props}
               />
             ))}
           </tbody>
         </table>
       </div>
-      {props.bins.length === 0 && <p className="px-md py-xl text-center text-[13px] text-grey">No bins have been created yet.</p>}
+      {props.bins.length === 0 && <p className="px-md py-xl text-center text-body-sm text-grey">No bins have been created yet.</p>}
     </div>
   );
 }
 
 function BinRow({ bin, inventory, canManage, busy, editingId, draft, onDraftChange, onEdit, onCancel, onSave, onRetire, expanded, onToggle }: TableProps & { bin: BinViewModel; expanded: boolean; onToggle: () => void }) {
   if (editingId === bin.id) {
-    return <tr data-bin-row className="border-t border-rule"><td colSpan={6} className="bg-wash px-md py-md"><BinForm draft={draft} busy={busy} submitLabel="Save changes" onChange={onDraftChange} onCancel={onCancel} onSubmit={onSave} /></td></tr>;
+    return <tr data-bin-row className="border-t border-rule"><td colSpan={6} className="px-md py-md"><BinForm draft={draft} busy={busy} submitLabel="Save changes" onChange={onDraftChange} onCancel={onCancel} onSubmit={onSave} /></td></tr>;
   }
   const wines = inventory.filter((item) => item.binId === bin.id);
   return (
     <>
       <tr data-bin-row className="group/bin border-t border-rule hover:bg-wash">
-        <td className="px-md py-sm font-mono font-medium text-ink">
+        <td className="px-md py-sm text-ink">
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
             disabled={wines.length === 0}
-            className="inline-flex min-h-11 items-center gap-xs rounded-md px-2xs text-left font-medium text-ink focus-ring disabled:cursor-default"
+            className="inline-flex min-h-11 items-center gap-xs rounded-pill px-2xs text-left font-serif text-body-lg font-normal text-ink focus-ring disabled:cursor-default"
           >
             <ChevronDown
               className={cn("h-4 w-4 shrink-0 text-grey transition-transform", !expanded && "-rotate-90", wines.length === 0 && "invisible")}
@@ -226,49 +230,41 @@ function BinRow({ bin, inventory, canManage, busy, editingId, draft, onDraftChan
         </td>
         <td className="px-md py-sm text-grey">{bin.zone ?? "—"}</td>
         <td className="px-md py-sm text-ink">
-          <div className="flex items-center gap-sm">
+          <div className="flex items-center gap-xs">
             {/* The bottles themselves, at a glance — this is what tells ten
                 bottles in one bin apart. */}
             {wines.slice(0, 5).map((wine) => (
-              <WineThumb
+              <BinThumb
                 key={`${wine.wineId}:${wine.binId}`}
                 src={wine.heroImageUrl}
                 producer={wine.producer}
                 name={wine.name}
                 colour={wine.colour}
-                size={28}
               />
             ))}
-            <span>{bin.occupancy}</span>
+            <span className="text-ledger text-grey">{bin.occupancy}</span>
           </div>
-          {bin.capacity != null && bin.capacity > 0 && (
-            <div className="mt-2xs h-1.5 w-full max-w-[160px] overflow-hidden rounded-pill bg-surface-sunken">
-              <div
-                className="h-full rounded-pill bg-primary"
-                style={{ width: `${Math.min(100, (bin.bottleCount / bin.capacity) * 100)}%` }}
-              />
-            </div>
-          )}
+          <OccupancyMeter bin={bin} className="mt-2xs" />
         </td>
         <td className="px-md py-sm text-right tabular text-grey">{bin.capacity ?? "—"}</td>
         <td className="px-md py-sm text-right tabular text-grey">{bin.priority}</td>
-        {canManage && <td className={cn(ACTIONS_CELL, "bg-surface group-hover/bin:bg-wash")}><div className="flex justify-end gap-2xs"><IconButton label={`Edit bin ${bin.code}`} onClick={() => onEdit(bin)} className="rounded-md text-grey hover:bg-wash hover:text-ink focus-ring"><Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden /></IconButton><IconButton label={`Retire bin ${bin.code}`} onClick={() => onRetire(bin)} disabled={busy} className="rounded-md text-grey hover:bg-risk-wash hover:text-risk-ink disabled:opacity-50"><Archive className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden /></IconButton></div></td>}
+        {canManage && <td className={cn(ACTIONS_CELL, "bg-canvas group-hover/bin:bg-wash")}><BinActions bin={bin} busy={busy} onEdit={onEdit} onRetire={onRetire} /></td>}
       </tr>
       {expanded && wines.length > 0 && (
         <tr data-bin-wines={bin.code} className="border-t border-rule">
-          <td colSpan={6} className="bg-wash px-md py-sm">
+          <td colSpan={6} className="px-md py-sm">
             <div className="flex flex-col gap-xs">
               {wines.map((wine) => (
                 <Link
                   key={`${wine.wineId}:${wine.binId}`}
                   href={`/cellar?wine=${wine.wineId}`}
                   data-bin-wine={wine.wineId}
-                  className="flex min-h-11 items-center gap-sm rounded-md border border-rule bg-surface px-sm py-xs transition-colors hover:bg-wash focus-ring"
+                  className="flex min-h-11 items-center gap-sm border-b border-rule px-sm py-xs transition-colors last:border-b-0 hover:bg-wash focus-ring"
                 >
-                  <WineThumb src={wine.heroImageUrl} producer={wine.producer} name={wine.name} colour={wine.colour} size={40} />
+                  <BinThumb src={wine.heroImageUrl} producer={wine.producer} name={wine.name} colour={wine.colour} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-caption font-medium uppercase text-grey">{wine.producer}</span>
-                    <span className="block truncate font-serif text-body-lg font-medium text-ink">{wineDisplayName(wine.producer, wine.name)}</span>
+                    <span className="block truncate font-serif text-body-lg font-normal text-ink">{wineDisplayName(wine.producer, wine.name)}</span>
                   </span>
                   <span className="shrink-0 tabular text-body-sm text-grey">{wine.quantity} {wine.quantity === 1 ? "bottle" : "bottles"}</span>
                 </Link>
@@ -282,9 +278,9 @@ function BinRow({ bin, inventory, canManage, busy, editingId, draft, onDraftChan
 }
 
 function FormPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="mb-lg rounded-card card-surface p-md"><h2 className="mb-md text-[15px] font-semibold text-ink">{title}</h2>{children}</section>;
+  return <section className="glass mb-lg rounded-card p-md"><h2 className="mb-md font-serif text-subheading font-normal text-ink">{title}</h2>{children}</section>;
 }
 
 function ErrorBanner({ message, dismiss }: { message: string; dismiss: () => void }) {
-  return <div role="alert" className="mb-md flex items-center justify-between gap-sm rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"><span>{message}</span><IconButton label="Dismiss error" onClick={dismiss} className="shrink-0 rounded-md text-risk-ink/70 hover:bg-risk-wash hover:text-risk-ink focus-ring"><X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden /></IconButton></div>;
+  return <div role="alert" className="mb-md flex items-center justify-between gap-sm rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"><span>{message}</span><IconButton label="Dismiss error" onClick={dismiss} className="shrink-0 rounded-pill text-risk-ink/70 hover:text-risk-ink focus-ring"><X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden /></IconButton></div>;
 }

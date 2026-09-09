@@ -118,7 +118,16 @@ test.describe("@opp-6 bin management", () => {
     await login(page);
     await page.goto("/bins");
 
-    const row = page.locator("[data-bin-row]", { hasText: BIN_CODE });
+    // /bins renders each bin twice: an <li> in the md:hidden phone list and a
+    // <tr> in the hidden md:block table. Both are real bin rows and both carry
+    // data-bin-row on purpose (one-row-rule.test.ts measures the phone one at
+    // 390px; this suite runs at the default ~1280px and wants the table), so
+    // the hook alone is ambiguous and strict mode rightly refuses it. Scope to
+    // whichever copy the current viewport actually shows — the same thing
+    // lineage.test.ts does for CellarRow's two breakpoint renders.
+    const row = page
+      .locator("[data-bin-row]", { hasText: BIN_CODE })
+      .filter({ visible: true });
     await expect(row).toBeVisible();
     await expect(row).toContainText("1 wine · 7 bottles");
 

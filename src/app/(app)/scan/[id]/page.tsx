@@ -96,7 +96,7 @@ export default async function ScanDetailPage({
       {statusReason && (
         <p
           role="status"
-          className="mb-md rounded-card border border-rule bg-wash px-md py-sm text-body-sm text-ink-soft"
+          className="glass mb-md rounded-card px-md py-sm text-body-sm text-ink-soft"
         >
           {statusReason}
         </p>

@@ -64,10 +64,17 @@ export default async function TeamPage() {
 
   return (
     <section>
-      <header className="mb-lg md:mb-xl">
-        <p className="text-caption font-medium uppercase text-grey">{restaurantName}</p>
-        <h1 className="mt-xs font-serif text-heading-sm text-ink">Team</h1>
-      </header>
+      <div className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-2xl md:pt-2xl">
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+          {restaurantName}
+          {" · "}
+          <span className="tabular">{roster.length}</span> member
+          {roster.length === 1 ? "" : "s"}
+        </p>
+        <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:text-display">
+          Team
+        </h1>
+      </div>
 
       <TeamActions
         members={enrichedRoster.map((m) => ({

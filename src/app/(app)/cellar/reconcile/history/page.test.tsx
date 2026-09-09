@@ -178,7 +178,10 @@ function expectPresentation(
   expected: { copy: string; background: string; text: string },
 ) {
   const wineLink = container.querySelector(`a[href="/cellar?wine=wine-${id}"]`);
-  const sessionCard = wineLink?.closest(".rounded-md.border.border-border.bg-surface");
+  // Purely a handle on the session panel, so it tracks the panel's classes:
+  // Obsidian Glass moved it from a rounded-md `border-border` box (a class
+  // that never existed as a token) to a rounded-card hairline panel.
+  const sessionCard = wineLink?.closest(".rounded-card.border.border-rule");
   expect(sessionCard, `session card for ${id}`).not.toBeNull();
 
   const sessionBadge = sessionCard?.firstElementChild?.querySelector("span.inline-flex");

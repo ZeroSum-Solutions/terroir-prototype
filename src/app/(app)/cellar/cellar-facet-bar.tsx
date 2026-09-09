@@ -107,7 +107,7 @@ export function CellarFacetBar({
           {appliedChips.map((chip) => (
             <span
               key={chip.key}
-              className="inline-flex h-8 items-center gap-2xs rounded-pill bg-wash pl-sm pr-2xs text-caption font-medium tracking-normal text-ink-soft"
+              className="glass inline-flex h-8 items-center gap-2xs rounded-pill pl-sm pr-2xs text-caption font-medium tracking-normal text-ink-soft"
             >
               {chip.label}
               <button
@@ -127,7 +127,7 @@ export function CellarFacetBar({
               onGroupByChange(null);
               onSortChange(null);
             }}
-            className="flex h-11 shrink-0 -my-[6px] items-center justify-center rounded-pill px-sm text-caption font-medium tracking-normal text-grey hover:bg-wash focus-ring"
+            className="flex h-11 shrink-0 -my-[6px] items-center justify-center rounded-pill px-sm text-caption font-medium tracking-normal text-accent hover:bg-wash focus-ring"
           >
             Clear all
           </button>

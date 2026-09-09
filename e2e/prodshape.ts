@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 /**
  * Drive a session into the production-SHAPED local tenant, and back out.
  *
- * `LOCAL SEED - Osteria Scala` is the best case on every axis a wine renders
+ * `Osteria Scala` is the best case on every axis a wine renders
  * on — 250 wines, 250 photographs, no blank producers, every row spine-linked.
  * Production is the worst case on all four. `LOCAL PRODSHAPE - Trattoria
  * Bianca` (scripts/local/prodshape.sh) holds production's ratios instead, so a

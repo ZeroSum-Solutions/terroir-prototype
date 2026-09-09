@@ -39,7 +39,7 @@ export function DrinkWindowSection({ row }: { row: CellarWineRow }) {
   return (
     <section
       aria-label="Drink window"
-      className="mt-md rounded-lg card-surface p-md"
+      className="card-surface mt-md rounded-card p-md"
     >
       <h3 className="text-caption font-medium uppercase text-grey mb-sm">Drink window</h3>
 
@@ -52,7 +52,7 @@ export function DrinkWindowSection({ row }: { row: CellarWineRow }) {
         peak={row.peak_year as number | undefined}
       />
 
-      <div className="mt-sm flex items-center justify-between text-[12px]">
+      <div className="mt-sm flex items-center justify-between text-ledger">
         {/* BND-071 — status pill, Wax & Counter mapping. */}
         <StatusChip tone={pillTone}>
           {formatStatusLabel(status, yearsLeft, yearsUntilOpen)}
@@ -67,7 +67,7 @@ export function DrinkWindowSection({ row }: { row: CellarWineRow }) {
       </div>
 
       {row.review_excerpt && (
-        <blockquote className="mt-sm border-l-2 border-risk-wash pl-sm text-[12px] text-grey italic leading-relaxed">
+        <blockquote className="mt-sm border-l-2 border-rule-strong pl-sm text-ledger text-grey italic leading-relaxed">
           {row.review_excerpt}
           {row.rating && row.rating_source && (
             <cite className="mt-2xs block not-italic font-medium text-grey">

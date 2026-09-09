@@ -3,14 +3,15 @@ import { Skeleton } from "@/components/skeleton";
 export default function ScanLoading() {
   return (
     <section>
-      <div className="mb-lg flex items-center justify-center">
-        <Skeleton className="h-11 w-48 rounded-pill" />
-      </div>
       <header className="mb-lg">
-        <Skeleton className="h-[28px] w-48 mb-xs" />
-        <Skeleton className="h-[15px] w-64" />
+        <Skeleton className="mb-xs h-3 w-24" />
+        <Skeleton className="h-[42px] w-64 mb-sm" />
+        <Skeleton className="h-[15px] w-72" />
       </header>
-      <div className="rounded-card border-2 border-dashed border-rule-strong bg-wash p-xl">
+      <div className="mb-lg flex items-center justify-center">
+        <Skeleton className="h-12 w-48 rounded-pill" />
+      </div>
+      <div className="rounded-card bg-surface-sunken p-xl">
         <div className="flex flex-col items-center gap-md">
           <Skeleton className="h-14 w-14 rounded-full" />
           <Skeleton className="h-[20px] w-40" />
@@ -26,15 +27,14 @@ export default function ScanLoading() {
           <Skeleton className="h-[14px] w-24" />
           <Skeleton className="h-[14px] w-14" />
         </div>
-        <div className="grid grid-cols-1 gap-sm md:grid-cols-3 md:gap-md">
+        <div className="overflow-hidden rounded-card card-surface">
           {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="rounded-card card-surface p-md">
-              <div className="mb-sm flex items-center justify-between">
-                <Skeleton className="h-[12px] w-16" />
-                <Skeleton className="h-[12px] w-8" />
-              </div>
-              <Skeleton className="mb-xs h-[14px] w-32" />
-              <Skeleton className="h-[13px] w-24" />
+            <div
+              key={i}
+              className={`px-md py-sm ${i > 0 ? "border-t border-rule" : ""}`}
+            >
+              <Skeleton className="mb-xs h-[12px] w-16" />
+              <Skeleton className="h-[17px] w-32" />
             </div>
           ))}
         </div>

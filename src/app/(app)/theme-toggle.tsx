@@ -6,24 +6,27 @@ const STORAGE_KEY = "terroir-theme";
 
 // Canvas colors for browser/PWA chrome — hand-synced with the DESIGN.md
 // tokens, viewport.themeColor in layout.tsx, and its themeInitScript.
-const THEME_COLORS = { light: "#F4F5F6", dark: "#07080A" } as const;
+const THEME_COLORS = { light: "#F1EADB", dark: "#0B0B0C" } as const;
 
 type ThemeChoice = "light" | "dark" | "system";
 
+// No stored choice means Bone, the default room for now (DESIGN.md —
+// Theme); "system" is stored explicitly when chosen, so it survives a reload
+// rather than collapsing back to the default. Mirrors layout.tsx's
+// themeInitScript.
 function readStoredChoice(): ThemeChoice {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
+    if (stored === "light" || stored === "dark" || stored === "system") return stored;
   } catch {
-    // storage unavailable (private mode) — fall through to system
+    // storage unavailable (private mode) — fall through to the default
   }
-  return "system";
+  return "light";
 }
 
 function applyChoice(choice: ThemeChoice) {
   try {
-    if (choice === "system") localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, choice);
+    localStorage.setItem(STORAGE_KEY, choice);
   } catch {
     // persisting is best-effort; the DOM attribute still applies this session
   }
@@ -58,13 +61,13 @@ const OPTIONS: Array<{
   label: string;
   short: string;
 }> = [
-  { value: "light", label: "Light theme", short: "Light" },
-  { value: "dark", label: "Dark theme", short: "Cellar" },
+  { value: "light", label: "Light theme", short: "Bone" },
+  { value: "dark", label: "Dark theme", short: "Obsidian" },
   { value: "system", label: "Match device theme", short: "Auto" },
 ];
 
 export function ThemeToggle() {
-  const [choice, setChoice] = useState<ThemeChoice>("system");
+  const [choice, setChoice] = useState<ThemeChoice>("light");
   // The stored choice is only knowable on the client; render the neutral
   // default first so server and client markup agree.
   // The post-hydration correction is intentional and covered by the mount test.

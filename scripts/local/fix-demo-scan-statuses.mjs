@@ -39,7 +39,7 @@ const SERVICE_KEY =
 const CONFIRM = process.argv.includes("--confirm");
 const RESTAURANT_NAME =
   process.argv.find((a) => a.startsWith("--restaurant="))?.slice("--restaurant=".length) ??
-  "LOCAL SEED - Osteria Scala";
+  "Osteria Scala";
 
 try {
   execFileSync("bash", [path.join(__dirname, "assert-local-db.sh")], {

@@ -73,7 +73,7 @@ export function AssistantPanel() {
         }}
         aria-haspopup="dialog"
         aria-label="Ask about your cellar"
-        className="grid h-11 w-11 place-items-center rounded-pill text-ink transition-colors hover:bg-wash focus-ring"
+        className="grid h-11 w-11 place-items-center rounded-pill text-ink transition-colors hover:text-accent focus-ring"
       >
         <MessageCircleQuestion className="h-5 w-5" strokeWidth={1.75} aria-hidden />
       </button>
@@ -165,16 +165,16 @@ function AssistantDialog({
   // it: role="dialog" was present and focusable either way. Keep the portal.
   return createPortal(
     <div
-      className="fixed inset-0 z-[var(--z-dialog)] flex items-start justify-center bg-scrim px-md py-xl"
+      className="fixed inset-0 z-[var(--z-dialog)] flex items-end justify-center bg-scrim p-md sm:items-start sm:py-xl"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
       <div
         ref={trapRef}
-        className="flex max-h-full w-full max-w-[560px] flex-col overflow-hidden rounded-card card-surface"
+        className="glass flex max-h-full w-full flex-col overflow-hidden rounded-t-card sm:max-w-[560px] sm:rounded-card"
       >
-        <div className="flex items-center justify-between border-b border-edge px-lg py-md">
+        <div className="flex items-center justify-between border-b border-rule px-lg py-md">
           <h2 id={titleId} className="font-serif text-subheading font-normal text-ink">
             Ask about your cellar
           </h2>
@@ -182,9 +182,9 @@ function AssistantDialog({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-9 w-9 place-items-center rounded-pill text-grey transition-colors hover:bg-wash hover:text-ink focus-ring"
+            className="grid h-11 w-11 place-items-center rounded-pill text-grey transition-colors hover:text-accent focus-ring"
           >
-            <X className="h-4 w-4" strokeWidth={2} aria-hidden />
+            <X className="h-4 w-4" strokeWidth={1.9} aria-hidden />
           </button>
         </div>
 
@@ -205,15 +205,15 @@ function AssistantDialog({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="a bold red that pairs with beef…"
-            className="h-11 min-w-0 flex-1 rounded-pill border border-edge bg-canvas px-md text-control text-ink placeholder:text-grey focus-visible:border-accent focus-ring"
+            className="glass min-h-11 h-[52px] min-w-0 flex-1 rounded-pill px-md text-control text-ink placeholder:text-grey focus-visible:border-accent focus-ring"
           />
           <button
             type="submit"
             disabled={pending || question.trim() === ""}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-pill bg-primary text-seal-ink transition-colors hover:bg-primary-hover disabled:opacity-40 focus-ring"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-pill bg-primary text-seal-ink transition-colors hover:bg-primary-hover disabled:opacity-40 focus-ring sm:h-[52px] sm:w-[52px]"
             aria-label="Ask"
           >
-            <Search className="h-4 w-4" strokeWidth={2.25} aria-hidden />
+            <Search className="h-4 w-4" strokeWidth={1.9} aria-hidden />
           </button>
         </form>
 
@@ -233,7 +233,7 @@ function AssistantDialog({
                         setQuestion(example);
                         void ask(example);
                       }}
-                      className="w-full rounded-md border border-edge px-md py-sm text-left text-body-sm text-ink transition-colors hover:bg-wash focus-ring"
+                      className="w-full rounded-pill border border-rule-strong px-md py-sm text-left text-body-sm text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
                     >
                       {example}
                     </button>
@@ -262,7 +262,7 @@ function AssistantDialog({
                   {chips.map((chip) => (
                     <li
                       key={chip}
-                      className="rounded-pill bg-wash px-sm py-2xs text-ledger text-ink-soft"
+                      className="rounded-pill border border-rule-strong px-sm py-2xs text-ledger text-ink-soft"
                     >
                       {chip}
                     </li>
@@ -282,7 +282,7 @@ function AssistantDialog({
                 // every red in the cellar, and without this line that list
                 // reads as an answer about Narnia. Say what was dropped
                 // BEFORE the results, in the results' own type size.
-                <p className="mb-md rounded-md bg-risk-wash px-md py-sm text-body-sm text-risk-ink">
+                <p className="mb-md rounded-card bg-risk-wash px-md py-sm text-body-sm text-risk-ink">
                   I did not understand{" "}
                   <strong className="font-medium">
                     {result.query.unrecognized.join(", ")}
@@ -294,13 +294,13 @@ function AssistantDialog({
 
               {result.cellar.length > 0 ? (
                 <>
-                  <p className="mb-sm text-ledger uppercase tracking-[0.08em] text-grey">
+                  <p className="mb-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
                     {result.cellarTotal} in your cellar
                     {result.cellarTotal > result.cellar.length
                       ? ` · showing ${result.cellar.length}`
                       : ""}
                   </p>
-                  <ul className="flex flex-col gap-sm">
+                  <ul className="border-t border-rule">
                     {result.cellar.map((wine) => (
                       <li key={wine.wineId}>
                         <CellarResult
@@ -324,10 +324,10 @@ function AssistantDialog({
 
               {result.corpus.length > 0 ? (
                 <>
-                  <p className="mb-sm mt-lg text-ledger uppercase tracking-[0.08em] text-grey">
+                  <p className="mb-sm mt-lg text-caption font-medium uppercase tracking-[0.18em] text-grey">
                     Not in your cellar — from the reference corpus
                   </p>
-                  <ul className="flex flex-col gap-sm">
+                  <ul className="border-t border-rule">
                     {result.corpus.map((wine) => (
                       <li key={wine.wineId}>
                         <CorpusResult wine={wine} />

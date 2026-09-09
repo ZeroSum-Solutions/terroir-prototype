@@ -97,8 +97,8 @@ export function SortableSectionButton({
       className={cn(
         "group flex items-center rounded-pill transition-colors",
         isActive && !isDragging
-          ? "bg-wash"
-          : "hover:bg-wash",
+          ? "bg-surface-raised"
+          : "hover:bg-surface-raised",
       )}
     >
       {/* Drag handle */}
@@ -110,7 +110,7 @@ export function SortableSectionButton({
           className="flex min-h-11 min-w-11 flex-shrink-0 cursor-grab touch-none items-center justify-center px-1 py-xs text-grey hover:text-ink active:cursor-grabbing"
           aria-label={`Drag to reorder ${section.name}`}
         >
-          <GripVertical className="h-3.5 w-3.5" strokeWidth={2} />
+          <GripVertical className="h-3.5 w-3.5" strokeWidth={1.9} />
         </button>
       )}
 
@@ -127,7 +127,7 @@ export function SortableSectionButton({
               if (e.key === "Escape") onEditCancel();
             }}
             onBlur={onEditCommit}
-            className="min-h-11 min-w-0 flex-1 rounded-pill border border-accent bg-surface px-sm py-0.5 text-[13px] font-medium text-ink outline-none focus-ring"
+            className="min-h-11 min-w-0 flex-1 rounded-pill border border-accent bg-surface-sunken px-sm py-0.5 text-control font-medium text-ink outline-none focus-ring"
           />
         </div>
       ) : (
@@ -136,7 +136,7 @@ export function SortableSectionButton({
           onClick={onSelect}
           className={cn(
             "flex min-h-11 min-w-0 flex-1 items-center justify-between px-sm py-xs text-left focus-ring",
-            isActive ? "text-ink font-medium" : "text-grey",
+            isActive ? "font-medium text-accent" : "text-grey",
           )}
         >
           {/* BUG-03. `truncate` on a single line left ~50px for the name once
@@ -149,18 +149,20 @@ export function SortableSectionButton({
               characters: shrinking the controls would have put them back under
               the 44px touch floor. */}
           <span
-            className="line-clamp-2 min-w-0 break-words text-[14px]"
+            className="line-clamp-2 min-w-0 break-words text-control"
             title={section.name}
           >
             {section.name}
           </span>
           <span
             className={cn(
-              "tabular text-[12px] ml-xs shrink-0",
-              isActive ? "text-ink" : "text-grey",
+              "tabular ml-xs shrink-0",
+              isActive ? "text-accent" : "text-grey",
             )}
           >
-            {section.wine_list_items.length}
+            <span className="text-ledger">
+              {section.wine_list_items.length}
+            </span>
           </span>
         </button>
       )}
@@ -179,10 +181,10 @@ export function SortableSectionButton({
               e.stopPropagation();
               onEditStart(section.id, section.name);
             }}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-pill text-grey hover:bg-surface-sunken hover:text-ink"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-pill text-grey hover:text-accent"
             aria-label={`Rename ${section.name}`}
           >
-            <Pencil className="h-3 w-3" strokeWidth={2} />
+            <Pencil className="h-3 w-3" strokeWidth={1.9} />
           </button>
           <button
             type="button"
@@ -193,7 +195,7 @@ export function SortableSectionButton({
             className="flex min-h-11 min-w-11 items-center justify-center rounded-pill text-grey hover:bg-risk-wash hover:text-risk-ink"
             aria-label={`Delete ${section.name}`}
           >
-            <Trash2 className="h-3 w-3" strokeWidth={2} />
+            <Trash2 className="h-3 w-3" strokeWidth={1.9} />
           </button>
         </div>
       )}

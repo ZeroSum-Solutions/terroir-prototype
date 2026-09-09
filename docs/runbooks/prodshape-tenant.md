@@ -7,13 +7,13 @@ data rather than on a fixture built to look good.
 
 ## Why it exists
 
-`scripts/seed-local-supabase.mjs` builds `LOCAL SEED - Osteria Scala`. That
+`scripts/seed-local-supabase.mjs` builds `Osteria Scala`. That
 tenant is the best case for producer completeness and identity links, but the
 reproducible seed does not include direct wine photos or the optional X-Wines
 corpus load. A QA session that only drives the demo tenant is still blind to the
 defects that appear at production's missing-data ratios.
 
-| axis | `LOCAL SEED - Osteria Scala` | production (2026-08-30) | `LOCAL PRODSHAPE - Trattoria Bianca` |
+| axis | `Osteria Scala` | production (2026-08-30) | `LOCAL PRODSHAPE - Trattoria Bianca` |
 |---|---|---|---|
 | wines | 250 | 1,385 | 400 |
 | with `hero_image_url` | 0 (0%) | 1 (0.07%) | 1 (0.25%) |
@@ -86,7 +86,7 @@ import { enterProdShape, leaveProdShape } from "./prodshape";
 await page.request.get("/api/dev-login");
 await enterProdShape(page);   // now in LOCAL PRODSHAPE - Trattoria Bianca
 await page.goto("/cellar");
-await leaveProdShape(page);   // back in LOCAL SEED - Osteria Scala
+await leaveProdShape(page);   // back in Osteria Scala
 ```
 
 **In a browser you are already signed into**, from the devtools console:

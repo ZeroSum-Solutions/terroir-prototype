@@ -28,7 +28,7 @@ export function MissingProducerGate({
   if (missingProducerRows <= 0) return null;
   const plural = missingProducerRows === 1;
   return (
-    <div className="mt-xs rounded-md bg-risk-wash px-sm py-xs text-body-sm text-risk-ink">
+    <div className="mt-xs rounded-card border border-accent px-sm py-xs text-body-sm text-ink-soft">
       <p>
         {missingProducerRows} row{plural ? " has" : "s have"} no producer. {plural ? "It" : "They"} will import, but a
         wine with no producer cannot be matched to the shared catalogue — so it will never gain a label photograph, a
@@ -37,15 +37,15 @@ export function MissingProducerGate({
       {/* No size class — the panel's own text-body-sm is the right size
           here, and the typography ratchet has no role for a bare pixel
           value (DESIGN.md scale tokens only). */}
-      <label className="mt-xs flex items-center gap-sm font-medium">
+      <label className="mt-xs -mx-sm flex min-h-11 cursor-pointer items-center gap-sm px-sm font-medium">
         <input
           type="checkbox"
           checked={acknowledged}
           disabled={disabled}
           onChange={(e) => onAcknowledge(e.target.checked)}
-          className="h-5 w-5 rounded-sm border-rule"
+          className="h-5 w-5 rounded-sm border-rule accent-[var(--color-accent)]"
         />
-        <span>Import {plural ? "it" : "them"} without a producer</span>
+        <span className="text-ink">Import {plural ? "it" : "them"} without a producer</span>
       </label>
     </div>
   );

@@ -55,10 +55,8 @@ export function DesktopNavLinks({ role }: { role: Role }) {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-11 min-w-11 items-center justify-center py-sm text-[13px] font-normal underline-offset-4 transition-colors",
-              active
-                ? "text-mark underline decoration-1"
-                : "text-ink-soft no-underline hover:text-ink",
+              "inline-flex min-h-11 min-w-11 items-center justify-center py-sm text-body-sm font-medium transition-colors",
+              active ? "text-mark" : "text-ink-soft hover:text-ink",
             )}
           >
             {label}
@@ -89,18 +87,21 @@ export function MobileNavLinks({ role }: { role: Role }) {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-[64px] flex-1 flex-col items-center justify-center gap-xs px-2xs py-sm text-[11px] font-medium transition-colors",
-              active
-                ? "border-t-2 border-mark text-mark"
-                : "border-t-2 border-transparent text-grey active:bg-wash",
+              // Inside the glass dock, colour-only "you are here": the
+              // active item is bone, the rest ash (DESIGN.md — Nav Dock).
+              // The size lives on the label span, not here: tailwind-merge
+              // cannot tell a custom text-<size> from a text-<colour> and
+              // keeps only the last, so `text-micro text-grey` would drop the size.
+              "flex min-h-[64px] flex-1 flex-col items-center justify-center gap-2xs px-2xs py-xs font-medium transition-colors first:rounded-l-pill last:rounded-r-pill",
+              active ? "text-primary" : "text-grey active:text-ink",
             )}
           >
             <Icon
-              className={cn("h-5 w-5", active && "text-mark")}
-              strokeWidth={active ? 2 : 1.75}
+              className={cn("h-[22px] w-[22px]", active && "text-primary")}
+              strokeWidth={active ? 1.9 : 1.6}
               aria-hidden
             />
-            <span className="truncate">{label}</span>
+            <span className="truncate text-micro tracking-normal">{label}</span>
           </Link>
         );
       })}

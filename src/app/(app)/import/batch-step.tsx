@@ -132,16 +132,16 @@ export function BatchStep({
 
   if (revertResult) {
     return (
-      <div className="rounded-card card-surface p-lg">
+      <div className="glass rounded-card p-lg">
         <div className="flex items-center gap-xs">
           <CheckCircle2 className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h2 className="font-serif text-[20px] text-ink">Import reverted</h2>
+          <h2 className="font-serif text-subheading font-normal text-ink">Import reverted</h2>
         </div>
-        <p className="mt-sm text-[14px] text-ink">{summarizeRevertResult(revertResult)}</p>
+        <p className="mt-sm text-control text-ink">{summarizeRevertResult(revertResult)}</p>
         <button
           type="button"
           onClick={onDone}
-          className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
+          className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
         >
           Done
         </button>
@@ -150,13 +150,13 @@ export function BatchStep({
   }
 
   return (
-    <div className="rounded-card card-surface p-lg">
+    <div className="glass rounded-card p-lg">
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-[20px] text-ink">{batch.batch.filename}</h2>
+        <h2 className="font-serif text-subheading font-normal text-ink">{batch.batch.filename}</h2>
         <StatusBadge status={batch.batch.status} />
       </div>
 
-      <dl className="mt-md grid grid-cols-2 gap-sm text-[13px]">
+      <dl className="mt-md grid grid-cols-2 gap-sm text-body-sm">
         <SummaryStat label="Total rows" value={batch.batch.total_rows} />
         <SummaryStat label="Applied" value={appliedCount} />
         <SummaryStat label="Needs resolution" value={pending.length} />
@@ -164,7 +164,7 @@ export function BatchStep({
       </dl>
 
       {actionError && (
-        <p role="alert" className="mt-md flex items-start gap-xs text-[13px] text-risk-ink">
+        <p role="alert" className="mt-md flex items-start gap-xs text-body-sm text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {actionError}
         </p>
@@ -175,10 +175,10 @@ export function BatchStep({
           <h3 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Needs your decision ({pending.length})
           </h3>
-          <ul className="mt-xs space-y-sm">
+          <ul className="mt-xs border-t border-rule">
             {pending.map((row) => (
-              <li key={row.id} className="rounded-card card-surface p-sm">
-                <p className="text-[14px] text-ink">
+              <li key={row.id} className="border-b border-rule px-2xs py-sm">
+                <p className="text-control text-ink">
                   Row {row.row_number}: {row.raw.producer ? `${row.raw.producer} — ` : ""}{row.raw.name}
                 </p>
                 <p className="mt-2xs text-caption text-grey">
@@ -194,7 +194,10 @@ export function BatchStep({
                       placeholder="Unit cost"
                       value={manualCostDrafts[row.id] ?? ""}
                       onChange={(e) => setManualCostDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                      className="min-h-11 w-28 rounded-pill border border-rule bg-surface px-sm text-[14px] focus:border-accent focus-ring"
+                      // 17px keeps iOS from zooming the page on focus; 14px
+                      // once there is a pointer. Both are scale tokens (see
+                      // add-wine-pricing.tsx).
+                      className="min-h-11 w-28 rounded-pill border border-rule-strong bg-surface-sunken px-md text-body-lg focus:border-accent focus-ring md:text-control"
                     />
                   )}
                   <button
@@ -205,14 +208,14 @@ export function BatchStep({
                       void resolveRow(row.id, "include", manualUnitCost);
                     }}
                     disabled={row.cost_status === "missing" && !manualCostDrafts[row.id]}
-                    className="min-h-11 rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-pill bg-primary px-md text-control font-semibold text-seal-ink hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Include anyway
                   </button>
                   <button
                     type="button"
                     onClick={() => void resolveRow(row.id, "exclude")}
-                    className="min-h-11 rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+                    className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
                   >
                     Exclude
                   </button>
@@ -245,7 +248,7 @@ export function BatchStep({
           neutral, always-true fact: it was reverted, its rows were never
           applied, re-upload to try again — no claim about why. */}
       {batch.batch.status === "reverted" && eligibleNotApplied.length > 0 && (
-        <p role="status" className="mt-md text-[13px] text-grey">
+        <p role="status" className="mt-md text-body-sm text-ink-soft">
           This import batch was reverted. Its rows were not imported; upload the file again to re-import.
         </p>
       )}
@@ -256,7 +259,7 @@ export function BatchStep({
             type="button"
             disabled={applying}
             onClick={applyAll}
-            className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {applying ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {applying ? `Applying… (${appliedCount} of ${batch.batch.total_rows})` : `Apply ${eligibleNotApplied.length} row(s)`}
@@ -276,7 +279,7 @@ export function BatchStep({
           <button
             type="button"
             onClick={() => setRevertDialogOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+            className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
             Revert this import
@@ -286,7 +289,7 @@ export function BatchStep({
         <button
           type="button"
           onClick={onDone}
-          className="min-h-11 rounded-pill px-lg text-[14px] font-medium text-grey underline underline-offset-4 hover:text-ink focus-ring"
+          className="min-h-11 rounded-pill px-lg text-control font-medium text-accent underline underline-offset-4 hover:text-ink focus-ring"
         >
           Start a new import
         </button>
@@ -313,7 +316,7 @@ function StatusBadge({ status }: { status: BatchSummary["status"] }) {
     reverted: "Reverted",
   }[status];
   return (
-    <span className="inline-flex items-center gap-2xs rounded-pill bg-wash px-sm py-2xs text-caption font-medium text-ink">
+    <span className="inline-flex items-center gap-2xs rounded-pill bg-peak-wash px-sm py-2xs text-caption font-medium uppercase text-peak-ink">
       {status === "completed" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
       {label}
     </span>

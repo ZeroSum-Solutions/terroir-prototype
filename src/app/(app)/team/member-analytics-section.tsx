@@ -33,12 +33,12 @@ export function MemberAnalyticsSection({
 
   if (error) {
     return (
-      <p role="alert" className="mt-lg rounded-md border border-risk-ink/30 bg-risk-wash px-md py-sm text-[13px] text-risk-ink">
+      <p role="alert" className="mt-lg rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink">
         {error}
       </p>
     );
   }
-  if (!data) return <div className="mt-lg h-32 animate-pulse rounded-card bg-wash" />;
+  if (!data) return <div className="mt-lg h-32 animate-pulse rounded-card bg-surface-raised" />;
   return <MemberAnalyticsTable data={data} identities={identities} />;
 }
 
@@ -50,14 +50,14 @@ export function MemberAnalyticsTable({
   identities: MemberIdentityLookup;
 }) {
   return (
-    <section aria-labelledby="member-analytics-heading" className="mt-xl rounded-card card-surface p-md">
+    <section aria-labelledby="member-analytics-heading" className="glass mt-xl rounded-card p-md">
       <div className="mb-md flex flex-wrap items-baseline justify-between gap-xs">
-        <h2 id="member-analytics-heading" className="text-[15px] font-semibold text-ink">Member analytics</h2>
-        <span className="text-[12px] text-grey">House median {formatRate(data.houseMedianCompRate)}</span>
+        <h2 id="member-analytics-heading" className="text-caption font-medium uppercase tracking-[0.18em] text-grey">Member analytics</h2>
+        <span className="text-ledger text-grey">House median {formatRate(data.houseMedianCompRate)}</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left text-[12px]">
-          <thead className="text-[11px] font-medium uppercase tracking-[0.18em] text-grey">
+        <table className="w-full min-w-[680px] text-left text-ledger">
+          <thead className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             <tr><th className="pb-sm">Member</th><th className="pb-sm">Pours</th><th className="pb-sm">Comps</th><th className="pb-sm">Comp rate vs median</th><th className="pb-sm">Close-out variance</th></tr>
           </thead>
           <tbody>
@@ -69,12 +69,12 @@ export function MemberAnalyticsTable({
                 email: "Email unavailable",
               };
               return (
-                <tr id={`member-${memberToken}`} key={member.memberId} className="border-t border-rule align-top hover:bg-wash">
+                <tr id={`member-${memberToken}`} key={member.memberId} className="border-t border-rule align-top hover:bg-surface-raised">
                   <td className="py-sm pr-md">
-                    <span className="block font-medium text-ink">{identity.name}</span>
+                    <span className="block font-serif text-body-lg font-normal text-ink">{identity.name}</span>
                     <span className="block break-all text-grey">{identity.email}</span>
                     <span className="mt-2xs block capitalize text-grey">{member.role}</span>
-                    {member.requiresVarianceInvestigation && <span className="mt-xs block w-fit rounded-pill bg-risk-wash px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide text-risk-ink">Variance investigation</span>}
+                    {member.requiresVarianceInvestigation && <span className="mt-xs block w-fit rounded-pill bg-risk-wash px-sm py-2xs text-caption font-medium uppercase tracking-[0.18em] text-risk-ink">Variance investigation</span>}
                   </td>
                   <Metric href={anchor} name={`member-${memberToken}-pours`}>{member.pourCount} · {member.pourMl.toLocaleString()} ml</Metric>
                   <Metric href={anchor} name={`member-${memberToken}-comps`}>{member.compCount}</Metric>

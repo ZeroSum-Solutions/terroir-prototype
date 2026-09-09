@@ -7,7 +7,7 @@ export function InsightScope(
   return (
     <span
       data-insight-scope={props.metric}
-      className="text-[11px] font-medium uppercase tracking-wide text-grey"
+      className="text-caption font-medium uppercase text-grey"
     >
       {text}
     </span>

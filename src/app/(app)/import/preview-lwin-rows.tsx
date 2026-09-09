@@ -48,7 +48,7 @@ export function PreviewMatchedWines({
         Each row below matched a wine in the catalog and will link it on import — reject a match you
         don&rsquo;t trust and it imports with no catalog link, exactly like a row that never matched.
       </p>
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {shownMatchedRows.map((row) => (
           <MatchedLwinRowItem
             key={row.rowNumber}
@@ -70,7 +70,7 @@ export function PreviewMatchedWines({
         <button
           type="button"
           onClick={() => setShownMatchedCount((count) => count + MAX_SHOWN_MATCHED_ROWS)}
-          className="mt-xs min-h-11 rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+          className="mt-xs min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
         >
           Show {Math.min(hiddenMatchedCount, MAX_SHOWN_MATCHED_ROWS)} more matched row(s)
         </button>
@@ -106,7 +106,7 @@ export function PreviewBelowThreshold({
         These scored below the {LWIN_APPLY_MIN_SCORE.toFixed(2)} confidence bar apply requires to link a
         catalog entry — they&rsquo;ll import with no wine-catalog link no matter what you do here.
       </p>
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {shownBelowThresholdRows.map((row) => (
           <BelowThresholdLwinRowItem key={row.rowNumber} row={row} />
         ))}
@@ -115,7 +115,7 @@ export function PreviewBelowThreshold({
         <button
           type="button"
           onClick={() => setShownBelowThresholdCount((count) => count + MAX_SHOWN_MATCHED_ROWS)}
-          className="mt-xs min-h-11 rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+          className="mt-xs min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
         >
           Show {Math.min(hiddenBelowThresholdCount, MAX_SHOWN_MATCHED_ROWS)} more row(s)
         </button>
@@ -162,7 +162,7 @@ function MatchedLwinRowItem({
     ? `Chunk ${row.chunkIndex}, data row ${row.chunkRowNumber}`
     : `Row ${row.rowNumber}`;
   return (
-    <li className="rounded-md bg-wash px-sm py-xs text-[13px] text-ink">
+    <li className="border-b border-rule px-2xs py-sm text-body-sm text-ink">
       <div className="flex flex-wrap items-center justify-between gap-sm">
         <div>
           <span>{label}</span>
@@ -180,7 +180,7 @@ function MatchedLwinRowItem({
           type="button"
           onClick={() => onToggle(row.rowNumber)}
           disabled={disabled}
-          className="min-h-11 rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:cursor-not-allowed disabled:opacity-60"
         >
           {rejected ? "Undo reject" : "Reject match"}
         </button>
@@ -200,7 +200,7 @@ function BelowThresholdLwinRowItem({ row }: { row: MatchedLwinRowEntry }) {
     ? `Chunk ${row.chunkIndex}, data row ${row.chunkRowNumber}`
     : `Row ${row.rowNumber}`;
   return (
-    <li className="rounded-md bg-wash px-sm py-xs text-[13px] text-ink">
+    <li className="border-b border-rule px-2xs py-sm text-body-sm text-ink">
       <span>{label}</span>
       <p className="mt-2xs text-caption text-grey">
         {row.lwinDisplayName ?? "Catalog entry (name unavailable)"} — match score {row.lwinScore.toFixed(2)}, will

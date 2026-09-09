@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/auth-context";
-import { ArrowLeft, ChevronLeft, ChevronRight, FileText, ScanLine } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ScanLine } from "lucide-react";
 import { RouteDataEmpty } from "@/components/route-data-state";
 import { expireStalledScans } from "@/domains/scanning/stalled-scans";
 import { describeScanStatusReason } from "@/lib/scanner/scan-status-reason";
@@ -93,7 +93,7 @@ export default async function ScansPage({
     console.error("Failed to load scan history:", error);
     return (
       <div className="flex flex-col items-center justify-center py-24">
-        <p className="text-[14px] text-grey">Failed to load scan history.</p>
+        <p className="text-body-sm text-grey">Failed to load scan history.</p>
       </div>
     );
   }
@@ -107,25 +107,37 @@ export default async function ScansPage({
     <ScanStatusSelect status={status} counts={statusCounts} />
   );
 
+  // The masthead (DESIGN.md — Components, Masthead): the copper glow rather
+  // than a photograph, the range and the section in the eyebrow, the room's
+  // name in the serif. The old count pill is that eyebrow now — one control
+  // fewer on a 390px row.
   const headerBlock = (
-    <header className="mb-lg">
+    <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-md md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-lg">
       <Link
         href="/scan"
-        className="mb-md inline-flex min-h-11 items-center gap-xs text-[13px] text-grey hover:text-ink focus-ring"
+        className="mb-md inline-flex min-h-11 items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey hover:text-accent focus-ring"
       >
-        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.9} />
         Back to scanner
       </Link>
-      <div className="flex items-center justify-between gap-md">
-        <h1 className="font-serif text-heading-sm text-ink md:text-heading">Scan history</h1>
-        <div className="flex items-center gap-sm">
-          {rows.length > 0 && (
-            <span className="rounded-pill bg-wash px-sm py-xs text-[11px] font-medium uppercase tracking-[0.1em] text-grey">
-              {offset + 1}–{offset + rows.length} of {total}
-            </span>
-          )}
-          <ExportCsvButton rows={rows} />
+      <div className="flex items-end justify-between gap-md">
+        <div className="min-w-0">
+          <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+            Scan · History
+            {rows.length > 0 ? (
+              <>
+                {" · "}
+                <span className="tabular">
+                  {offset + 1}–{offset + rows.length} of {total}
+                </span>
+              </>
+            ) : null}
+          </p>
+          <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
+            Scan history
+          </h1>
         </div>
+        <ExportCsvButton rows={rows} />
       </div>
       {statusFilter}
     </header>
@@ -168,7 +180,7 @@ export default async function ScansPage({
           action={
             <Link
               href="/scan"
-              className="inline-flex h-11 items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+              className="inline-flex h-12 items-center gap-sm rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
             >
               Scan an invoice
             </Link>
@@ -182,148 +194,52 @@ export default async function ScansPage({
     <section>
       {headerBlock}
 
-      {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-card card-surface md:block">
-        <table className="w-full border-collapse text-[14px]">
-          <thead>
-            <tr className="bg-wash">
-              <th scope="col" className="px-md py-sm text-left text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Date
-              </th>
-              <th scope="col" className="px-md py-sm text-left text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Supplier
-              </th>
-              <th scope="col" className="px-md py-sm text-left text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Invoice #
-              </th>
-              <th scope="col" className="px-md py-sm text-center text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Items
-              </th>
-              <th scope="col" className="px-md py-sm text-center text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Status
-              </th>
-              <th scope="col" className="px-md py-sm text-center text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                Accuracy
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s, i) => (
-              <tr
-                key={s.id}
-                className={`border-t border-rule hover:bg-wash ${
-                  i === 0 ? "border-t-0" : ""
-                }`}
-              >
-                <td className="px-md py-sm">
-                  <Link
-                    href={`/scan/${s.id}`}
-                    className="block text-ink hover:text-accent focus-ring"
-                  >
-                    <span className="font-mono text-[13px] tabular">
-                      {s.invoice_date ?? s.created_at.slice(0, 10)}
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-md py-sm">
-                  <Link
-                    href={`/scan/${s.id}`}
-                    className="block font-medium text-ink hover:text-accent focus-ring"
-                  >
-                    {s.distributor_name}
-                  </Link>
-                  {/* D6 rule 1: nothing vanishes on its own, so a row that
-                      found nothing or failed has to say WHY here — a 0-item
-                      "complete" and a 0-item "failed" were otherwise
-                      indistinguishable. */}
-                  {describeScanStatusReason(s.status_reason) && (
-                    <p className="mt-2xs text-ledger text-grey">
-                      {describeScanStatusReason(s.status_reason)}
-                    </p>
-                  )}
-                </td>
-                <td className="px-md py-sm">
-                  <Link
-                    href={`/scan/${s.id}`}
-                    className="block font-mono text-[13px] text-grey focus-ring"
-                  >
-                    {s.invoice_number ?? "—"}
-                  </Link>
-                </td>
-                <td className="px-md py-sm text-center">
-                  <Link
-                    href={`/scan/${s.id}`}
-                    className="block font-mono tabular text-ink focus-ring"
-                  >
-                    {s.item_count}
-                  </Link>
-                </td>
-                <td className="px-md py-sm text-center">
-                  <Link href={`/scan/${s.id}`} className="block focus-ring">
-                    <span
-                      className={`inline-block rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${statusBadge(s.status)}`}
-                    >
-                      {statusLabel(s.status)}
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-md py-sm text-center">
-                  <Link href={`/scan/${s.id}`} className="block focus-ring">
-                    <span className="font-mono text-[13px] text-grey tabular">
-                      {s.accuracy_score != null
-                        ? `${Math.round(s.accuracy_score * 100)}%`
-                        : "—"}
-                    </span>
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="flex flex-col gap-sm md:hidden">
-        {rows.map((s) => (
+      {/* One index list at every width (DESIGN.md — Index Row): supplier in
+          the serif, date and invoice number as the eyebrow, the wine count
+          right-aligned, the status as a seal. The desktop table this replaces
+          carried the same six fields in six columns and a second, unrelated
+          card layout below it. */}
+      <div className="overflow-hidden rounded-card card-surface">
+        {rows.map((s, i) => (
           <Link
             key={s.id}
             href={`/scan/${s.id}`}
-            className="flex items-center gap-md rounded-card card-surface p-md hover:bg-wash focus-ring"
+            className={`flex min-h-11 items-start gap-md px-md py-sm transition-colors hover:bg-surface-raised focus-ring${
+              i > 0 ? " border-t border-rule" : ""
+            }`}
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-wash">
-              <FileText className="h-5 w-5 text-grey" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-medium text-ink">
-                {s.distributor_name}
-              </div>
-              <div className="mt-2xs flex items-center gap-sm text-[12px] text-grey">
-                <span className="font-mono">
-                  {s.invoice_date ?? s.created_at.slice(0, 10)}
-                </span>
-                {s.invoice_number && (
-                  <>
-                    <span aria-hidden className="text-grey">·</span>
-                    <span className="font-mono">#{s.invoice_number}</span>
-                  </>
-                )}
-              </div>
-              {describeScanStatusReason(s.status_reason) && (
-                <p className="mt-2xs text-ledger text-grey">
-                  {describeScanStatusReason(s.status_reason)}
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-xs">
-              <span className="font-mono text-[14px] tabular text-ink">
-                {s.item_count}
+            <span className="min-w-0 flex-1">
+              <span className="tabular block text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                {s.invoice_date ?? s.created_at.slice(0, 10)}
+                {s.invoice_number ? ` · #${s.invoice_number}` : ""}
               </span>
+              <span className="mt-2xs block truncate font-serif text-body-lg text-ink">
+                {s.distributor_name}
+              </span>
+              {/* D6 rule 1: nothing vanishes on its own, so a row that found
+                  nothing or failed has to say WHY here — a 0-item "complete"
+                  and a 0-item "failed" were otherwise indistinguishable. */}
+              {describeScanStatusReason(s.status_reason) && (
+                <span className="mt-2xs block text-ledger text-risk-ink">
+                  {describeScanStatusReason(s.status_reason)}
+                </span>
+              )}
+            </span>
+            <span className="flex shrink-0 flex-col items-end gap-xs">
               <span
-                className={`inline-block rounded-pill px-sm py-2xs text-[10px] font-medium uppercase tracking-wide ${statusBadge(s.status)}`}
+                className={`inline-block rounded-pill px-sm py-2xs text-caption font-medium uppercase tracking-[0.14em] ${statusBadge(
+                  s.status,
+                )}`}
               >
                 {statusLabel(s.status)}
               </span>
-            </div>
+              <span className="tabular text-body-lg text-ink">{s.item_count}</span>
+              <span className="tabular text-ledger text-grey">
+                {s.accuracy_score != null
+                  ? `${Math.round(s.accuracy_score * 100)}%`
+                  : "—"}
+              </span>
+            </span>
           </Link>
         ))}
       </div>
@@ -336,32 +252,32 @@ export default async function ScansPage({
         {page > 1 ? (
           <Link
             href={`/scans${buildQuery({ page: page - 1, status })}`}
-            className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+            className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
-            <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.9} />
             Previous
           </Link>
         ) : (
-          <span className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule bg-surface px-md text-[13px] font-medium text-grey opacity-50">
-            <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+          <span className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule bg-transparent px-md text-control font-medium text-grey opacity-50">
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.9} />
             Previous
           </span>
         )}
-        <span className="px-sm text-[13px] tabular text-grey">
+        <span className="tabular px-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
           Page {page} of {totalPages}
         </span>
         {hasMore ? (
           <Link
             href={`/scans${buildQuery({ page: page + 1, status })}`}
-            className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+            className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             Next
-            <ChevronRight className="h-4 w-4" strokeWidth={2} />
+            <ChevronRight className="h-4 w-4" strokeWidth={1.9} />
           </Link>
         ) : (
-          <span className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule bg-surface px-md text-[13px] font-medium text-grey opacity-50">
+          <span className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule bg-transparent px-md text-control font-medium text-grey opacity-50">
             Next
-            <ChevronRight className="h-4 w-4" strokeWidth={2} />
+            <ChevronRight className="h-4 w-4" strokeWidth={1.9} />
           </span>
         )}
       </nav>

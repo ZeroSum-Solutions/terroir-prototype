@@ -43,33 +43,33 @@ export function CellarHealthPanel({
           >
             Cellar health
           </h2>
-          <p className="mt-2xs text-[12px] text-grey">
+          <p className="mt-2xs text-ledger text-grey">
             Stock value and wine count by segment
           </p>
         </div>
         {canRecompute && <RecomputeCellarHealthButton />}
       </div>
-      <div className="grid gap-xs rounded-card card-surface p-md md:grid-cols-5">
+      <div className="glass grid gap-xs rounded-card p-md md:grid-cols-5">
         {summary.map((item) => {
           const href = `/cellar?health=${item.segment}`;
           return (
-            <div key={item.segment} className={`rounded-md border border-rule p-sm ${SEGMENT_BG[item.segment]}`}>
-              <h3 className="text-[12px] font-medium text-ink">{LABELS[item.segment]}</h3>
+            <div key={item.segment} className={`rounded-lg p-sm ${SEGMENT_BG[item.segment]}`}>
+              <h3 className="text-caption font-medium uppercase text-grey">{LABELS[item.segment]}</h3>
               <div className="mt-xs grid grid-cols-2 gap-xs">
                 <div data-metric={`cellar-health-${item.segment}-value`}>
-                  <Link href={href} className="block rounded-sm hover:bg-surface-sunken">
-                    <span className="block font-mono text-[16px] font-medium tabular text-ink">
+                  <Link href={href} className="block rounded-sm hover:text-accent">
+                    <span className="block font-serif text-subheading font-normal tabular text-ink">
                       {formatMoney(item.value)}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.06em] text-grey">
+                    <span className="text-micro uppercase text-grey">
                       value
                     </span>
                   </Link>
                 </div>
                 <div data-metric={`cellar-health-${item.segment}-count`}>
-                  <Link href={href} className="block rounded-sm hover:bg-surface-sunken">
-                    <span className="block font-mono text-[16px] font-medium tabular text-ink">{item.count}</span>
-                    <span className="text-[10px] uppercase tracking-[0.06em] text-grey">
+                  <Link href={href} className="block rounded-sm hover:text-accent">
+                    <span className="block font-serif text-subheading font-normal tabular text-ink">{item.count}</span>
+                    <span className="text-micro uppercase text-grey">
                       wines
                     </span>
                   </Link>
@@ -85,11 +85,11 @@ export function CellarHealthPanel({
       {unscored && unscored.count > 0 && (
         <p
           data-metric="cellar-health-unscored"
-          className="mt-xs text-[12px] text-grey"
+          className="mt-xs text-ledger text-grey"
         >
-          <span className="font-mono tabular">{unscored.count}</span> wine
+          <span className="tabular">{unscored.count}</span> wine
           {unscored.count === 1 ? "" : "s"} ·{" "}
-          <span className="font-mono tabular">{formatMoney(unscored.value)}</span>{" "}
+          <span className="tabular">{formatMoney(unscored.value)}</span>{" "}
           not yet scored — recompute to include them.
         </p>
       )}

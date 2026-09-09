@@ -29,16 +29,16 @@ export function ManualView({ manualCode, onManualCodeChange, onSubmit, onUseCame
             value={manualCode}
             onChange={(e) => onManualCodeChange(e.target.value)}
             placeholder="Enter the code from the bottle label"
-            className="w-full rounded-pill border border-rule bg-surface px-md py-sm font-mono text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+            className="h-12 w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink placeholder:text-grey focus:border-accent focus-ring"
           />
-          <p className="mt-xs text-[12px] text-grey">
+          <p className="mt-xs text-ledger text-grey">
             The code is printed below the QR code on the bottle label.
           </p>
         </div>
         <button
           type="submit"
           disabled={!manualCode.trim()}
-          className="flex h-[44px] w-full items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center gap-sm rounded-pill bg-primary text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-50"
         >
           <Search className="h-4 w-4" strokeWidth={2} />
           Look up wine
@@ -47,7 +47,7 @@ export function ManualView({ manualCode, onManualCodeChange, onSubmit, onUseCame
       <button
         type="button"
         onClick={onUseCamera}
-        className="flex h-[44px] w-full items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+        className="flex h-12 w-full items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
       >
         <Camera className="h-4 w-4" strokeWidth={2} />
         Use camera instead

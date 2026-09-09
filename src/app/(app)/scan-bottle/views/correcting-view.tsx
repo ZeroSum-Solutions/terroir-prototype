@@ -41,12 +41,12 @@ export function CorrectingView({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by producer, name, or vintage..."
-          className="w-full rounded-pill border border-rule bg-surface px-md py-sm text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+          className="h-12 w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink placeholder:text-grey focus:border-accent focus-ring"
         />
       </div>
 
       {searching && (
-        <p className="px-md text-[13px] text-grey">Searching...</p>
+        <p className="px-md text-body-sm text-grey">Searching...</p>
       )}
 
       {!searching && searchError && (
@@ -62,18 +62,18 @@ export function CorrectingView({
               <button
                 type="button"
                 onClick={() => onSelect(w)}
-                className="flex w-full items-start gap-md px-md py-md text-left hover:bg-wash focus-ring"
+                className="flex min-h-11 w-full items-start gap-md px-md py-md text-left transition-colors hover:bg-surface-raised focus-ring"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-serif text-[17px] font-medium text-ink">
+                  <p className="truncate font-serif text-body-lg font-medium text-ink">
                     {w.producer}
                   </p>
-                  <p className="truncate text-[14px] text-grey">
+                  <p className="truncate text-body-sm text-grey">
                     {wineDisplayName(w.producer, w.name)}
                     {w.vintage ? ", " + w.vintage : ""}
                   </p>
                 </div>
-                <span className="mt-0.5 shrink-0 text-[11px] text-grey">
+                <span className="mt-0.5 shrink-0 text-ledger text-grey">
                   {w.varietal}
                   {w.varietal && w.region ? " . " : ""}
                   {w.region}
@@ -88,7 +88,7 @@ export function CorrectingView({
         !searchError &&
         searchQuery.length >= 2 &&
         searchResults.length === 0 && (
-          <p className="px-md text-[13px] text-grey">
+          <p className="px-md text-body-sm text-grey">
             No wines found for &ldquo;
             {searchQuery}
             &rdquo;.
@@ -98,7 +98,7 @@ export function CorrectingView({
       <button
         type="button"
         onClick={onCancel}
-        className="flex h-[44px] w-full items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+        className="flex h-12 w-full items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
       >
         <X className="h-4 w-4" strokeWidth={2} />
         Cancel

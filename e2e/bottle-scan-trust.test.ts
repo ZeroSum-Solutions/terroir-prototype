@@ -105,6 +105,8 @@ test.describe("bottle-scan result trust (AF-D, walkthrough §1.2)", () => {
     await gotoFreshScanPage(page);
     await page.getByRole("button", { name: "Bottle", exact: true }).click();
 
+    await expect(page.getByRole("button", { name: "Bottle", exact: true })).toHaveAttribute("aria-pressed", "true");
+
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Upload file" }).click();
     const chooser = await fileChooserPromise;

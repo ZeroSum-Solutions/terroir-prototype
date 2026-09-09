@@ -16,6 +16,7 @@ import { resolveCellarNavigationIntent } from "./cellar-navigation";
 import { useCellarUrlState } from "./use-cellar-url-state";
 import { buildCellarCounters } from "./cellar-counters";
 import { CellarControlBar } from "./cellar-control-bar";
+import { CellarMasthead } from "./cellar-masthead";
 import { VoiceCellarControl } from "./voice-cellar-control";
 
 type CellarSection = { id: string; name: string };
@@ -30,7 +31,7 @@ export function CellarShell({
   cellarConfig,
   gridData,
   restaurantName,
-  restaurantId,
+  restaurantId, userId,
   autoEightysixEnabled,
   autoEightysixThresholdMl,
   eightysixStrategy,
@@ -44,7 +45,7 @@ export function CellarShell({
   cellarConfig: { id: string; rows: number; columns: number; name: string; lowStockThreshold: number; reconcileVarianceThresholdOz: number } | null;
   gridData: GridData;
   restaurantName: string;
-  restaurantId: string;
+  restaurantId: string; userId: string;
   autoEightysixEnabled: boolean;
   autoEightysixThresholdMl: number;
   eightysixStrategy: "hide" | "mark";
@@ -176,7 +177,7 @@ export function CellarShell({
   }, []);
 
   const alerts = useMemo(() => {
-    const totalBottles = rows.reduce((acc, r) => acc + r.sealed_count, 0);
+    const totalBottles = rows.length; // wines, not bottles — matches every sibling counter below
     const openCount = rows.filter(
       (r) => r.open_remaining_ml !== null && r.open_remaining_ml > 0,
     ).length;
@@ -240,15 +241,7 @@ export function CellarShell({
 
   return (
     <section className="min-w-0 max-w-full overflow-x-hidden">
-      {/* Dawn Hero */}
-      <div className="-mx-md -mt-lg dawn-gradient px-md pb-lg pt-lg max-[359px]:pb-xs max-[359px]:pt-xs md:-mx-lg md:-mt-xl md:px-lg md:pb-2xl md:pt-xl">
-        <p className="truncate text-caption font-medium uppercase text-grey">
-          {restaurantName} · Cellar
-        </p>
-        <h1 className="mt-xs max-w-[560px] font-serif text-heading-sm font-light leading-[1.1] text-ink max-[359px]:mt-2xs max-[359px]:text-[22px] md:text-heading lg:max-w-[820px] lg:text-display">
-          A cellar beyond the <em className="italic font-normal text-mark">ordinary</em>
-        </h1>
-      </div>
+      <CellarMasthead count={rows.length} restaurantName={restaurantName} />
 
       {/* Search — GLOBAL-02 lifts it out of the control row and puts it above,
           on its own, at every width. The mobile search icon and its overlay are
@@ -449,7 +442,7 @@ export function CellarShell({
         open={reconcileOpen}
         items={reconcileItems}
         varianceThresholdOz={cellarConfig?.reconcileVarianceThresholdOz ?? 1.0}
-        onClose={() => setReconcileOpen(false)}
+        onClose={() => setReconcileOpen(false)} restaurantId={restaurantId} userId={userId}
       />
 
       {isOwner && (
@@ -510,7 +503,7 @@ function SearchInput({
         }}
         placeholder="Search name, producer, region…"
         autoFocus={autoFocus}
-        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-[13px] text-ink outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
+        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink md:text-control outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
       />
       {value ? (
         <button

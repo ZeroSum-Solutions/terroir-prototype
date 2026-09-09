@@ -45,7 +45,7 @@ export function NameEditField({
       }}
       placeholder={item.wines.name}
       aria-label={`Display name for ${item.wines.name}`}
-      className="min-h-11 w-full rounded-md border-2 border-mark bg-surface px-xs py-2xs font-serif text-body-lg font-medium text-ink focus-ring"
+      className="min-h-11 w-full rounded-md border-2 border-accent bg-surface-sunken px-xs py-2xs font-serif text-body-lg font-normal text-ink focus-ring"
     />
   );
 }
@@ -73,7 +73,7 @@ export function NameEdit({
     return (
       <span
         className={cn(
-          "block min-h-11 px-xs py-2xs font-serif text-body-lg font-medium",
+          "block min-h-11 px-xs py-2xs font-serif text-body-lg font-normal",
           item.name_override != null ? "text-accent italic" : "text-ink",
         )}
       >
@@ -92,8 +92,8 @@ export function NameEdit({
         type="button"
         onClick={() => setEditing(true)}
         className={cn(
-          "min-h-11 rounded-md border border-transparent px-xs py-2xs text-left transition-colors hover:border-rule hover:bg-surface",
-          "font-serif text-body-lg font-medium",
+          "min-h-11 rounded-md border border-transparent px-xs py-2xs text-left transition-colors hover:border-rule-strong hover:bg-surface-raised",
+          "font-serif text-body-lg font-normal",
           isOverridden ? "text-accent italic" : "text-ink",
         )}
         title={isOverridden ? "Custom display name (click to edit)" : "Click to set a custom display name"}

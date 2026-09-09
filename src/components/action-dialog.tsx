@@ -95,12 +95,12 @@ export function ActionDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         aria-busy={busy || undefined}
-        className="w-full rounded-t-card card-surface p-lg pb-[calc(var(--safe-bottom)+var(--spacing-lg))] sm:max-w-[420px] sm:rounded-card sm:pb-lg"
+        className="glass w-full rounded-t-card p-lg pb-[calc(var(--safe-bottom)+var(--spacing-lg))] sm:max-w-[420px] sm:rounded-card sm:pb-lg"
       >
-        <h2 id={titleId} className="font-serif text-[24px] font-normal leading-tight text-ink">
+        <h2 id={titleId} className="font-serif text-subheading font-normal leading-tight text-ink">
           {title}
         </h2>
-        <p id={descriptionId} className="mt-xs text-[14px] leading-relaxed text-grey">
+        <p id={descriptionId} className="mt-xs text-body-sm leading-relaxed text-ink-soft">
           {description}
         </p>
 
@@ -115,7 +115,7 @@ export function ActionDialog({
             type="button"
             aria-disabled={busy || undefined}
             onClick={closeWhenIdle}
-            className="min-h-11 rounded-pill border border-rule bg-surface px-lg text-[14px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+            className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             {cancelLabel}
           </button>
@@ -124,7 +124,7 @@ export function ActionDialog({
             disabled={busy}
             onClick={onConfirm}
             className={cn(
-              "min-h-11 rounded-pill px-lg text-[14px] font-medium transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-60",
+              "min-h-11 rounded-pill px-lg text-control font-semibold transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-60",
               tone === "danger"
                 ? "bg-primary text-seal-ink hover:bg-primary-hover"
                 : "bg-surface-inverse text-on-inverse hover:bg-ink-soft",

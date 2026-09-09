@@ -732,7 +732,7 @@ export function Scanner({
     router.push("/import");
   };
 
-  if (!hydrated) return <ReadyView onStart={handleStart} onSpreadsheet={handleSpreadsheet} mode={mode} onModeChange={handleModeChange} recentScans={recentScans} savedResult={null} onDismissSaved={() => {}} />;
+  if (!hydrated) return <ReadyView disabled onStart={handleStart} onSpreadsheet={handleSpreadsheet} mode={mode} onModeChange={handleModeChange} recentScans={recentScans} savedResult={null} onDismissSaved={() => {}} />;
 
   return (
     <>
@@ -789,13 +789,13 @@ export function Scanner({
         <div
           role={feedback.kind === "error" ? "alert" : "status"}
           aria-live={feedback.kind === "error" ? "assertive" : "polite"}
-          className="glass fixed inset-x-md bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-lg))] z-[var(--z-toast)] mx-auto max-w-[420px] rounded-card px-md py-sm text-[14px] text-ink md:bottom-lg"
+          className="glass fixed inset-x-md bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-lg))] z-[var(--z-toast)] mx-auto max-w-[420px] rounded-card px-md py-sm text-control text-ink md:bottom-lg"
         >
           <div className="flex items-center gap-sm">
             {feedback.kind === "error" ? (
-              <AlertTriangle className="h-4 w-4 text-risk-ink" strokeWidth={2.25} aria-hidden="true" />
+              <AlertTriangle className="h-4 w-4 text-risk-ink" strokeWidth={1.9} aria-hidden="true" />
             ) : (
-              <Check className="h-4 w-4 text-ready-ink" strokeWidth={2.25} aria-hidden="true" />
+              <Check className="h-4 w-4 text-ready-ink" strokeWidth={1.9} aria-hidden="true" />
             )}
             {feedback.message}
           </div>

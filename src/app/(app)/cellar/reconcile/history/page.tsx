@@ -83,8 +83,8 @@ function VarianceChart({ dailySummaries }: { dailySummaries: DayGroup[] }) {
   );
 
   return (
-    <div className="mb-xl rounded-md border border-border bg-surface p-lg">
-      <h2 className="mb-md flex items-center gap-xs font-serif text-[18px] text-ink">
+    <div className="glass mb-xl rounded-card p-lg">
+      <h2 className="mb-md flex items-center gap-xs font-serif text-subheading font-normal text-ink">
         <BarChart3 className="h-5 w-5 text-grey" strokeWidth={1.5} />
         Variance trend
       </h2>
@@ -97,15 +97,15 @@ function VarianceChart({ dailySummaries }: { dailySummaries: DayGroup[] }) {
               className="flex flex-1 flex-col items-center justify-end"
               style={{ height: "100%" }}
             >
-              <span className="mb-xs font-mono text-[10px] text-grey tabular-nums">
+              <span className="mb-xs text-micro tabular-nums text-grey">
                 {formatAbsoluteOz(day.totalVarianceMl)}
               </span>
               <div
-                className="w-full max-w-[40px] rounded-t-sm bg-accent/70 transition-colors hover:bg-accent"
+                className="w-full max-w-[40px] rounded-t-sm bg-gradient-to-t from-accent to-primary transition-opacity hover:opacity-80"
                 style={{ height: `${Math.max(pct, 4)}%` }}
                 title={`${day.displayDate}: ${formatAbsoluteOz(day.totalVarianceMl)}`}
               />
-              <span className="mt-xs font-mono text-[9px] text-grey leading-tight text-center">
+              <span className="mt-xs text-center text-micro leading-tight text-grey">
                 {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -145,21 +145,25 @@ export default async function ReconcileHistoryPage() {
 
   return (
     <section>
-      <header className="mb-lg flex items-center gap-sm">
-        <Link
-          href="/cellar/reconcile"
-          className="flex h-[44px] w-[44px] items-center justify-center rounded-sm text-grey hover:bg-wash transition-colors"
-          aria-label="Back to reconcile"
-        >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-serif text-[28px] text-ink">Reconcile History</h1>
-          <p className="text-[12px] text-grey tabular">
-            {history.length > 0
-              ? `${history.length} day${history.length === 1 ? "" : "s"} of reconciliation data`
-              : "No reconciliation history yet"}
-          </p>
+      <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-2xl">
+        <div className="flex items-start gap-sm">
+          <Link
+            href="/cellar/reconcile"
+            className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft transition-colors hover:text-ink"
+            aria-label="Back to reconcile"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={1.9} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+              {history.length > 0
+                ? `Reconcile · ${history.length} day${history.length === 1 ? "" : "s"} of reconciliation data`
+                : "Reconcile · No reconciliation history yet"}
+            </p>
+            <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:text-display">
+              Reconcile History
+            </h1>
+          </div>
         </div>
       </header>
 
@@ -171,7 +175,7 @@ export default async function ReconcileHistoryPage() {
           action={
             <Link
               href="/cellar/reconcile"
-              className="inline-flex h-11 items-center gap-sm rounded-sm bg-primary px-md text-[14px] font-medium text-seal-ink hover:bg-primary-hover"
+              className="inline-flex h-11 items-center gap-sm rounded-pill bg-primary px-md text-control font-semibold text-seal-ink hover:bg-primary-hover"
             >
               Go to reconcile
             </Link>
@@ -184,27 +188,27 @@ export default async function ReconcileHistoryPage() {
 
           {/* Summary cards */}
           <div className="mb-lg grid grid-cols-1 gap-sm sm:grid-cols-3">
-            <div className="rounded-md border border-border bg-surface p-md">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-grey">
+            <div className="glass rounded-card p-md">
+              <div className="text-caption font-medium uppercase text-grey">
                 Total sessions
               </div>
-              <div className="mt-xs font-mono text-[20px] font-medium text-ink">
+              <div className="mt-xs text-subheading tabular-nums text-ink">
                 {history.reduce((sum, d) => sum + d.sessions.length, 0)}
               </div>
             </div>
-            <div className="rounded-md border border-border bg-surface p-md">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-grey">
+            <div className="glass rounded-card p-md">
+              <div className="text-caption font-medium uppercase text-grey">
                 Bottles reconciled
               </div>
-              <div className="mt-xs font-mono text-[20px] font-medium text-ink">
+              <div className="mt-xs text-subheading tabular-nums text-ink">
                 {history.reduce((sum, d) => sum + d.eventCount, 0)}
               </div>
             </div>
-            <div className="rounded-md border border-border bg-surface p-md">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-grey">
+            <div className="glass rounded-card p-md">
+              <div className="text-caption font-medium uppercase text-grey">
                 Total variance
               </div>
-              <div className="mt-xs font-mono text-[20px] font-medium text-ink">
+              <div className="mt-xs text-subheading tabular-nums text-ink">
                 {formatAbsoluteOz(history.reduce((sum, d) => sum + d.totalVarianceMl, 0))}
               </div>
             </div>
@@ -214,10 +218,10 @@ export default async function ReconcileHistoryPage() {
           <div className="flex flex-col gap-lg">
             {history.map((day) => (
               <div key={day.date}>
-                <h2 className="mb-md flex items-center gap-xs font-serif text-[16px] text-ink">
+                <h2 className="mb-md flex items-center gap-xs font-serif text-subheading font-normal text-ink">
                   <span className="inline-block h-[6px] w-[6px] rounded-full bg-accent" />
                   {day.displayDate}
-                  <span className="font-mono text-[12px] text-grey">
+                  <span className="text-ledger tabular-nums text-grey">
                     · {day.sessions.length} session
                     {day.sessions.length !== 1 ? "s" : ""}
                     {" · "}
@@ -232,30 +236,30 @@ export default async function ReconcileHistoryPage() {
                     return (
                       <div
                         key={`${day.date}-${si}`}
-                        className="rounded-md border border-border bg-surface"
+                        className="rounded-card border border-rule"
                       >
                         {/* Session header */}
-                        <div className="flex items-center justify-between border-b border-border px-md py-sm">
-                          <span className="font-mono text-[13px] font-medium text-ink tabular-nums">
+                        <div className="flex items-center justify-between border-b border-rule px-md py-sm">
+                          <span className="text-control font-medium tabular-nums text-ink">
                             {session.timeLabel}
                           </span>
                           <div className="flex items-center gap-sm">
-                            <span className="text-[12px] text-grey tabular-nums">
+                            <span className="text-ledger tabular-nums text-grey">
                               {wineCount} bottle{wineCount !== 1 ? "s" : ""}
                             </span>
                             <VarianceValue
                               deltaMl={session.totalVarianceMl}
                               badge
-                              className="inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-[11px] font-semibold"
+                              className="inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-caption font-medium uppercase tracking-[0.13em]"
                             />
                           </div>
                         </div>
 
                         {/* Session wines — desktop table */}
                         <div className="hidden md:block">
-                          <table className="w-full text-[13px]">
+                          <table className="w-full text-body-sm">
                             <thead>
-                              <tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-grey">
+                              <tr className="text-caption font-medium uppercase text-grey">
                                 <th scope="col" className="px-md py-sm text-left font-semibold">
                                   Wine
                                 </th>
@@ -271,15 +275,15 @@ export default async function ReconcileHistoryPage() {
                               {session.events.map((event) => (
                                 <tr
                                   key={event.id}
-                                  className="border-t border-dashed border-border"
+                                  className="border-t border-rule"
                                 >
                                   <td className="px-md py-sm">
                                     {event.wines ? (
                                       <Link
                                         href={`/cellar?wine=${event.wine_id}`}
-                                        className="group rounded-sm focus-ring"
+                                        className="group rounded-pill focus-ring"
                                       >
-                                        <span className="font-medium text-ink group-hover:text-accent">
+                                        <span className="font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                                           {event.wines.producer}
                                         </span>
                                         <span className="text-grey group-hover:text-accent">
@@ -294,7 +298,7 @@ export default async function ReconcileHistoryPage() {
                                       <span className="text-grey">Unknown wine</span>
                                     )}
                                   </td>
-                                  <td className="px-md py-sm text-right font-mono tabular-nums">
+                                  <td className="px-md py-sm text-right tabular-nums">
                                     <VarianceValue deltaMl={event.delta} />
                                   </td>
                                   <td className="px-md py-sm text-grey">
@@ -311,38 +315,38 @@ export default async function ReconcileHistoryPage() {
                           {session.events.map((event) => (
                             <div
                               key={event.id}
-                              className="flex items-center justify-between border-t border-dashed border-border px-md py-sm"
+                              className="flex items-center justify-between border-t border-rule px-md py-sm"
                             >
                               <div className="min-w-0 flex-1">
                                 {event.wines ? (
                                   <Link
                                     href={`/cellar?wine=${event.wine_id}`}
-                                    className="group rounded-sm focus-ring"
+                                    className="group rounded-pill focus-ring"
                                   >
-                                    <div className="truncate text-[13px] font-medium text-ink group-hover:text-accent">
+                                    <div className="truncate font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                                       {event.wines.producer}{" "}
                                       {wineDisplayName(event.wines.producer, event.wines.name)}
                                     </div>
                                     {event.wines.vintage && (
-                                      <div className="font-mono text-[11px] text-grey">
+                                      <div className="text-ledger tabular-nums text-grey">
                                         {event.wines.vintage}
                                       </div>
                                     )}
                                   </Link>
                                 ) : (
-                                  <span className="text-[13px] text-grey">
+                                  <span className="text-body-sm text-grey">
                                     Unknown wine
                                   </span>
                                 )}
                                 {event.note && (
-                                  <div className="mt-2xs truncate text-[11px] text-grey">
+                                  <div className="mt-2xs truncate text-ledger text-grey">
                                     {event.note}
                                   </div>
                                 )}
                               </div>
                               <VarianceValue
                                 deltaMl={event.delta}
-                                className="ml-sm shrink-0 font-mono text-[13px] font-medium tabular-nums"
+                                className="ml-sm shrink-0 text-body-sm font-medium tabular-nums"
                               />
                             </div>
                           ))}

@@ -84,7 +84,7 @@ function QueueView(props: QueueViewProps) {
       <QueueHeader summary={data.summary} latestBatch={canManage ? data.latest_batch : null} busy={busy} undo={props.undo} />
       {(props.message || props.mutationError) && <StatusBanner message={props.message} error={props.mutationError} />}
       {rows.length === 0 ? <QueueEmpty /> : (
-        <div className="overflow-hidden rounded-card card-surface">
+        <div className="border-y border-rule">
           {visibleRows.map((row) => (
           <QueueIssueRow
             key={row.id}
@@ -109,7 +109,7 @@ function QueueView(props: QueueViewProps) {
               count: visibleCount + QUEUE_PAGE_SIZE,
             })
           }
-          className="mt-md min-h-11 w-full rounded-pill border border-rule bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+          className="glass mt-md min-h-11 w-full rounded-pill px-md text-control font-medium text-ink focus-ring"
         >
           Show {Math.min(QUEUE_PAGE_SIZE, rows.length - visibleRows.length)} more ·{" "}
           {visibleRows.length} of {rows.length}
@@ -161,14 +161,16 @@ function useQueueData() {
 
 function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueResponse["summary"]; latestBatch: QueueResponse["latest_batch"]; busy: boolean; undo: () => void }) {
   return (
-    <header className="mb-lg flex flex-wrap items-end justify-between gap-md md:mb-xl">
-      <div>
-        <p className="mb-xs text-caption font-medium uppercase text-accent">Inventory control</p>
-        <h1 className="font-serif text-heading-sm text-ink">Reconciliation queue</h1>
-        <p className="mt-xs text-[14px] tabular-nums text-grey">{summary.itemCount} items · {summary.unitCount} units · ${formatRisk(summary.atRisk)} at risk</p>
+    // The summary line stays ONE text node: e2e/reconcile-queue.test.ts
+    // asserts it with an exact getByText.
+    <header className="dawn-gradient relative -mx-md -mt-lg mb-lg flex flex-wrap items-end justify-between gap-md overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-2xl">
+      <div className="min-w-0">
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">Inventory control</p>
+        <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:text-display">Reconciliation queue</h1>
+        <p className="mt-sm text-control tabular-nums text-grey">{summary.itemCount} items · {summary.unitCount} units · ${formatRisk(summary.atRisk)} at risk</p>
       </div>
       {latestBatch && (
-        <button type="button" onClick={undo} disabled={busy} className="flex h-11 items-center gap-xs rounded-pill border border-rule-strong bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-50">
+        <button type="button" onClick={undo} disabled={busy} className="glass flex h-11 items-center gap-xs rounded-pill px-md text-control font-medium text-ink focus-ring disabled:opacity-50">
           <Undo2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />Undo latest batch
         </button>
       )}
@@ -179,6 +181,15 @@ function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueRespo
 /**
  * GLOBAL-01 — the bulk rail, minus the count it was already saying twice.
  *
+ * FIXED, not sticky, on a phone: the app shell's wrapper carries
+ * `overflow-x-hidden`, which makes it a scroll container whose scrollport is
+ * its own full height — so a `position: sticky` child inside it resolves
+ * against a box that never scrolls and simply never sticks. Measured on the
+ * running app: the rail sat 6,264px below the fold with the page scrolled to
+ * it. `fixed` above the nav dock is what the rail was always meant to do —
+ * and above the FAB as well as the dock, since the FAB owns the bottom-right
+ * corner at exactly the dock+md+md the rail would otherwise take.
+ *
  * Measured on the running app at 390px against the production-shaped tenant
  * (e2e/one-row-rule.test.ts): "Select actionable (51)" 147px + "51 selected"
  * 56px + "Accept 51 items" 146px is 349px of content plus 24px of gaps against
@@ -187,16 +198,24 @@ function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueRespo
  *
  * The read-out was the control to lose: "Accept 51 items" already states the
  * selected count, on the button that acts on it, so the standalone span was
- * the same number a second time. Two controls, 305px, one line — and the label
- * only grows one digit at a time from here.
+ * the same number a second time. Two controls, one line — and the label only
+ * grows one digit at a time from here.
+ *
+ * The two survivors then wrapped anyway when the Cellar Index redesign swapped
+ * the sans face for Inter, which sets the same 13px labels wider: 161px + 153px
+ * against the 310px the 390px frame leaves once the page gutter, the rail's own
+ * padding and the gap are taken out. Four pixels. The labels are both load-
+ * bearing (one names what gets selected, the other what gets accepted), so the
+ * padding gave way instead — px-xs on the ghost toggle, px-sm on the primary.
+ * That leaves ~16px of slack, which is what a third digit in either count costs.
  */
 function BulkRail({ busy, selectedCount, readyCount, allReadySelected, accept, toggleAll }: { busy: boolean; selectedCount: number; readyCount: number; allReadySelected: boolean; accept: () => void; toggleAll: () => void }) {
   return (
-    <div data-bulk-rail className="glass sticky bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))] z-[var(--z-sticky)] mt-md flex flex-wrap items-center justify-between gap-sm rounded-lg px-sm py-sm md:bottom-md md:px-md">
-      <button type="button" onClick={toggleAll} disabled={busy || readyCount === 0} className="h-11 rounded-pill px-sm text-[13px] font-medium text-grey hover:bg-wash focus-ring disabled:opacity-40">
+    <div data-bulk-rail className="glass fixed inset-x-md bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-md)+var(--spacing-md))] z-[var(--z-chrome)] flex flex-nowrap items-center justify-between gap-sm rounded-card px-sm py-sm md:static md:mt-md md:px-md">
+      <button type="button" onClick={toggleAll} disabled={busy || readyCount === 0} className="h-11 shrink-0 whitespace-nowrap rounded-pill px-xs text-body-sm font-medium text-ink-soft hover:bg-wash hover:text-ink focus-ring disabled:opacity-40">
         {allReadySelected ? "Clear actionable" : `Select actionable (${readyCount})`}
       </button>
-      <button type="button" onClick={accept} disabled={busy || selectedCount === 0} className="flex h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-45">
+      <button type="button" onClick={accept} disabled={busy || selectedCount === 0} className="flex h-11 shrink-0 items-center gap-xs whitespace-nowrap rounded-pill bg-primary px-sm text-body-sm font-semibold text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-45">
         {busy ? <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.75} aria-hidden /> : <Check className="h-4 w-4" strokeWidth={2} aria-hidden />}
         Accept {selectedCount} item{selectedCount === 1 ? "" : "s"}
       </button>
@@ -209,15 +228,15 @@ function QueueLoading() {
 }
 
 function QueueError({ message, retry }: { message: string; retry: () => void }) {
-  return <div role="alert" className="rounded-md border border-risk-ink/30 bg-risk-wash p-md text-[13px] text-risk-ink"><p>{message}</p><button type="button" onClick={retry} className="mt-sm h-11 rounded-pill border border-edge bg-surface px-md font-medium hover:bg-wash focus-ring">Try again</button></div>;
+  return <div role="alert" className="rounded-card border border-risk-ink/30 bg-risk-wash p-md text-body-sm text-risk-ink"><p>{message}</p><button type="button" onClick={retry} className="mt-sm h-11 rounded-pill border border-rule-strong bg-transparent px-md font-medium hover:bg-wash focus-ring">Try again</button></div>;
 }
 
 function QueueEmpty() {
-  return <div className="rounded-card card-surface px-lg py-3xl text-center"><Check className="mx-auto mb-sm h-8 w-8 text-ready-ink" aria-hidden /><p className="font-serif text-[18px] text-ink">Queue is clear</p><p className="mt-xs text-[13px] text-grey">No inventory records need reconciliation.</p></div>;
+  return <div className="rounded-card card-surface px-lg py-3xl text-center"><Check className="mx-auto mb-sm h-8 w-8 text-ready-ink" aria-hidden /><p className="font-serif text-subheading font-normal text-ink">Queue is clear</p><p className="mt-xs text-body-sm text-grey">No inventory records need reconciliation.</p></div>;
 }
 
 function StatusBanner({ message, error }: { message: string | null; error: string | null }) {
-  return <div role={error ? "alert" : "status"} className={`mb-md rounded-md border px-md py-sm text-[13px] ${error ? "border-risk-ink/30 bg-risk-wash text-risk-ink" : "border-ready-ink/30 bg-ready-wash text-ready-ink"}`}>{error ?? message}</div>;
+  return <div role={error ? "alert" : "status"} className={`mb-md rounded-card border px-md py-sm text-body-sm ${error ? "border-risk-ink/30 bg-risk-wash text-risk-ink" : "border-ready-ink/30 bg-ready-wash text-ready-ink"}`}>{error ?? message}</div>;
 }
 
 function toggleId(current: Set<string>, id: string) {

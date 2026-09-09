@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { metricHref, type MetricKey } from "./metric-href";
 
 export type OwnerMetrics = {
@@ -35,45 +34,51 @@ export function TodayStrip({ exceptions }: { exceptions: TodayException[] }) {
   if (exceptions.length === 0) return null;
 
   return (
-    <section className="mb-lg md:mb-xl" aria-labelledby="today-heading">
-      <div className="mb-sm flex items-baseline justify-between gap-sm">
+    <section className="mb-xl md:mb-3xl" aria-labelledby="today-heading">
+      <div className="mb-sm flex flex-wrap items-baseline justify-between gap-sm">
         <h2
           id="today-heading"
-          className="text-caption font-medium uppercase text-grey"
+          className="text-caption font-medium uppercase tracking-[0.18em] text-grey"
         >
           Today
         </h2>
-        <span className="text-[12px] text-grey">Most actionable</span>
+        <span className="text-ledger text-grey">Most actionable</span>
       </div>
-      <ul className="grid gap-sm md:grid-cols-3">
+      {/* Hairline index rows (DESIGN.md — Components, Index Row): the wine in
+          the serif, the reason in the ledger voice, rows separated by `rule`
+          with no gap between them — three bordered cards drew three boxes
+          around one queue. */}
+      <ul className="border-t border-rule">
         {exceptions.map((exception) => (
           <li
             key={`${exception.kind}:${exception.wineId}`}
             data-metric={`today-${exception.kind}-${exception.wineId}`}
-            className="min-w-0"
+            className="min-w-0 border-b border-rule"
           >
             <Link
               href={metricHref("wine", exception.wineId)}
-              className="group flex h-full min-w-0 items-start justify-between gap-md rounded-card card-surface p-md transition-colors hover:bg-surface-sunken"
+              className="group flex min-h-11 min-w-0 items-center gap-md py-sm transition-colors focus-ring"
             >
-              <span className="min-w-0">
-                <span
-                  className={cn(
-                    "inline-block rounded-pill px-xs py-[2px] text-[10.5px] font-medium uppercase tracking-wide",
-                    exceptionBadgeClass(exception.kind),
-                  )}
-                >
-                  {exceptionLabel(exception.kind)}
-                </span>
-                <span className="mt-xs block truncate text-[14px] font-medium text-ink">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-serif text-body-lg font-normal text-ink transition-colors group-hover:text-accent">
                   {exception.title}
                 </span>
-                <span className="mt-2xs block text-[12px] text-grey">
+                <span className="mt-2xs block truncate text-ledger text-grey">
                   {exception.detail}
                 </span>
               </span>
+              <span
+                className={
+                  "shrink-0 rounded-pill px-xs py-2xs font-medium uppercase " +
+                  exceptionBadgeClass(exception.kind)
+                }
+              >
+                <span className="text-caption">
+                  {exceptionLabel(exception.kind)}
+                </span>
+              </span>
               <ArrowUpRight
-                className="mt-0.5 h-4 w-4 shrink-0 text-grey transition-colors group-hover:text-accent"
+                className="h-4 w-4 shrink-0 text-grey transition-colors group-hover:text-accent"
                 strokeWidth={1.75}
                 aria-hidden
               />
@@ -164,11 +169,11 @@ function exceptionLabel(kind: TodayException["kind"]): string {
 function exceptionBadgeClass(kind: TodayException["kind"]): string {
   switch (kind) {
     case "drink-window":
-      return "border border-risk-ink/40 bg-risk-wash text-risk-ink";
+      return "bg-risk-wash text-risk-ink";
     case "past-window":
-      return "border border-primary bg-primary text-seal-ink";
+      return "bg-primary text-seal-ink";
     case "pricing":
-      return "border border-edge bg-transparent text-ink-soft";
+      return "bg-peak-wash text-peak-ink";
   }
 }
 

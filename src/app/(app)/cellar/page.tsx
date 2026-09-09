@@ -61,7 +61,7 @@ async function fetchAll<T>(
  */
 export default async function CellarPage() {
   const auth = (await getAuthContext())!; // AppLayout redirects when null
-  const { supabase, restaurantId, restaurantName, userRole } = auth;
+  const { supabase, restaurantId, restaurantName, userRole, user } = auth;
 
   const [
     wineRows,
@@ -463,7 +463,7 @@ export default async function CellarPage() {
       cellarSections={cellarSections}
       gridData={gridData}
       restaurantName={restaurantName}
-      restaurantId={restaurantId}
+      restaurantId={restaurantId} userId={user.id}
       autoEightysixEnabled={restaurantRow?.auto_eightysix_from_inventory ?? false}
       autoEightysixThresholdMl={restaurantRow?.eightysix_ml_threshold ?? 148}
       eightysixStrategy={eightysixStrategy}

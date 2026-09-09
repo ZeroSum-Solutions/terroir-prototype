@@ -32,7 +32,7 @@ export default function CellarLoading() {
                   <Skeleton className="h-[12px] w-20" />
                 </div>
               </div>
-              <Skeleton className="h-8 w-8 shrink-0 rounded-pill" />
+              <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
             </div>
           </div>
         ))}

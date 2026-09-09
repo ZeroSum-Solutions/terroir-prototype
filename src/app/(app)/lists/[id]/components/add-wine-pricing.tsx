@@ -39,9 +39,9 @@ export function AddWinePricing({
         </div>
       )}
       {!suggesting && suggestion && suggestion.hasRetailData && (
-        <div className="mt-md rounded-md border-l-2 border-primary bg-wash p-sm">
+        <div className="mt-md rounded-card border border-rule-strong bg-surface-sunken p-sm">
           <div className="flex items-baseline justify-between">
-            <div className="text-caption font-medium uppercase text-grey">
+            <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
               Suggested prices
             </div>
             <button
@@ -83,7 +83,7 @@ export function AddWinePricing({
         </div>
       )}
       {!suggesting && suggestion && !suggestion.hasRetailData && (
-        <div className="mt-md rounded-md bg-wash p-sm text-ledger italic text-grey">
+        <div className="mt-md rounded-card border border-rule bg-surface-sunken p-sm text-ledger italic text-grey">
           Pricing data unavailable for this wine. Refresh retail data from
           Insights to enable suggestions.
         </div>
@@ -125,7 +125,7 @@ function PriceField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-xs block text-caption font-medium uppercase text-grey">
+      <label htmlFor={id} className="mb-xs block text-caption font-medium uppercase tracking-[0.18em] text-grey">
         {label}
       </label>
       <div className="relative">
@@ -141,7 +141,7 @@ function PriceField({
           placeholder="—"
           // 17px keeps iOS from zooming the page on focus; 14px once there is
           // a pointer. Both are scale tokens, unlike the 16px literal before.
-          className="h-11 w-full rounded-pill border border-rule bg-surface pl-md pr-sm text-right tabular text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
+          className="min-h-11 w-full rounded-pill border border-rule-strong bg-surface-sunken pl-md pr-sm text-right tabular text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
         />
       </div>
     </div>

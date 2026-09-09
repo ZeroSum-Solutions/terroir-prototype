@@ -168,6 +168,22 @@ async function postBottleScan(request: NextRequest) {
     if (error instanceof Anthropic.BadRequestError) {
       return Errors.badRequest("Could not process this photo. Try a different angle or better lighting.");
     }
+    // 402 is the provider's account, not this request and not this photo.
+    // OpenRouter answers "you requested up to 4000 tokens, but can only
+    // afford N" once the credit balance runs out, and the SDK surfaces that
+    // as a plain APIError — so it fell into the branch below and reached the
+    // sommelier as "The AI service encountered an error. Please try again."
+    // Retrying cannot work, and on a phone in a cellar that message sends
+    // someone to photograph the bottle again instead of telling anyone.
+    // Measured 2026-09-08: balance -$0.20, every scan 402 in ~0.2s, reported
+    // as a 502. Named separately so the next person reads the cause off the
+    // response instead of reproducing it.
+    if (error instanceof Anthropic.APIError && error.status === 402) {
+      return Errors.serviceUnavailable(
+        "provider_credit_exhausted",
+        "Bottle scanning is unavailable: the AI provider account is out of credit. Top it up, then try again.",
+      );
+    }
     if (error instanceof Anthropic.APIError) {
       return Errors.badGateway("The AI service encountered an error. Please try again.");
     }

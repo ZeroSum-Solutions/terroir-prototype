@@ -137,6 +137,7 @@ describe("CellarPage cellar-scale read pagination", () => {
       restaurantId: "restaurant-1",
       restaurantName: "House",
       userRole: "owner",
+      user: { id: "user-1" },
     });
 
     const element = await CellarPage();

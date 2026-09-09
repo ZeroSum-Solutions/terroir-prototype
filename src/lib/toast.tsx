@@ -81,15 +81,15 @@ function ToastContainer({ items }: { items: ToastItem[] }) {
               // are alerts (DESIGN.md — State).
               role={t.tone === "error" ? "alert" : "status"}
               className={cn(
-                "glass flex items-center gap-sm rounded-lg px-md py-sm text-[14px] text-ink",
+                "glass flex items-center gap-sm rounded-card px-md py-sm text-control text-ink",
                 "animate-[toast-in_0.2s ease-out]",
               )}
             >
               {t.tone === "success" && (
-                <Check className="h-4 w-4 text-ready-ink shrink-0" strokeWidth={2.25} />
+                <Check className="h-4 w-4 text-ready-ink shrink-0" strokeWidth={1.9} />
               )}
               {t.tone === "error" && (
-                <AlertTriangle className="h-4 w-4 text-risk-ink shrink-0" strokeWidth={2.25} />
+                <AlertTriangle className="h-4 w-4 text-risk-ink shrink-0" strokeWidth={1.9} />
               )}
               <span className="flex-1">{t.text}</span>
             </div>

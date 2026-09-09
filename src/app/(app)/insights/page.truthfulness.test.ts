@@ -8,6 +8,13 @@ describe("Insights page metric scope", () => {
       resolve("src/app/(app)/insights/page.tsx"),
       "utf8",
     );
+    // The CSV export moved into the masthead component when the page was
+    // split to stay under its file-size budget. It is still the same link
+    // with the same 44px target — only its file changed.
+    const masthead = readFileSync(
+      resolve("src/app/(app)/insights/insights-masthead.tsx"),
+      "utf8",
+    );
 
     expect(source).not.toMatch(/\bscanItems\b/);
     expect(source).toMatch(
@@ -31,9 +38,7 @@ describe("Insights page metric scope", () => {
     expect(source).toMatch(
       /<YieldReportSection\s+groups=\{yieldGroups\}\s+rangeLabel=\{selectedRangeLabel\}\s*\/>/,
     );
-    expect(source).toMatch(
-      /href="\/api\/insights\/csv"[\s\S]*?className="flex min-h-11 /,
-    );
+    expect(masthead).toMatch(/href="\/api\/insights\/csv"[\s\S]*?\bmin-h-11\b/);
     expect(source).toMatch(
       /href=\{metricHref\("varietal", label\)\}[\s\S]*?className="flex min-h-11 /,
     );

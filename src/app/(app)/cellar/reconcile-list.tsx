@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,14 +12,21 @@ import { cn } from "@/lib/utils";
 import { ML_PER_OZ } from "@/lib/units";
 import { wineTitle } from "@/lib/wine-display-name";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import { ReconcileNavigationGuard } from "./reconcile-navigation-guard";
+import {
+  clearReconcileDraft,
+  describeReconcileDraft,
+  readReconcileDraft,
+  writeReconcileDraft,
+} from "@/lib/reconcile-draft/draft-storage";
 
 type ReconcileItem = OpenBottleRow;
 
-const FRACTIONS: Array<{ label: string; value: number }> = [
+const FRACTIONS: Array<{ label: string; value: number; short?: string }> = [
   { label: "Empty", value: 0 },
-  { label: "Quarter", value: 0.25 },
-  { label: "Half", value: 0.5 },
-  { label: "Three Quarter", value: 0.75 },
+  { label: "Quarter", short: "¼", value: 0.25 },
+  { label: "Half", short: "½", value: 0.5 },
+  { label: "Three Quarter", short: "¾", value: 0.75 },
   { label: "Full", value: 1 },
 ];
 
@@ -29,10 +36,13 @@ const badgeToneClasses = {
   neutral: "bg-wash text-grey",
 } as const;
 
-const flaggedCardClasses = {
-  positive: "border-ready-ink/30 bg-ready-wash",
-  negative: "border-risk-ink/40 bg-risk-wash",
-  neutral: "border-rule bg-surface",
+// A flagged count is marked in the margin the way a ledger marks a
+// discrepancy: a rule down the left edge and a wash behind the row. A full
+// bordered card only reads as "flagged" while its neighbours are cards too.
+const flaggedRowClasses = {
+  positive: "border-l-2 border-ready-ink bg-ready-wash",
+  negative: "border-l-2 border-risk-ink bg-risk-wash",
+  neutral: "border-l-2 border-rule-strong bg-wash",
 } as const;
 
 type PendingChange = { newRemainingMl: number; note?: string };
@@ -40,21 +50,51 @@ type PendingChange = { newRemainingMl: number; note?: string };
 export function ReconcileList({
   initialItems,
   varianceThresholdOz = 1.0,
+  onStateChange,
+  inDialog = false,
+  restaurantId,
+  userId,
 }: {
   initialItems: ReconcileItem[];
   varianceThresholdOz?: number;
+  onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
+  inDialog?: boolean;
+  // Draft-storage key (tenant-isolation surface) — required, not optional.
+  restaurantId: string;
+  userId: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<Record<string, PendingChange>>({});
+  const [draftNotice, setDraftNotice] = useState<ReturnType<typeof describeReconcileDraft>>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [refreshing, startTransition] = useTransition();
+  const [success, setSuccess] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   const changedCount = Object.keys(pending).length;
+  const busy = saving || refreshing;
+  useEffect(() => { onStateChange?.({ dirty: changedCount > 0, busy }); }, [changedCount, busy, onStateChange]);
+
+  // Only knowable client-side; SSR renders empty, corrects post-hydration (theme-toggle.tsx's precedent).
+  useEffect(() => {
+    const result = readReconcileDraft(restaurantId, userId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (result.kind === "restored") setPending(result.entries);
+    setDraftNotice(describeReconcileDraft(result));
+  }, [restaurantId, userId]);
+  // Mirrors every change so a Back/Forward loses nothing (draft-storage.ts).
+  useEffect(() => {
+    writeReconcileDraft(restaurantId, userId, pending);
+  }, [pending, restaurantId, userId]);
+
+  const discardDraft = () => { setPending({}); setDraftNotice(null); clearReconcileDraft(restaurantId, userId); };
 
   const onSaveAll = async () => {
-    if (changedCount === 0) return;
+    if (changedCount === 0 || inFlight.current || refreshing) return;
+    inFlight.current = true;
     setError(null);
+    setSuccess(null);
     setSaving(true);
     const entries = Object.entries(pending).map(([wine_id, p]) => ({
       wine_id,
@@ -69,22 +109,27 @@ export function ReconcileList({
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as
-          | { error?: string; code?: string }
+          | { error?: string | { message?: string }; code?: string }
           | null;
-        throw new Error(payload?.error ?? `Failed (${res.status}).`);
+        const message = typeof payload?.error === "string" ? payload.error : payload?.error?.message;
+        throw new Error(message ?? `Could not save (${res.status}). Your counts are still here; try again.`);
       }
       setPending({});
+      setDraftNotice(null);
+      clearReconcileDraft(restaurantId, userId);
+      setSuccess(`${entries.length} bottle${entries.length === 1 ? "" : "s"} reconciled.`);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
     } finally {
+      inFlight.current = false;
       setSaving(false);
     }
   };
 
   if (initialItems.length === 0) {
     return (
-      <div className="rounded-card card-surface px-md py-lg text-center text-[13px] text-grey">
+      <div className="border-y border-rule px-md py-lg text-center text-body-sm text-grey">
         No open bottles to reconcile. Open one by pouring a glass.
       </div>
     );
@@ -92,42 +137,60 @@ export function ReconcileList({
 
   return (
     <div className="pb-[120px]">
+      <ReconcileNavigationGuard dirty={changedCount > 0} busy={busy} interceptLinks={!inDialog} onDiscard={discardDraft} />
+      {/* One action, not two (GLOBAL-01). Undo discards the restored draft; there
+          is no separate dismiss because the notice clears itself the moment the
+          user edits a count or saves. */}
+      {draftNotice && (
+        <div role="status" className="glass mb-md flex items-center justify-between gap-sm rounded-card px-md py-sm text-body-sm text-ink">
+          <span>{draftNotice.message}</span>
+          {draftNotice.canUndo && <button type="button" onClick={discardDraft} className="min-h-11 shrink-0 rounded-pill px-sm text-ledger font-medium text-accent hover:underline">Undo</button>}
+        </div>
+      )}
+      {success && <p role="status" className="mb-md text-control text-ready-ink">{success}</p>}
       {error && (
         <div
           role="alert"
-          className="mb-md rounded-md border border-risk-ink/30 bg-risk-wash px-md py-sm text-[13px] text-risk-ink"
+          className="mb-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
         >
           {error}
         </div>
       )}
 
-      <ul className="flex flex-col gap-md">
+      <fieldset disabled={busy} className="min-w-0">
+      <legend className="sr-only">Actual remaining volume for each open bottle</legend>
+      {/* Hairline-divided rows on paper, as on /cellar. Detached cards over a
+          gap-md gutter stretched a twelve-bottle count by half a screen. */}
+      <ul className="-mx-md divide-y divide-rule border-y border-rule md:mx-0">
         {initialItems.map((item) => (
           <ReconcileRow
             key={item.wine_id}
             item={item}
+            inDialog={inDialog}
             pending={pending[item.wine_id] ?? null}
             varianceThresholdOz={varianceThresholdOz}
             onChange={(change) =>
-              setPending((prev) => ({ ...prev, [item.wine_id]: change }))
+              { setSuccess(null); setDraftNotice(null); setPending((prev) => ({ ...prev, [item.wine_id]: change })); }
             }
           />
         ))}
       </ul>
+      </fieldset>
 
-      <div className="fixed bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))] left-0 right-0 z-[var(--z-chrome)] border-t border-rule bg-surface px-lg py-sm md:static md:mt-lg md:border-0 md:px-0 md:py-0">
+      {/* The one action, on a floating glass rail clearing the nav dock. */}
+      <div className={cn("glass fixed left-md right-md z-[var(--z-chrome)] rounded-card px-md py-sm md:static md:mt-lg", inDialog ? "bottom-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-md)+var(--spacing-md))]")}>
         <button
           type="button"
           onClick={onSaveAll}
-          disabled={changedCount === 0 || saving}
+          disabled={changedCount === 0 || busy}
           className={cn(
-            "h-[48px] w-full rounded-pill font-medium transition-colors",
-            changedCount > 0 && !saving
+            "h-[48px] w-full rounded-pill font-semibold transition-colors",
+            changedCount > 0 && !busy
               ? "bg-primary text-seal-ink hover:bg-primary-hover"
               : "bg-wash text-grey",
           )}
         >
-          {saving
+          {busy
             ? "Saving..."
             : changedCount > 0
               ? `Save ${changedCount} change${changedCount === 1 ? "" : "s"}`
@@ -143,8 +206,10 @@ function ReconcileRow({
   pending,
   onChange,
   varianceThresholdOz,
+  inDialog,
 }: {
   item: ReconcileItem;
+  inDialog: boolean;
   pending: PendingChange | null;
   onChange: (c: PendingChange) => void;
   varianceThresholdOz: number;
@@ -165,30 +230,28 @@ function ReconcileRow({
   const isVarianceFlagged = pending !== null && Math.abs(varianceOz) > varianceThresholdOz;
 
   return (
-    <li
-      className={`rounded-card p-md ${
-        isVarianceFlagged
-          ? `border ${flaggedCardClasses[tone]}`
-          : "card-surface"
-      }`}
-    >
+    <li className={`px-md py-md ${isVarianceFlagged ? flaggedRowClasses[tone] : ""}`}>
       <div className="mb-sm">
         <div className="flex items-start justify-between gap-sm">
           <div className="min-w-0">
             {/* The wine itself opens the wine. Everything else on this card is
                 a counting control, so only the name is the link. */}
+            {inDialog ? <p className="flex min-h-11 items-center font-serif text-body-lg font-normal leading-snug text-ink">
+              {wineTitle(item.producer, item.name)} {item.vintage ?? ""}
+            </p> : (
             <Link
               href={`/cellar?wine=${item.wine_id}`}
-              className="flex min-h-11 items-center rounded-md font-serif text-[17px] font-medium text-ink leading-snug transition-colors hover:text-accent focus-ring"
+              className="flex min-h-11 items-center rounded-pill font-serif text-body-lg font-normal leading-snug text-ink transition-colors hover:text-accent focus-ring"
             >
               {wineTitle(item.producer, item.name)}
               {item.vintage !== null && (
-                <span className="ml-xs font-sans text-[12px] font-light text-grey">
+                <span className="ml-xs font-sans text-ledger font-light text-grey">
                   {item.vintage}
                 </span>
               )}
             </Link>
-            <div className="mt-2xs flex flex-wrap items-center gap-xs text-[12px] text-grey">
+            )}
+            <div className="mt-2xs flex flex-wrap items-center gap-xs text-ledger text-grey">
               <span className="rounded-pill bg-surface-sunken px-sm py-2xs font-mono">
                 {formatBottleSize(item.size_ml)}
               </span>
@@ -202,13 +265,13 @@ function ReconcileRow({
         </div>
       </div>
 
-      <div className="mb-sm rounded-md bg-wash px-sm py-sm">
+      <div className="mb-sm rounded-card bg-surface-sunken px-sm py-sm">
         <div className="flex flex-wrap items-baseline gap-sm">
-          <span className="text-[12px] text-grey">Tracked:</span>
-          <span className="font-mono text-[15px] font-semibold text-ink tabular-nums">
+          <span className="text-ledger text-grey">Tracked:</span>
+          <span className="font-mono text-body font-medium text-ink tabular-nums">
             {trackedOz.toFixed(1)} oz
           </span>
-          <span className="text-[12px] text-grey tabular-nums">
+          <span className="text-ledger text-grey tabular-nums">
             ({item.open_remaining_ml} ml ~{glassesLeft} glass
             {glassesLeft === 1 ? "" : "es"})
           </span>
@@ -217,10 +280,11 @@ function ReconcileRow({
 
       <div className="mb-sm">
         <div className="flex flex-wrap items-center gap-sm">
-          <label className="flex min-h-11 items-center gap-xs text-[13px] text-grey">
+          <label className="flex min-h-11 items-center gap-xs text-body-sm text-grey">
             <span>Actual:</span>
             <input
               type="number"
+              inputMode="numeric"
               min={0}
               max={item.size_ml}
               value={currentMl}
@@ -242,24 +306,24 @@ function ReconcileRow({
                   note: pending?.note,
                 });
               }}
-              className="h-11 w-[96px] rounded-pill border border-rule bg-surface px-sm text-[14px] font-mono tabular-nums outline-none focus:border-accent focus-ring"
+              className="h-11 w-[96px] rounded-pill border border-rule bg-surface px-sm text-body-lg font-mono tabular-nums outline-none focus:border-accent focus-ring"
               aria-label="Actual remaining volume in ml"
             />
           </label>
-          <span className="text-[13px] text-grey tabular-nums">
+          <span className="text-body-sm text-grey tabular-nums">
             = {currentOz.toFixed(1)} oz
           </span>
         </div>
         {pending !== null && (
           <div
-            className={`mt-xs inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${badgeToneClasses[tone]}`}
+            className={`mt-xs inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-caption font-medium uppercase tracking-[0.13em] ${badgeToneClasses[tone]}`}
           >
             {formatSignedVarianceOz(variance.deltaMl)} · {variance.label}
           </div>
         )}
       </div>
 
-      <div className="mb-sm grid grid-cols-5 gap-xs">
+      <div className="mb-sm grid grid-cols-5 gap-2xs sm:gap-xs">
         {FRACTIONS.map((f) => {
           const ml = Math.round(item.size_ml * f.value);
           const isActive = currentMl === ml;
@@ -267,6 +331,8 @@ function ReconcileRow({
             <button
               key={f.label}
               type="button"
+              aria-label={f.label}
+              aria-pressed={isActive}
               onClick={() =>
                 onChange({
                   newRemainingMl: ml,
@@ -274,13 +340,13 @@ function ReconcileRow({
                 })
               }
               className={cn(
-                "h-[44px] rounded-pill border text-[12px] font-medium transition-colors",
+                "h-[44px] rounded-pill border text-ledger font-medium transition-colors",
                 isActive
                   ? "border-accent bg-primary text-seal-ink"
-                  : "border-rule bg-surface text-ink hover:bg-wash",
+                  : "border-rule-strong bg-transparent text-ink hover:bg-wash",
               )}
             >
-              {f.label}
+              {f.short ?? f.label}
             </button>
           );
         })}
@@ -288,7 +354,7 @@ function ReconcileRow({
 
       <div className="flex flex-wrap items-center gap-sm">
         <label className="flex min-h-11 w-full items-center gap-xs sm:w-auto sm:flex-1">
-          <span className="text-[12px] text-grey whitespace-nowrap">
+          <span className="text-ledger text-grey whitespace-nowrap">
             Note:
           </span>
           <input
@@ -302,7 +368,7 @@ function ReconcileRow({
               })
             }
             placeholder="spill, miscount, etc."
-            className="h-11 flex-1 rounded-pill border border-rule bg-surface px-sm text-[13px] outline-none focus:border-accent focus-ring"
+            className="h-11 min-w-0 flex-1 rounded-pill border border-rule bg-surface px-sm text-body-lg outline-none focus:border-accent focus-ring"
           />
         </label>
       </div>

@@ -41,10 +41,42 @@ const ACTIONS: Action[] = [
 // primary-action surface or that don't need it. /atlas: the map's own
 // tap targets (and the region bottom sheet) sit in the same bottom-right
 // zone the FAB floats in — none of its actions (Scan/Pour/86) are Atlas
-// tasks anyway.
-const HIDE_ON: ReadonlyArray<string> = ["/scan", "/login", "/atlas"];
+// tasks anyway. Import, setup and reconciliation also own their primary action;
+// floating service shortcuts must not cover their form controls. /bins and
+// /insights join for the same reason, not a new one: /bins pins its
+// row-action column (edit/archive) to the same bottom-right corner the FAB
+// occupies, and /insights runs date-range copy the full width of the same
+// band — both real controls a fixed 56px square would sit on top of at
+// ordinary scroll positions, and neither page has a Scan/Pour/86 use case
+// the FAB would otherwise be serving.
+const HIDE_ON: ReadonlyArray<string> = [
+  "/scan",
+  "/scan-bottle",
+  "/scans",
+  "/login",
+  "/atlas",
+  "/import",
+  "/get-started",
+  "/bins",
+  "/insights",
+  "/lists",
+  "/team",
+  "/reconcile-queue",
+  "/price-comparison",
+  "/catalogue",
+];
 
+/**
+ * The speed-dial lives where the cellar lives: on the cellar index itself.
+ * Every page that carries its own primary action (a bottom rail, a
+ * "Create …" pill, a save bar) hides it, because a second floating circle
+ * beside a page's own action reads as a competing primary and, at 390px,
+ * lands on top of the rail (Gemini audit, 2026-09-09). Cellar sub-routes —
+ * the wine page, open bottles, reconcile, config — all carry their own
+ * actions, so anything under /cellar/ hides it too.
+ */
 function shouldHide(pathname: string): boolean {
+  if (pathname.startsWith("/cellar/")) return true;
   return HIDE_ON.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
@@ -97,11 +129,17 @@ function FabInner() {
         aria-label={open ? "Close actions" : "Open actions"}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-pill bg-primary text-seal-ink transition-transform duration-200",
-          "hover:bg-primary-hover active:scale-95 focus-ring",
+          // A copper glass circle (DESIGN.md — Components): the blur and
+          // edge come from .glass, the copper tint from the inline style
+          // below because an unlayered recipe outranks a utility.
+          "glass pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-full text-ink transition-transform duration-200",
+          "active:scale-95 focus-ring",
           open && "rotate-45",
         )}
-        style={{ bottom: "calc(var(--chrome-tabbar-total) + var(--spacing-md))" }}
+        style={{
+          bottom: "calc(var(--chrome-tabbar-total) + var(--spacing-md) + var(--spacing-md))",
+          background: "color-mix(in srgb, var(--color-accent) 55%, transparent)",
+        }}
       >
         {/* Single icon that rotates 45° to become close. Avoids icon
             swap flicker. */}
@@ -158,17 +196,19 @@ function ActionPill({
   const inner = (
     <span
       className={cn(
-        "glass flex items-center gap-sm rounded-pill px-md py-sm text-[13px] font-medium transition-all duration-200",
+        // A glass capsule (DESIGN.md — Components): blur and edge from
+        // .glass, the label in ash, the icon in a copper-tinted circle.
+        "glass flex items-center gap-sm rounded-pill px-md py-sm text-body-sm font-medium transition-all duration-200",
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-2 opacity-0",
       )}
       style={{ transitionDelay }}
     >
-      <span className="text-[12px] uppercase tracking-[0.06em] text-grey">
+      <span className="text-ledger uppercase tracking-[0.06em] text-grey">
         {label}
       </span>
-      <span className="grid h-9 w-9 place-items-center rounded-pill bg-risk-wash text-risk-ink">
+      <span className="grid h-9 w-9 place-items-center rounded-full bg-accent/15 text-accent">
         <Icon className="h-4 w-4" strokeWidth={2} />
       </span>
     </span>
@@ -180,7 +220,7 @@ function ActionPill({
       onClick={onActivate}
       aria-label={label}
       role="menuitem"
-      className="pointer-events-auto inline-flex rounded-pill focus-ring"
+      className="pointer-events-auto inline-flex rounded-md focus-ring"
     >
       {inner}
     </Link>

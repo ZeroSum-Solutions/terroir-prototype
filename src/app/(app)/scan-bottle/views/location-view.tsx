@@ -35,7 +35,7 @@ export function LocationView({
           <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Bottle location
           </span>
-          <span className="rounded-pill bg-surface-sunken px-sm py-2xs text-[12px] font-medium text-ink-soft">
+          <span className="rounded-pill border border-rule-strong px-sm py-2xs text-ledger font-medium text-ink-soft">
             {wineTitle(wine.producer, wine.name)}
             {wine.vintage ? " " + wine.vintage : ""}
           </span>
@@ -44,7 +44,7 @@ export function LocationView({
           <div>
             <label
               htmlFor="bottle-section"
-              className="mb-xs block text-[13px] font-medium text-ink"
+              className="mb-xs block text-caption font-medium uppercase tracking-[0.18em] text-grey"
             >
               Section
             </label>
@@ -56,13 +56,13 @@ export function LocationView({
               value={section}
               onChange={(e) => onSectionChange(e.target.value)}
               placeholder='e.g. "Red Room", "Main Cellar"'
-              className="w-full rounded-pill border border-rule bg-surface px-md py-sm text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+              className="h-12 w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink placeholder:text-grey focus:border-accent focus-ring"
             />
           </div>
           <div>
             <label
               htmlFor="bottle-bin"
-              className="mb-xs block text-[13px] font-medium text-ink"
+              className="mb-xs block text-caption font-medium uppercase tracking-[0.18em] text-grey"
             >
               Bin location
             </label>
@@ -73,7 +73,7 @@ export function LocationView({
               value={binLocation}
               onChange={(e) => onBinLocationChange(e.target.value)}
               placeholder='e.g. "A-12", "Shelf 3, Row 5"'
-              className="w-full rounded-pill border border-rule bg-surface px-md py-sm text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+              className="h-12 w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink placeholder:text-grey focus:border-accent focus-ring"
             />
           </div>
           {locationError && (
@@ -85,17 +85,17 @@ export function LocationView({
             <button
               type="button"
               onClick={onBack}
-              className="flex h-[44px] items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+              className="flex h-12 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
             >
-              <X className="h-4 w-4" strokeWidth={2} />
+              <X className="h-4 w-4" strokeWidth={1.9} />
               Back
             </button>
             <button
               type="submit"
               disabled={!section.trim() || !binLocation.trim() || confirming}
-              className="flex h-[44px] items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-50"
+              className="flex h-12 items-center justify-center gap-sm rounded-pill bg-primary text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-50"
             >
-              <Check className="h-4 w-4" strokeWidth={2} />
+              <Check className="h-4 w-4" strokeWidth={1.9} />
               {confirming ? "Saving..." : "Save location"}
             </button>
           </div>

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Plus, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -21,6 +21,7 @@ import {
   type BrandKitView,
 } from "./components/brand-kit-panel";
 import { ListActions } from "./components/list-actions";
+import { RemoveWineDialog } from "./components/remove-wine-dialog";
 import { SortableSectionButton } from "./components/sortable-section-button";
 import { useSectionReorder } from "./use-section-reorder";
 import { useWineItemReorder } from "./use-wine-item-reorder";
@@ -36,7 +37,6 @@ export type {
   WineListEditorItem,
   WineListEditorSection,
 } from "./wine-list-editor.types";
-import { wineDisplayName } from "@/lib/wine-display-name";
 
 /**
  * SD-12: `canManage` is the page's `role === "owner" || role === "manager"`,
@@ -330,27 +330,35 @@ export function WineListEditor({
       <header className="mb-lg md:mb-xl">
         <Link
           href="/lists"
-          className="mb-sm inline-flex min-h-11 items-center gap-xs text-[13px] text-grey hover:text-ink focus-ring"
+          className="mb-sm inline-flex min-h-11 items-center gap-xs text-ledger text-grey transition-colors hover:text-accent focus-ring"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
           All lists
         </Link>
         <div className="flex flex-col gap-sm md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="font-serif text-heading-sm text-ink">{list.name}</h1>
-            <p className="mt-xs text-[13px] text-grey">
+            <div className="flex flex-wrap items-center gap-sm">
               {list.is_published ? (
-                <span className="mr-sm inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-ready-ink">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ready-ink" />
-                  Published
+                <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-2xs uppercase text-ready-ink">
+                  <span className="h-1.5 w-1.5 rounded-full bg-ready-ink" />
+                  <span className="text-caption font-medium tracking-[0.18em]">
+                    Published
+                  </span>
                 </span>
               ) : (
-                <span className="mr-sm inline-flex items-center gap-xs rounded-pill bg-surface-sunken px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-ink-soft">
-                  Draft
+                <span className="inline-flex items-center rounded-pill bg-peak-wash px-sm py-2xs uppercase text-peak-ink">
+                  <span className="text-caption font-medium tracking-[0.18em]">
+                    Draft
+                  </span>
                 </span>
               )}
-              {totalWines} wines
-            </p>
+              <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                <span className="tabular">{totalWines}</span> wines
+              </span>
+            </div>
+            <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
+              {list.name}
+            </h1>
           </div>
           <ListActions
             listId={list.id}
@@ -387,9 +395,11 @@ export function WineListEditor({
         />
 
         {sections.length === 0 ? (
-          <section className="rounded-card border border-dashed border-rule p-lg text-center">
-            <h2 className="font-serif text-[22px] text-ink">Start your list</h2>
-            <p className="mt-xs text-[14px] text-grey">
+          <section className="rounded-card border border-dashed border-rule-strong p-lg text-center">
+            <h2 className="font-serif text-subheading font-normal text-ink">
+              Start your list
+            </h2>
+            <p className="mt-xs text-body-sm text-ink-soft">
               Add a section before adding wines.
             </p>
             {canManage && (
@@ -397,7 +407,7 @@ export function WineListEditor({
                 type="button"
                 onClick={addSection}
                 disabled={addingSection}
-                className="mt-md min-h-11 rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-50"
+                className="mt-md min-h-11 rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-50"
               >
                 Add first section
               </button>
@@ -407,7 +417,7 @@ export function WineListEditor({
           <div>
             <label
               htmlFor="mobile-section"
-              className="text-caption font-medium uppercase text-grey"
+              className="text-caption font-medium uppercase tracking-[0.18em] text-grey"
             >
               Section
             </label>
@@ -416,7 +426,7 @@ export function WineListEditor({
                 id="mobile-section"
                 value={activeSection}
                 onChange={(e) => setActiveSection(e.target.value)}
-                className="h-11 w-full appearance-none rounded-pill border border-rule bg-canvas px-sm pr-xl text-[14px] font-medium text-ink focus:border-accent focus-ring"
+                className="min-h-11 w-full appearance-none rounded-pill border border-rule-strong bg-surface-sunken px-md pr-xl text-control font-medium text-ink focus:border-accent focus-ring"
               >
                 {sections.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -439,7 +449,7 @@ export function WineListEditor({
                   if (event.key === "Escape") cancelRename();
                 }}
                 onBlur={commitRename}
-                className="mt-xs min-h-11 w-full rounded-pill border border-accent bg-surface px-sm text-[14px] font-medium text-ink outline-none focus-ring"
+                className="mt-xs min-h-11 w-full rounded-pill border border-accent bg-surface-sunken px-md text-control font-medium text-ink outline-none focus-ring"
               />
             ) : currentSection && canManage ? (
               <div className="mt-sm grid grid-cols-3 gap-xs">
@@ -447,7 +457,7 @@ export function WineListEditor({
                   type="button"
                   aria-label={`Rename ${currentSection.name}`}
                   onClick={() => startRename(currentSection.id, currentSection.name)}
-                  className="min-h-11 rounded-pill border border-rule px-xs text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-xs text-ledger font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
                 >
                   Rename
                 </button>
@@ -455,7 +465,7 @@ export function WineListEditor({
                   type="button"
                   aria-label={`Delete ${currentSection.name}`}
                   onClick={() => setDeleteTarget(currentSection)}
-                  className="min-h-11 rounded-pill border border-risk-ink/30 px-xs text-[13px] font-medium text-risk-ink hover:bg-risk-wash focus-ring"
+                  className="min-h-11 rounded-pill border border-risk-ink/40 bg-transparent px-xs text-ledger font-medium text-risk-ink transition-colors hover:bg-risk-wash focus-ring"
                 >
                   Delete
                 </button>
@@ -463,7 +473,7 @@ export function WineListEditor({
                   type="button"
                   onClick={addSection}
                   disabled={addingSection}
-                  className="min-h-11 rounded-pill border border-rule px-xs text-[13px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-50"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-xs text-ledger font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:opacity-50"
                 >
                   Add section
                 </button>
@@ -476,7 +486,7 @@ export function WineListEditor({
           <div>
             <h2
               id="mobile-template-heading"
-              className="text-caption font-medium uppercase text-grey"
+              className="text-caption font-medium uppercase tracking-[0.18em] text-grey"
             >
               Template
             </h2>
@@ -496,7 +506,7 @@ export function WineListEditor({
       <div className="md:grid md:grid-cols-[288px_1fr] md:gap-lg">
         {/* Desktop sidebar */}
         <aside className="hidden md:block">
-          <div className="text-caption font-medium uppercase text-grey">
+          <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Sections
           </div>
           <div className="mt-sm flex flex-col gap-2xs">
@@ -534,7 +544,7 @@ export function WineListEditor({
                 type="button"
                 onClick={addSection}
                 disabled={addingSection}
-                className="flex min-h-11 items-center gap-xs px-sm py-xs text-[13px] text-grey hover:text-ink disabled:opacity-50"
+                className="flex min-h-11 items-center gap-xs px-sm py-xs text-ledger text-grey transition-colors hover:text-accent disabled:opacity-50"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2} />
                 Add section
@@ -544,7 +554,7 @@ export function WineListEditor({
 
           {canManage && (
             <>
-              <div className="mt-lg text-caption font-medium uppercase text-grey">
+              <div className="mt-lg text-caption font-medium uppercase tracking-[0.18em] text-grey">
                 Template
               </div>
               <div className="mt-sm">
@@ -560,15 +570,18 @@ export function WineListEditor({
 
         {/* Main content — active section */}
         {currentSection && (
-          <div className="rounded-card card-surface">
+          <div className="overflow-hidden rounded-card card-surface">
             {/* Section header */}
             <div className="flex items-center justify-between border-b border-rule px-md py-md md:px-lg">
               <div>
-                <h2 className="font-serif text-[22px] font-medium text-ink md:text-[26px]">
+                <h2 className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
                   {currentSection.name}
                 </h2>
-                <p className="mt-2xs text-[13px] text-grey">
-                  {currentSection.wine_list_items.length} wines
+                <p className="mt-2xs text-ledger text-grey">
+                  <span className="tabular">
+                    {currentSection.wine_list_items.length}
+                  </span>{" "}
+                  wines
                 </p>
               </div>
               {canManage && (
@@ -576,7 +589,7 @@ export function WineListEditor({
                   <button
                     type="button"
                     onClick={() => setShowAddWine(true)}
-                    className="flex min-h-11 min-w-11 items-center gap-xs rounded-pill bg-primary px-sm text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+                    className="flex min-h-11 min-w-11 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
                   >
                     <Plus className="h-3.5 w-3.5" strokeWidth={2} />
                     <span className="hidden sm:inline">Add wine</span>
@@ -588,10 +601,10 @@ export function WineListEditor({
             {/* Wine items */}
             {currentSection.wine_list_items.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-lg py-3xl text-center">
-                <p className="text-[14px] text-grey">
+                <p className="text-body-sm text-ink-soft">
                   No wines in this section yet.
                 </p>
-                <p className="mt-xs text-[13px] text-grey">
+                <p className="mt-xs text-ledger text-grey">
                   Add wines from your inventory or scan a new invoice.
                 </p>
               </div>
@@ -608,15 +621,15 @@ export function WineListEditor({
                 >
                   <div>
                     {/* Desktop table header */}
-                    <div className="hidden border-b border-rule bg-wash px-lg py-xs md:grid md:grid-cols-[28px_1fr_136px_136px_36px]">
+                    <div className="hidden border-b border-rule px-lg py-xs md:grid md:grid-cols-[28px_1fr_136px_136px_36px]">
                       <div />
-                      <div className="text-caption font-medium uppercase text-grey">
+                      <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
                         Wine
                       </div>
-                      <div className="text-right text-caption font-medium uppercase text-grey">
+                      <div className="text-right text-caption font-medium uppercase tracking-[0.18em] text-grey">
                         Glass
                       </div>
-                      <div className="text-right text-caption font-medium uppercase text-grey">
+                      <div className="text-right text-caption font-medium uppercase tracking-[0.18em] text-grey">
                         Bottle
                       </div>
                       <div />
@@ -642,11 +655,11 @@ export function WineListEditor({
 
             {/* Add another wine footer */}
             {canManage && (
-              <div className="border-t border-dashed border-rule px-lg py-md text-center">
+              <div className="border-t border-dashed border-rule-strong px-lg py-md text-center">
                 <button
                   type="button"
                   onClick={() => setShowAddWine(true)}
-                  className="inline-flex min-h-11 items-center text-[13px] text-grey hover:text-ink focus-ring"
+                  className="inline-flex min-h-11 items-center text-ledger text-grey transition-colors hover:text-accent focus-ring"
                 >
                   <Plus
                     className="mr-xs inline-block h-3.5 w-3.5"
@@ -668,56 +681,14 @@ export function WineListEditor({
         />
       )}
 
-            {/* Delete wine confirmation dialog (BND-194) */}
+      {/* Delete wine confirmation dialog (BND-194) */}
       {wineToDelete && (
-        <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim p-md">
-          <div className="w-full max-w-[384px] rounded-card card-surface">
-            <div className="px-lg py-lg">
-              <div className="flex items-start justify-between">
-                <h3 className="font-serif text-[18px] font-medium text-ink">
-                  Remove wine
-                </h3>
-                <button
-                  type="button"
-                  onClick={function() { setWineToDelete(null); }}
-                  className="rounded-pill p-1 text-grey hover:text-ink"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" strokeWidth={2} />
-                </button>
-              </div>
-              <p className="mt-sm text-[14px] text-grey leading-relaxed">
-                Remove{" "}
-                <strong className="text-ink">
-                  {wineToDelete.wines.producer},{" "}
-                  {wineDisplayName(wineToDelete.wines.producer, wineToDelete.wines.name)}
-                </strong>
-                {wineToDelete.wines.vintage && <span> ({wineToDelete.wines.vintage})</span>}
-                {" "}from this wine list?
-              </p>
-              <p className="mt-xs text-[13px] text-grey">
-                The wine will remain in your cellar inventory.
-              </p>
-              <div className="mt-lg flex justify-end gap-sm">
-                <button
-                  type="button"
-                  onClick={function() { setWineToDelete(null); }}
-                  className="rounded-pill border border-rule px-md py-1.5 text-[13px] font-medium text-grey hover:bg-wash focus-ring"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDeleteItem}
-                  disabled={deletingItem}
-                  className="rounded-pill bg-primary px-md py-1.5 text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60"
-                >
-                  Remove wine
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RemoveWineDialog
+          item={wineToDelete}
+          busy={deletingItem}
+          onCancel={function() { setWineToDelete(null); }}
+          onConfirm={confirmDeleteItem}
+        />
       )}
 
       <ActionDialog
@@ -738,7 +709,7 @@ export function WineListEditor({
         {errorToast && (
           <p
             role="alert"
-            className="rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"
+            className="rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"
           >
             {errorToast}
           </p>
@@ -769,7 +740,7 @@ export function WineListEditor({
 
       {/* Error toast — failed reorders, and every failed item write (SD-18). */}
       {errorToast && deleteTarget === null && (
-        <div role="alert" className="fixed bottom-[calc(var(--safe-bottom)+var(--spacing-lg))] left-1/2 z-[var(--z-toast)] -translate-x-1/2 rounded-pill bg-primary px-lg py-sm text-[13px] font-medium text-seal-ink animate-in fade-in slide-in-from-bottom-2">
+        <div role="alert" className="glass fixed bottom-[calc(var(--safe-bottom)+var(--spacing-lg))] left-1/2 z-[var(--z-toast)] -translate-x-1/2 rounded-pill px-lg py-sm text-control font-medium text-risk-ink animate-in fade-in slide-in-from-bottom-2">
           {errorToast}
         </div>
       )}
@@ -778,7 +749,7 @@ export function WineListEditor({
       {notice && (
         <div
           role="status"
-          className="fixed bottom-[calc(var(--safe-bottom)+var(--spacing-lg))] left-1/2 z-[var(--z-toast)] -translate-x-1/2 rounded-pill bg-surface-inverse px-lg py-sm text-[13px] font-medium text-on-inverse animate-in fade-in slide-in-from-bottom-2"
+          className="glass fixed bottom-[calc(var(--safe-bottom)+var(--spacing-lg))] left-1/2 z-[var(--z-toast)] -translate-x-1/2 rounded-pill px-lg py-sm text-control font-medium text-ink animate-in fade-in slide-in-from-bottom-2"
         >
           {notice}
         </div>

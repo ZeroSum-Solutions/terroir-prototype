@@ -75,6 +75,25 @@ describe("BriefingAlertCard", () => {
     expect(document.body.textContent).not.toContain("Unknown");
   });
 
+  it("distinguishes a past window from a wine in its final year", () => {
+    const end = new Date().getFullYear() - 3;
+    document.body.innerHTML = renderToStaticMarkup(
+      <BriefingAlertCard alert={{ ...baseAlert, drink_window_end: end }} canManage />,
+    );
+    expect(document.querySelector("h3")?.textContent).toContain("are past their drinking window");
+    expect(document.body.textContent).toContain(`Optimal window ended in ${end}`);
+    expect(document.body.textContent).not.toContain("entering");
+    expect(document.body.textContent).not.toContain("Final year");
+  });
+
+  it("does not claim a critic review for an unrecognized source", () => {
+    document.body.innerHTML = renderToStaticMarkup(
+      <BriefingAlertCard alert={{ ...baseAlert, rating_source: "unknown" }} canManage />,
+    );
+    expect(document.body.textContent).not.toContain("Source:");
+    expect(document.body.textContent).not.toContain("last reviewed");
+  });
+
   it("writes the remaining-window clause as a sentence, never a ledger fragment", () => {
     const thisYear = new Date().getFullYear();
     document.body.innerHTML = renderToStaticMarkup(

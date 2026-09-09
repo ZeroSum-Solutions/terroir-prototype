@@ -31,11 +31,12 @@ import {
 } from "./date-range";
 import { InsightScope } from "./insight-scope";
 import {
-  OwnerMetricGrid,
   TodayStrip,
   selectTodayExceptions,
   type TodayException,
 } from "./insights-drilldown";
+import { InsightsMasthead } from "./insights-masthead";
+import { StatTileGrid } from "./insights-stat-tiles";
 import { metricHref } from "./metric-href";
 import { fetchYieldGroups, YieldReportSection } from "./yield-report-section";
 import { summarizeCellarHealth, summarizeUnscoredStock } from "@/lib/cellar-health/summary";
@@ -47,6 +48,7 @@ import {
   summarizeDistributorMetrics,
 } from "./distributor-metrics";
 import { wineTitle } from "@/lib/wine-display-name";
+import { fetchInsightsHealth, fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 type NullableDateRange = { range?: string; from?: string; to?: string };
 type SearchParams = Promise<NullableDateRange>;
@@ -106,7 +108,7 @@ export default async function DashboardPage({
 }) {
   const sp = await searchParams;
   const auth = (await getAuthContext())!;
-  const { supabase, restaurantId: rid, restaurantName, userRole } = auth;
+  const { supabase, restaurantId: rid, userRole, restaurantName } = auth;
 
   // ── Date range from URL search params ──────────────────────────────
   const { range, from, to } = normalizeInsightsRange(
@@ -144,7 +146,7 @@ export default async function DashboardPage({
       "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
     )
     .eq("restaurant_id", rid)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }).order("id");
 
   if (rangeSince) {
     scanQuery = scanQuery.gte("created_at", rangeSince.toISOString());
@@ -154,23 +156,17 @@ export default async function DashboardPage({
   }
 
   const [
-    { data: scans },
-    { data: inventoryItems },
-    { data: cellarHealthRows, error: cellarHealthError },
+    scans,
+    inventoryItems,
+    cellarHealthRows,
     { count: rawEightysixedCount },
     { count: rawDrinkNowCount },
     initPastDrinkWindow,
   ] =
     await Promise.all([
-      scanQuery,
-      supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, wine_id, wines(varietal)")
-        .eq("restaurant_id", rid),
-      supabase
-        .from("cellar_health")
-        .select("wine_id, segment")
-        .eq("restaurant_id", rid),
+      readInsightsPages((from, to) => scanQuery.range(from, to)),
+      fetchInsightsInventory(supabase, rid),
+      fetchInsightsHealth(supabase, rid),
       // Server-side counts: a .select() read is capped at the PostgREST row
       // limit, which silently truncates on large cellars.
       supabase
@@ -193,7 +189,6 @@ export default async function DashboardPage({
 
   const allScans = scans ?? [];
   const items = inventoryItems ?? [];
-  if (cellarHealthError) throw cellarHealthError;
   const cellarHealthSummary = summarizeCellarHealth(cellarHealthRows ?? [], items);
   const cellarHealthUnscored = summarizeUnscoredStock(cellarHealthRows ?? [], items);
   const pastDrinkWindowWines: PastDrinkWindowRow[] = initPastDrinkWindow;
@@ -288,32 +283,27 @@ export default async function DashboardPage({
   if (allScans.length === 0 && items.length === 0 && yieldGroups.length === 0) {
     return (
       <section>
-        <header className="mb-lg md:mb-xl">
-          <p className="text-caption font-medium uppercase text-grey">
-            {restaurantName}
-          </p>
-          <h1 className="mt-xs font-serif text-heading-sm font-normal text-ink md:text-heading lg:text-display">
-            Insights
-          </h1>
-        </header>
+        <InsightsMasthead
+          tenant={restaurantName}
+          rangeLabel={selectedRangeLabel}
+        />
         <ReconcileQueueMetric />
-        <div className="flex flex-col items-center justify-center rounded-card border border-dashed border-rule-strong bg-wash px-lg py-3xl text-center">
-          <BarChart3
-            className="mb-md h-10 w-10 text-grey"
-            strokeWidth={1.5}
-          />
-          <p className="text-[15px] font-medium text-ink">
-            Scan your first invoice to start tracking
+        <div className="glass flex flex-col items-center justify-center rounded-card px-lg py-3xl text-center">
+          <span className="mb-md grid h-12 w-12 place-items-center rounded-full bg-accent/15 text-accent">
+            <BarChart3 className="h-6 w-6" strokeWidth={1.75} />
+          </span>
+          <p className="font-serif text-subheading font-normal text-ink">
+            Bring your wine inventory into Terroir
           </p>
-          <p className="mt-xs text-[13px] text-grey">
-            Your wine program metrics will appear here after your first scan.
+          <p className="mt-xs text-body-sm text-grey">
+            Import your stock file or scan an invoice. Your inventory and service activity will build your Insights.
           </p>
           <Link
-            href="/scan"
-            className="mt-lg flex h-[38px] items-center gap-sm rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
+            href="/get-started"
+            className="mt-lg flex min-h-11 items-center gap-sm rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
           >
             <ScanLine className="h-4 w-4" strokeWidth={2} />
-            Go to scanner
+            Set up your restaurant
           </Link>
         </div>
       </section>
@@ -322,71 +312,37 @@ export default async function DashboardPage({
 
   return (
     <section>
-      {/* Dawn Hero — the one atmospheric moment on this page, per DESIGN.md's
-          canonical anatomy (gradient hero with glass stat tiles, resolving
-          into a beige bridge band, then the white workspace). Contained
-          within the padded app shell rather than edge-to-edge. Copy is
-          unchanged from the prior "Dashboard" heading — no new marketing
-          copy is introduced here, only the atmospheric surface. */}
-      <div className="dawn-gradient relative mb-xl overflow-hidden rounded-card px-lg py-xl md:mb-3xl md:px-2xl md:py-2xl">
-        <div className="flex flex-wrap items-start justify-between gap-md">
-          <div>
-            <p className="text-caption font-medium uppercase text-grey">
-              {restaurantName}
-            </p>
-            <h1 className="mt-xs font-serif text-heading-sm font-normal text-ink md:text-heading lg:text-display">
-              Insights
-            </h1>
-          </div>
-          {/* Ghost, not filled burgundy — a back-office export must not be
-              the page's only accent-spending element (Kimi audit 2026-08-26). */}
-          <a
-            href="/api/insights/csv"
-            download="insights-export.csv"
-            className="flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-              aria-hidden="true"
-            >
-              <path d="M14 10v2.67A1.33 1.33 0 0 1 12.67 14H3.33A1.33 1.33 0 0 1 2 12.67V10" />
-              <path d="M4.67 6.67L8 10l3.33-3.33" />
-              <path d="M8 10V2" />
-            </svg>
-            Export CSV
-          </a>
-        </div>
+      {/* Masthead (DESIGN.md — Components, Masthead): the copper dawn glow,
+          an eyebrow carrying the tenant and the range in force, the room's
+          name in the serif, and the CSV export as a ghost pill — a
+          back-office export must never spend the screen's one primary fill
+          (Kimi audit 2026-08-26). */}
+      <InsightsMasthead
+        tenant={restaurantName}
+        rangeLabel={selectedRangeLabel}
+      />
 
-        {/* Glass stat tiles — the correct DESIGN.md treatment for stat
-            tiles sitting ON the dawn gradient (solid ivory + hairline is
-            reserved for the same tiles on white surfaces). */}
-        <div className="relative mt-xl">
-          <div className="mb-sm">
-            <InsightScope metric="inventory" kind="snapshot" />
-          </div>
-          <OwnerMetricGrid
-            metrics={{
-              inventoryValue,
-              totalBottles,
-              eightysixedCount,
-              drinkNowCount,
-            }}
-          />
+      {/* One glass strip divided by hairlines, not four tiles with four
+          edges. */}
+      <div className="mb-xl md:mb-3xl">
+        <div className="mb-sm">
+          <InsightScope metric="inventory" kind="snapshot" />
         </div>
+        <StatTileGrid
+          metrics={{
+            inventoryValue,
+            totalBottles,
+            eightysixedCount,
+            drinkNowCount,
+          }}
+        />
       </div>
 
-      {/* Bridge band — the one beige toolbar strip on this page, per DESIGN.md */}
-      <div className="mb-lg rounded-card bg-surface-sunken px-md py-sm md:mb-xl md:px-lg md:py-md">
+      {/* The range control is its own glass segmented pill now, so it needs
+          no band behind it. */}
+      <div className="mb-lg md:mb-xl">
         <DateRangeSelector />
-        <p className="mt-xs text-[12px] text-ink-soft">
+        <p className="mt-sm text-ledger text-grey">
           Selected range applies to invoice scans, distributor metrics, and partial-bottle yield. Inventory value, bottle counts, availability, and varietal spend are current.
         </p>
       </div>
@@ -411,14 +367,14 @@ export default async function DashboardPage({
             {/* The count is a door, not a label — plain text gave 162
                 alerts no affordance at all (Kimi audit 2026-08-26). */}
             {drinkWindowAlerts.length === 0 ? (
-              <span className="text-[12px] text-grey">
+              <span className="text-ledger text-grey">
                 No alerts right now
               </span>
             ) : (
               <Link
                 href={metricHref("drink-now-count")}
                 aria-label={`All ${drinkWindowAlerts.length} alerts`}
-                className="tabular text-[12px] font-medium text-ink underline decoration-rule underline-offset-4 hover:text-accent"
+                className="tabular text-ledger font-medium text-ink underline decoration-rule underline-offset-4 hover:text-accent"
               >
                 {alertTriageParts.length > 1
                   ? `${alertTriageParts.join(" · ")} →`
@@ -427,7 +383,7 @@ export default async function DashboardPage({
             )}
           </div>
           {drinkWindowAlerts.length > 0 && (
-            <div className="flex flex-col gap-md">
+            <div className="border-t border-rule">
               {visibleDrinkWindowAlerts.map(function (alert) {
                 return (
                   <BriefingAlertCard key={alert.wine_id} alert={alert} canManage={canManage} />
@@ -436,7 +392,7 @@ export default async function DashboardPage({
               {drinkWindowAlerts.length > visibleDrinkWindowAlerts.length && (
                 <Link
                   href={metricHref("drink-now-count")}
-                  className="inline-flex min-h-11 items-center justify-center self-start rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+                  className="mt-md inline-flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
                 >
                   View all {drinkWindowAlerts.length} in Cellar
                 </Link>
@@ -462,15 +418,15 @@ export default async function DashboardPage({
             >
               Past drink window
             </h2>
-            <span className="text-[12px] text-grey">
+            <span className="text-ledger text-grey">
               {pastDrinkWindowWines.length} wine{pastDrinkWindowWines.length === 1 ? "" : "s"}
             </span>
           </div>
-          <div className="rounded-card card-surface p-lg">
+          <div>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-body-sm">
                 <thead>
-                  <tr className="bg-wash text-caption font-medium uppercase text-grey">
+                  <tr className="border-y border-rule text-caption font-medium uppercase text-grey">
                     <th scope="col" className="px-sm py-sm text-left font-medium">Wine</th>
                     <th scope="col" className="px-sm py-sm text-right font-medium">Vintage</th>
                     <th scope="col" className="px-sm py-sm text-right font-medium">Window ended</th>
@@ -478,19 +434,19 @@ export default async function DashboardPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {visiblePastDrinkWindowWines.map(function (w, i) {
+                  {visiblePastDrinkWindowWines.map(function (w) {
                     return (
                       <tr
                         key={w.wine_id}
                         data-metric={`past-drink-window-${w.wine_id}`}
-                        className={`hover:bg-wash ${i > 0 ? "border-t border-rule" : ""}`}
+                        className="border-b border-rule transition-colors hover:bg-surface-raised"
                       >
                         <td className="px-sm py-sm">
-                          <Link href={metricHref("wine", w.wine_id)} className="font-serif text-[17px] font-medium text-ink hover:text-accent transition-colors">
+                          <Link href={metricHref("wine", w.wine_id)} className="font-serif text-body-lg font-normal text-ink transition-colors hover:text-accent">
                             {wineTitle(w.producer, w.name)}
                           </Link>
                           {w.bin_location && (
-                            <div className="mt-0.5 text-[11px] font-light text-grey">
+                            <div className="mt-2xs text-micro tracking-[0.12em] text-accent">
                               {w.bin_location}
                             </div>
                           )}
@@ -514,7 +470,7 @@ export default async function DashboardPage({
               visiblePastDrinkWindowWines.length && (
               <Link
                 href={metricHref("drink-now-count")}
-                className="mt-md inline-flex min-h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+                className="mt-md inline-flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
               >
                 View all {pastDrinkWindowWines.length} past-window wines in Cellar
               </Link>
@@ -554,7 +510,7 @@ export default async function DashboardPage({
             >
               Pricing review
             </h2>
-            <span className="text-[12px] text-grey">
+            <span className="text-ledger text-grey">
               {pricingAlerts.length} alert{pricingAlerts.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -582,7 +538,7 @@ export default async function DashboardPage({
       </h2>
       <div className="grid gap-md md:grid-cols-2">
         {/* Scan activity sparkline */}
-        <div className="rounded-card card-surface p-lg md:col-span-2">
+        <div className="glass rounded-card p-lg md:col-span-2">
           <div className="mb-sm flex items-center justify-between text-caption font-medium uppercase text-grey">
             <span>Scan activity</span>
             <InsightScope
@@ -599,17 +555,17 @@ export default async function DashboardPage({
                 .map(function (s) { return { value: s.item_count, date: s.created_at }; })}
             />
           ) : (
-            <div className="flex h-[100px] items-center justify-center text-[13px] text-grey">
+            <div className="flex h-[100px] items-center justify-center text-body-sm text-grey">
               More data needed for trend
             </div>
           )}
         </div>
 
         {/* BND-149 — Extraction accuracy KPI */}
-        <div className="rounded-card card-surface p-lg">
+        <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-medium text-ink">
+              <h3 className="text-caption font-medium uppercase text-grey">
                 Extraction accuracy
               </h3>
               <InsightScope
@@ -624,27 +580,27 @@ export default async function DashboardPage({
             />
           </div>
           {allScans.length === 0 ? (
-            <p className="text-[13px] text-grey">No scans yet</p>
+            <p className="text-body-sm text-grey">No scans yet</p>
           ) : (
             <div>
               <div className="flex items-baseline gap-xs">
                 <span
-                  className={`font-mono text-[28px] font-medium leading-none tabular ${accuracyColor(extractionAccuracyPct)}`}
+                  className={`font-serif text-heading-sm font-normal leading-none tabular ${accuracyColor(extractionAccuracyPct)}`}
                 >
                   {extractionAccuracyPct}%
                 </span>
-                <span className="text-[12px] text-grey">
+                <span className="text-ledger text-grey">
                   auto-accepted
                 </span>
               </div>
-              <p className="mt-sm text-[12px] text-grey">
+              <p className="mt-sm text-ledger text-grey">
                 {totalItemCount} line items processed ·{" "}
                 {Math.round(totalAutoAcceptedFields)} auto-accepted
               </p>
               {latestScanAccuracy !== null && (
-                <div className="mt-md flex items-center gap-sm rounded-md bg-wash px-sm py-sm">
+                <div className="mt-md flex items-center gap-sm rounded-pill bg-surface-raised px-sm py-xs">
                   <Activity className="h-4 w-4 shrink-0 text-grey" strokeWidth={1.5} />
-                  <span className="text-[12px] text-grey">
+                  <span className="text-ledger text-grey">
                     Latest scan:{" "}
                     <span className={`font-medium ${accuracyColor(latestScanAccuracy)}`}>
                       {latestScanAccuracy}%
@@ -658,10 +614,10 @@ export default async function DashboardPage({
         </div>
 
         {/* BND-148 — Scan throughput */}
-        <div className="rounded-card card-surface p-lg">
+        <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-medium text-ink">
+              <h3 className="text-caption font-medium uppercase text-grey">
                 Scan throughput
               </h3>
               <InsightScope
@@ -673,18 +629,18 @@ export default async function DashboardPage({
             <History className="h-5 w-5 shrink-0 text-grey" strokeWidth={1.5} />
           </div>
           {throughputData.length === 0 ? (
-            <p className="text-[13px] text-grey">No scan data yet</p>
+            <p className="text-body-sm text-grey">No scan data yet</p>
           ) : (
             <div>
               <div className="flex items-baseline gap-xs">
-                <span className="font-mono text-[28px] font-medium leading-none tabular text-ink">
+                <span className="font-serif text-heading-sm font-normal leading-none tabular text-ink">
                   {avgScansPerWeek}
                 </span>
-                <span className="text-[12px] text-grey">
+                <span className="text-ledger text-grey">
                   scans / week avg
                 </span>
               </div>
-              <p className="mt-sm text-[12px] text-grey">
+              <p className="mt-sm text-ledger text-grey">
                 {allScans.length} total scans · last {totalWeeks} week{totalWeeks === 1 ? "" : "s"}
               </p>
               <div className="mt-lg">
@@ -695,20 +651,20 @@ export default async function DashboardPage({
         </div>
 
         {/* Spend by varietal */}
-        <div className="rounded-card card-surface p-lg">
+        <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-medium text-ink">
+              <h3 className="text-caption font-medium uppercase text-grey">
                 Spend by varietal
               </h3>
               <InsightScope metric="varietal-spend" kind="snapshot" />
             </div>
-            <span className="tabular text-[12px] text-grey">
+            <span className="tabular text-ledger text-grey">
               {formatMoney(varietalTotalAll)} total
             </span>
           </div>
           {varietalBreakdown.length === 0 ? (
-            <p className="text-[13px] text-grey">No data yet</p>
+            <p className="text-body-sm text-grey">No data yet</p>
           ) : (
             <>
               <div className="flex flex-col gap-sm">
@@ -720,30 +676,36 @@ export default async function DashboardPage({
                     <div key={label} data-metric={`varietal-${label}`}>
                       <Link
                         href={metricHref("varietal", label)}
-                        className="flex min-h-11 items-center gap-sm rounded-sm transition-colors hover:bg-wash"
+                        className="flex min-h-11 flex-col justify-center gap-2xs rounded-sm transition-colors hover:bg-surface-raised"
                       >
-                        <span className="w-[100px] shrink-0 truncate text-[13px] text-ink">
-                          {label}
-                        </span>
-                        <div className="h-2.5 flex-1 overflow-hidden rounded-pill bg-surface-sunken">
+                        <div className="flex items-center gap-sm">
+                          {/* Adapts to the label instead of clipping it at a
+                              fixed pixel width — a long varietal name (e.g.
+                              "Cabernet Sauvignon") has the full row to grow
+                              into on a narrow phone. */}
+                          <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
+                            {label}
+                          </span>
+                          <span className="shrink-0 text-right tabular text-ledger text-grey">
+                            {Math.round(pct * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-[3px] w-full overflow-hidden rounded-pill bg-rule-strong">
                           <div
-                            className="h-full rounded-pill bg-primary"
+                            className="h-full rounded-pill bg-gradient-to-r from-accent to-primary"
                             style={{
                               width: `${pct * 100}%`,
                               opacity: 1 - i * 0.07,
                             }}
                           />
                         </div>
-                        <span className="w-[36px] shrink-0 text-right tabular text-[12px] text-grey">
-                          {Math.round(pct * 100)}%
-                        </span>
                       </Link>
                     </div>
                   );
                 })}
               </div>
               {otherVarietalCount > 0 && (
-                <p className="mt-sm text-[12px] text-grey">
+                <p className="mt-sm text-ledger text-grey">
                   +{otherVarietalCount} more varietal
                   {otherVarietalCount === 1 ? "" : "s"}
                 </p>
@@ -753,10 +715,10 @@ export default async function DashboardPage({
         </div>
 
         {/* Top distributors */}
-        <div className="rounded-card card-surface p-lg">
+        <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-medium text-ink">
+              <h3 className="text-caption font-medium uppercase text-grey">
                 Top distributors
               </h3>
               <InsightScope
@@ -767,11 +729,11 @@ export default async function DashboardPage({
             </div>
           </div>
           {distributors.length === 0 ? (
-            <p className="text-[13px] text-grey">No scans yet</p>
+            <p className="text-body-sm text-grey">No scans yet</p>
           ) : (
-            <table className="w-full text-[13px]">
+            <table className="w-full text-body-sm">
               <thead>
-                <tr className="bg-wash text-caption font-medium uppercase text-grey">
+                <tr className="border-b border-rule text-caption font-medium uppercase text-grey">
                   <th scope="col" className="px-sm py-sm text-left font-medium">Distributor</th>
                   <th scope="col" className="px-sm py-sm text-right font-medium">Spend</th>
                   <th scope="col" className="px-sm py-sm text-right font-medium">Share</th>
@@ -788,9 +750,9 @@ export default async function DashboardPage({
                     >
                       <td className="px-sm py-sm">
                         <div className="font-medium text-ink">{metric.name}</div>
-                        <div className="mt-2xs h-1.5 overflow-hidden rounded-pill bg-surface-sunken">
+                        <div className="mt-xs h-[3px] overflow-hidden rounded-pill bg-rule-strong">
                           <div
-                            className="h-full rounded-pill bg-primary"
+                            className="h-full rounded-pill bg-gradient-to-r from-accent to-primary"
                             style={{
                               width: `${pct * 100}%`,
                               opacity: 1 - i * 0.07,
@@ -816,10 +778,10 @@ export default async function DashboardPage({
         </div>
 
         {/* Recent activity */}
-        <div className="rounded-card card-surface p-lg md:col-span-2">
+        <div className="glass rounded-card p-lg md:col-span-2">
           <div className="mb-md flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-medium text-ink">
+              <h3 className="text-caption font-medium uppercase text-grey">
                 Recent activity
               </h3>
               <InsightScope
@@ -836,15 +798,15 @@ export default async function DashboardPage({
                 strokeWidth={1.5}
                 aria-hidden
               />
-              <p className="text-[14px] font-medium text-ink">
+              <p className="text-control font-medium text-ink">
                 No invoices scanned yet
               </p>
-              <p className="mt-2xs text-[13px] text-grey">
+              <p className="mt-2xs text-body-sm text-grey">
                 Scan a distributor invoice to start tracking your activity.
               </p>
               <Link
                 href="/scan"
-                className="mt-md inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+                className="mt-md inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
               >
                 <ScanLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                 Scan an invoice
@@ -867,16 +829,16 @@ export default async function DashboardPage({
                     key={scan.id}
                     href={`/scan/${scan.id}`}
                     aria-label={`View scan from ${scan.distributor_name}, ${scan.item_count} wines, ${formatMoney(scanTotal)}, ${relative}`}
-                    className={`flex items-center gap-md rounded-sm py-sm transition-colors hover:bg-wash focus-ring ${i > 0 ? "border-t border-rule" : ""}`}
+                    className={`flex items-center gap-md rounded-sm py-sm transition-colors hover:bg-surface-raised focus-ring ${i > 0 ? "border-t border-rule" : ""}`}
                   >
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-wash text-grey">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
                       <ScanLine className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[14px] font-medium text-ink">
+                      <div className="text-control font-medium text-ink">
                         Invoice scanned
                       </div>
-                      <div className="mt-2xs text-[13px] text-grey">
+                      <div className="mt-2xs text-body-sm text-grey">
                         {scan.distributor_name} · {scan.item_count} wines
                         {scanTotal > 0 && (
                           <>
@@ -890,7 +852,7 @@ export default async function DashboardPage({
                     </div>
                     {scan.accuracy_score != null && (
                       <span
-                        className={`tabular text-[12px] ${accuracyColor(
+                        className={`tabular text-ledger ${accuracyColor(
                           Math.round(scan.accuracy_score * 100),
                         )}`}
                       >
@@ -899,7 +861,7 @@ export default async function DashboardPage({
                     )}
                     <TimeAgo
                       iso={scan.created_at}
-                      className="shrink-0 tabular text-[12px] text-grey"
+                      className="shrink-0 tabular text-ledger text-grey"
                     />
                   </Link>
                 );
@@ -923,9 +885,9 @@ function buildTodayExceptions(
   const candidates: TodayException[] = [
     ...drinkWindowAlerts.map((alert) => ({
       wineId: alert.wine_id,
-      kind: "drink-window" as const,
+      kind: alert.drink_window_end != null && alert.drink_window_end < new Date().getFullYear() ? "past-window" as const : "drink-window" as const,
       title: `${wineTitle(alert.producer, alert.name)}${alert.vintage ? ` ${alert.vintage}` : ""}`,
-      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window ends ${alert.drink_window_end ?? "soon"}`,
+      detail: `${alert.bottle_count} bottle${alert.bottle_count === 1 ? "" : "s"} · window end: ${alert.drink_window_end ?? "unknown"}`,
     })),
     ...pastDrinkWindowWines.map((wine) => ({
       wineId: wine.wine_id,
@@ -942,4 +904,3 @@ function buildTodayExceptions(
   ];
   return selectTodayExceptions(candidates);
 }
-

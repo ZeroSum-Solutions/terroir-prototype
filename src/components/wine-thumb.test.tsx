@@ -71,6 +71,9 @@ describe("WineThumb", () => {
   });
 
   it("reserves the same box whether or not there is a picture", () => {
+    // `size` is the WIDTH and the box is 2:3 portrait (DESIGN.md — Imagery),
+    // so 40 reserves 40×60 either way. What is being pinned is that both
+    // branches reserve the SAME box, not the shape it happens to be.
     const withImage = renderToStaticMarkup(
       <WineThumb src="https://cdn.example/w.jpg" producer="Krug" name="G" size={40} />,
     );
@@ -79,8 +82,8 @@ describe("WineThumb", () => {
     );
     expect(withImage).toContain("width:40px");
     expect(without).toContain("width:40px");
-    expect(withImage).toContain("height:40px");
-    expect(without).toContain("height:40px");
+    expect(withImage).toContain("height:60px");
+    expect(without).toContain("height:60px");
   });
 
   it("requests the image at 2x so a 36px thumbnail is not soft on a retina screen", () => {
@@ -88,7 +91,7 @@ describe("WineThumb", () => {
       <WineThumb src="https://cdn.example/w.jpg" producer="Krug" name="G" size={36} />,
     );
     expect(markup).toContain('width="72"');
-    expect(markup).toContain('height="72"');
+    expect(markup).toContain('height="108"');
   });
 
   it("hides the stand-in from screen readers — the name is already in the row", () => {
@@ -120,5 +123,6 @@ describe("WineThumb", () => {
       <WineThumb src={null} producer={null} name={null} size={36} />,
     );
     expect(markup).toContain("width:36px");
+    expect(markup).toContain("height:54px");
   });
 });

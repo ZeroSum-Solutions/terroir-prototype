@@ -18,7 +18,8 @@ export function IconButton({
       type={type}
       aria-label={label}
       className={cn(
-        "inline-flex min-h-11 min-w-11 items-center justify-center",
+        // Every interactive element is a pill (DESIGN.md - Spacing & Shapes).
+        "inline-flex min-h-11 min-w-11 items-center justify-center rounded-pill",
         className,
       )}
     >

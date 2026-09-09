@@ -44,12 +44,16 @@ export function ScanInventoryList({ items }: { items: ScanInventoryItem[] }) {
       <div className="mb-md text-caption font-medium uppercase tracking-[0.18em] text-grey">
         Inventory created
       </div>
-      <div className="flex flex-col gap-sm">
-        {items.map((item) => (
+      {/* Hairline index rows (DESIGN.md — Index Row): one sheet, rows
+          divided by a rule rather than floated apart. */}
+      <div className="overflow-hidden rounded-card card-surface">
+        {items.map((item, i) => (
           <Link
             key={item.id}
             href={`/cellar?wine=${encodeURIComponent(item.wineId)}`}
-            className="flex min-h-11 items-center gap-md rounded-card card-surface p-md hover:bg-wash focus-ring"
+            className={`flex min-h-11 items-center gap-md px-md py-sm transition-colors hover:bg-surface-raised focus-ring${
+              i > 0 ? " border-t border-rule" : ""
+            }`}
           >
             <WineThumb
               src={item.heroImageUrl}
@@ -59,10 +63,10 @@ export function ScanInventoryList({ items }: { items: ScanInventoryItem[] }) {
               size={40}
             />
             <span className="min-w-0 flex-1">
-              <span className="block font-serif text-body-lg font-medium leading-snug text-ink">
+              <span className="block font-serif text-body-lg leading-snug text-ink">
                 {wineDisplayName(item.producer, item.name)}
               </span>
-              <span className="mt-2xs block text-body-sm text-grey">
+              <span className="mt-2xs block text-caption font-medium uppercase tracking-[0.18em] text-grey">
                 {item.producer}
               </span>
             </span>

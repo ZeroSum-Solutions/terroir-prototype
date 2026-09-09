@@ -33,7 +33,9 @@ export function TasteBlock({
 
   return (
     <Section title="What does this wine taste like?">
-      <div className="grid gap-xl md:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+      {/* The profile panel: glass, because it is the one panel that carries
+          the meters and sits directly under the hero band's light. */}
+      <div className="glass grid gap-xl rounded-card p-lg md:grid-cols-[minmax(0,1fr)_minmax(0,320px)] md:p-xl">
         {structure !== null && (
           <div className="flex flex-col gap-lg">
             {structure.value.body && <AxisBar axis={structure.value.body} />}
@@ -96,7 +98,7 @@ function PerNote({ notes }: { notes: HouseNote[] }) {
 /** Achromatic on purpose: no per-family colour (D10). */
 function Chip({ label, count }: { label: string; count?: number }) {
   return (
-    <span className="inline-flex items-baseline gap-xs rounded-pill border border-rule bg-surface px-md py-xs text-body-sm text-ink-soft">
+    <span className="inline-flex items-baseline gap-xs rounded-pill border border-rule-strong px-md py-xs text-body-sm text-ink-soft">
       {label}
       {count !== undefined && <span className="tabular text-caption text-grey">{count}</span>}
     </span>

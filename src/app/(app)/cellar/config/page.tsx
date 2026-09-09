@@ -200,13 +200,17 @@ export default function CellarConfigPage() {
           type="button"
           onClick={() => router.back()}
           aria-label="Back to cellar"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash focus-ring"
+          className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft hover:text-ink focus-ring"
         >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="h-5 w-5" strokeWidth={1.9} aria-hidden />
         </button>
-        <div className="min-w-0 flex-1 pt-1.5">
-          <h1 className="font-serif text-heading-sm md:text-heading font-normal text-ink">Cellar Sections</h1>
-          <p className="text-[13px] text-grey">
+        <div className="min-w-0 flex-1">
+          <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+            Cellar · Sections ·{" "}
+            <span className="tabular">{sections.length}</span>
+          </p>
+          <h1 className="mt-xs font-serif text-heading-sm font-normal leading-[1.05] tracking-[-0.02em] text-ink md:text-heading">Cellar Sections</h1>
+          <p className="mt-xs text-body-sm text-ink-soft">
             Organize your cellar into named groups like Reds by Region or Cult
             Cabs.
           </p>
@@ -216,7 +220,7 @@ export default function CellarConfigPage() {
       {error && (
         <div
           role="alert"
-          className="mb-md rounded-md border border-risk-ink/30 bg-risk-wash px-md py-sm text-[13px] text-risk-ink"
+          className="mb-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
         >
           {error}
         </div>
@@ -232,7 +236,7 @@ export default function CellarConfigPage() {
             items={sections.map((s) => s.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="mb-lg divide-y divide-rule rounded-card card-surface">
+            <ul className="mb-lg divide-y divide-rule border-y border-rule">
               {sections.map((section) => (
                 <SortableSectionItem
                   key={section.id}
@@ -252,7 +256,7 @@ export default function CellarConfigPage() {
           </SortableContext>
         </DndContext>
       ) : (
-        <p className="mb-lg rounded-card card-surface px-md py-lg text-center text-[14px] text-grey">
+        <p className="mb-lg rounded-card card-surface px-md py-lg text-center text-control text-grey">
           No sections yet. Add your first one below.
         </p>
       )}
@@ -266,7 +270,7 @@ export default function CellarConfigPage() {
             if (e.key === "Enter") addSection();
           }}
           placeholder="New section name (e.g. Reds by Region)"
-          className="min-w-0 flex-1 rounded-pill border border-rule px-sm py-sm text-[14px] text-ink placeholder:text-grey focus-ring"
+          className="glass min-w-0 flex-1 rounded-pill px-sm py-sm text-control text-ink placeholder:text-grey focus-ring"
           disabled={busy}
         />
         <button
@@ -274,7 +278,7 @@ export default function CellarConfigPage() {
           onClick={addSection}
           disabled={busy || !newName.trim()}
           className={cn(
-            "flex h-[44px] shrink-0 items-center gap-xs rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink transition-colors",
+            "flex h-[44px] shrink-0 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors",
             "hover:bg-primary-hover disabled:opacity-60 focus-ring",
           )}
         >
@@ -295,16 +299,16 @@ export default function CellarConfigPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-section-heading"
-            className="mx-md w-full max-w-[420px] rounded-card card-surface p-lg"
+            className="glass mx-md w-full max-w-[420px] rounded-card p-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <h3
               id="delete-section-heading"
-              className="font-serif text-[18px] font-normal text-ink"
+              className="font-serif text-subheading font-normal text-ink"
             >
               Delete section?
             </h3>
-            <p className="mt-sm text-[14px] text-grey">
+            <p className="mt-sm text-control text-ink-soft">
               This will permanently remove &ldquo;{deleteTarget.name}&rdquo;.
             </p>
             <div className="mt-lg flex gap-sm">
@@ -312,7 +316,7 @@ export default function CellarConfigPage() {
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={busy}
-                className="min-h-11 flex-1 rounded-pill border border-edge px-md py-sm text-[14px] font-medium text-ink hover:bg-wash disabled:opacity-60 focus-ring"
+                className="min-h-11 flex-1 rounded-pill border border-rule-strong bg-transparent px-md py-sm text-control font-medium text-ink hover:bg-wash disabled:opacity-60 focus-ring"
               >
                 Cancel
               </button>
@@ -320,7 +324,7 @@ export default function CellarConfigPage() {
                 type="button"
                 onClick={confirmDelete}
                 disabled={busy}
-                className="min-h-11 flex-1 rounded-pill bg-primary px-md py-sm text-[14px] font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60 focus-ring"
+                className="min-h-11 flex-1 rounded-pill bg-primary px-md py-sm text-control font-semibold text-seal-ink hover:bg-primary-hover disabled:opacity-60 focus-ring"
               >
                 Delete
               </button>

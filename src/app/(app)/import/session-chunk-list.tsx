@@ -27,11 +27,11 @@ export function SessionChunkList({
         Chunks ({progress.chunks.length}
         {progress.declaredChunkTotal ? ` of ${progress.declaredChunkTotal}` : ""})
       </h3>
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {progress.chunks.map((chunk) => (
           <li
             key={chunk.batchId}
-            className="flex items-center justify-between rounded-md bg-wash px-sm py-xs text-[13px] text-ink"
+            className="flex items-center justify-between border-b border-rule px-2xs py-sm text-body-sm text-ink"
           >
             <span>Chunk {chunk.chunkIndex ?? "—"} ({chunk.counts.applied}/{chunk.counts.total} applied)</span>
             <ChunkStatusChip status={chunk.status} />
@@ -89,7 +89,7 @@ function ChunkStatusChip({ status }: { status: string }) {
     reverted: "Reverted",
   };
   return (
-    <span className="inline-flex items-center gap-2xs rounded-pill bg-wash px-sm py-2xs text-caption font-medium text-ink">
+    <span className="inline-flex items-center gap-2xs rounded-pill bg-peak-wash px-sm py-2xs text-caption font-medium uppercase text-peak-ink">
       {status === "completed" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
       {label[status] ?? status}
     </span>

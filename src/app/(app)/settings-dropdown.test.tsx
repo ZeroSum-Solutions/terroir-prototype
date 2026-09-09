@@ -60,13 +60,17 @@ describe("SettingsDropdown touch targets", () => {
     });
 
     const actions = [
-      ...container.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      // The menu is portalled to <body> so it can escape the glass header's
+      // stacking context; the container is appended to body, so document
+      // sees both the trigger and the menu.
+      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
     ];
     expect(actions.map((action) => action.textContent?.trim())).toEqual([
       "Pricing",
       "Bins",
       "Team",
       "Import",
+      "Setup guide",
       "Sign out",
     ]);
     for (const action of actions) {
@@ -87,7 +91,10 @@ describe("SettingsDropdown touch targets", () => {
     });
 
     const actions = [
-      ...container.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      // The menu is portalled to <body> so it can escape the glass header's
+      // stacking context; the container is appended to body, so document
+      // sees both the trigger and the menu.
+      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
     ];
     for (const action of actions) {
       expect.soft(action.className, action.textContent?.trim()).toContain(

@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DollarSign, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /**
  * BND-040 — RefreshRetailButton
@@ -103,10 +102,10 @@ export function RefreshRetailButton() {
         type="button"
         onClick={onClick}
         disabled={busy}
-        className={cn(
-          "inline-flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-60",
-          busy && "cursor-wait",
-        )}
+        className={
+          "inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring disabled:opacity-60" +
+          (busy ? " cursor-wait" : "")
+        }
       >
         {busy ? (
           <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />
@@ -117,7 +116,7 @@ export function RefreshRetailButton() {
       </button>
 
       {progress && (
-        <p className="text-[12px] text-grey">
+        <p className="text-ledger text-grey">
           {progress.refreshed} wine{progress.refreshed === 1 ? "" : "s"} refreshed
           {progress.skipped > 0 && (
             <>
@@ -133,7 +132,7 @@ export function RefreshRetailButton() {
       )}
 
       {errorMsg && (
-        <p role="alert" className="text-[12px] text-risk-ink">
+        <p role="alert" className="text-ledger text-risk-ink">
           {errorMsg}
         </p>
       )}

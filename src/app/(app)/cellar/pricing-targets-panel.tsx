@@ -134,7 +134,9 @@ export function PricingTargetsPanel({
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
               aria-label="Glass pour cost percentage target"
-              className="h-[34px] w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-[14px]"
+              // 17px keeps iOS from zooming the page on focus; 14px once
+              // there is a pointer. h-11 meets the 44px touch target.
+              className="h-11 w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-body-lg md:text-control"
             />
             <span className="text-[12px] text-grey">%</span>
             <span className="ml-xs text-[11px] text-grey">
@@ -160,7 +162,9 @@ export function PricingTargetsPanel({
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
               aria-label="Bottle markup ratio target"
-              className="h-[34px] w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-[14px]"
+              // 17px keeps iOS from zooming the page on focus; 14px once
+              // there is a pointer. h-11 meets the 44px touch target.
+              className="h-11 w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-body-lg md:text-control"
             />
             <span className="text-[12px] text-grey">× retail</span>
             <span className="ml-xs text-[11px] text-grey">

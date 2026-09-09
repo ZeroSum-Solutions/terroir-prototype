@@ -9,7 +9,7 @@
     "concreteRequirementCount": 32,
     "exactDiscoveredCount": 17,
     "plannedPromiseCount": 15,
-    "extensionDiscoveredCount": 97,
+    "extensionDiscoveredCount": 98,
     "crossCuttingRequirementCount": 6,
     "ter020LeafCount": 8
   },
@@ -518,6 +518,12 @@
     },
     {
       "operationId": "api:POST:/api/import/sessions/{param}/revert",
+      "classification": "extension",
+      "concreteRequirementId": null,
+      "semanticAliasContext": []
+    },
+    {
+      "operationId": "api:GET:/api/import/template",
       "classification": "extension",
       "concreteRequirementId": null,
       "semanticAliasContext": []

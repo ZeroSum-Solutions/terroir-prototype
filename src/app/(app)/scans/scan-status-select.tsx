@@ -41,7 +41,7 @@ export function ScanStatusSelect({
         onChange={(event) => {
           router.push(`/scans${buildQuery({ status: event.target.value as StatusFilter })}`);
         }}
-        className="h-11 min-w-0 flex-1 truncate rounded-pill border border-edge bg-surface px-sm text-body-sm font-medium text-ink hover:bg-wash focus-ring sm:max-w-[240px]"
+        className="h-11 min-w-0 flex-1 truncate rounded-pill border border-rule-strong bg-surface-sunken px-md text-control font-medium text-ink transition-colors hover:border-accent focus-ring sm:max-w-[240px]"
       >
         {STATUS_FILTERS.map((filter) => (
           <option key={filter.value} value={filter.value}>

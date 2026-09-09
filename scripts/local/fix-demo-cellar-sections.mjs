@@ -8,7 +8,7 @@
  *
  * The base seeder dealt items into `inventory_items.section` round-robin
  * (`sections[i % sections.length]`), and `/cellar` groups by that column
- * (BND-063). Measured 2026-09-01 on LOCAL SEED - Osteria Scala: "Sparkling"
+ * (BND-063). Measured 2026-09-01 on Osteria Scala: "Sparkling"
  * held 35 reds and 8 sparklings; "Whites" 27 reds and 16 whites; every
  * section was ~30% right. fix-demo-wine-lists.mjs fixed the same fault on
  * the wine lists and left the cellar alone; this is the cellar half, on the
@@ -23,7 +23,7 @@
  * Usage:
  *   node scripts/local/fix-demo-cellar-sections.mjs              # dry run
  *   node scripts/local/fix-demo-cellar-sections.mjs --confirm
- *   node scripts/local/fix-demo-cellar-sections.mjs --restaurant="LOCAL SEED - Osteria Scala"
+ *   node scripts/local/fix-demo-cellar-sections.mjs --restaurant="Osteria Scala"
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -41,7 +41,7 @@ const SERVICE_KEY =
 const CONFIRM = process.argv.includes("--confirm");
 const RESTAURANT_NAME =
   process.argv.find((a) => a.startsWith("--restaurant="))?.slice("--restaurant=".length) ??
-  "LOCAL SEED - Osteria Scala";
+  "Osteria Scala";
 
 try {
   execFileSync("bash", [path.join(__dirname, "assert-local-db.sh")], {

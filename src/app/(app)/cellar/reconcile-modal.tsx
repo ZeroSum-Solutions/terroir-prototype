@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 import { ReconcileList } from "./reconcile-list";
+import { ActionDialog } from "@/components/action-dialog";
+import { clearReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
 
 /**
  * Reconcile mode (Phase 2 IA redesign — .council/specs/2026-04-24-ux-ia-redesign.md
@@ -29,19 +31,31 @@ export function ReconcileModal({
   items,
   varianceThresholdOz,
   onClose,
+  restaurantId,
+  userId,
 }: {
   open: boolean;
   items: OpenBottleRow[];
   varianceThresholdOz?: number;
   onClose: () => void;
+  restaurantId: string;
+  userId: string;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingId = "reconcile-modal-heading";
+  const [editState, setEditState] = useState({ dirty: false, busy: false });
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  function close() {
+    if (editState.busy) return;
+    if (editState.dirty) setConfirmDiscard(true);
+    else onClose();
+  }
 
   useFocusTrap({
     containerRef: dialogRef,
-    onEscape: onClose,
+    onEscape: close,
     enabled: open,
+    paused: confirmDiscard,
   });
 
   // Lock body scroll while modal is open. The full-screen overlay
@@ -65,7 +79,7 @@ export function ReconcileModal({
       aria-labelledby={headingId}
       className="fixed inset-0 z-[var(--z-dialog)] flex flex-col bg-canvas md:items-center md:justify-center md:bg-scrim md:p-lg"
     >
-      <div className="flex h-full w-full flex-col overflow-hidden bg-surface md:h-[min(720px,90vh)] md:max-w-[640px] md:rounded-card md:border md:border-rule">
+      <div className="glass flex h-full w-full flex-col overflow-hidden rounded-none md:h-[min(720px,90vh)] md:max-w-[640px] md:rounded-card">
         <header
           className="flex items-center justify-between border-b border-rule px-md py-md md:px-lg"
           style={{ paddingTop: "calc(var(--safe-top) + var(--spacing-lg))" }}
@@ -73,29 +87,35 @@ export function ReconcileModal({
           <div>
             <h2
               id={headingId}
-              className="font-serif text-[20px] font-medium text-ink md:text-[22px]"
+              className="font-serif text-subheading font-normal text-ink md:text-heading-sm"
             >
               Reconcile open bottles
             </h2>
-            <p className="mt-2xs text-[13px] text-grey">
+            <p className="mt-2xs text-body-sm text-grey">
               End-of-shift correction. Set each open bottle to its actual
               remaining level.
             </p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
+            disabled={editState.busy}
             aria-label="Close reconcile mode"
-            className="ml-md flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash"
+            className="ml-md flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft hover:bg-wash hover:text-ink"
           >
             <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
         </header>
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-md py-md md:px-lg md:py-lg">
-          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} />
+          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog restaurantId={restaurantId} userId={userId} />
         </div>
       </div>
+      {/* This confirm flow is independent of ReconcileList's own dirty-state
+          (ReconcileNavigationGuard) — closing the modal unmounts ReconcileList
+          entirely, so the draft is cleared here directly rather than through
+          a callback into a component that is about to disappear. */}
+      <ActionDialog open={confirmDiscard} title="Discard unsaved counts?" description="Your changes to the remaining bottle volumes have not been saved." confirmLabel="Discard changes" cancelLabel="Keep counting" onClose={() => setConfirmDiscard(false)} onConfirm={() => { setConfirmDiscard(false); setEditState({ dirty: false, busy: false }); clearReconcileDraft(restaurantId, userId); onClose(); }} />
     </div>
   );
 }

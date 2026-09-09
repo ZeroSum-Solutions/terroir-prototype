@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Clock, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { DrinkWindowTimeline } from "@/components/drink-window-timeline";
 import { getYearsUntilWindowClose } from "@/lib/drink-window/status";
 import type { DrinkWindowAlertRow } from "@/lib/drink-window/alerts";
@@ -49,12 +48,16 @@ export function BriefingAlertCard({
   const [, startTransition] = useTransition();
 
   const yearsLeft = getYearsUntilWindowClose(alert.drink_window_end);
+  const pastWindow = yearsLeft != null && yearsLeft < 0;
+  const ratingSourceLabel = formatRatingSourceLabel(alert.rating_source);
   // Whole clauses, not ledger fragments — "~— remaining of optimal" shipped
   // to the screen (Kimi audit 2026-08-26). Null window end → say nothing.
   const remainingLabel =
     yearsLeft == null
       ? null
-      : yearsLeft <= 0
+      : pastWindow
+        ? `Optimal window ended in ${alert.drink_window_end}`
+      : yearsLeft === 0
         ? "Final year of the optimal window"
         : `~${yearsLeft} yr${yearsLeft === 1 ? "" : "s"} of optimal window left`;
 
@@ -85,10 +88,7 @@ export function BriefingAlertCard({
   return (
     <article
       data-metric={`drink-window-${alert.wine_id}`}
-      className={cn(
-        "rounded-card card-surface p-md md:p-lg",
-        "border-l-[3px] border-l-primary",
-      )}
+      className="border-b border-rule py-md"
     >
       <div className="flex flex-col gap-md md:flex-row md:items-start md:gap-lg">
         {/* The bottle itself. This alert asks someone to go and find a
@@ -105,34 +105,34 @@ export function BriefingAlertCard({
           {/* Fact first — the salutation ("Hey Owner+local") both leaked the
               email local-part and buried the actionable sentence
               (Kimi audit 2026-08-26). */}
-          <h3 className="font-serif text-[18px] text-ink md:text-[20px]">
+          <h3 className="font-serif text-body-lg font-normal text-ink md:text-subheading">
             <span className="tabular">{alert.bottle_count}</span> bottle{alert.bottle_count === 1 ? "" : "s"} of{" "}
             <em className="font-medium italic">
               {wineTitle(alert.producer, alert.name, ", ")}
               {alert.vintage ? ` ${alert.vintage}` : ""}
             </em>{" "}
-            {alert.bottle_count === 1 ? "is" : "are"} entering {alert.bottle_count === 1 ? "its" : "their"} final drinking window.
+            {alert.bottle_count === 1 ? "is" : "are"} {pastWindow ? "past" : "entering"} {alert.bottle_count === 1 ? "its" : "their"} {pastWindow ? "drinking window." : "final drinking window."}
           </h3>
-          <div className="mt-xs flex flex-wrap items-center gap-sm text-[12px] text-grey">
+          <div className="mt-xs flex flex-wrap items-center gap-sm text-ledger text-grey">
             {remainingLabel && (
               <span className="inline-flex items-center gap-2xs">
                 <Clock className="h-3 w-3" strokeWidth={2} aria-hidden />
                 {remainingLabel}
               </span>
             )}
-            {alert.rating != null && alert.rating_source && (
+            {alert.rating != null && ratingSourceLabel && (
               <span>
                 · last reviewed <span className="tabular">{alert.rating} pts</span>
               </span>
             )}
             {alert.bin_location && (
               <span>
-                · bin <span className="inline-flex rounded-pill bg-surface-sunken px-xs py-[1px] text-[11px] text-ink-soft">{alert.bin_location}</span>
+                · bin <span className="inline-flex rounded-pill border border-rule-strong px-xs py-2xs text-micro tracking-[0.12em] text-accent">{alert.bin_location}</span>
               </span>
             )}
           </div>
           {alert.review_excerpt && (
-            <p className="mt-sm font-serif text-[17px] italic text-ink leading-snug">
+            <p className="mt-sm font-serif text-body-lg italic leading-snug text-ink-soft">
               &ldquo;{alert.review_excerpt}&rdquo;
             </p>
           )}
@@ -140,7 +140,7 @@ export function BriefingAlertCard({
           <div className="mt-md flex flex-wrap items-center gap-xs">
             <Link
               href={metricHref("wine", alert.wine_id)}
-              className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+              className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
             >
               View {alert.bottle_count} bottle{alert.bottle_count === 1 ? "" : "s"}
               <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -150,9 +150,7 @@ export function BriefingAlertCard({
                 type="button"
                 disabled={busy}
                 onClick={onSnooze}
-                className={cn(
-                  "inline-flex min-h-11 items-center gap-xs rounded-pill px-md text-[13px] font-medium text-grey hover:bg-wash focus-ring disabled:opacity-60",
-                )}
+                className="inline-flex min-h-11 items-center gap-xs rounded-pill px-md text-control font-medium text-grey transition-colors hover:bg-surface-raised focus-ring disabled:opacity-60"
               >
                 <X className="h-4 w-4" strokeWidth={2} aria-hidden />
                 {busy ? "Snoozing…" : "Snooze 30 days"}
@@ -161,7 +159,7 @@ export function BriefingAlertCard({
           </div>
 
           {errorMsg && (
-            <p role="alert" className="mt-sm text-[12px] text-risk-ink">
+            <p role="alert" className="mt-sm text-ledger text-risk-ink">
               {errorMsg}
             </p>
           )}
@@ -176,9 +174,9 @@ export function BriefingAlertCard({
           />
           {/* Only cite a source that exists — "Source: Unknown" printed on
               every unattributed alert and eroded trust (Kimi audit). */}
-          {alert.rating_source != null && (
-            <p className="mt-xs text-[11px] italic text-grey">
-              Source: {formatRatingSourceLabel(alert.rating_source)}
+          {ratingSourceLabel && (
+            <p className="mt-xs text-micro italic text-grey">
+              Source: {ratingSourceLabel}
               {alert.rating_source === "claude_inference" && " (estimated)"}
             </p>
           )}
@@ -188,7 +186,7 @@ export function BriefingAlertCard({
   );
 }
 
-function formatRatingSourceLabel(source: string | null): string {
+function formatRatingSourceLabel(source: string | null): string | null {
   switch (source) {
     case "rule_engine":
       return "Rule engine estimate";
@@ -207,6 +205,6 @@ function formatRatingSourceLabel(source: string | null): string {
     case "aggregate":
       return "Multiple critics";
     default:
-      return "Unknown";
+      return null;
   }
 }

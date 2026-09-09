@@ -98,9 +98,12 @@ describe("BottleResultsView — wine name typography (DESIGN.md)", () => {
     expect(valueEl).toBeTruthy();
     const className = valueEl!.className;
     expect(className).toContain("font-serif");
-    expect(className).toContain("text-[17px]");
+    // The scale token, not an arbitrary px (DESIGN.md — Type Scale). The
+    // identified name is the sheet's headline now: heading-sm, well above the
+    // 17px floor this suite was written to hold.
+    expect(className).toContain("text-heading-sm");
     expect(className).toContain("font-medium");
-    expect(className).not.toContain("text-[14px]");
+    expect(className).not.toContain("text-control");
     expect(className).not.toContain("font-bold");
   });
 
@@ -114,7 +117,7 @@ describe("BottleResultsView — wine name typography (DESIGN.md)", () => {
     );
     expect(producerValueEl).toBeTruthy();
     expect(producerValueEl!.className).not.toContain("font-serif");
-    expect(producerValueEl!.className).toContain("text-[14px]");
+    expect(producerValueEl!.className).toContain("text-control");
   });
 
   it("keeps the editing-stage wine name input in the same serif treatment", async () => {
@@ -123,7 +126,8 @@ describe("BottleResultsView — wine name typography (DESIGN.md)", () => {
 
     const nameInput = container.querySelector('input[aria-label="Wine name"]') as HTMLInputElement;
     expect(nameInput.className).toContain("font-serif");
-    expect(nameInput.className).toContain("text-[17px]");
+    // text-body-lg IS 17px — the scale token for it (DESIGN.md — Type Scale).
+    expect(nameInput.className).toContain("text-body-lg");
     expect(nameInput.className).toContain("font-medium");
     expect(nameInput.className).not.toContain("font-bold");
   });

@@ -193,7 +193,7 @@ export function BrandKitPanel({
   return (
     <section
       aria-label="Brand kit"
-      className="mt-xl rounded-card card-surface p-md md:p-lg"
+      className="glass mt-xl rounded-card p-md md:p-lg"
       onDragOver={(event) => {
         event.preventDefault();
         setDragging(true);
@@ -205,14 +205,16 @@ export function BrandKitPanel({
         <div>
           <div className="flex items-center gap-xs">
             <Palette className="h-4 w-4 text-accent" aria-hidden />
-            <h2 className="font-serif text-[20px] font-medium text-ink">Brand kit</h2>
+            <h2 className="font-serif text-subheading font-normal text-ink">
+              Brand kit
+            </h2>
           </div>
-          <p className="mt-xs max-w-[576px] text-[13px] text-grey">
+          <p className="mt-xs max-w-[576px] text-body-sm text-ink-soft">
             Drop, paste or upload a logo — or give the restaurant&apos;s website
             address — then generate accessible menu themes.
           </p>
         </div>
-        <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-xs rounded-pill border border-rule bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring">
+        <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring">
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
           {uploading ? "Extracting…" : "Upload logo"}
           <input
@@ -249,13 +251,13 @@ export function BrandKitPanel({
             placeholder="yourrestaurant.com"
             value={siteUrl}
             onChange={(event) => setSiteUrl(event.target.value)}
-            className="h-11 w-full rounded-pill border border-edge bg-surface pl-xl pr-sm text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
+            className="min-h-11 w-full rounded-pill border border-rule-strong bg-surface-sunken pl-xl pr-sm text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
           />
         </div>
         <button
           type="submit"
           disabled={uploading}
-          className="min-h-11 shrink-0 rounded-pill border border-rule bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring disabled:opacity-50"
+          className="min-h-11 shrink-0 rounded-pill border border-rule-strong bg-transparent px-md text-body-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:opacity-50"
         >
           Build from website
         </button>
@@ -264,10 +266,10 @@ export function BrandKitPanel({
       <p
         data-brand-kit-dropzone
         className={cn(
-          "mt-sm rounded-md border border-dashed px-sm py-xs text-ledger",
+          "mt-sm rounded-card border border-dashed px-sm py-xs text-ledger",
           dragging
-            ? "border-accent bg-wash text-ink"
-            : "border-rule text-grey",
+            ? "border-accent text-accent"
+            : "border-rule-strong text-grey",
         )}
       >
         {dragging
@@ -276,7 +278,7 @@ export function BrandKitPanel({
       </p>
 
       {(logoUrl || palette) && (
-        <div className="mt-md flex flex-wrap items-center gap-md rounded-md bg-wash p-sm">
+        <div className="mt-md flex flex-wrap items-center gap-md rounded-card border border-rule bg-surface-sunken p-sm">
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="Uploaded restaurant logo" className="h-12 w-24 object-contain" />
@@ -287,7 +289,7 @@ export function BrandKitPanel({
                 key={colour}
                 data-palette-swatch
                 title={colour}
-                className="h-8 w-8 rounded-md border border-edge"
+                className="h-8 w-8 rounded-md border border-rule-strong"
                 style={{ backgroundColor: colour }}
               />
             ))}
@@ -300,13 +302,13 @@ export function BrandKitPanel({
           type="button"
           disabled={!palette || generating}
           onClick={() => void generateThemes()}
-          className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-50"
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
           {generating ? "Designing…" : "Generate themes"}
         </button>
         {status && (
-          <p role="status" className={`text-[13px] ${status.kind === "error" ? "text-risk-ink" : "text-ready-ink"}`}>
+          <p role="status" className={`text-body-sm ${status.kind === "error" ? "text-risk-ink" : "text-ready-ink"}`}>
             {status.message}
           </p>
         )}
@@ -317,15 +319,20 @@ export function BrandKitPanel({
           {proposals.map((theme, index) => (
             <article
               key={index}
-              className="overflow-hidden rounded-card shadow-card border border-rule"
+              className="overflow-hidden rounded-card border border-rule-strong"
               style={themeCssVariables(theme)}
             >
               <div className="bg-canvas p-md text-ink">
-                <p className="text-caption uppercase text-grey">Wine list</p>
-                <h3 className="mt-xs font-serif text-[20px]">{theme.name}</h3>
+                <p className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                  Wine list
+                </p>
+                <h3 className="mt-xs font-serif text-subheading">{theme.name}</h3>
                 <div className="mt-md border-t border-rule pt-sm">
-                  <p className="font-serif text-[17px]">Estate Pinot Noir <span className="font-sans text-[12px] text-grey">2021</span></p>
-                  <p className="mt-xs text-[12px] text-grey">Willamette Valley</p>
+                  <p className="font-serif text-body-lg">
+                    Estate Pinot Noir{" "}
+                    <span className="font-sans text-ledger text-grey">2021</span>
+                  </p>
+                  <p className="mt-xs text-ledger text-grey">Willamette Valley</p>
                 </div>
               </div>
               <div className="flex items-center gap-xs border-t border-rule bg-surface p-sm">
@@ -334,7 +341,7 @@ export function BrandKitPanel({
                   aria-label={`Apply ${theme.name}`}
                   disabled={applying !== null}
                   onClick={() => void applyTheme(theme)}
-                  className="h-11 flex-1 rounded-pill bg-primary px-sm text-[12px] font-medium text-seal-ink focus-ring disabled:opacity-50"
+                  className="min-h-11 flex-1 rounded-pill bg-primary px-sm text-ledger font-semibold text-seal-ink focus-ring disabled:opacity-50"
                 >
                   {applying === theme.name ? "Applying…" : appliedTheme?.name === theme.name ? "Applied" : "Apply"}
                 </button>
@@ -342,7 +349,7 @@ export function BrandKitPanel({
                   type="button"
                   disabled={generating}
                   onClick={() => void generateThemes(theme)}
-                  className="h-11 rounded-pill border border-rule px-sm text-[12px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-50"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-ledger font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:opacity-50"
                 >
                   Refine
                 </button>

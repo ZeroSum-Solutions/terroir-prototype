@@ -1,27 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Ephesis, Source_Code_Pro, Source_Sans_3, Source_Serif_4 } from "next/font/google";
+import { Cormorant_Garamond, Manrope, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 
 /**
- * Nocturne's four faces (DESIGN.md — Typography). Source Serif 4, Source
- * Sans 3 and Source Code Pro were drawn as one superfamily, which is why they
- * sit together without negotiation. Bodoni Moda, Archivo and Courier Prime are
- * retired: a Didone's defining feature is extreme stroke contrast, and on a
- * near-black ground light type irradiates outward and eats exactly those
- * hairlines.
+ * Obsidian Glass's three faces (DESIGN.md — Typography). Cormorant Garamond
+ * is the named face — wine names, producers, headlines, the wordmark — with
+ * the italic carrying the one emphasised word in a headline. Manrope is the
+ * working face for everything you operate. Source Code Pro is unchanged,
+ * for bin codes only.
  */
-const sourceSerif = Source_Serif_4({
-  variable: "--font-source-serif",
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
-  // The optical-size axis is the reason this face was chosen: one family
-  // redraws itself for a 13px caption and a 72px hero.
-  axes: ["opsz"],
+  weight: ["400", "500", "600"],
   style: ["normal", "italic"],
   display: "swap",
 });
 
-const sourceSans = Source_Sans_3({
-  variable: "--font-source-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
   display: "swap",
 });
@@ -29,13 +26,6 @@ const sourceSans = Source_Sans_3({
 const sourceCode = Source_Code_Pro({
   variable: "--font-source-code",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const ephesis = Ephesis({
-  variable: "--font-ephesis",
-  subsets: ["latin"],
-  weight: "400",
   display: "swap",
 });
 
@@ -58,22 +48,27 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#07080A" },
-    { media: "(prefers-color-scheme: light)", color: "#F4F5F6" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B0B0C" },
+    { media: "(prefers-color-scheme: light)", color: "#F1EADB" },
   ],
   viewportFit: "cover",
 };
 
 /**
- * Applies the stored theme choice before first paint so neither mode
- * flashes. "light" | "dark" set data-theme explicitly; anything else
- * (or no storage access) leaves the system preference in charge via
- * the prefers-color-scheme blocks in globals.css. An explicit choice
- * also overrides both theme-color metas so browser/PWA chrome matches
- * the page rather than the system scheme (ThemeToggle keeps them in
- * sync on later changes; hexes hand-synced with viewport.themeColor).
+ * Applies the stored theme choice before first paint so neither room
+ * flashes. "light" | "dark" set data-theme explicitly; "system" leaves the
+ * device preference in charge via the prefers-color-scheme blocks in
+ * globals.css; NO stored choice means Bone — the light room is the default
+ * for now (owner's call, 2026-09-09; DESIGN.md — Theme), so a first visit
+ * lands there whatever the device says, and Obsidian is one tap away in
+ * Settings. The public guest list (/list/…) is always light regardless:
+ * it is the venue's artefact, read at a table, and a venue's own brand
+ * theme paints over it. An explicit choice also overrides both
+ * theme-color metas so browser/PWA chrome matches the page (ThemeToggle
+ * keeps them in sync on later changes; hexes hand-synced with
+ * viewport.themeColor).
  */
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#07080A":"#F4F5F6";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="light"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0B0B0C":"#F1EADB";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -81,7 +76,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sourceSans.variable} ${sourceSerif.variable} ${sourceCode.variable} ${ephesis.variable} h-full overflow-x-clip`}
+      className={`${manrope.variable} ${cormorant.variable} ${sourceCode.variable} h-full overflow-x-clip`}
       suppressHydrationWarning
     >
       <body className="min-h-full">

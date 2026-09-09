@@ -1,119 +1,161 @@
 import Image from "next/image";
 import { StatusChip } from "@/components/status-chip";
-import { CommunityRating } from "@/components/detail-sections";
-import { WineThumb } from "@/components/wine-thumb";
+import {
+  CommunityRating,
+  DetailHero,
+  StatStrip,
+  type StatItem,
+} from "@/components/detail-sections";
+import { wineTint, wineInitials } from "@/components/wine-thumb";
 import { CORPUS_IMAGE_NOTE } from "@/lib/wine-intelligence/corpus-image";
 import { wineDisplayName } from "@/lib/wine-display-name";
+import type { ResolvedWineFacts } from "@/lib/wine-intelligence/wine-reference-facts";
 import type { XWinesProfile } from "@/lib/wine-intelligence/xwines-profile";
 import type { WineRow } from "./types";
-
-// The hero's candlelight: a warm pool behind the bottle that reads as a lit
-// alcove. It is drawn with the `mark` — champagne in Nocturne, claret in
-// Daylight — because that is the one warm value in the system. `accent` is
-// bone in the dark room and would light the alcove in white.
-const HERO_GLOW = {
-  backgroundImage:
-    "radial-gradient(60% 55% at 22% 42%, color-mix(in oklab, var(--t-mark) 22%, transparent) 0%, transparent 70%)",
-} as const;
+import { wineImageReferenceNote } from "@/lib/wine-intelligence/wine-image-reference";
 
 export type HeroSectionProps = {
   wine: WineRow;
   profile: XWinesProfile | null;
   bottleCount: number;
-  facets: string[];
+  /** Bins this wine is placed in, for the stat strip. */
+  locations: string[];
+  facts: ResolvedWineFacts;
   heroSrc: string | null;
   heroAlt: string;
   corpusImage: NonNullable<XWinesProfile["image"]> | null;
 };
 
+/**
+ * The wine, as the page opens (DESIGN.md — Masthead, Imagery): the bottle
+ * full-bleed in a band that fades into the canvas, then a glass sheet carrying
+ * the eyebrow, the name in the serif, one line of metadata and the strip of
+ * figures the bottle is judged on.
+ *
+ * Everything the old two-column header stated is still stated — producer,
+ * region, country, vintage, style, varietal, format, the picture's caption,
+ * the 86 seal, the stock count, the community rating — regrouped so a phone
+ * reads it in one pass instead of scrolling a 300px image column first.
+ */
 export function HeroSection({
   wine,
   profile,
   bottleCount,
-  facets,
+  locations,
+  facts,
   heroSrc,
   heroAlt,
   corpusImage,
 }: HeroSectionProps) {
-  return (
-    <header
-      className="relative mt-md grid gap-xl rounded-card py-2xl md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:gap-2xl md:py-3xl"
-      style={HERO_GLOW}
-    >
-      <div className="flex flex-col items-center justify-center gap-sm">
-        {heroSrc !== null ? (
-          /* unoptimized, as every other hero_image_url render does
-             (wine-detail-drawer, WineThumb): the URL is an absolute
-             Supabase Storage one and next.config.ts declares no
-             images.remotePatterns, so the optimizer would refuse it and
-             the page would throw for any wine that HAS a picture. */
-          <Image
-            src={heroSrc}
-            alt={heroAlt}
-            width={300}
-            height={480}
-            priority
-            unoptimized
-            className="h-auto w-[min(62vw,240px)] object-contain drop-shadow-2xl md:w-full"
-          />
-        ) : (
-          <div className="flex h-[300px] w-[132px] items-center justify-center rounded-card border border-rule bg-surface md:h-[380px] md:w-[168px]">
-            <WineThumb
-              src={null}
-              colour={wine.colour}
-              producer={wine.producer}
-              name={wine.name}
-              size={96}
-              className="rounded-pill"
-            />
-          </div>
-        )}
-        {corpusImage !== null && (
-          <p className="max-w-[240px] text-center text-caption text-grey md:max-w-full">
-            {CORPUS_IMAGE_NOTE[corpusImage.kind]}
-            {corpusImage.credit !== null && (
-              <span className="block">{corpusImage.credit}</span>
-            )}
-          </p>
-        )}
-      </div>
+  const referenceNote = wineImageReferenceNote(wine.hero_image_url);
+  // The no-photo hero: the same tint WineThumb uses, at 2:3 portrait in the
+  // middle of the band — a considered graphic element, not a stand-in for a
+  // missing asset (DESIGN.md — Imagery).
+  const tint = wineTint(wine.colour);
+  const initials = wineInitials(wine.producer, wine.name);
+  const caption =
+    referenceNote ?? (corpusImage !== null ? CORPUS_IMAGE_NOTE[corpusImage.kind] : null);
+  const credit = referenceNote === null ? (corpusImage?.credit ?? null) : null;
 
-      <div className="flex flex-col justify-center">
-        <p className="text-caption uppercase text-mark">{wine.producer}</p>
-        <h1 className="mt-sm font-serif text-heading-sm leading-[1.06] text-ink md:text-heading lg:text-display">
-          {wineDisplayName(wine.producer, wine.name)}
-        </h1>
-        {wine.vintage !== null && (
-          <p className="mt-xs font-serif text-heading-sm text-grey">{wine.vintage}</p>
-        )}
+  const eyebrow = [wine.producer, facts.region, facts.country]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
+  const meta = [
+    wine.vintage !== null ? String(wine.vintage) : null,
+    profile?.type ?? null,
+    facts.varietal,
+    wine.size_ml !== null ? `${wine.size_ml} ml` : null,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
 
-        {facets.length > 0 && (
-          <ul className="mt-md flex flex-wrap items-center gap-x-sm gap-y-xs text-body-sm text-ink-soft">
-            {facets.map((facet, index) => (
-              <li key={facet} className="flex items-center gap-x-sm">
-                {index > 0 && <span aria-hidden="true" className="text-rule">·</span>}
-                {facet}
-              </li>
-            ))}
-          </ul>
-        )}
+  const stats: StatItem[] = [
+    {
+      label: "Stock",
+      value: (
+        <span className="text-body-lg text-ink">
+          <span className="tabular">{bottleCount === 0 ? "None" : bottleCount}</span>{" "}
+          <span className="text-ledger text-grey">on hand</span>
+        </span>
+      ),
+    },
+    { label: "Bin", value: locations.length > 0 ? locations.join(" · ") : null },
+    {
+      label: "Retail median",
+      value:
+        wine.retail_median != null ? (
+          <span className="text-body-lg tabular text-ink">${wine.retail_median}</span>
+        ) : null,
+    },
+    {
+      label: "Community",
+      value:
+        profile?.ratingAvg != null ? (
+          <CommunityRating avg={profile.ratingAvg} count={profile.ratingCount} />
+        ) : null,
+    },
+  ];
 
-        <div className="mt-lg flex flex-wrap items-center gap-md">
-          {profile?.ratingAvg != null && (
-            <CommunityRating avg={profile.ratingAvg} count={profile.ratingCount} />
-          )}
-          <StockBadge count={bottleCount} />
-          {wine.is_eightysixed && <StatusChip tone="urgent">86&rsquo;d</StatusChip>}
+  const image =
+    heroSrc !== null ? (
+      /* unoptimized, as every other hero_image_url render does
+         (wine-detail-drawer, WineThumb): the URL is an absolute Supabase
+         Storage one and next.config.ts declares no images.remotePatterns, so
+         the optimizer would refuse it and the page would throw for any wine
+         that HAS a picture. object-contain, never a cover crop: the band is
+         full-bleed, the bottle inside it is whole. */
+      <Image
+        src={heroSrc}
+        alt={heroAlt}
+        fill
+        priority
+        unoptimized
+        sizes="100vw"
+        /* A radial mask fades the photograph's own studio backdrop into
+           the canvas at the edges, so a white reference plate reads as
+           light on the bottle rather than a pale rectangle on obsidian. */
+        className="object-contain p-lg [mask-image:radial-gradient(ellipse_62%_72%_at_50%_46%,black_42%,transparent_80%)]"
+      />
+    ) : (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          aria-hidden="true"
+          data-wine-image-fallback="true"
+          className={`flex h-[210px] w-[140px] items-center justify-center rounded-lg border border-glass-edge md:h-[264px] md:w-[176px] ${tint.surface}`}
+        >
+          {/* The size token is concatenated outside cn() on purpose: the
+              tint's `text-ink` and the scale's `text-heading` read as one
+              tailwind-merge group and the size would be dropped. */}
+          <span className={`font-serif text-heading font-normal leading-none ${tint.ink}`}>
+            {initials}
+          </span>
         </div>
       </div>
-    </header>
-  );
-}
+    );
 
-function StockBadge({ count }: { count: number }) {
   return (
-    <span className="rounded-pill border border-rule bg-surface px-md py-xs text-body-sm text-ink-soft">
-      {count === 0 ? "None on hand" : `${count} on hand`}
-    </span>
+    <DetailHero image={image} back={{ href: "/cellar", label: "The cellar" }}>
+      {eyebrow && (
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+          {eyebrow}
+        </p>
+      )}
+      <h1 className="mt-xs font-serif text-heading font-normal leading-[1.02] tracking-[-0.02em] text-ink">
+        {wineDisplayName(wine.producer, wine.name)}
+      </h1>
+      {meta && <p className="mt-sm text-body-sm text-ink-soft">{meta}</p>}
+      {(wine.is_eightysixed || caption !== null) && (
+        <div className="mt-sm flex flex-wrap items-center gap-sm">
+          {wine.is_eightysixed && <StatusChip tone="urgent">86&rsquo;d</StatusChip>}
+          {caption !== null && (
+            <p className="text-ledger text-grey">
+              {caption}
+              {credit !== null && <span className="block">{credit}</span>}
+            </p>
+          )}
+        </div>
+      )}
+      <StatStrip items={stats} />
+    </DetailHero>
   );
 }

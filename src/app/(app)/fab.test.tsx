@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), pathname: "/cellar" }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/cellar",
+  usePathname: () => navigation.pathname,
   useRouter: () => ({ push: navigation.push }),
 }));
 
@@ -13,8 +13,22 @@ const { Fab } = await import("./fab");
 describe("Fab", () => {
   beforeEach(() => {
     navigation.push.mockReset();
+    navigation.pathname = "/cellar";
     document.body.innerHTML = "";
   });
+
+  it.each(["/import", "/get-started", "/cellar/reconcile"])("does not cover dedicated form actions on %s", (pathname) => {
+    navigation.pathname = pathname;
+    expect(renderToStaticMarkup(<Fab />)).toBe("");
+  });
+
+  it.each(["/bins", "/insights"])(
+    "does not cover the row-action column or date-range copy on %s",
+    (pathname) => {
+      navigation.pathname = pathname;
+      expect(renderToStaticMarkup(<Fab />)).toBe("");
+    },
+  );
 
   it("exposes exactly the three working actions and no Voice promise", () => {
     document.body.innerHTML = renderToStaticMarkup(<Fab />);
@@ -44,10 +58,11 @@ describe("Fab", () => {
       'button[aria-label="Open actions"]',
     );
 
-    // The offset clears the tab bar AND its safe area, and reads that from
-    // the chrome tokens rather than restating the geometry here.
+    // The offset clears the floating dock, the gap it floats above, AND the
+    // safe area, and reads all of that from the chrome tokens rather than
+    // restating the geometry here.
     expect(trigger?.getAttribute("style")).toContain(
-      "bottom:calc(var(--chrome-tabbar-total) + var(--spacing-md))",
+      "bottom:calc(var(--chrome-tabbar-total) + var(--spacing-md) + var(--spacing-md))",
     );
   });
 

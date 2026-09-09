@@ -43,6 +43,7 @@ import { convertSpreadsheetFile, isSpreadsheetFile } from "./spreadsheet-upload"
 import { takeHandoffFile } from "./spreadsheet-handoff";
 import { useFileIntake } from "@/lib/upload/use-file-intake";
 import { loadBatchDetail } from "./load-batch-detail";
+import { ImportHeader } from "./import-header";
 import { UploadStep } from "./upload-step";
 import { PreviewStep } from "./preview-step";
 import { BatchStep } from "./batch-step";
@@ -439,7 +440,7 @@ export function ImportClient() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-[640px] px-md py-lg">
+    <div className="mx-auto max-w-[640px]">
       {/* The whole window is the drop target — there is one upload here, so
           making the operator hit a rectangle buys nothing. */}
       {isDragging && (
@@ -447,19 +448,14 @@ export function ImportClient() {
           aria-hidden="true"
           className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim p-lg"
         >
-          <div className="rounded-card border-2 border-dashed border-surface-sunken bg-surface px-xl py-lg text-center">
-            <p className="font-serif text-[20px] text-ink">Drop your cellar file</p>
-            <p className="mt-xs text-[13px] text-grey">.csv or .xlsx — one file at a time</p>
+          <div className="glass rounded-card border border-dashed border-accent px-xl py-lg text-center">
+            <p className="font-serif text-subheading font-normal text-ink">Drop your cellar file</p>
+            <p className="mt-xs text-body-sm text-ink-soft">.csv or .xlsx — one file at a time</p>
           </div>
         </div>
       )}
 
-      <header className="mb-lg">
-        <h1 className="font-serif text-heading-sm md:text-heading font-normal leading-tight text-ink">Import cellar</h1>
-        <p className="mt-2xs text-[14px] text-grey">
-          Upload a CSV or Excel (.xlsx) file of your existing inventory — choose it, drag it in, or paste it. Nothing is written to your cellar until you confirm the preview.
-        </p>
-      </header>
+      <ImportHeader step={step} />
 
       {step === "upload" && (
         <UploadStep

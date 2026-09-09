@@ -43,24 +43,29 @@ vi.mock("./onboarding-modal", () => ({
 
 const { default: AppLayout } = await import("./layout");
 
-describe("AppLayout shell context", () => {
+describe("AppLayout header", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = "";
   });
 
-  it("mounts the current restaurant and role without sacrificing shell edges", async () => {
+  it("mounts the current restaurant without sacrificing shell edges", async () => {
     const root = await renderLayout("Bar Norman");
-    const context = root.querySelector('[data-shell-context="true"]')!;
     const home = root.querySelector<HTMLAnchorElement>('a[href="/"]')!;
     const settings = root.querySelector('[data-settings="true"]')!;
 
-    expect(context.textContent).toContain("Bar Norman");
-    expect(context.textContent).toContain("Manager");
+    expect(home.textContent).toBe("Terroir");
     expect(home.className).toContain("shrink-0");
     expect(home.className).toContain("min-h-11");
+    // Restaurant identity renders once, in the header, and is free to use
+    // whatever width its shrink-0 siblings don't need — not a role pill
+    // squeezed into a fixed-px cap (removed with ShellContext).
+    expect(root.querySelector("header")?.textContent).toContain("Bar Norman");
     expect(settings.parentElement?.className).toContain("ml-auto");
     expect(settings.parentElement?.className).toContain("shrink-0");
+    // Search renders twice, once per breakpoint: the header field (md:block)
+    // and the band beneath it (md:hidden). Both are the same SearchPalette.
+    expect(root.querySelectorAll('[data-global-search="true"]')).toHaveLength(2);
     expect(root.querySelector('[data-desktop-nav="true"]')).not.toBeNull();
     expect(root.querySelector('[data-mobile-nav="true"]')).not.toBeNull();
     expect(root.querySelector("header")?.parentElement?.className).toContain(
@@ -73,21 +78,19 @@ describe("AppLayout shell context", () => {
     );
   });
 
-  it("keeps onboarding and visible fallback context for a null restaurant", async () => {
-    const root = await renderLayout(null);
+  it.each(["owner", "manager", "staff"])("only requires owner naming for a null restaurant (%s)", async (role) => {
+    const root = await renderLayout(null, role);
 
-    expect(
-      root.querySelector('[data-shell-context="true"]')?.textContent,
-    ).toContain("Unnamed restaurant");
-    expect(root.querySelector('[data-onboarding="true"]')).not.toBeNull();
+    expect(root.querySelector("header")?.textContent).toContain("Unnamed restaurant");
+    expect(root.querySelector('[data-onboarding="true"]') !== null).toBe(role === "owner");
   });
 });
 
-async function renderLayout(restaurantName: string | null) {
+async function renderLayout(restaurantName: string | null, userRole = "manager") {
   mocks.getAuthContext.mockResolvedValue({
     restaurantId: "restaurant-1",
     restaurantName,
-    userRole: "manager",
+    userRole,
     user: { email: "manager@example.com" },
   });
 

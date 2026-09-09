@@ -6,7 +6,8 @@
 // (file selection, spreadsheet conversion, the preview-unit count).
 
 import { AlertTriangle, Loader2, Upload } from "lucide-react";
-import { CANONICAL_HEADERS, CLIENT_CHUNK_TARGET_ROWS } from "@/domains/import/constants";
+import Link from "next/link";
+import { CLIENT_CHUNK_TARGET_ROWS } from "@/domains/import/constants";
 import { describeWaitEstimate, estimateChunkedPhaseWaitSeconds } from "@/domains/import/wait-estimate";
 
 /** BLOCK 1 (round-13 fix) — countPreviewUnits (preview-units.ts) resolves
@@ -26,8 +27,6 @@ import { describeWaitEstimate, estimateChunkedPhaseWaitSeconds } from "@/domains
  * decode/split surfaces the actual error, there is nothing more honest to
  * gate on here. */
 export type PreviewUnitsStatus = "idle" | "pending" | "ready" | "unavailable";
-
-const TEMPLATE_CSV = `${CANONICAL_HEADERS.join(",")}\nDomaine Example,Cuvee One,2020,Pinot Noir,Burgundy,France,750,,USD,6,24.50,,\n`;
 
 export function UploadStep({
   file,
@@ -72,10 +71,11 @@ export function UploadStep({
   error: string | null;
 }) {
   return (
-    <div className="rounded-card card-surface p-lg">
+    <div className="glass rounded-card p-lg">
+      <p className="mb-md text-control text-grey">On your phone, choose a file from Files or your cloud drive. Nothing changes in your stock during preview.</p>
       <label
         htmlFor="import-file"
-        className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-sm rounded-card border-2 border-dashed border-rule-strong bg-wash px-lg py-xl text-center transition-colors hover:border-risk-ink/40 hover:bg-risk-wash/40 focus-ring"
+        className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-sm rounded-card border border-dashed border-rule-strong px-lg py-xl text-center transition-colors hover:border-accent focus-ring"
       >
         <input
           ref={fileInputRef}
@@ -88,24 +88,24 @@ export function UploadStep({
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-seal-ink">
           <Upload className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
         </span>
-        <span className="text-[14px] font-medium text-ink">
-          {converting ? "Reading spreadsheet…" : file ? file.name : "Choose a CSV or Excel file, or drag one here"}
+        <span className="text-control font-medium text-ink">
+          {converting ? "Reading spreadsheet…" : file ? file.name : "Choose CSV or Excel"}
         </span>
-        <span className="text-caption text-grey">
-          .csv or .xlsx up to 5 MB per upload — drag one in or paste it — larger files split into {CLIENT_CHUNK_TARGET_ROWS}-row chunks automatically
+        <span className="text-control text-grey">
+          .csv or .xlsx. Large CSV files are split into {CLIENT_CHUNK_TARGET_ROWS}-row parts, with a 5 MB limit per upload.
         </span>
       </label>
 
       {dropNotice && (
-        <p role="status" className="mt-md text-[13px] text-grey">{dropNotice}</p>
+        <p role="status" className="mt-md text-body-sm text-ink-soft">{dropNotice}</p>
       )}
 
       {conversionNotice && (
-        <p className="mt-md text-[13px] text-grey">{conversionNotice}</p>
+        <p className="mt-md text-body-sm text-ink-soft">{conversionNotice}</p>
       )}
 
       {error && (
-        <p role="alert" className="mt-md flex items-start gap-xs text-[13px] text-risk-ink">
+        <p role="alert" className="mt-md flex items-start gap-xs text-body-sm text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
@@ -118,7 +118,7 @@ export function UploadStep({
           file is previewed one chunk at a time, so this is the total for
           the whole (sequential) phase, not any one chunk's own budget. */}
       {previewUnits !== null && (
-        <p className="mt-md text-[13px] text-grey">
+        <p className="mt-md text-body-sm text-ink-soft">
           {previewUnits > 1
             ? `This file needs ${previewUnits} chunks, uploaded one at a time — previewing it is estimated to take `
             : "Previewing this file is estimated to take "}
@@ -140,19 +140,29 @@ export function UploadStep({
         // that ordering staying true.
         disabled={!file || converting || previewing || previewUnitsStatus === "pending"}
         onClick={onPreview}
-        className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-lg flex min-h-11 w-full items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
       >
         {previewing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         {previewing ? "Reading file…" : "Preview import"}
       </button>
 
+      {/* A real route, not a `data:` URI `<a download>` — mobile Safari
+          handles download on data: URIs unreliably and tends to navigate
+          the tab to raw text instead. The route sets Content-Disposition
+          so the download attribute below is a hint, not the mechanism. */}
       <a
-        href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE_CSV)}`}
+        href="/api/import/template"
         download="cellar-import-template.csv"
-        className="mt-md flex min-h-11 items-center justify-center text-[13px] font-medium text-grey underline underline-offset-4 hover:text-ink focus-ring"
+        className="mt-md flex min-h-11 items-center justify-center text-body-sm font-medium text-accent underline underline-offset-4 hover:text-ink focus-ring"
       >
         Download CSV template
       </a>
+      <details className="mt-md border-t border-rule pt-sm text-control text-ink-soft">
+        <summary className="min-h-11 cursor-pointer font-medium text-ink focus-ring">Which file should I use?</summary>
+        <p className="mt-xs">Use the CSV template for column names and examples. Include the wine name, quantity and bottle size; keep the producer and vintage in separate columns when available.</p>
+        <p className="mt-sm">Excel imports read the first worksheet only. Export Apple Numbers, Google Sheets or older .xls workbooks as CSV or .xlsx first.</p>
+        <Link href="/scan" className="mt-sm flex min-h-11 items-center text-accent underline underline-offset-4 focus-ring">Have an invoice photo or PDF? Open Scan</Link>
+      </details>
     </div>
   );
 }

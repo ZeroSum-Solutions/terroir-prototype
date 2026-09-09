@@ -14,8 +14,9 @@
  *   focus         3:1    and solid — alpha cannot be guaranteed
  *
  * Deliberately NOT checked: `rule` / `dark-rule`. WCAG 1.4.11 exempts purely
- * decorative boundaries, and forcing 3:1 there would require 0.37 alpha on
- * #07080A, which is scaffolding rather than a hairline.
+ * decorative boundaries, and forcing 3:1 on the Ink-room ground would require
+ * an alpha high enough to read as a solid stroke, which is scaffolding rather
+ * than a hairline.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -83,14 +84,16 @@ for (const p of ["", "dark-"]) {
   );
 
   // Text must clear 4.5:1 on every ground it can land on — including
-  // surface-raised, because that is where a hovered row sits.
-  for (const ink of ["ink", "ink-soft", "grey", "accent"]) {
+  // surface-raised, because that is where a hovered row sits. `mark` is the
+  // same value as `accent` in this palette, so checking it too costs
+  // nothing and closes a gap the previous revision left open.
+  for (const ink of ["ink", "ink-soft", "grey", "accent", "mark"]) {
     for (const g of grounds) need(4.5, p + ink, g, `${room} body text`);
   }
 
-  // The claret fill has to be findable as a shape before its label matters.
-  for (const g of grounds) need(3, p + "primary", g, `${room} claret fill`);
-  for (const g of grounds) need(3, p + "primary-hover", g, `${room} claret hover fill`);
+  // The primary fill has to be findable as a shape before its label matters.
+  for (const g of grounds) need(3, p + "primary", g, `${room} primary fill`);
+  for (const g of grounds) need(3, p + "primary-hover", g, `${room} primary hover fill`);
   need(4.5, p + "seal-ink", p + "primary", `${room} label on a filled seal`);
 
   // Load-bearing boundaries and the focus indicator.

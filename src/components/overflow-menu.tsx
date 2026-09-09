@@ -107,7 +107,7 @@ export function OverflowMenu({
   if (items.length === 0) return null;
 
   const itemClassName =
-    "flex min-h-11 w-full items-center gap-sm px-md py-sm text-left text-body-sm text-ink transition-colors hover:bg-wash focus-ring disabled:opacity-50";
+    "flex min-h-11 w-full items-center gap-sm px-md py-sm text-left text-body-sm text-ink transition-colors hover:text-accent focus-ring disabled:opacity-50";
 
   return (
     <div ref={containerRef} className={cn("relative shrink-0", className)}>
@@ -118,7 +118,7 @@ export function OverflowMenu({
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex h-11 w-11 items-center justify-center rounded-pill border border-edge bg-surface text-ink-soft transition-colors hover:bg-wash focus-ring"
+        className="glass flex h-11 w-11 items-center justify-center rounded-pill text-ink-soft transition-colors hover:text-accent focus-ring"
       >
         <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} aria-hidden />
       </button>
@@ -137,7 +137,7 @@ export function OverflowMenu({
         <div
           role="menu"
           aria-label={label}
-          className="absolute right-0 top-full z-[var(--z-overlay)] mt-xs flex w-[240px] flex-col py-xs rounded-card card-surface"
+          className="glass absolute right-0 top-full z-[var(--z-overlay)] mt-xs flex w-[240px] flex-col rounded-card py-xs"
         >
           {items.map((item, index) => {
             const content = (
