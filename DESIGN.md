@@ -1,90 +1,90 @@
 ---
 version: alpha
-name: Terroir — Cellar Index
-description: A wine list read like a printed index. Paper ground, ink-black structure, one printmaker blue for everything you can act on. Set in Archivo over Inter, tight-tracked, sentence case. Brown and cream are banned outright, in every mode.
+name: Terroir — Obsidian Glass
+description: A cellar at night, read through glass. Obsidian ground, copper light, bone display serif, and translucent panels that let the photograph behind them keep breathing. One metal (copper) for everything you can act on, one paper (bone) for the primary fill. Cool hues are banned outright, in every room.
 colors:
-  primary: "#1664EB"
-  primary-hover: "#0E4FC7"
-  accent: "#1664EB"
-  mark: "#1664EB"
-  canvas: "#F8F7EF"
-  surface: "#FFFFFF"
-  surface-raised: "#F5F4E9"
-  surface-sunken: "#F2F1E4"
-  wash: "#F7F6EC"
-  ink: "#121212"
-  ink-soft: "#3D3D3D"
-  grey: "#686868"
-  ink-disabled: "#9A9A9A"
-  rule: "rgba(18, 18, 18, 0.12)"
-  rule-strong: "rgba(18, 18, 18, 0.22)"
-  edge: "#7A7A7A"
-  focus: "#1664EB"
-  seal-ink: "#FFFFFF"
+  primary: "#141312"
+  primary-hover: "#2A2724"
+  accent: "#8A4419"
+  mark: "#8A4419"
+  canvas: "#F1EADB"
+  surface: "#FAF6EC"
+  surface-raised: "#E9E0CC"
+  surface-sunken: "#E3D9C3"
+  wash: "#EDE5D2"
+  ink: "#141312"
+  ink-soft: "#3F3A33"
+  grey: "#5F584E"
+  ink-disabled: "#9C948A"
+  rule: "rgba(20, 19, 18, 0.12)"
+  rule-strong: "rgba(20, 19, 18, 0.22)"
+  edge: "#7A7266"
+  focus: "#8A4419"
+  seal-ink: "#F3EDE2"
   ready: "#2C774E"
   ready-wash: "#E4F0EA"
   ready-ink: "#215C3C"
-  hold: "#2D6A9F"
-  hold-wash: "#E3EEF6"
-  hold-ink: "#22506F"
-  peak-wash: "#E8EAEC"
-  peak-ink: "#121212"
+  hold: "#A56B2A"
+  hold-wash: "#F3E6CF"
+  hold-ink: "#6E4512"
+  peak-wash: "#E6DFD0"
+  peak-ink: "#141312"
   risk-wash: "#F7E4E8"
   risk-ink: "#96122A"
-  glass: "#FFFFFF"
-  glass-edge: "rgba(18, 18, 18, 0.16)"
-  shadow-card: "rgba(18, 18, 18, 0.08)"
-  dark-primary: "#4A90FF"
-  dark-primary-hover: "#6BA6FF"
-  dark-accent: "#4A90FF"
-  dark-mark: "#4A90FF"
-  dark-canvas: "#121212"
-  dark-surface: "#1B1B1B"
-  dark-surface-raised: "#262626"
-  dark-surface-sunken: "#0A0A0A"
-  dark-wash: "#1F1F1F"
-  dark-ink: "#F8F7EF"
-  dark-ink-soft: "#CFCFCF"
-  dark-grey: "#A0A0A0"
-  dark-ink-disabled: "#5C5C5C"
-  dark-rule: "rgba(248, 247, 239, 0.10)"
-  dark-rule-strong: "rgba(248, 247, 239, 0.18)"
-  dark-edge: "#8F8F8F"
-  dark-focus: "#4A90FF"
+  glass: "rgba(250, 246, 236, 0.72)"
+  glass-edge: "rgba(20, 19, 18, 0.14)"
+  shadow-card: "rgba(20, 19, 18, 0.12)"
+  dark-primary: "#E8D9BF"
+  dark-primary-hover: "#F0E3C9"
+  dark-accent: "#D48C5A"
+  dark-mark: "#D48C5A"
+  dark-canvas: "#0B0B0C"
+  dark-surface: "#141314"
+  dark-surface-raised: "#1D1B1A"
+  dark-surface-sunken: "#060606"
+  dark-wash: "#171514"
+  dark-ink: "#F3EDE2"
+  dark-ink-soft: "#C9BFA9"
+  dark-grey: "#A39C8C"
+  dark-ink-disabled: "#6F695E"
+  dark-rule: "rgba(232, 217, 191, 0.12)"
+  dark-rule-strong: "rgba(232, 217, 191, 0.22)"
+  dark-edge: "#7A7266"
+  dark-focus: "#D48C5A"
   dark-ready: "#4FB07A"
   dark-ready-wash: "#0F2419"
   dark-ready-ink: "#8FD9AF"
-  dark-hold: "#6BA8D6"
-  dark-hold-wash: "#0D1D2A"
-  dark-hold-ink: "#A9CFEA"
-  dark-peak-wash: "#1F242A"
-  dark-peak-ink: "#F8F7EF"
+  dark-hold: "#C99A5B"
+  dark-hold-wash: "#2A2013"
+  dark-hold-ink: "#E6C79C"
+  dark-peak-wash: "#26211D"
+  dark-peak-ink: "#F3EDE2"
   dark-risk-wash: "#2A0A11"
   dark-risk-ink: "#F2879C"
-  dark-glass: "#1B1B1B"
-  dark-seal-ink: "#121212"
-  dark-glass-edge: "rgba(248, 247, 239, 0.14)"
+  dark-glass: "rgba(255, 255, 255, 0.07)"
+  dark-seal-ink: "#0B0B0C"
+  dark-glass-edge: "rgba(232, 217, 191, 0.18)"
 typography:
-  display-family: "Archivo, Arial Black, sans-serif"
-  ui-family: "Inter, ui-sans-serif, system-ui, sans-serif"
+  display-family: "Cormorant Garamond, Georgia, Times New Roman, serif"
+  ui-family: "Manrope, ui-sans-serif, system-ui, sans-serif"
   mono-family: "Source Code Pro, ui-monospace, SFMono-Regular, monospace"
   micro: { size: "10px", line: 1.4, tracking: "0.06em", role: "non-essential microcopy only" }
-  caption: { size: "11px", line: 1.5, tracking: "0.18em", case: "uppercase", weight: 600 }
+  caption: { size: "11px", line: 1.5, tracking: "0.18em", case: "uppercase", weight: 500, role: "eyebrow — the tenant, the section, the room" }
   ledger: { size: "12px", line: 1.4, role: "dense metadata, timestamps, secondary figures" }
   body-sm: { size: "13px", line: 1.55 }
   control: { size: "14px", line: 1.45, role: "anything you tap, type into, or read inside a table row" }
   body: { size: "15px", line: 1.6 }
-  body-lg: { size: "17px", line: 1.5, role: "wine name in a row or card; mobile primary" }
+  body-lg: { size: "17px", line: 1.5, role: "wine name in a row or card; mobile primary — set in the serif" }
   subheading: { size: "20px", line: 1.4 }
   heading-sm: { size: "27px", line: 1.22 }
   heading: { size: "42px", line: 1.1, tracking: "-0.02em", case: "sentence" }
   display: { size: "72px", line: 1.04, tracking: "-0.025em", case: "sentence" }
 rounded:
-  sm: "3px"
-  md: "4px"
-  lg: "6px"
-  card: "8px"
-  pill: "6px"
+  sm: "6px"
+  md: "10px"
+  lg: "14px"
+  card: "20px"
+  pill: "999px"
 spacing:
   3xs: "4px"
   2xs: "2px"
@@ -119,528 +119,359 @@ chrome:
   fab: "56px"
 ---
 
-# Terroir — Cellar Index
-
-Supersedes **Terroir — Nocturne** (2026-08-29). Nocturne staged a cellar at
-night; the owner's review of the demo design options selected a different
-concept for the investor build — **Concept A, the Cellar Index** — built
-from a print reference (Fidèle Editions), Shopify's inventory-field
-structure, and Uber Eats' image-led identification
-(`docs/plans/2026-09-08-demo-design-options/`). This revision replaces
-Nocturne's palette and type system outright rather than layering a new hue
-over the old one; Nocturne's full text remains in this file's git history.
-
-## Overview
-
-The Cellar Index reads like a printed wine list, not a lacquered bar at
-midnight. The ground is paper, not black glass. The structure is ink —
-heavy, tight-tracked headings, hairline rows, sharp corners — and exactly
-one hue, a printmaker blue, carries every place in the interface that is a
-link, a brand mark, an active state, or a thing you are about to press.
-Nothing else in the room is coloured.
-
-This is a narrower thesis than Nocturne's, and it should be: Nocturne's
-warmth-only-from-photography rule existed to keep a *dark* room honest. A
-paper room does not have that problem — paper is warm by nature, so the
-discipline here is different. It is not "no warmth anywhere"; it is **one
-exact paper, everywhere, and nothing warmer.** The ground, every raised
-surface and every wash are the same parchment hue at different lightnesses;
-nothing is allowed to drift toward tan, manila or blush. "The paper and
-blush law" below proves that mechanically, on every commit.
-
-### The two rooms
-
-**Paper** is the primary room and the one the investor demo ships in: a
-sommelier or floor manager reading a wine list off a paper stock. **Ink** is
-the same system with the grounds inverted — the working cellar at night, or
-simply the phone's own dark-mode preference. Terroir already ships a working
-theme toggle, so both rooms are specified in full; a viewer who has never
-touched the toggle and one who has must see the same room.
-
-Ink is not merely "Paper, inverted colours." It keeps Paper's exact hue
-discipline — one blue, structural ink, no second colour — and swaps which
-extreme plays which role: the ground becomes true ink black, the ink becomes
-paper white, and the blue itself has to lighten, because Paper's `#1664EB`
-measures under 4:1 on a near-black ground, and a link you can technically
-find but not comfortably read is not a passing link.
-
-## Colours
-
-### Ground and ink
-
-Five grounds, ascending lightness: `surface-sunken`, `wash`, `surface-raised`,
-`canvas`, `surface` on Paper; the same five names, same ascending order, on
-Ink, inverted. Three inks: `ink` for anything that must be read, `ink-soft`
-for supporting prose, `grey` for metadata. Nothing else carries text.
-
-`canvas` is the page — `#F8F7EF`, a single named paper. `surface` is the
-brightest register, true white, for anything that sits *on* the page and
-needs to read as its own sheet: an input field, a bottom sheet, a dialog.
-`surface-raised` and `surface-sunken` are hover and pressed states, both
-still inside the paper family, a few points either side of `canvas`. `wash`
-is the palest of the five, used for table headers and quiet section
-backgrounds.
-
-Ink runs the same shape, cold: `dark-canvas` and its neighbours are a true
-neutral black-to-charcoal ramp (`#121212` → `#262626`), with no hue at all —
-equal red, green and blue channels on every one of them, the simplest
-possible way to guarantee none of them can drift warm.
-
-### The one colour — printmaker blue
-
-Blue is the only hue with a job. `#1664EB` on Paper, lightened to `#4A90FF`
-on Ink, it is the brand mark, the link colour, the "you are here" indicator
-and the focus ring — in both rooms, at once. That collapse is deliberate.
-Nocturne kept its accent role achromatic because its one hue, claret, was
-overloaded across brand, primary action, urgent status and destructive
-action, and a colour doing four unrelated jobs stops meaning any of them.
-The Cellar Index's blue only ever does one *kind* of job — *this is where
-you can act, and this is where you are* — so brand, link, active tab and
-focus ring sharing a value is not overload, it is one meaning worn four ways.
-
-**The primary button is not blue.** It is the highest-contrast neutral in
-the room: an ink fill (`ink` on Paper, `dark-ink` on Ink) with the opposite
-room's paper tone as its label — `#121212` on `#F8F7EF`, 17.43:1, in either
-direction. This is the board's own convention ("Record a pour", "Save
-count"), and it matters for the reason it mattered in Nocturne: the colour
-that means "you can act here" everywhere else in the interface should not
-also be the colour of the one button that means "this is the primary action,
-right now." Keeping them apart is what lets blue stay quiet the rest of the
-time — `primary` as a fill still needs to clear 3:1 so it is findable
-wherever it is used for a secondary emphasis action, which it does at
-4.55–5.18:1 on Paper and 4.85–6.34:1 on Ink.
-
-### The mark
-
-The utility that carries the "you are here" meaning is **`mark`**. In
-Nocturne this token had to resolve to two different named colours —
-champagne at night, claret by day — because champagne measured 1.26:1 on
-white and could not survive the light room at all. The Cellar Index has no
-such asymmetry: `mark` is `#1664EB` on Paper and `#4A90FF` on Ink, the same
-blue already doing brand, link and focus duty, just lightened for the dark
-ground. Because it is no longer a special case, `mark` and `dark-mark` are
-ordinary scalar keys in the frontmatter above, verified by
-`check-design-token-sync.mjs` exactly the way every other colour is — there
-is no hand-written exception left for this one token, and no champagne
-substitute was invented to fill its place. There is no champagne in this
-system, and there does not need to be one.
-
-### Status
-
-Four states, unchanged in hue from the system this document supersedes,
-because none of them competes with the brand blue and none of them is a warm
-neutral:
-
-| State | Paper ink / wash | Ink ink / wash |
-|---|---|---|
-| Drink now | `#215C3C` on `#E4F0EA` — 6.75:1 | `#8FD9AF` on `#0F2419` — 9.88:1 |
-| Hold | `#22506F` on `#E3EEF6` — 7.29:1 | `#A9CFEA` on `#0D1D2A` — 10.44:1 |
-| At peak | `#121212` on `#E8EAEC` — 15.53:1 | `#F8F7EF` on `#1F242A` — 14.54:1 |
-| Window risk | `#96122A` on `#F7E4E8` — 7.12:1 | `#F2879C` on `#2A0A11` — 7.58:1 |
-
-"Hold" keeps a muted slate-blue distinct from the brand blue — duller,
-darker, never used as a fill the way `primary` is — so a status chip on a
-bottle is never mistaken for a link or an active tab. That is a real tension
-worth naming rather than hiding: both are, strictly, blue. If a future pass
-wants more daylight between them, moving `hold` to a non-blue hue is the
-fix; it was out of scope for this migration because the pairing above
-already clears 4.5:1 in both rooms and nothing forced the change.
-
-"Window risk" is the only red anywhere in the system, and it is a *status*,
-never a brand colour — it does not fill a button, does not mark "you are
-here", and does not appear outside the four rows above. That confinement is
-what keeps it from re-becoming a second accent the way Nocturne's claret
-slid into one.
-
-There is still **no `info` hue.** An informational message takes the "at
-peak" achromatic treatment; a fifth colour would dilute the one-hue thesis
-to buy nothing.
-
-### The paper and blush law
-
-Two tests, enforced by `scripts/check-design-palette.mjs`, which exits 1 in
-CI, plus the source-literal sweep that has run since Nocturne. A ban nobody
-can run is a preference.
-
-1. **Any dark neutral must be genuinely neutral.** A colour darker than
-   `#404040` with real saturation in the brown-to-yellow wedge (hue 15°–60°)
-   is brown, whatever shade of dark it is. Every Ink-room ground in this
-   system has equal red, green and blue channels, so this test can only ever
-   fire on a *future* addition — which is the point: the rule exists for the
-   colour nobody has picked yet, not the ones already here.
-
-2. **A light neutral may only be the one named paper, never a nearby one.**
-   Widening Nocturne's old numeric threshold (`r − b ≤ 4`) far enough to
-   admit `#F8F7EF` also admits `#F0E8E3` — a salmon-leaning off-white just
-   past the old threshold's reach, one this same script's own HSL scan
-   already calls cream on its own separate terms. Channel arithmetic cannot
-   tell a parchment from a blush at the width these two colours actually
-   differ by (nine points of red-minus-blue apart; the widened threshold
-   would need fourteen to admit Paper's own ground).
-
-   The replacement is not a wider number, it is a **narrower question**:
-   what hue is this actually on? `#F8F7EF` sits at hue ≈ 53°, in the middle
-   of the yellow-parchment band. `#F0E8E3` sits at hue ≈ 23°, in the
-   orange-blush band — thirty degrees away, further apart in hue than the
-   two colours are in any single RGB channel. The new rule tests exactly
-   that: a light neutral (lighter than `#C0C0C0`) is allowed only if it is
-   either a true grey (no saturation at all) or falls inside the narrow
-   parchment window — hue 44°–60°, moderate saturation, high lightness.
-   Outside that window, inside the same warm wedge, is exactly where tan,
-   manila and blush live, and the rule rejects all three by the same test
-   that admits paper.
-
-   Verified against a scratch copy of this script with `#F0E8E3` inserted as
-   a token: **rejected** — `F0E8E3: cream/blush — warm light neutral outside
-   the paper band (h≈23°)`. The five paper-family tokens actually in this
-   palette (`canvas`, `surface-raised`, `surface-sunken`, `wash`, and their
-   Ink-room mirrors, where applicable) measure hue 44°–60° and pass.
-
-The same script still reads every colour literal in `src/`, in HSL rather
-than by channel, for the reason it always has: brown is a saturated warm
-mid-tone, not a dark neutral, so the channel tests alone would wave it
-through. A warm hue (15°–60°) too dark to be a colour (L < 0.72) is brown;
-one too pale to be a colour (L ≥ 0.80) is cream. Printed menus, the
-standalone HTML export and the brand-kit fixtures stay excluded by name,
-because those carry the *client's* palette, on paper — a different paper
-than this one.
-
-There is no longer a claret rule or a champagne rule. Both existed to keep a
-specific named hue from drifting toward its own danger zone (peach for
-claret, tan for champagne); the Cellar Index has no claret and no champagne,
-so those two tests retire along with the colours they protected, rather than
-surviving as dead code guarding nothing.
-
-## The contrast law
-
-Unchanged from the system this document supersedes, because the law was
-never about which colours were in the room:
-
-- **Text needs 4.5:1** against the ground it actually sits on — which for a
-  row means `surface-raised`, not `canvas`, because rows get hovered.
-- **A control's boundary needs 3:1.** A control you cannot see is a control
-  you cannot find.
-- **A focus indicator needs 3:1 and must be solid.** No alpha.
-- **A fill needs 3:1 against its ground** before you worry about the label
-  on it.
-
-### Load-bearing lines versus decorative rules
-
-The same split as before, and the same test:
-
-> **Set the line to `transparent` in DevTools. If any control, state, hit
-> area, data mark or relationship becomes ambiguous, it is load-bearing. If
-> nothing operational changes, it is decorative.**
-
-- **`rule` / `dark-rule`** — decorative, alpha ink on paper
-  (`rgba(18, 18, 18, 0.12)`) or alpha paper on ink
-  (`rgba(248, 247, 239, 0.10)`). Row dividers, keylines a card's own surface
-  already defines. Exempt under WCAG 1.4.11: forcing a hairline to 3:1 on a
-  near-black ground needs an alpha high enough to read as a solid stroke,
-  which is not a hairline any more, it is scaffolding.
-- **`edge` / `dark-edge`** — load-bearing, solid, never alpha: `#7A7A7A` on
-  Paper (3.78–4.29:1 across the five grounds), `#8F8F8F` on Ink
-  (4.68–6.12:1). Input and select boundaries, unchecked checkbox and radio
-  outlines, slider tracks, chart strokes, any tap target whose extent is not
-  otherwise visible.
-
-### Focus
-
-One focus token, solid, one recipe — `2px solid` at `2px` offset, on
-`:focus-visible` only, shipped as `.focus-ring`, unchanged in mechanism from
-Nocturne:
-
-- Paper: `focus` `#1664EB` — 4.55–5.18:1 across the five grounds.
-- Ink: `dark-focus` `#4A90FF` — 4.85–6.34:1.
-
-Both clear the 3:1 floor with room to spare, because the same value already
-has to clear 4.5:1 as text (it is also `accent` and `mark`); a focus ring
-was never going to be the binding constraint here.
-
-`.focus-ring-inset` is unchanged — the negative-offset variant for a control
-clipped by an `overflow: hidden` ancestor, such as a segmented control or a
-stepper.
-
-The codebase's two competing focus idioms recorded in the prior revision — an
-outline, and `focus:ring-2 focus:ring-accent/25` at a measured 1.5–1.6:1 —
-are a code-level migration this document does not resolve on its own; the
-outstanding call sites still need moving to the outline.
-
-## Typography
-
-Archivo for display, headings and wine names. Inter for everything you
-operate. Source Code Pro for bin codes.
-
-This reverses a call Nocturne made on purpose: the previous revision retired
-Archivo, alongside Bodoni Moda and Courier Prime, because a Didone's thin
-hairlines irradiate on a near-black ground, and Archivo did not fit the
-Source-family superfamily Nocturne was built around. Neither objection
-applies here. The Cellar Index is a paper-primary system — irradiation is a
-dark-ground problem — and it is not trying to be one superfamily drawn by
-one foundry; it is trying to be a heavy, tight-tracked grotesque for
-headings paired with a clean operational sans, which is exactly what a
-print-index reference calls for. Archivo carries real weight range and
-tightens well at large sizes; Inter is the safest well-hinted grotesque at
-13–14px on a phone screen, which is most of what this app actually renders.
-
-The Tailwind utility for the display face is still spelled `font-serif`,
-inherited from `check-design-token-sync.mjs`'s fixed name mapping
-(`display` → `--font-serif`). It is a stable identifier, not a claim about
-the letterform — the same way `primary` stayed `primary` when its value
-moved from claret to blue. Renaming it would mean auditing every existing
-`font-serif` class reference across the codebase, which is not this
-revision's job.
-
-Heading and display tracking tightened from Nocturne's `-0.01em` /
-`-0.015em` to `-0.02em` / `-0.025em` — "big, heavy, tight-tracked" is a
-stated character of this concept, and Archivo's counters are open enough to
-take the extra pull without the letterforms colliding.
-
-**There is no signature face.** Ephesis is dropped outright, not replaced —
-Concept A has no signature, no script flourish, nothing that reads as a
-brand mark drawn by hand. The `signature` type role and its `--font-signature`
-CSS variable are removed along with it, rather than left pointing at a
-fallback nobody chose.
-
-The rest of the scale — sizes, the `control` / `ledger` / `caption` roles,
-the `tabular-nums` rule for prices and counts, the bypass-baseline
-enforcement in `check-design-typography.mjs` — is unchanged. None of it was
-about the typeface; it was about which *token* a size belongs to, and that
-argument does not change when the token's font does.
-
-### Enforcement
-
-Unchanged mechanism:
-
-- `check-design-token-sync.mjs` — DESIGN.md frontmatter and the CSS `@theme`
-  block must agree, including the font-family heads.
-- `check-design-typography.mjs` — no arbitrary `text-[…]`, no inline
-  `fontSize`, no `font-mono` outside the code roles, off a fingerprinted
-  baseline that can only shrink.
-- `check-design-contrast.mjs` — computes the WCAG ratio of every pair named
-  in this document from the frontmatter itself, now including `mark` as
-  text (previously untested; it is the same value as `accent`, so it costs
-  nothing to check and closes a real gap in the old contract).
-- `check-design-palette.mjs` — the paper and blush law above.
-- All four exposed as `pnpm check:design`.
-
-## Spacing, rhythm and density
-
-Unchanged: `2xs` 2, `xs` 8, `sm` 14, `md` 18, `lg` 24, `xl` 36, `2xl` 48,
-`3xl` 80, `3xs` 4. Density tiers (`compact` 48px / `standard` 64px /
-`relaxed` 84px) are unchanged. None of this was a colour or type-family
-question.
-
-## Rows and columns
-
-The one typed column contract with several renderers, described in the
-prior revision, is unchanged in shape. Two rules update for the new
-palette:
-
-- Separation is a decorative `rule`, never zebra striping — now alpha ink on
-  paper rather than alpha bone on near-black, same reasoning: alternating
-  fills produce visible banding, and a hairline reads as structure without
-  it.
-- Hover is a `surface-raised` fill; selection is `surface-raised` plus a 2px
-  **blue** leading edge (`primary` / `dark-primary`), not claret — claret no
-  longer exists in this system, and blue is the only hue left to carry a
-  selection mark.
-
-## Controls
-
-Unchanged from the prior revision: the stepper, segmented control and
-range-slider guidance are about which control exists and where, not about
-colour.
-
-Geometry sharpens again with this pass. The first Cellar Index revision only
-shrank `sm`/`md`/`lg`/`card` and left `pill` at a full capsule, reasoned as
-"the handful of controls where a capsule is the right shape: a search field,
-a segmented tab." The board proves that reasoning wrong — Concept A has **no
-capsule anywhere.** Its filter tabs are text with a blue underline, not a
-pill; its search fields, buttons and the bin badge are all sharp-cornered
-rectangles. A 390px screenshot pass against the board confirmed the gap:
-every control that had been left on `rounded-pill` — search fields, filter
-buttons, date-range chips, the "Create bin" button, section-count chips —
-was the single biggest visible deviation from the reference. **Radii shrink
-across the board, and `pill` stops being a capsule:**
-
-| Token | Was | Now | Role |
-|---|---|---|---|
-| `sm` | 6px | **3px** | badges, small chips, the bin badge |
-| `md` | 8px | **4px** | buttons, form controls |
-| `lg` | 10px | **6px** | tiles, larger inputs |
-| `card` | 12px | **8px** | cards, panels, modals |
-| `pill` | 999px | **6px** | every control that used to be a lozenge |
-
-`--radius-pill` is used across roughly 144 files in this codebase — search
-fields, filter chips, date-range controls, the FAB and primary buttons alike
-— almost all of them built on the assumption that the house shape was a
-lozenge. Auditing and re-classing 144 call sites individually is not this
-revision's job and is not what a token layer is for: redefining the token
-itself to 6px sharpens the whole app in one edit, the same way the palette
-propagated everywhere when it shipped. `rounded-pill` keeps its name only
-because that many call sites already spell it that way; it no longer means
-"capsule," it means "small radius," the same value as `--radius-lg`.
-
-**This does not touch genuine circles, and it does create real fallout for a
-few that were built on the wrong token.** A mic button, an avatar, a loading
-dot — anything that must render as a perfect circle — uses Tailwind's
-built-in `rounded-full` directly, which this revision never redefines. But
-at least three existing call sites used `rounded-pill` on an equal-width/
-equal-height box specifically to *get* a circle rather than a capsule, and
-this change turns those into sharp-ish squares instead:
-`reconcile-queue-metric.tsx`'s `h-8 w-8` icon roundel, `scan-detail-view.tsx`'s
-`h-10 w-10` avatar roundel, and `cellar/loading.tsx`'s `h-8 w-8` skeleton
-dot. Each needs `rounded-full` in place of `rounded-pill`, in whichever pass
-next touches that file — this token-layer revision documents the fallout
-rather than chasing it into files it does not own.
-
-Any control this system adds keeps the standing spec: 44px minimum hit
-bounds, a solid `edge` boundary at 3:1, the standard focus outline, and a
-disabled treatment using the disabled *tokens* rather than container
-opacity.
-
-## Mobile
-
-Unchanged in every number — the 390×844 budget, the chrome tokens, the 44px
-touch floor, the bottom-sheet-for-filters rule, the container-query collapse
-rule. None of it depended on which colours or fonts filled the tokens.
-
-## Elevation and depth
-
-Three levels, not four — **there is no glass level in the Cellar Index —
-and, as of this pass, no shadow level either.**
-
-0. **Ground** — `canvas`. The page.
-1. **Card** — `surface`, a solid `rule` border, `card` radius. No shadow.
-2. **Raised** — `surface-raised`. Hover and selection. No shadow change.
-
-The prior Cellar Index revision kept `shadow-card` painting a two-layer drop
-shadow (`0 1px 2px …, 0 6px 20px …` on Paper) under every card and under
-`.glass`, on the reasoning that a card is "separated from the ground" by
-rule plus shadow together. The board has no such thing: it is open rows and
-flat panels on the paper ground, divided by hairlines, never a white card
-floating with a shadow beneath it. **`--t-shadow-card` is now `none` in both
-rooms.** A card's only separation from its ground is its solid `rule`
-border; `.card-surface` keeps a faint inset top light in Ink
-(`--t-card-highlight`, transparent on Paper) as a 1px lighting cue, but that
-highlight never lifted anything off the page and is not the shadow being
-removed here. `shadow-card` survives as a Tailwind utility name — a handful
-of components still pair it with their own border — but it now resolves to
-nothing, so the border they already carry is the only depth cue left; no
-component file needed to change for this to take effect.
-
-Nocturne's fourth level was a translucent, blurred `backdrop-filter` panel
-for floating chrome — the sticky header, drawers, dialogs, toasts. Concept A
-explicitly forbids glass and blur: "graphic clarity" and a blurred pane are
-opposites. The `.glass` class stays, because sticky chrome still has to sit
-above content, but it is now **flattened to an opaque bordered panel, with
-no elevation shadow at all** — `glass` (`#FFFFFF` on Paper, `#1B1B1B` on
-Ink) with a solid `glass-edge` border and nothing else, since `shadow-card`
-resolves to `none`. There is no `@supports backdrop-filter` feature-detection
-left in the stylesheet, because nothing left needs it.
-
-`.dawn-gradient` is neutralised rather than deleted, because more than a
-dozen files across the app still reference the class name for hero bands
-(`/insights`, `/atlas`, `/cellar`, login, invite, password reset). Deleting
-the rule would leave those elements with no background at all; instead the
-class now resolves to a flat `canvas` fill. Concept A bans decorative
-gradients outright — "warmth comes from pictures, never from paint" was
-Nocturne's version of the same rule, and it holds here too, just with a
-paper ground instead of a black one. The class name surviving as a flat
-colour is a known seam, not a disguised fix: those call sites should rename
-to whatever the flat-panel utility is once someone is in those files for
-another reason.
-
-## Layers
-
-Unchanged: `base` 0 · `sticky` 10 · `chrome` 20 · `drag` 30 · `overlay` 40 ·
-`dialog` 50 · `toast` 60.
-
-## State
-
-Unchanged shape, one colour swap:
-
-| State | Ground | Ink | Boundary |
-|---|---|---|---|
-| Default | `surface` | `ink` | `rule` |
-| Hover | `surface-raised` | `ink` | `rule-strong` |
-| Pressed | `surface-sunken` | `ink` | `rule-strong` |
-| Focus | unchanged | unchanged | `focus`, 2px solid, 2px offset |
-| Selected | `surface-raised` | `ink` | 2px **blue** leading edge |
-| Disabled | `surface` | `ink-disabled` | `rule` — never container opacity |
-| Loading | `surface-sunken` skeleton | — | none, plus a live region |
-| Error | `risk-wash` | `risk-ink` | `edge`, plus `aria-invalid` and a linked message |
-
-The three known contract breaches recorded in the prior revision —
-unreachable validation state on the desktop scan table, toasts announcing at
-the wrong ARIA priority, dirty edits discarded without confirmation — are
-code-level bugs, not colour or type questions, and this migration did not
-touch them. They are still open.
-
-## Motion
-
-Unchanged: `fast` 120ms, `normal` 200ms, `slow` 320ms, `ease-standard` /
-`ease-exit`. `prefers-reduced-motion: reduce` stays wired globally.
-
-## Iconography
-
-Unchanged: Lucide, 16/20/24px grid, two stroke weights (1.75 default, 2.25
-active/filled), nothing at 12px, never the sole carrier of meaning.
-
-## Photography
-
-Unchanged in structure — mat, `label`, `bottle`, `plate` — because none of
-it was about paint. Photography was always "the one place warmth is
-allowed" in Nocturne, and it stays exactly that here: the paper ground and
-the ink structure are both cool-neutral-to-parchment, never tinted to match
-a label or a wine's colour, so a photograph's warmth reads as the
-photograph's, not the interface's.
-
-## Formatting
-
-Unchanged: one formatting module, one restaurant locale, tabular figures,
-never a bare `$`, the 100-point score and the 1–5 crowd average always
-labelled apart.
-
-## Truncation
-
-Unchanged: anything truncated is reachable in full, and the accessible name
-always carries the untruncated text.
-
-## Print
-
-Unchanged: print hides all chrome, drops to the Paper room (which was
-already the light room, so "drop to Paper" is the room print always used),
-expands truncation, prints tables as tables.
-
-## RTL
-
-Unchanged: not currently viable, new work uses logical properties so it
-stays merely unfinished rather than becoming more expensive.
-
-## Do's and don'ts
-
-**Do**
-
-- Keep blue to one job: brand, link, active state, focus, mark — never a
-  fifth meaning.
-- Let the primary button be ink, not blue — the neutral is the loudest thing
-  in the room precisely because nothing else competes with it.
-- Match a light neutral to the named paper, or don't call it a neutral.
+# Terroir — Obsidian Glass — Style Reference
+> a cellar at night, read through glass
+
+**Theme:** dark (default) · light room "Bone" for print, daylight and the guest-facing list
+
+Supersedes **Terroir — Cellar Index** (2026-09-08). The Cellar Index put the
+list on paper with one printmaker blue. The owner's review of the obsidian
+prototype screens (2026-09-08, five artboards, three Gemini audit passes)
+selected this direction instead: a near-black canvas with copper light in it,
+a bone display serif carrying every wine name, and panels that are genuinely
+translucent — the photograph behind a sheet keeps going, softened, rather
+than stopping at its edge. The Cellar Index's full text remains in git
+history. The frontmatter above is the contract; `scripts/check-design-*.mjs`
+hold `src/app/globals.css` to it.
+
+Terroir operates in a cellar at night: the ground is obsidian (`#0B0B0C`),
+never blue-black, never brown-black — a neutral so dark that the only colour
+in the room comes from light on a bottle. Two things carry colour. **Copper**
+(`#D48C5A` on obsidian, `#8A4419` on bone) is the metal: links, the active
+tab, the "you are here" mark, focus, the meter fills. **Bone** (`#E8D9BF`)
+is the paper: the primary button, the wordmark, the italic word in a
+headline. Nothing else in the room is coloured. Type is a display serif for
+anything named — a wine, a producer, a headline — and Manrope for everything
+you operate. Surfaces are glass: a translucent fill, a 1px inset top
+highlight, a hairline edge in bone at low alpha, and the content behind
+them blurred, not hidden.
+
+References: the owner's six supplied photographs (FILLVOID's copper-and-
+bone poster grid; Miolo Testardi Syrah and Merlot Terroir studio bottles;
+stacked corks under copper rim light; a wine-intensity glass; the Rolling
+Forks Marquette pair), and two Refero Styles systems — Authkit ("frosted
+glass cathedral at midnight": pill controls, inset-frost elevation, one
+hairline border everywhere) and Vivid+Co ("prismatic light through
+obsidian": scale carries hierarchy, weight does not).
+
+## Tokens — Colors
+
+Obsidian room (default). Every pair below is measured by
+`scripts/check-design-contrast.mjs`, not judged by eye.
+
+| Name | Value | Token | Role |
+|------|-------|-------|------|
+| Obsidian | `#0B0B0C` | `--color-canvas` | Page ground. Neutral: equal-ish channels, no blue cast, no brown cast |
+| Cellar Wall | `#141314` | `--color-surface` | Opaque panel ground where glass cannot be used (print, PDF, image-heavy lists) |
+| Raised Wall | `#1D1B1A` | `--color-surface-raised` | Hovered or selected row, the lit step |
+| Vault | `#060606` | `--color-surface-sunken` | Wells, input insets, the ground under a sheet |
+| Wash | `#171514` | `--color-wash` | Very faint warm band — behind an eyebrow strip, never a card |
+| Bone Ink | `#F3EDE2` | `--color-ink` | Primary text, wine names, headline fill |
+| Bone Soft | `#C9BFA9` | `--color-ink-soft` | Secondary text, lead paragraphs |
+| Ash | `#A39C8C` | `--color-grey` | Metadata, placeholders, nav labels at rest (6.3:1 on the raised wall) |
+| Ash Disabled | `#6F695E` | `--color-ink-disabled` | Disabled labels only |
+| Copper | `#D48C5A` | `--color-accent` `--color-mark` `--color-focus` | The one metal: links, active tab, the mark, focus ring, meter fills |
+| Bone | `#E8D9BF` | `--color-primary` | The primary action fill. Label on it is `seal-ink` (`#0B0B0C`) |
+| Bone Lit | `#F0E3C9` | `--color-primary-hover` | Primary hover |
+| Hairline | `rgba(232,217,191,0.12)` | `--color-rule` | Decorative row divider. Alpha, exempt from 1.4.11 |
+| Hairline Strong | `rgba(232,217,191,0.22)` | `--color-rule-strong` | Section divider, card outline when the card is opaque |
+| Edge | `#7A7266` | `--color-edge` | Load-bearing boundary — anything a hand has to find. Solid, 3.6:1, never alpha |
+| Glass | `rgba(255,255,255,0.07)` | `--color-glass-white` | Glass panel fill, composed with blur in `.glass` |
+| Glass Edge | `rgba(232,217,191,0.18)` | `--color-glass-edge` | Glass panel hairline |
+| Ready | `#8FD9AF` on `#0F2419` | `--color-ready-ink` / `-wash` | Drink now |
+| Hold | `#E6C79C` on `#2A2013` | `--color-hold-ink` / `-wash` | Hold — moved from slate blue to a warm amber so nothing in the room is cool |
+| At peak | `#F3EDE2` on `#26211D` | `--color-peak-ink` / `-wash` | Achromatic; also the informational treatment |
+| Window risk | `#F2879C` on `#2A0A11` | `--color-risk-ink` / `-wash` | The only red. A status, never a brand colour |
+
+Bone room (light). Same roles, inverted: canvas `#F1EADB`, surface `#FAF6EC`,
+ink `#141312`, copper darkened to `#8A4419` so it still clears 4.5:1 as text
+on the sunken ground, and the primary fill flips to obsidian with a bone
+label. It exists for printed lists, daylight use and the guest menu; it is
+not the brand's first face.
+
+### The cold law
+
+The Cellar Index banned brown and cream. This system is built from them, so
+that law is gone, and its replacement is the inverse: **no cool hue,
+anywhere.** Enforced by `scripts/check-design-palette.mjs`:
+
+1. Every ground and ink token (`canvas`, `surface*`, `wash`, `ink*`, `grey`,
+   `edge`, `seal-ink`) is either a true neutral (saturation ≤ 0.05) or a warm
+   hue in the copper–bone band (15°–60°). A blue-black or a green-grey fails.
+2. Every action token (`primary`, `primary-hover`, `accent`, `mark`, `focus`)
+   is copper, bone or obsidian — the same test.
+3. No colour literal in `src/` may be a cool chromatic (hue 190°–290°,
+   saturation > 0.15) unless it is a named token. The printmaker blue is
+   gone; a stray `#1664EB` fails the build.
+
+Status hues are exempt by name (`ready` is green, `risk` is red — they were
+never neutrals), and `hold` has been moved to amber so it no longer needs
+the exemption.
+
+### The contrast law
+
+Unchanged from the Cellar Index and still measured, not judged:
+text 4.5:1 on every ground it can land on (including the raised wall, where
+a hovered row sits); the primary fill and the focus ring 3:1; `edge` 3:1 and
+solid; status inks 4.5:1 on their washes. Decorative `rule` is alpha and
+exempt. Glass fills are alpha and therefore unmeasurable by definition —
+which is why text never sits on glass alone: every glass panel composes over
+a ground that already passes, and blur does not lower the ratio below what
+the ground gives.
+
+## Tokens — Typography
+
+### Cormorant Garamond — the named face
+`--font-serif` · **Substitute:** Georgia, Times New Roman ·
+**Weights:** 400, 500, 600, italic 400 · **Role:** every proper noun — wine
+name, producer, headline, the wordmark — and the italic word inside a
+headline ("A cellar beyond *the ordinary*"). Never body copy, never a
+control. Authority comes from size (42–72px at line-height 1.0–1.1) and
+from the italic, not from weight: 600 is the ceiling and is rare.
+
+### Manrope — the working face
+`--font-sans` · **Substitute:** system-ui · **Weights:** 400, 500, 600 ·
+**Role:** body, controls, inputs, badges, nav labels, eyebrows. 500 for a
+label, 600 for the label on a filled button. Uppercase eyebrows track at
++0.18em; nothing else tracks wider than +0.02em.
+
+### Source Code Pro — identifiers
+`--font-mono` · bin codes and identifiers only. Prices, vintages, counts and
+percentages are Manrope with `tabular-nums`.
+
+### Type Scale
+
+| Role | Size | Line Height | Letter Spacing | Token |
+|------|------|-------------|----------------|-------|
+| micro | 10px | 1.4 | 0.06em | `--text-micro` |
+| caption | 11px | 1.5 | 0.18em, uppercase, 500 | `--text-caption` |
+| ledger | 12px | 1.4 | — | `--text-ledger` |
+| body-sm | 13px | 1.55 | — | `--text-body-sm` |
+| control | 14px | 1.45 | — | `--text-control` |
+| body | 15px | 1.6 | — | `--text-body` |
+| body-lg | 17px | 1.5 | — (serif) | `--text-body-lg` |
+| subheading | 20px | 1.4 | — (serif) | `--text-subheading` |
+| heading-sm | 27px | 1.22 | — (serif) | `--text-heading-sm` |
+| heading | 42px | 1.1 | -0.02em (serif) | `--text-heading` |
+| display | 72px | 1.04 | -0.025em (serif) | `--text-display` |
+
+The scale is unchanged from the Cellar Index so that no component migrates
+a size; only the face behind `body-lg` and above changes. The typography
+ratchet (`scripts/check-design-typography.mjs`) still refuses a new
+`text-[Npx]`.
+
+## Tokens — Spacing & Shapes
+
+**Base unit:** 4px · **Density:** comfortable
+
+### Spacing Scale
+`2xs` 2 · `3xs` 4 · `xs` 8 · `sm` 14 · `md` 18 · `lg` 24 · `xl` 36 ·
+`2xl` 48 · `3xl` 80 (`--spacing-*`)
+
+### Border Radius
+
+| Element | Value | Token |
+|---------|-------|-------|
+| badges, bin chips | 6px | `--radius-sm` |
+| inputs, form controls | 10px | `--radius-md` |
+| tiles, thumbnails | 14px | `--radius-lg` |
+| cards, sheets, panels | 20px | `--radius-card` |
+| buttons, chips, search, the nav dock, segmented controls | 999px | `--radius-pill` |
+
+Every interactive element is a pill; every panel is 20px. Do not mix radius
+families on one component type.
+
+### Layout
+Page max-width 1200px (`--container-page`), prose 720px. Phone-first: one
+column, 16px gutters, the nav dock floating 22px above the safe area, the
+header a floating glass pill rather than a bar. Section gap `xl` (36px) on a
+phone, `2xl` on desktop. Card padding `md`–`lg`.
+
+## Components
+
+### Glass Panel (`.glass`)
+Translucent fill `rgba(255,255,255,0.07)` graded to `0.04` at the bottom,
+`backdrop-filter: blur(34px) saturate(1.6)`, 1px `glass-edge` border, inset
+`0 1px 0 rgba(255,255,255,0.28)` top highlight, inset `0 -1px 0
+rgba(0,0,0,0.4)` bottom shade, and a long soft drop `0 30px 60px -30px
+rgba(0,0,0,0.9)`. Radius `card`. This is the material of every sheet,
+card, dock and header. Where `backdrop-filter` is unsupported the fill
+falls back to `surface` at full opacity.
+
+### Card (`.card-surface`)
+The same recipe with the blur omitted, for lists that sit on plain
+obsidian where there is nothing to blur. Same edge, same top highlight.
+
+### Primary Button
+Bone fill (`primary`, graded `#F0E3C9 → #DFCDA9`), `seal-ink` label at
+control size, weight 600, 52px tall, radius `pill`, inset `0 1px 0
+rgba(255,255,255,0.7)` highlight. One per screen. No drop glow.
+
+### Ghost Button
+Transparent, 1px `rgba(232,217,191,0.35)` border, `ink` label at 500,
+52px, pill, inset top highlight `0.18`. The secondary action beside a
+primary; never filled.
+
+### Search Field
+52px pill glass, search glyph in `ink-soft`, placeholder in `grey`. Top of
+every authenticated page (GLOBAL-02).
+
+### Eyebrow
+`caption` role: 11px, uppercase, +0.18em, 500, in `ink-soft` — or `accent`
+when it opens a masthead. The tenant, the section name, a count.
+
+### Masthead
+Eyebrow + `heading` in the serif with one italic word in `primary` (bone),
+over a 400px image band that fades into the canvas by 84%. The image is a
+photograph of light on a bottle, a cork, or a pour — never an illustration,
+never text.
+
+### Index Row
+Thumbnail 40×60 at radius `lg` with a `glass-edge` border; eyebrow line
+(producer · vintage · region) in `grey`; name in the serif at `subheading`;
+count at `body-lg` 600 right-aligned; bin chip below it. Rows separate with
+`rule`, never a gap.
+
+### Bin Chip
+10px, +0.12em, `accent` text, 1px `rgba(232,217,191,0.35)` border, radius
+`pill`, 3px 8px padding.
+
+### Status Seal
+`caption`-sized uppercase on its wash, radius `pill`. Four states, hues in
+the colour table. A fifth would dilute the one-metal thesis to buy nothing.
+
+### Nav Dock
+68px glass pill floating 22px above the safe-area bottom, five items,
+22px stroke icons, 11px labels in `grey`; the active item in `primary`
+(bone). Replaces the flush tab bar. There is no floating action button:
+creation is a glass circle in the header.
+
+### Header
+A 48px glass pill holding the wordmark (serif, 16px, +0.28em, uppercase,
+bone), a hairline divider, the tenant name at control size, and the role as
+a bone seal. A LOCAL seal appears beside it on a local stack — derived from
+the connection, never from data.
+
+### Meter
+3px track in `rule-strong`, fill graded copper → bone. Body, tannin, acidity.
+
+## Do's and Don'ts
+
+### Do
+- Put every wine name and headline in the serif, and let the italic word
+  do the work a colour used to do.
+- Let the photograph continue behind a sheet. If the panel hides what is
+  behind it, it is not glass — lower the fill or move the panel.
+- Use copper for the thing you can press and bone for the one thing you
+  press most. Nothing else is coloured.
 - Use `edge`, solid, for anything a hand has to find by its boundary.
+- Keep the canvas neutral. Warmth comes from copper light in a photograph,
+  never from tinting the black.
 - Measure the pair before you ship the colour.
 
-**Don't**
-
-- Don't introduce a second colour. If a role feels like it needs one, it
-  needs a shade of blue or a shade of ink, not a new hue.
-- Don't widen the paper rule's numbers to let a colour in. Ask what hue it
-  actually is first.
-- Don't put a decorative gradient anywhere. Photography carries warmth;
-  paint does not.
-- Don't use `rounded-pill` to draw a circle. It is a small sharp radius now,
-  the same value as `--radius-lg` — reach for `rounded-full` instead.
-- Don't reach for `.glass`'s old blur. It is an opaque panel now.
+### Don't
+- Don't introduce a cool hue. No blue link, no slate chip, no violet focus.
+- Don't put a filled button beside another filled button.
+- Don't draw a drop-shadow glow under a button; depth is the inset highlight
+  and the long soft drop under a panel.
+- Don't set text on glass over a photograph without a scrim beneath the
+  panel; the ratio is only guaranteed against the ground.
+- Don't use an image with text in it as a background. A wine label in a
+  photograph is fine; a poster is not.
+- Don't draw a status bar, a keyboard or a device frame in a screen.
 - Don't set a size in `text-[Npx]`. If the role is missing, add the role.
-- Don't add a fifth status colour.
+
+## Surfaces
+
+| Level | Name | Value | Purpose |
+|-------|------|-------|---------|
+| 0 | Obsidian | `#0B0B0C` | Page ground, full-bleed image bands fade into it |
+| 1 | Glass | `rgba(255,255,255,0.07)` + blur | Every panel, sheet, dock, header |
+| 2 | Cellar Wall | `#141314` | Opaque fallback panel where blur is unavailable or nothing lies behind |
+| 3 | Bone | `#E8D9BF` | The primary action, the wordmark, the active nav item |
+
+## Elevation
+
+Depth is light, not shadow. A panel reads as raised because its top edge
+catches a 1px highlight and its bottom edge falls into a 1px shade; the
+long, low-alpha drop under it (`0 30px 60px -30px`) only separates it from
+an image. Cards on plain obsidian carry no drop at all. A copper radial
+glow (`.dawn-gradient`, `rgba(181,103,47,0.22)` fading by 65%) may sit
+behind a panel to give the blur something to catch; it is the only paint in
+the system and it is never a linear gradient across a surface.
+
+## Imagery
+
+Photography of light on glass, foil and cork: a bottle on stone under a
+single key, corks rim-lit in copper, a pour. Full-bleed, cropped tight,
+faded into the canvas by 84% so type never sits on a busy region. Thumbnails
+are 2:3 portrait at radius `lg`, never square. The prototype's six reference
+photographs live in `public/design-refs/`; they are the owner's supplied
+references for the look and are not licensed for production use — replace
+them with the venue's own photography before anything ships.
+
+## Layout
+
+Phone first. A floating header pill, a full-bleed masthead band, one search
+pill, a chip row, one glass list card, and the nav dock. Desktop keeps the
+same components at `--container-page` width with the dock replaced by inline
+nav in the header pill. Nothing is edge-to-edge except a photograph.
+
+## Agent Prompt Guide
+
+Quick colour reference (obsidian room):
+- text: `#F3EDE2` · secondary `#C9BFA9` · muted `#A39C8C`
+- background: `#0B0B0C` (canvas) · `#141314` (opaque surface)
+- glass: `rgba(255,255,255,0.07)` + `blur(34px)` · edge `rgba(232,217,191,0.18)`
+- accent (copper): `#D48C5A` · primary fill (bone): `#E8D9BF` with `#0B0B0C` label
+- border (load-bearing): `#7A7266` · hairline: `rgba(232,217,191,0.12)`
+
+Example component prompts:
+- **Masthead:** 400px image band (a bottle under a single key light) fading
+  to `#0B0B0C` by 84%; eyebrow "OSTERIA SCALA · CELLAR · 946 WINES" in
+  Manrope 11px +0.18em `#D48C5A`; headline in Cormorant Garamond 42px
+  line-height 1.0 `#F3EDE2` with the last two words italic in `#E8D9BF`.
+- **Index row:** 40×60 thumbnail radius 14px with `rgba(232,217,191,0.22)`
+  border; eyebrow "MIOLO · 2020 · VALE DO S. FRANCISCO" 10px `#A39C8C`; name
+  "Testardi Syrah" Cormorant 22px `#F3EDE2`; "×3" Manrope 17px 600 right;
+  bin chip "D2" 10px `#D48C5A` in a pill hairline. Rows divided by
+  `rgba(232,217,191,0.12)`.
+- **Primary button:** 52px pill, fill `linear-gradient(180deg,#F0E3C9,#DFCDA9)`,
+  label Manrope 15px 600 `#0B0B0C`, inset `0 1px 0 rgba(255,255,255,0.7)`.
+- **Nav dock:** 68px glass pill 16px from each side, 22px above the safe
+  area; five 22px stroke icons with 11px labels `#A39C8C`, active `#E8D9BF`.
+
+## Motion Philosophy
+
+Restrained. `fast` 120ms for state, `normal` 200ms for reveals, `slow`
+320ms for a sheet, all on `ease-standard`. One orchestrated reveal per
+screen (the masthead image fading up under the headline); no scattered
+micro-interactions, no parallax. Reduced-motion collapses everything to 0ms.
+
+## Similar Brands
+- **Authkit** (Refero Styles) — frosted glass at midnight: pill controls,
+  inset-frost elevation, one hairline border, one accent.
+- **Vivid+Co** (Refero Styles) — obsidian canvas where scale carries
+  hierarchy at weight 400 and the only chroma lives in the artwork.
+- **FILLVOID** — the copper-light-on-black poster language behind the
+  masthead crops.
+
+## Quick Start
+
+### CSS Custom Properties
+```css
+:root {
+  --color-canvas: #0b0b0c; --color-surface: #141314; --color-surface-raised: #1d1b1a;
+  --color-ink: #f3ede2; --color-ink-soft: #c9bfa9; --color-grey: #a39c8c;
+  --color-accent: #d48c5a; --color-primary: #e8d9bf; --color-seal-ink: #0b0b0c;
+  --color-edge: #7a7266; --color-rule: rgba(232, 217, 191, 0.12);
+  --color-glass-white: rgba(255, 255, 255, 0.07); --color-glass-edge: rgba(232, 217, 191, 0.18);
+  --font-serif: "Cormorant Garamond", Georgia, serif; --font-sans: Manrope, system-ui, sans-serif;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-card: 20px; --radius-pill: 999px;
+}
+```
+
+### Tailwind v4
+The live `@theme inline` block in `src/app/globals.css` is the export; it maps
+every token above onto `bg-canvas`, `text-ink`, `border-rule`, `rounded-card`,
+`font-serif` and friends, retinted per room by the `--t-*` runtime variables.

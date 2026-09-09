@@ -26,24 +26,23 @@ export default async function AppLayout({
     <RestaurantProvider restaurantId={restaurantId} restaurantName={restaurantName} userRole={userRole}>
       <ToastWrapper>
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-canvas">
-      {/* Top bar — minimal on mobile, full nav on md+. Hard-edged on paper
-          with a hairline rule beneath (Concept A — "The Cellar Index" —
-          replaces the old translucent glass strip: no blur, no shadow,
-          just the canvas colour and a border).
+      {/* Top bar — minimal on mobile, full nav on md+. A glass strip
+          (DESIGN.md — Components, Header): translucent, blurred over
+          whatever scrolls beneath it, a hairline glass edge below.
           The top safe area is RESERVED, not ignored: viewportFit is "cover",
           so without this the brand mark and the settings control sit under a
           notched iPhone's Dynamic Island when Terroir is installed as a PWA.
           Geometry comes from the chrome tokens in globals.css, never from a
           hand-written 54px in one file and 56px in another. */}
       <header
-        className="sticky top-0 z-[var(--z-sticky)] flex items-center border-b border-rule bg-canvas px-md md:px-lg"
+        className="glass sticky top-0 z-[var(--z-sticky)] flex items-center rounded-none border-x-0 border-t-0 border-b border-glass-edge px-md md:px-lg"
         style={{ height: "var(--chrome-header-total)", paddingTop: "var(--safe-top)" }}
       >
-        {/* The board's TERROIR wordmark: one heavy blue grotesque, not the
-            old two-tone ink/mark split with loosened small-caps tracking. */}
+        {/* The wordmark: the named face, uppercase, wide-tracked, in bone
+            (DESIGN.md — Components, Header). */}
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center font-serif text-body-lg font-bold uppercase tracking-[-0.01em] text-primary"
+          className="inline-flex min-h-11 shrink-0 items-center font-serif text-body font-medium uppercase tracking-[0.22em] text-primary md:text-body-lg md:tracking-[0.28em]"
         >
           Terroir
         </Link>
@@ -59,7 +58,7 @@ export default async function AppLayout({
             what the name needed. The per-page grey eyebrow repeating this
             same string in full is going away with it; see the handoff for
             which routes still carry one outside this file. */}
-        <div className="ml-sm flex min-w-0 flex-1 items-center gap-3xs border-l border-rule pl-sm md:ml-md md:pl-md">
+        <div className="ml-sm flex min-w-0 flex-1 items-center gap-3xs border-l border-rule-strong pl-sm md:ml-md md:pl-md">
           {/* text-ledger at every width, not text-caption on phones. The
               caption token carries 0.18em of tracking, which is right for the
               uppercase eyebrows it was made for and wrong for a proper noun:
@@ -80,7 +79,7 @@ export default async function AppLayout({
           {onLocalStack && (
             <span
               title="Connected to a local Supabase stack, not hosted data"
-              className="shrink-0 rounded-sm border border-risk-ink/40 px-3xs py-2xs text-micro font-medium uppercase text-risk-ink"
+              className="shrink-0 rounded-pill border border-risk-ink/40 px-xs py-2xs text-micro font-medium uppercase tracking-[0.14em] text-risk-ink"
             >
               Local
             </span>
@@ -122,7 +121,7 @@ export default async function AppLayout({
           the failure. Sticky rather than fixed: in flow it reserves its own
           height, so nothing downstream has to know its size to clear it. */}
       <div
-        className="sticky z-[var(--z-sticky)] border-b border-rule bg-canvas px-md py-sm md:hidden"
+        className="glass sticky z-[var(--z-sticky)] rounded-none border-x-0 border-t-0 border-b border-glass-edge px-md py-sm md:hidden"
         style={{ top: "var(--chrome-header-total)" }}
       >
         <SearchPalette />
@@ -138,13 +137,13 @@ export default async function AppLayout({
         {children}
       </main>
 
-      {/* Bottom tab bar — mobile only, thumb-friendly. Now 4 tabs
-          per the v5 IA redesign (.council/specs/2026-04-24-ux-ia-redesign.md).
-          Was 6-7 tabs (truncating at ~55px on a 390px phone); now ~97px
-          per tab. */}
+      {/* Bottom nav dock — mobile only, thumb-friendly. A glass pill
+          floating above the safe area (DESIGN.md — Components, Nav Dock),
+          not a flush bar. Five tabs per the v5 IA redesign
+          (.council/specs/2026-04-24-ux-ia-redesign.md) plus D5's Atlas. */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-[var(--z-chrome)] flex border-t border-rule bg-canvas md:hidden"
-        style={{ paddingBottom: "var(--safe-bottom)" }}
+        className="glass fixed inset-x-md z-[var(--z-chrome)] flex rounded-pill md:hidden"
+        style={{ bottom: "calc(var(--safe-bottom) + var(--spacing-md))", height: "var(--chrome-tabbar)" }}
         aria-label="Primary mobile"
       >
         <MobileNavLinks role={userRole} />

@@ -1,25 +1,22 @@
 #!/usr/bin/env node
 /**
- * DESIGN.md "paper and blush law" gate.
+ * DESIGN.md "cold law" gate (Obsidian Glass, 2026-09-08).
  *
- * Nocturne banned brown in prose and then drifted into it anyway, because a
- * ban nobody can run is a preference. The Cellar Index revision replaces
- * Nocturne's claret/champagne-specific rules with two general, hue-based
- * tests — there is no brand red or brand gold left in this palette to carve
- * out special cases for, so the two rules below are the whole law.
+ * The Cellar Index banned brown and cream; Obsidian Glass is built from
+ * copper and bone, so that law is gone and its inverse is enforced instead:
+ * no cool hue anywhere. A blue-black canvas, a slate status chip or a violet
+ * focus ring is the way a dark theme quietly stops being this one.
  *
  * Two surfaces are checked, because checking only the frontmatter is how a
- * Nocturne-era brown (#8B6914) and cream (#E3D9CB) survived an entire
- * palette migration inside one component's inline styles:
+ * previous palette survived an entire migration inside one component's
+ * inline styles:
  *
- *   1. The DESIGN.md frontmatter palette, against the two rules in
- *      § "The paper and blush law".
+ *   1. The DESIGN.md frontmatter palette — grounds, inks and action tokens
+ *      must be true neutrals or warm (copper–bone band); status tokens are
+ *      exempt by name because they were never neutrals.
  *
- *   2. Every colour literal written into src/. Channel tests are the wrong
- *      instrument here — #8B6914 is neither a dark neutral nor a light one,
- *      it is a saturated warm mid-tone — so this surface is judged in HSL,
- *      which is how "brown" and "cream" are actually defined: a warm hue
- *      that is either too dark or too pale to be a colour in its own right.
+ *   2. Every colour literal written into src/ — a saturated cool chromatic
+ *      that is not a named token fails, judged in HSL.
  *
  * Exit 1 on any violation so CI can hold the line.
  */
@@ -63,57 +60,34 @@ function hsl(hex) {
   return { h, s, l };
 }
 
-/**
- * The brown-to-yellow danger wedge. Brown and its light-mode twin, cream, are
- * both warm hues in this band — orange through yellow — at the wrong
- * lightness. Anything outside the wedge (blue, green, red, magenta, at any
- * lightness) was never a brown/cream risk in the first place, whatever its
- * channel values look like — a saturated dark red is a maroon, not a brown,
- * and a pale pink status wash is not a cream.
- */
-const WEDGE_MIN = 15;
-const WEDGE_MAX = 60;
+/** The copper–bone band: orange through yellow. Everything warm in this
+ *  system — copper, bone, the amber hold status, the obsidian canvas's faint
+ *  warmth — lives here. */
+const WARM_MIN = 15;
+const WARM_MAX = 60;
 
-/**
- * The one warm shape this palette allows: parchment paper. Narrower than the
- * wedge on both sides, and named after the one colour it exists to describe
- * (DESIGN.md — "canvas" is #F8F7EF, hue ~53°). A hue outside this window but
- * still inside the wedge — tan, manila, blush — is rejected by the same test
- * that admits paper, rather than by a numeric channel threshold that has no
- * way to tell them apart at the widths they actually differ by.
- */
-const PAPER_HUE_MIN = 44;
-const PAPER_HUE_MAX = 60;
-const PAPER_SAT_MAX = 0.45;
-const PAPER_LIGHT_MIN = 0.85;
+/** The cold band: blue through violet. Nothing in the system lives here. */
+const COLD_MIN = 190;
+const COLD_MAX = 290;
 
-/** Rule 1 — a dark neutral must not be warm. Brown is a dark, warm, at-least-
- *  somewhat-saturated colour; this rejects anything in the wedge with real
- *  saturation, regardless of exactly how dark or how saturated. */
-function darkNeutralFault(hex) {
+const NEUTRAL_SAT = 0.05;
+
+/** Rule 1 — a ground, ink or action token is a neutral or a warm. */
+function warmOrNeutralFault(hex) {
   const { h, s, l } = hsl(hex);
-  if (s <= 0.05) return null; // a true grey/black has no hue to be brown with
-  if (h < WEDGE_MIN || h >= WEDGE_MAX) return null; // not the brown wedge at all
-  return `dark neutral is brown — hue ${h.toFixed(1)}° is in the brown wedge ` +
-    `(15°–60°) with real saturation (l${l.toFixed(2)} s${s.toFixed(2)})`;
+  if (s <= NEUTRAL_SAT) return null; // a true grey/black/white has no hue to be cool with
+  if (h >= WARM_MIN && h < WARM_MAX) return null; // copper–bone band
+  return `not warm or neutral — hue ${h.toFixed(1)}° is outside the copper–bone band ` +
+    `(${WARM_MIN}°–${WARM_MAX}°) with real saturation (l${l.toFixed(2)} s${s.toFixed(2)})`;
 }
 
-/** Rule 2 — a light neutral must be the one named paper, or no hue at all.
- *  Cream, tan and blush are all warm hues in the same wedge as brown, just
- *  pale instead of dark; only the narrow parchment window is exempt. */
-function lightNeutralFault(hex) {
-  const { h, s, l } = hsl(hex);
-  if (s <= 0.05) return null; // true white/grey — never a cream risk
-  if (h < WEDGE_MIN || h >= WEDGE_MAX) return null; // not the brown/cream wedge
-  if (h >= PAPER_HUE_MIN && h <= PAPER_HUE_MAX && s <= PAPER_SAT_MAX && l >= PAPER_LIGHT_MIN) {
-    return null; // inside the parchment window
-  }
-  return (
-    `light neutral is cream/blush — hue ${h.toFixed(1)}° is in the warm wedge ` +
-    `but outside the paper band (${PAPER_HUE_MIN}°–${PAPER_HUE_MAX}°, ` +
-    `s<=${PAPER_SAT_MAX}, l>=${PAPER_LIGHT_MIN}); got s${s.toFixed(2)} l${l.toFixed(2)}`
-  );
-}
+/** Tokens the rule applies to, by bare name (the dark- twin is checked too).
+ *  Status tokens (ready/hold/peak/risk) are semantic hues and exempt. */
+const GOVERNED = new Set([
+  "canvas", "surface", "surface-raised", "surface-sunken", "wash",
+  "ink", "ink-soft", "grey", "ink-disabled", "edge", "seal-ink",
+  "primary", "primary-hover", "accent", "mark", "focus",
+]);
 
 /* ── 1. The frontmatter palette ────────────────────────────────────── */
 
@@ -125,28 +99,19 @@ const palette = new Set(tokens.map((t) => t.hex));
 
 const failures = [];
 for (const { name, hex } of tokens) {
-  const r = parseInt(hex.slice(0, 2), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const luminous = Math.max(r, parseInt(hex.slice(2, 4), 16), b);
-
-  if (luminous < 0x40) {
-    const fault = darkNeutralFault(hex);
-    if (fault) failures.push(`${name} #${hex}: ${fault}`);
-  } else if (luminous > 0xc0) {
-    const fault = lightNeutralFault(hex);
-    if (fault) failures.push(`${name} #${hex}: ${fault}`);
-  }
+  const bare = name.startsWith("dark-") ? name.slice(5) : name;
+  if (!GOVERNED.has(bare)) continue;
+  const fault = warmOrNeutralFault(hex);
+  if (fault) failures.push(`${name} #${hex}: ${fault}`);
 }
 
 /* ── 2. Colour literals in the app's own source ────────────────────── */
 
-function warmFault(hex) {
-  const { h, s, l } = hsl(hex);
-  if (s <= 0.05) return null; // a neutral grey is not a brown
-  if (h < 15 || h >= 60) return null; // outside the orange–yellow wedge
-  if (l < 0.72 && s > 0.15) return "brown — a warm hue this dark is brown, whatever it is called";
-  if (l >= 0.8) return "cream — a warm hue this pale is cream, whatever it is called";
-  return null;
+function coldFault(hex) {
+  const { h, s } = hsl(hex);
+  if (s <= 0.15) return null; // a tinted neutral is not an accent
+  if (h < COLD_MIN || h >= COLD_MAX) return null; // outside the blue–violet band
+  return "cold accent — the system has one metal, and it is copper";
 }
 
 function walk(dir, out = []) {
@@ -163,6 +128,7 @@ let scanned = 0;
 for (const file of walk(join(root, "src"))) {
   const rel = relative(root, file).split("\\").join("/");
   if (NOT_THE_APP.some((prefix) => rel.startsWith(prefix))) continue;
+  if (/\.test\.tsx?$/.test(rel)) continue; // tests carry client-palette fixtures, not the app's own colours
   const text = readFileSync(file, "utf8");
   for (const m of text.matchAll(/#([0-9A-Fa-f]{6})\b/g)) {
     const hex = m[1].toUpperCase();
@@ -170,7 +136,7 @@ for (const file of walk(join(root, "src"))) {
     // A colour that IS in the palette is fine wherever it appears; the
     // frontmatter check above already judged it.
     if (palette.has(hex)) continue;
-    const fault = warmFault(hex);
+    const fault = coldFault(hex);
     if (fault) {
       const line = text.slice(0, m.index).split("\n").length;
       failures.push(`${rel}:${line} #${hex}: ${fault}`);
@@ -183,5 +149,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `Palette: ${tokens.length} DESIGN.md tokens + ${scanned} source literal(s), no brown, no cream.`,
+  `Palette: ${tokens.length} DESIGN.md tokens + ${scanned} source literal(s), no cool hue.`,
 );

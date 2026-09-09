@@ -38,14 +38,16 @@ function press(label: string) {
 }
 
 describe("ThemeToggle", () => {
-  it("defaults to the system choice with no stored theme", () => {
+  // Obsidian is the brand's first face (DESIGN.md — Theme): no stored
+  // choice reads as dark, and the boot script in layout.tsx sets the
+  // attribute before this component mounts.
+  it("defaults to the dark choice with no stored theme", () => {
     render();
     expect(
       container
-        .querySelector('button[aria-label="Match device theme"]')
+        .querySelector('button[aria-label="Dark theme"]')
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
   it("applies and persists an explicit dark choice", () => {
@@ -56,12 +58,24 @@ describe("ThemeToggle", () => {
     expect(dark.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("returns to system by clearing both the attribute and storage", () => {
+  it("returns to system by clearing the attribute and storing the choice", () => {
     render();
     press("Dark theme");
     press("Match device theme");
     expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(localStorage.getItem("terroir-theme")).toBeNull();
+    // Stored explicitly: an absent key would collapse back to dark on the
+    // next boot, which is not what "match device" means.
+    expect(localStorage.getItem("terroir-theme")).toBe("system");
+  });
+
+  it("restores a stored system choice on mount", () => {
+    localStorage.setItem("terroir-theme", "system");
+    render();
+    expect(
+      container
+        .querySelector('button[aria-label="Match device theme"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 
   it("restores a stored choice on mount", () => {
@@ -83,11 +97,11 @@ describe("ThemeToggle", () => {
       darkMeta = document.createElement("meta");
       darkMeta.name = "theme-color";
       darkMeta.media = "(prefers-color-scheme: dark)";
-      darkMeta.content = "#07080A";
+      darkMeta.content = "#0B0B0C";
       lightMeta = document.createElement("meta");
       lightMeta.name = "theme-color";
       lightMeta.media = "(prefers-color-scheme: light)";
-      lightMeta.content = "#F4F5F6";
+      lightMeta.content = "#F1EADB";
       document.head.append(darkMeta, lightMeta);
     });
 
@@ -96,26 +110,26 @@ describe("ThemeToggle", () => {
       lightMeta.remove();
     });
 
-    it("forces both metas to the cellar color on an explicit dark choice", () => {
+    it("forces both metas to the obsidian color on an explicit dark choice", () => {
       render();
       press("Dark theme");
-      expect(darkMeta.content).toBe("#07080A");
-      expect(lightMeta.content).toBe("#07080A");
+      expect(darkMeta.content).toBe("#0B0B0C");
+      expect(lightMeta.content).toBe("#0B0B0C");
     });
 
-    it("forces both metas to the tasting-room color on an explicit light choice", () => {
+    it("forces both metas to the bone color on an explicit light choice", () => {
       render();
       press("Light theme");
-      expect(darkMeta.content).toBe("#F4F5F6");
-      expect(lightMeta.content).toBe("#F4F5F6");
+      expect(darkMeta.content).toBe("#F1EADB");
+      expect(lightMeta.content).toBe("#F1EADB");
     });
 
     it("restores each meta to its own media color on returning to system", () => {
       render();
       press("Dark theme");
       press("Match device theme");
-      expect(darkMeta.content).toBe("#07080A");
-      expect(lightMeta.content).toBe("#F4F5F6");
+      expect(darkMeta.content).toBe("#0B0B0C");
+      expect(lightMeta.content).toBe("#F1EADB");
     });
   });
 });

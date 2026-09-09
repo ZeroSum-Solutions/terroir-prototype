@@ -16,6 +16,7 @@ import { resolveCellarNavigationIntent } from "./cellar-navigation";
 import { useCellarUrlState } from "./use-cellar-url-state";
 import { buildCellarCounters } from "./cellar-counters";
 import { CellarControlBar } from "./cellar-control-bar";
+import { CellarMasthead } from "./cellar-masthead";
 import { VoiceCellarControl } from "./voice-cellar-control";
 
 type CellarSection = { id: string; name: string };
@@ -240,15 +241,7 @@ export function CellarShell({
 
   return (
     <section className="min-w-0 max-w-full overflow-x-hidden">
-      {/* Dawn Hero — Concept A masthead: heavy blue "Cellar" + wine count; restaurant identity now lives in the app header. */}
-      <div className="-mx-md -mt-lg dawn-gradient px-md pb-lg pt-lg max-[359px]:pb-xs max-[359px]:pt-xs md:-mx-lg md:-mt-xl md:px-lg md:pb-2xl md:pt-xl">
-        <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading lg:text-display">
-          Cellar
-        </h1>
-        <p className="mt-2xs text-body-sm font-medium tabular text-grey">
-          {rows.length.toLocaleString()} wine{rows.length === 1 ? "" : "s"}
-        </p>
-      </div>
+      <CellarMasthead count={rows.length} restaurantName={restaurantName} />
 
       {/* Search — GLOBAL-02 lifts it out of the control row and puts it above,
           on its own, at every width. The mobile search icon and its overlay are

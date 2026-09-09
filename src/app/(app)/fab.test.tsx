@@ -58,10 +58,11 @@ describe("Fab", () => {
       'button[aria-label="Open actions"]',
     );
 
-    // The offset clears the tab bar AND its safe area, and reads that from
-    // the chrome tokens rather than restating the geometry here.
+    // The offset clears the floating dock, the gap it floats above, AND the
+    // safe area, and reads all of that from the chrome tokens rather than
+    // restating the geometry here.
     expect(trigger?.getAttribute("style")).toContain(
-      "bottom:calc(var(--chrome-tabbar-total) + var(--spacing-md))",
+      "bottom:calc(var(--chrome-tabbar-total) + var(--spacing-md) + var(--spacing-md))",
     );
   });
 

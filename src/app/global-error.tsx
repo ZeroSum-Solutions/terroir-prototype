@@ -20,12 +20,12 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="dark"}if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 const palette = `
-:root{--ge-canvas:#F4F5F6;--ge-ink:#0B0D10;--ge-grey:#626B72;--ge-primary:#96122A;color-scheme:light}
-[data-theme="dark"]{--ge-canvas:#07080A;--ge-ink:#EEF1F4;--ge-grey:#79838B;--ge-primary:#D01A3C;color-scheme:dark}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-theme="dark"]){--ge-canvas:#07080A;--ge-ink:#EEF1F4;--ge-grey:#79838B;--ge-primary:#D01A3C;color-scheme:dark}}
+:root{--ge-canvas:#F1EADB;--ge-ink:#141312;--ge-grey:#5F584E;--ge-primary:#8A4419;color-scheme:light}
+[data-theme="dark"]{--ge-canvas:#0B0B0C;--ge-ink:#F3EDE2;--ge-grey:#A39C8C;--ge-primary:#D48C5A;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-theme="dark"]){--ge-canvas:#0B0B0C;--ge-ink:#F3EDE2;--ge-grey:#A39C8C;--ge-primary:#D48C5A;color-scheme:dark}}
 `;
 
 export default function GlobalError({

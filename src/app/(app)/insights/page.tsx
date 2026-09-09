@@ -283,7 +283,7 @@ export default async function DashboardPage({
     return (
       <section>
         <header className="mb-lg md:mb-xl">
-          <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading lg:text-display">
+          <h1 className="font-serif text-heading-sm font-normal leading-[1.05] tracking-[-0.02em] text-ink md:text-heading lg:text-display">
             Insights
           </h1>
         </header>
@@ -324,7 +324,7 @@ export default async function DashboardPage({
       <div className="mb-xl md:mb-3xl">
         <div className="flex flex-wrap items-start justify-between gap-md">
           <div>
-            <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading lg:text-display">
+            <h1 className="font-serif text-heading-sm font-normal leading-[1.05] tracking-[-0.02em] text-ink md:text-heading lg:text-display">
               Insights
             </h1>
           </div>

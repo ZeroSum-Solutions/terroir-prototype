@@ -2,14 +2,16 @@
 
 /*
  * Terroir Design System — token layer
- * Source: DESIGN.md ("Terroir — Cellar Index", revised 2026-09-08).
+ * Source: DESIGN.md ("Terroir — Obsidian Glass", revised 2026-09-08).
  * Do not edit values here without updating DESIGN.md first — the two are held
  * in agreement by `scripts/check-design-token-sync.mjs`.
  *
  * Architecture:
- *  1. Runtime theme variables (--t-*) — the light "Paper" values on :root,
- *     swapped to the dark "Ink" set under [data-theme="dark"], and under
- *     prefers-color-scheme: dark when no explicit choice is stored.
+ *  1. Runtime theme variables (--t-*) — the light "Bone" values on :root,
+ *     swapped to the dark "Obsidian" set under [data-theme="dark"], and under
+ *     prefers-color-scheme: dark when no explicit choice is stored. The app
+ *     defaults to Obsidian (layout.tsx sets data-theme="dark" on first run);
+ *     Bone is the print, daylight and guest-menu room.
  *  2. @theme inline — maps Tailwind tokens onto the runtime variables, so
  *     every token utility (bg-canvas, text-ink, border-rule…) retints per mode
  *     with zero component changes.
@@ -20,114 +22,115 @@
  *            changes ratio with whatever is composited behind it.
  */
 
-/* ── Light — "Paper" (default) ───────────────────────────────── */
+/* ── Light — "Bone" (print, daylight, guest menu) ─────────────── */
 :root {
-  --t-primary: #1664eb;
-  --t-primary-hover: #0e4fc7;
-  --t-accent: #1664eb;
-  /* The "you are here" mark: the same blue in both rooms, lightened on Ink.
-     Unlike Nocturne's champagne/claret split, there is no asymmetry here. */
-  --t-mark: #1664eb;
-  --t-focus: #1664eb;
+  --t-primary: #141312; /* the primary action: an obsidian fill with a bone label */
+  --t-primary-hover: #2a2724;
+  --t-accent: #8a4419; /* copper, darkened to clear 4.5:1 as text on the sunken ground */
+  --t-mark: #8a4419;
+  --t-focus: #8a4419;
 
-  --t-canvas: #f8f7ef;
-  --t-surface: #ffffff;
-  --t-surface-raised: #f5f4e9; /* hover / selection — a step DOWN from white */
-  --t-surface-sunken: #f2f1e4;
-  --t-wash: #f7f6ec;
+  --t-canvas: #f1eadb;
+  --t-surface: #faf6ec;
+  --t-surface-raised: #e9e0cc; /* hover / selection — a step DOWN from the surface */
+  --t-surface-sunken: #e3d9c3;
+  --t-wash: #ede5d2;
 
-  --t-ink: #121212;
-  --t-ink-soft: #3d3d3d;
-  --t-grey: #686868;
-  --t-ink-disabled: #9a9a9a;
+  --t-ink: #141312;
+  --t-ink-soft: #3f3a33;
+  --t-grey: #5f584e;
+  --t-ink-disabled: #9c948a;
 
-  --t-rule: rgba(18, 18, 18, 0.12);
-  --t-rule-strong: rgba(18, 18, 18, 0.22);
-  --t-edge: #7a7a7a;
+  --t-rule: rgba(20, 19, 18, 0.12);
+  --t-rule-strong: rgba(20, 19, 18, 0.22);
+  --t-edge: #7a7266;
 
-  --t-seal-ink: #ffffff;
+  --t-seal-ink: #f3ede2;
 
   --t-ready: #2c774e;
   --t-ready-wash: #e4f0ea;
   --t-ready-ink: #215c3c;
-  --t-hold: #2d6a9f;
-  --t-hold-wash: #e3eef6;
-  --t-hold-ink: #22506f;
-  --t-peak-wash: #e8eaec;
-  --t-peak-ink: #121212;
+  --t-hold: #a56b2a;
+  --t-hold-wash: #f3e6cf;
+  --t-hold-ink: #6e4512;
+  --t-peak-wash: #e6dfd0;
+  --t-peak-ink: #141312;
   --t-risk-wash: #f7e4e8;
   --t-risk-ink: #96122a;
 
-  --t-window-ramp-start: #f2f1e4;
-  --t-window-marker: #1664eb;
-  --t-card-highlight: transparent; /* inner top light on raised cards — Ink only */
+  --t-window-ramp-start: #e3d9c3;
+  --t-window-marker: #8a4419;
+  --t-card-highlight: rgba(255, 255, 255, 0.6); /* inner top light on a raised card */
 
-  --t-surface-inverse: #121212; /* the primary action: an ink fill at 17.43:1 */
-  --t-on-inverse: #f8f7ef;
+  --t-surface-inverse: #141312;
+  --t-on-inverse: #f3ede2;
 
-  --t-scrim: rgba(18, 18, 18, 0.4);
-  --t-glass: #ffffff; /* flattened — opaque bordered panel, no translucency */
-  --t-glass-edge: rgba(18, 18, 18, 0.16);
-  --t-glass-shadow: rgba(18, 18, 18, 0.08);
-  --t-shadow-card: none; /* flattened -- Concept A has no floating cards on paper */
-  --t-shadow-glass: 0 8px 32px rgba(18, 18, 18, 0.1);
+  --t-scrim: rgba(20, 19, 18, 0.4);
+  --t-glass: rgba(250, 246, 236, 0.72); /* translucent — composed with blur in .glass */
+  --t-glass-edge: rgba(20, 19, 18, 0.14);
+  --t-glass-shadow: rgba(20, 19, 18, 0.12);
+  --t-glass-highlight: rgba(255, 255, 255, 0.7);
+  --t-glow: rgba(181, 103, 47, 0.16); /* the one paint: a copper radial behind a panel */
+  --t-shadow-card: 0 20px 40px -28px rgba(20, 19, 18, 0.35);
+  --t-shadow-glass: 0 30px 60px -30px rgba(20, 19, 18, 0.45);
   color-scheme: light;
 }
 
-/* ── Dark — "Ink": true near-black, NEVER brown ──────────────── */
-/* Brown ban: every dark ground here has equal R/G/B channels, so a warm dark
-   neutral — which is what brown is — cannot be expressed. Enforced by
-   check-design-palette.mjs's hue-wedge test. */
+/* ── Dark — "Obsidian" (default): true near-black, NEVER blue-black ── */
+/* Cold law: every ground here is a neutral or a warm neutral; a cool tint
+   cannot be expressed. Enforced by check-design-palette.mjs. */
 [data-theme="dark"] {
-  --t-primary: #4a90ff; /* lightened for Ink: 4.85–6.34:1 across the room */
-  --t-primary-hover: #6ba6ff;
-  --t-accent: #4a90ff;
-  --t-mark: #4a90ff;
-  --t-focus: #4a90ff;
+  --t-primary: #e8d9bf; /* bone: the primary fill */
+  --t-primary-hover: #f0e3c9;
+  --t-accent: #d48c5a; /* copper: 6.3:1 on the raised wall */
+  --t-mark: #d48c5a;
+  --t-focus: #d48c5a;
 
-  --t-canvas: #121212;
-  --t-surface: #1b1b1b;
-  --t-surface-raised: #262626;
-  --t-surface-sunken: #0a0a0a;
-  --t-wash: #1f1f1f;
+  --t-canvas: #0b0b0c;
+  --t-surface: #141314;
+  --t-surface-raised: #1d1b1a;
+  --t-surface-sunken: #060606;
+  --t-wash: #171514;
 
-  --t-ink: #f8f7ef; /* paper-white ink */
-  --t-ink-soft: #cfcfcf;
-  --t-grey: #a0a0a0;
-  --t-ink-disabled: #5c5c5c;
+  --t-ink: #f3ede2; /* bone ink */
+  --t-ink-soft: #c9bfa9;
+  --t-grey: #a39c8c;
+  --t-ink-disabled: #6f695e;
 
-  /* Alpha-paper rules: an opaque near-black hairline vanishes on the Ink
-     ground and cards fuse into one field. Decorative by contract. */
-  --t-rule: rgba(248, 247, 239, 0.1);
-  --t-rule-strong: rgba(248, 247, 239, 0.18);
-  --t-edge: #8f8f8f; /* load-bearing, solid: 4.68–6.12:1 */
+  /* Bone hairlines at low alpha: an opaque near-black line vanishes on
+     obsidian and panels fuse into one field. Decorative by contract. */
+  --t-rule: rgba(232, 217, 191, 0.12);
+  --t-rule-strong: rgba(232, 217, 191, 0.22);
+  --t-edge: #7a7266; /* load-bearing, solid: 3.6:1 on the raised wall */
 
-  --t-seal-ink: #121212; /* ink label on the lightened-blue fill: 6.00:1 */
+  --t-seal-ink: #0b0b0c; /* obsidian label on the bone fill */
 
   --t-ready: #4fb07a;
   --t-ready-wash: #0f2419;
   --t-ready-ink: #8fd9af;
-  --t-hold: #6ba8d6;
-  --t-hold-wash: #0d1d2a;
-  --t-hold-ink: #a9cfea;
-  --t-peak-wash: #1f242a;
-  --t-peak-ink: #f8f7ef;
+  --t-hold: #c99a5b;
+  --t-hold-wash: #2a2013;
+  --t-hold-ink: #e6c79c;
+  --t-peak-wash: #26211d;
+  --t-peak-ink: #f3ede2;
   --t-risk-wash: #2a0a11;
   --t-risk-ink: #f2879c;
 
-  --t-window-ramp-start: #262626;
-  --t-window-marker: #4a90ff;
-  --t-card-highlight: rgba(248, 247, 239, 0.05);
+  --t-window-ramp-start: #1d1b1a;
+  --t-window-marker: #d48c5a;
+  --t-card-highlight: rgba(255, 255, 255, 0.16);
 
-  --t-surface-inverse: #f8f7ef;
-  --t-on-inverse: #121212;
+  --t-surface-inverse: #e8d9bf;
+  --t-on-inverse: #0b0b0c;
 
   --t-scrim: rgba(0, 0, 0, 0.72);
-  --t-glass: #1b1b1b; /* flattened — opaque bordered panel, no translucency */
-  --t-glass-edge: rgba(248, 247, 239, 0.14);
-  --t-glass-shadow: rgba(0, 0, 0, 0.5);
-  --t-shadow-card: none; /* flattened -- same hairline treatment in Ink */
-  --t-shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --t-glass: rgba(255, 255, 255, 0.07);
+  --t-glass-edge: rgba(232, 217, 191, 0.18);
+  --t-glass-shadow: rgba(0, 0, 0, 0.6);
+  --t-glass-highlight: rgba(255, 255, 255, 0.28);
+  --t-glow: rgba(181, 103, 47, 0.22);
+  --t-shadow-card: 0 20px 40px -28px rgba(0, 0, 0, 0.8);
+  --t-shadow-glass: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
   color-scheme: dark;
 }
 
@@ -135,53 +138,57 @@
    [data-theme="dark"] block exactly. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --t-primary: #4a90ff;
-    --t-primary-hover: #6ba6ff;
-    --t-accent: #4a90ff;
-    --t-mark: #4a90ff;
-    --t-focus: #4a90ff;
+    --t-primary: #e8d9bf; /* bone: the primary fill */
+    --t-primary-hover: #f0e3c9;
+    --t-accent: #d48c5a; /* copper: 6.3:1 on the raised wall */
+    --t-mark: #d48c5a;
+    --t-focus: #d48c5a;
 
-    --t-canvas: #121212;
-    --t-surface: #1b1b1b;
-    --t-surface-raised: #262626;
-    --t-surface-sunken: #0a0a0a;
-    --t-wash: #1f1f1f;
+    --t-canvas: #0b0b0c;
+    --t-surface: #141314;
+    --t-surface-raised: #1d1b1a;
+    --t-surface-sunken: #060606;
+    --t-wash: #171514;
 
-    --t-ink: #f8f7ef;
-    --t-ink-soft: #cfcfcf;
-    --t-grey: #a0a0a0;
-    --t-ink-disabled: #5c5c5c;
+    --t-ink: #f3ede2; /* bone ink */
+    --t-ink-soft: #c9bfa9;
+    --t-grey: #a39c8c;
+    --t-ink-disabled: #6f695e;
 
-    --t-rule: rgba(248, 247, 239, 0.1);
-    --t-rule-strong: rgba(248, 247, 239, 0.18);
-    --t-edge: #8f8f8f;
+    /* Bone hairlines at low alpha: an opaque near-black line vanishes on
+       obsidian and panels fuse into one field. Decorative by contract. */
+    --t-rule: rgba(232, 217, 191, 0.12);
+    --t-rule-strong: rgba(232, 217, 191, 0.22);
+    --t-edge: #7a7266; /* load-bearing, solid: 3.6:1 on the raised wall */
 
-    --t-seal-ink: #121212;
+    --t-seal-ink: #0b0b0c; /* obsidian label on the bone fill */
 
     --t-ready: #4fb07a;
     --t-ready-wash: #0f2419;
     --t-ready-ink: #8fd9af;
-    --t-hold: #6ba8d6;
-    --t-hold-wash: #0d1d2a;
-    --t-hold-ink: #a9cfea;
-    --t-peak-wash: #1f242a;
-    --t-peak-ink: #f8f7ef;
+    --t-hold: #c99a5b;
+    --t-hold-wash: #2a2013;
+    --t-hold-ink: #e6c79c;
+    --t-peak-wash: #26211d;
+    --t-peak-ink: #f3ede2;
     --t-risk-wash: #2a0a11;
     --t-risk-ink: #f2879c;
 
-    --t-window-ramp-start: #262626;
-    --t-window-marker: #4a90ff;
-    --t-card-highlight: rgba(248, 247, 239, 0.05);
+    --t-window-ramp-start: #1d1b1a;
+    --t-window-marker: #d48c5a;
+    --t-card-highlight: rgba(255, 255, 255, 0.16);
 
-    --t-surface-inverse: #f8f7ef;
-    --t-on-inverse: #121212;
+    --t-surface-inverse: #e8d9bf;
+    --t-on-inverse: #0b0b0c;
 
     --t-scrim: rgba(0, 0, 0, 0.72);
-    --t-glass: #1b1b1b;
-    --t-glass-edge: rgba(248, 247, 239, 0.14);
-    --t-glass-shadow: rgba(0, 0, 0, 0.5);
-    --t-shadow-card: none; /* flattened -- same hairline treatment in Ink */
-    --t-shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.55);
+    --t-glass: rgba(255, 255, 255, 0.07);
+    --t-glass-edge: rgba(232, 217, 191, 0.18);
+    --t-glass-shadow: rgba(0, 0, 0, 0.6);
+    --t-glass-highlight: rgba(255, 255, 255, 0.28);
+    --t-glow: rgba(181, 103, 47, 0.22);
+    --t-shadow-card: 0 20px 40px -28px rgba(0, 0, 0, 0.8);
+    --t-shadow-glass: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
     color-scheme: dark;
   }
 }
@@ -259,14 +266,15 @@
   --color-glass-white: var(--t-glass);
   --color-glass-edge: var(--t-glass-edge);
   --color-glass-shadow: var(--t-glass-shadow);
+  --color-glass-highlight: var(--t-glass-highlight);
+  --color-glow: var(--t-glow);
 
-  /* Typography — fonts injected via next/font in layout.tsx. The Tailwind
-     utility name `font-serif` is a stable identifier inherited from
-     check-design-token-sync.mjs's fixed family map; it no longer describes
-     the letterform (Archivo is a grotesque), the same way `primary` kept its
-     name when its value moved from claret to blue. */
-  --font-serif: var(--font-archivo), Archivo, "Arial Black", sans-serif;
-  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Typography — fonts injected via next/font in layout.tsx (DESIGN.md —
+     Typography). Cormorant Garamond is the named face: wine names, producers,
+     headlines, the wordmark. Manrope is the working face for everything you
+     operate. */
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-manrope), Manrope, ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-source-code), "Source Code Pro", ui-monospace, SFMono-Regular, monospace;
 
   /* Type scale (contract — DESIGN.md typography frontmatter) */
@@ -308,20 +316,17 @@
   --spacing-2xl: 48px;
   --spacing-3xl: 80px;
 
-  /* Radii — sharpened for Cellar Index. --radius-pill is no longer a
-     capsule: Concept A has no lozenges, so pill now sits on the same sharp
-     scale as everything else (DESIGN.md — Controls). A genuinely circular
-     control (mic button, avatar, loading dot) uses Tailwind's built-in
-     rounded-full directly — never this token. */
-  --radius-sm: 3px; /* badges, small chips, the bin badge */
-  --radius-md: 4px; /* buttons, form controls */
-  --radius-lg: 6px; /* tiles, larger inputs */
-  --radius-card: 8px; /* cards, panels, modals */
-  --radius-pill: 6px;
+  /* Radii (DESIGN.md — Spacing & Shapes). Every interactive element is a
+     pill; every panel is 20px. */
+  --radius-sm: 6px; /* badges, bin chips */
+  --radius-md: 10px; /* inputs, form controls */
+  --radius-lg: 14px; /* tiles, thumbnails */
+  --radius-card: 20px; /* cards, sheets, panels */
+  --radius-pill: 999px; /* buttons, chips, search, the nav dock, segmented controls */
 
-  /* Shadows — depth comes from ground value first, shadow second.
-     --shadow-card is `none`: cards and .glass sit flush on the page,
-     separated by a border, never lifted off it (DESIGN.md — Elevation). */
+  /* Shadows (DESIGN.md — Elevation). Depth is light first: the inset top
+     highlight and bottom shade on a panel. The long, low drop only separates
+     a panel from a photograph behind it. */
   --shadow-card: var(--t-shadow-card);
   --shadow-glass: var(--t-shadow-glass);
   --shadow-sm: 0 1px 2px var(--t-glass-shadow);
@@ -394,45 +399,58 @@ body {
 }
 
 /*
- * Card recipe (DESIGN.md — Elevation and depth, level 1).
- * A card is separated from the ground by a solid border, never a shadow —
- * the Cellar Index has no floating white cards on paper. --shadow-card is
- * `none` in both rooms now, so it is dropped from this rule's box-shadow
- * list entirely rather than composed in: `none` is only a legal box-shadow
- * value on its own, never alongside another shadow in the same comma list.
+ * Card recipe (DESIGN.md — Surfaces, level 2 / Elevation).
+ * The glass recipe with the blur omitted, for lists that sit on plain
+ * obsidian where there is nothing to blur: the same hairline edge, the
+ * same 1px top highlight, no drop.
  */
 .card-surface {
   background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  /* The inset line is the raised top light — transparent in Paper, faint
-     paper-white in Ink (--t-card-highlight). Not an elevation shadow: it
-     never lifts the card off the page, just a 1px lighting cue in Ink. */
-  box-shadow: inset 0 1px 0 var(--t-card-highlight);
+  border: 1px solid var(--color-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--t-card-highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
 }
 
 /*
- * Glass recipe (DESIGN.md — Elevation and depth, level 2).
- * Flattened for the Cellar Index: an OPAQUE bordered panel, no blur, no
- * translucency, and — since --shadow-card is `none` — no drop shadow either.
- * Concept A has no glass — this class name survives because sticky chrome
- * (header, drawers, dialogs, toasts) still needs to sit above content, but
- * there is no @supports backdrop-filter branch left, because nothing here
- * needs one any more.
+ * Glass recipe (DESIGN.md — Components, Glass Panel; Surfaces, level 1).
+ * A translucent fill graded top to bottom, a 34px blur of whatever lies
+ * behind, a 1px top highlight that reads as the lit edge, a 1px bottom
+ * shade, and a long low drop that only matters over a photograph. Where
+ * backdrop-filter is unsupported the panel falls back to the opaque wall.
  */
 .glass {
-  background: var(--color-glass-white);
+  /* Graded top to bottom: the fill fades to ~60% of itself at the foot.
+     Written as a stop past 100% rather than color-mix, which the CSS
+     pipeline rewrites into a nested @supports. */
+  background: linear-gradient(180deg, var(--color-glass-white) 0%, transparent 180%);
+  /* Unprefixed only: the CSS pipeline adds -webkit- for the targets that
+     need it, and when the prefixed form is ALSO authored it keeps only
+     that one — which Chromium does not honour, so the blur silently
+     vanished. */
+  backdrop-filter: blur(34px) saturate(1.6);
   border: 1px solid var(--color-glass-edge);
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 0 1px 0 var(--t-glass-highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    var(--shadow-glass);
+}
+/* No blur available: fall back to the opaque wall so text keeps its ground. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: var(--color-surface);
+  }
 }
 
 /*
- * Hero band background. Neutralised, not deleted: more than a dozen files
- * still reference this class name for hero bands, and Concept A bans
- * decorative gradients outright ("warmth comes from pictures, never from
- * paint"), so this is now a flat canvas fill rather than a value gradient.
+ * Hero band background (DESIGN.md — Elevation). The one paint in the
+ * system: a copper radial glow on the canvas, so a glass panel over a
+ * masthead has light to catch. Never a linear gradient across a surface.
  */
 .dawn-gradient {
-  background: var(--color-canvas);
+  background:
+    radial-gradient(circle at 85% 20%, var(--color-glow) 0%, transparent 62%),
+    var(--color-canvas);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -468,6 +486,12 @@ body {
   body {
     background: #ffffff;
     color: #000000;
+  }
+  .glass,
+  .card-surface {
+    background: #ffffff;
+    backdrop-filter: none;
+    box-shadow: none;
   }
 }
 

@@ -80,7 +80,7 @@ export default async function BinsPage() {
           route -- the same string twice on one 390px screen, the second time
           in the position a subtitle would occupy. */}
       <header className="mb-lg md:mb-xl">
-        <h1 className="font-serif text-heading-sm font-bold leading-[1.1] tracking-[-0.01em] text-primary md:text-heading">
+        <h1 className="font-serif text-heading-sm font-normal leading-[1.05] tracking-[-0.02em] text-ink md:text-heading">
           Bins
         </h1>
         <p className="mt-2xs text-body-sm font-medium tabular text-grey">

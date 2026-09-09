@@ -113,13 +113,17 @@ function FabInner() {
         aria-label={open ? "Close actions" : "Open actions"}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          // Squared off, not a capsule (DESIGN.md — Controls: the FAB moves
-          // off rounded-pill in a sharp system).
-          "pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-md bg-primary text-seal-ink transition-transform duration-200",
-          "hover:bg-primary-hover active:scale-95 focus-ring",
+          // A copper glass circle (DESIGN.md — Components): the blur and
+          // edge come from .glass, the copper tint from the inline style
+          // below because an unlayered recipe outranks a utility.
+          "glass pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-full text-ink transition-transform duration-200",
+          "active:scale-95 focus-ring",
           open && "rotate-45",
         )}
-        style={{ bottom: "calc(var(--chrome-tabbar-total) + var(--spacing-md))" }}
+        style={{
+          bottom: "calc(var(--chrome-tabbar-total) + var(--spacing-md) + var(--spacing-md))",
+          background: "color-mix(in srgb, var(--color-accent) 55%, transparent)",
+        }}
       >
         {/* Single icon that rotates 45° to become close. Avoids icon
             swap flicker. */}
@@ -176,9 +180,9 @@ function ActionPill({
   const inner = (
     <span
       className={cn(
-        // Opaque, not glass (Concept A bans blur/translucency), and squared
-        // off to match the trigger rather than staying a capsule.
-        "flex items-center gap-sm rounded-md border border-edge bg-surface px-md py-sm text-body-sm font-medium shadow-card transition-all duration-200",
+        // A glass capsule (DESIGN.md — Components): blur and edge from
+        // .glass, the label in ash, the icon in a copper-tinted circle.
+        "glass flex items-center gap-sm rounded-pill px-md py-sm text-body-sm font-medium transition-all duration-200",
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-2 opacity-0",
@@ -188,7 +192,7 @@ function ActionPill({
       <span className="text-ledger uppercase tracking-[0.06em] text-grey">
         {label}
       </span>
-      <span className="grid h-9 w-9 place-items-center rounded-md bg-primary/10 text-primary">
+      <span className="grid h-9 w-9 place-items-center rounded-full bg-accent/15 text-accent">
         <Icon className="h-4 w-4" strokeWidth={2} />
       </span>
     </span>
