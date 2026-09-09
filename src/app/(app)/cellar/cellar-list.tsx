@@ -345,27 +345,27 @@ export function CellarList({
   if (rows.length === 0) {
     return (
       <div className="rounded-card card-surface px-md py-2xl text-center">
-        <p className="font-serif text-body-lg font-semibold text-ink">No wines in your cellar yet.</p>
+        <p className="font-serif text-body-lg font-normal text-ink">No wines in your cellar yet.</p>
         <p className="mt-xs text-body-sm text-grey">
           Scan an invoice, photograph a bottle, or import a spreadsheet to start building your cellar.
         </p>
         <div className="mt-md flex flex-col items-center gap-sm">
           <Link
             href="/scan"
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-md text-body-sm font-medium text-seal-ink hover:bg-primary-hover"
+            className="inline-flex min-h-11 items-center justify-center rounded-pill bg-primary px-md text-body-sm font-semibold text-seal-ink hover:bg-primary-hover"
           >
             Scan an invoice →
           </Link>
           <div className="flex flex-wrap items-center justify-center gap-sm">
             <Link
               href="/scan?mode=bottle"
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
+              className="inline-flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
             >
               Scan a bottle
             </Link>
             <Link
               href="/import"
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
+              className="inline-flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
             >
               Import CSV or Excel
             </Link>
@@ -406,7 +406,7 @@ export function CellarList({
           <button
             type="button"
             onClick={onResetFilters}
-            className="mt-sm inline-flex min-h-11 items-center rounded-md border border-edge bg-surface px-md text-ledger font-medium text-ink hover:bg-wash focus-ring"
+            className="mt-sm inline-flex min-h-11 items-center rounded-pill border border-rule-strong bg-transparent px-md text-ledger font-medium text-ink hover:bg-wash focus-ring"
           >
             Clear filters & search
           </button>
@@ -554,7 +554,7 @@ export function CellarList({
                 count: visibleCount + CELLAR_PAGE_SIZE,
               })
             }
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
+            className="inline-flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
           >
             Show {Math.min(CELLAR_PAGE_SIZE, filtered.length - visibleRows.length)} more · {visibleRows.length} of {filtered.length}
           </button>

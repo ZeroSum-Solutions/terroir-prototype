@@ -14,10 +14,10 @@ import { wineDisplayName } from "@/lib/wine-display-name";
 // no spread/savings columns since there's nothing to compare against.
 export function SingleSourcePriceTable({ wines }: { wines: WineComparison[] }) {
   return (
-    <div className="hidden overflow-hidden rounded-card card-surface md:block">
+    <div className="hidden md:block">
       <table className="w-full text-body-sm">
         <thead>
-          <tr className="bg-wash text-caption font-medium uppercase text-grey">
+          <tr className="border-y border-rule text-caption font-medium uppercase text-grey">
             <th scope="col" className="px-md py-sm text-left font-medium">Wine</th>
             <th scope="col" className="px-md py-sm text-left font-medium">Distributor</th>
             <th scope="col" className="px-md py-sm text-right font-medium">Unit cost</th>
@@ -32,13 +32,7 @@ export function SingleSourcePriceTable({ wines }: { wines: WineComparison[] }) {
             return (
               <tr
                 key={comp.wine.id}
-                className={`border-t border-dashed border-rule ${
-                  comp.variancePct != null && comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD
-                    ? "bg-risk-wash/25"
-                    : comp.variancePct != null && comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD
-                      ? "bg-ready-wash/15"
-                      : ""
-                }`}
+                className="border-b border-rule"
               >
                 <td className="px-md py-sm">
                   <div className="flex items-start gap-xs">
@@ -47,7 +41,7 @@ export function SingleSourcePriceTable({ wines }: { wines: WineComparison[] }) {
                       aria-label={`View ${comp.wine.producer} ${wineDisplayName(comp.wine.producer, comp.wine.name)} in cellar`}
                       className="group inline-block min-w-0 rounded-md focus-ring"
                     >
-                      <span className="font-serif text-body-lg font-medium text-ink group-hover:text-accent">
+                      <span className="font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                         {comp.wine.producer}
                       </span>
                       <span className="font-serif text-body-lg text-grey group-hover:text-accent">
@@ -80,11 +74,11 @@ export function SingleSourcePriceTable({ wines }: { wines: WineComparison[] }) {
                 <td className="px-md py-sm text-right tabular">
                   {comp.variancePct != null ? (
                     comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD ? (
-                      <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-risk-ink">
+                      <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-2xs text-caption font-medium uppercase text-risk-ink">
                         +{formatPct(comp.variancePct)}
                       </span>
                     ) : comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD ? (
-                      <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-ready-ink">
+                      <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-2xs text-caption font-medium uppercase text-ready-ink">
                         {formatPct(comp.variancePct)}
                       </span>
                     ) : (

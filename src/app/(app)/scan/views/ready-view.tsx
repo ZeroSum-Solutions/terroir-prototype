@@ -22,31 +22,39 @@ function RecentScansList({ scans }: RecentScansListProps) {
   if (scans.length === 0) return null;
   return (
     <section className="mt-2xl">
-      <div className="mb-md flex items-center justify-between"><h3 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">Recent scans</h3><Link href="/scans" className="inline-flex min-h-11 items-center gap-xs text-[11px] font-medium text-grey hover:text-accent focus-ring">View all<ArrowRight className="h-3 w-3" strokeWidth={2} /></Link></div>
-      <div className="grid grid-cols-1 gap-sm md:grid-cols-3 md:gap-md">
-        {scans.map((s) => (
+      <div className="mb-sm flex items-center justify-between"><h3 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">Recent scans</h3><Link href="/scans" className="inline-flex min-h-11 items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey hover:text-accent focus-ring">View all<ArrowRight className="h-3 w-3" strokeWidth={2} /></Link></div>
+      {/* Hairline index rows on the plain canvas (DESIGN.md — Index Row):
+          rows separate with a rule, never a gap. */}
+      <div className="overflow-hidden rounded-card card-surface">
+        {scans.map((s, i) => (
           <Link
             key={s.id}
             href={`/scan/${s.id}`}
-            className="block min-h-11 rounded-card card-surface p-md transition-colors hover:border-accent/40 focus-ring"
+            className={cn(
+              "flex min-h-11 items-center gap-md px-md py-sm transition-colors hover:bg-surface-raised focus-ring",
+              i > 0 && "border-t border-rule",
+            )}
           >
-            <div className="mb-sm flex items-center justify-between">
-              <TimeAgo iso={s.parsedAt} className="tabular text-[12px] text-grey" />
-              <div className="flex items-center gap-xs">
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                <TimeAgo iso={s.parsedAt} className="tabular" />
                 {s.hasImage && (
-                  <ImageIcon className="h-3 w-3 text-grey" strokeWidth={2} aria-label="Has invoice image" />
+                  <ImageIcon className="h-3 w-3" strokeWidth={1.9} aria-label="Has invoice image" />
                 )}
-                <span className={cn("tabular text-[12px]", accuracyColor(s.accuracy))}>{s.accuracy}%</span>
-              </div>
-            </div>
-            <div className="mb-xs text-[14px] font-medium text-ink">
-              {s.distributor}
-            </div>
-            <div className="flex items-center gap-xs text-[13px] text-grey">
-              <span>{s.items} wines</span>
-              <span aria-hidden className="text-grey">·</span>
-              <span className="tabular">${formatMoney(s.total)}</span>
-            </div>
+              </span>
+              <span className="mt-2xs block truncate font-serif text-body-lg text-ink">
+                {s.distributor}
+              </span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="tabular block text-body-lg text-ink">
+                ${formatMoney(s.total)}
+              </span>
+              <span className="mt-2xs block text-ledger text-grey">
+                <span className="tabular">{s.items}</span> wines ·{" "}
+                <span className={cn("tabular", accuracyColor(s.accuracy))}>{s.accuracy}%</span>
+              </span>
+            </span>
           </Link>
         ))}
       </div>
@@ -159,33 +167,53 @@ export function ReadyView({
           aria-hidden="true"
           className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim p-lg"
         >
-          <div className="rounded-card border-2 border-dashed border-surface-sunken bg-surface px-xl py-lg text-center">
-            <p className="font-serif text-[20px] text-ink">
+          <div className="glass rounded-card px-xl py-lg text-center">
+            <p className="font-serif text-subheading text-ink">
               {isBottle ? "Drop the label photo" : "Drop to scan"}
             </p>
-            <p className="mt-xs text-[13px] text-grey">
-              {isBottle ? "JPG or PNG" : "JPG, PNG, PDF \u2014 or a .csv/.xlsx cellar list"}
+            <p className="mt-xs text-body-sm text-ink-soft">
+              {isBottle ? "JPG or PNG" : "JPG, PNG, PDF — or a .csv/.xlsx cellar list"}
             </p>
           </div>
         </div>
       )}
 
-      {/* Mode toggle */}
-      <div className="mb-lg flex items-center justify-center">
-        <div className="inline-flex rounded-pill border border-rule bg-wash p-0.5">
+      {/* SCAN-09's search bar moved to the global palette (P1 slice 2c):
+          with no route-local search declared on this page, the palette's "/"
+          shortcut now reaches it from /scan. */}
+
+      {/* Masthead (DESIGN.md - Components, Masthead). No photograph on this
+          route: the copper glow is the paint, and the eyebrow carries the
+          section and the mode the switch below sets. */}
+      <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-2xl">
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+          Scan &middot; {isBottle ? "Bottle" : "Invoice"}
+        </p>
+        <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
+          {isBottle ? "Scan a bottle label" : "Scan an invoice"}
+        </h1>
+        <p className="mt-sm max-w-[52ch] text-body text-ink-soft">
+          {isBottle
+            ? "Photograph a wine label. We'll identify the wine in a few seconds."
+            : "Parsed into inventory in about 20 seconds."}
+        </p>
+      </header>
+
+      {/* Mode switch - a glass segmented pill. The size token lives on the
+          wrapper so cn() never has to choose between a size and a colour. */}
+      <div className="mb-lg flex justify-center">
+        <div className="glass inline-flex rounded-pill p-3xs text-control">
           <button
             type="button"
             onClick={() => onModeChange("invoice")}
             disabled={disabled}
             aria-pressed={!isBottle}
             className={cn(
-              "flex min-h-11 items-center gap-xs rounded-pill px-md py-sm text-[13px] font-medium transition-colors focus-ring",
-              !isBottle
-                ? "bg-ink text-on-inverse"
-                : "text-grey hover:text-ink",
+              "flex min-h-11 items-center gap-xs rounded-pill px-md font-medium transition-colors focus-ring",
+              !isBottle ? "bg-primary text-seal-ink" : "text-grey hover:text-ink",
             )}
           >
-            <ScanLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            <ScanLine className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
             Invoice
           </button>
           <button
@@ -194,54 +222,37 @@ export function ReadyView({
             disabled={disabled}
             aria-pressed={isBottle}
             className={cn(
-              "flex min-h-11 items-center gap-xs rounded-pill px-md py-sm text-[13px] font-medium transition-colors focus-ring",
-              isBottle
-                ? "bg-ink text-on-inverse"
-                : "text-grey hover:text-ink",
+              "flex min-h-11 items-center gap-xs rounded-pill px-md font-medium transition-colors focus-ring",
+              isBottle ? "bg-primary text-seal-ink" : "text-grey hover:text-ink",
             )}
           >
-            <Wine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            <Wine className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
             Bottle
           </button>
         </div>
       </div>
 
-      {/* SCAN-09's search bar moved to the global palette (P1 slice 2c):
-          with no route-local search declared on this page, the palette's "/"
-          shortcut now reaches it from /scan. */}
-
-      <header className="mb-lg md:mb-xl">
-        <h1 className="font-serif text-heading-sm text-ink md:text-heading">
-          {isBottle ? "Scan a bottle label" : "Scan an invoice"}
-        </h1>
-        <p className="mt-xs text-[14px] text-grey md:text-[15px]">
-          {isBottle
-            ? "Photograph a wine label. We'll identify the wine in a few seconds."
-            : "Parsed into inventory in about 20 seconds."}
-        </p>
-      </header>
-
       {savedResult && (
-        <div className="mb-lg flex items-center justify-between rounded-card shadow-card border border-rule bg-ready-wash px-md py-sm">
+        <div className="glass mb-lg flex items-center justify-between gap-sm rounded-card px-md py-sm">
           <div className="flex items-center gap-sm">
-            <Check className="h-4 w-4 text-ready-ink" strokeWidth={2.5} aria-hidden="true" />
-            <span role="status" aria-live="polite" className="text-[14px] text-ink">
+            <Check className="h-4 w-4 shrink-0 text-ready-ink" strokeWidth={2} aria-hidden="true" />
+            <span role="status" aria-live="polite" className="text-body-sm text-ink">
               Saved {savedResult.itemCount} {savedResult.itemCount === 1 ? "item" : "items"} to inventory ({savedResult.wineCount} distinct {savedResult.wineCount === 1 ? "wine" : "wines"})
             </span>
           </div>
-          <div className="flex items-center gap-sm">
+          <div className="flex shrink-0 items-center gap-xs">
             <Link
               href="/lists"
               onClick={onDismissSaved}
-              className="flex min-h-11 items-center gap-xs rounded-pill px-sm py-xs text-[13px] font-medium text-risk-ink hover:bg-risk-wash focus-ring"
+              className="flex min-h-11 items-center gap-xs rounded-pill px-sm text-caption font-medium uppercase tracking-[0.18em] text-accent hover:text-ink focus-ring"
             >
-              <ListOrdered className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+              <ListOrdered className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
               Add to wine list
             </Link>
             <button
               type="button"
               onClick={onDismissSaved}
-              className="min-h-11 text-[13px] text-grey hover:text-ink focus-ring"
+              className="min-h-11 px-xs text-caption font-medium uppercase tracking-[0.18em] text-grey hover:text-ink focus-ring"
             >
               Dismiss
             </button>
@@ -249,29 +260,38 @@ export function ReadyView({
         </div>
       )}
 
+      {/* The capture band: a full-bleed vault ground with a copper reticle
+          drawn on it - four corner brackets and one scan line. */}
       <button
         type="button"
         onClick={() => beginCapture(cameraRef)}
         disabled={disabled}
-        className="flex min-h-11 w-full flex-col items-center justify-center rounded-card border-2 border-dashed border-rule-strong bg-wash px-lg py-2xl text-center transition-colors hover:border-risk-ink/40 hover:bg-risk-wash/40 focus-ring md:py-3xl"
+        className="relative flex min-h-11 w-full flex-col items-center justify-center overflow-hidden rounded-card bg-surface-sunken px-lg py-2xl text-center transition-colors hover:bg-canvas focus-ring md:py-3xl"
       >
-        <span className="mb-md flex h-14 w-14 items-center justify-center rounded-full bg-primary text-seal-ink md:h-16 md:w-16">
+        <span aria-hidden="true" className="pointer-events-none absolute inset-md">
+          <span className="absolute left-0 top-0 h-[26px] w-[26px] rounded-tl-lg border-l border-t border-accent/70" />
+          <span className="absolute right-0 top-0 h-[26px] w-[26px] rounded-tr-lg border-r border-t border-accent/70" />
+          <span className="absolute bottom-0 left-0 h-[26px] w-[26px] rounded-bl-lg border-b border-l border-accent/70" />
+          <span className="absolute bottom-0 right-0 h-[26px] w-[26px] rounded-br-lg border-b border-r border-accent/70" />
+          <span className="absolute inset-x-lg top-1/2 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+        </span>
+        <span className="relative mb-md flex h-14 w-14 items-center justify-center rounded-full bg-primary text-seal-ink md:h-16 md:w-16">
           <Camera className="h-6 w-6 md:h-7 md:w-7" strokeWidth={1.75} aria-hidden="true" />
         </span>
-        <h2 className="font-serif text-[20px] text-ink md:text-[22px]">
+        <h2 className="relative font-serif text-subheading font-normal text-ink md:text-heading-sm">
           {isBottle ? "Tap to photograph label" : "Tap to photograph"}
         </h2>
-        {/* The zone is a camera target — advertising PDF formats on it was
+        {/* The zone is a camera target - advertising PDF formats on it was
             dishonest (a camera can't capture a PDF); file specs live on the
             upload affordance below (Kimi audit 2026-08-26). */}
-        <p className="mt-xs text-[13px] text-grey">
+        <p className="relative mt-xs text-body-sm text-grey">
           {isBottle
             ? "One label per photo"
             : "You'll review parsed lines before they reach the cellar"}
         </p>
       </button>
 
-      {/* One camera entrance (the zone above) + one upload entrance — the
+      {/* One camera entrance (the zone above) + one upload entrance - the
           old "Take photo" button duplicated the zone exactly. */}
       <div className="mt-md md:mt-lg">
         <div className="flex gap-sm">
@@ -279,14 +299,14 @@ export function ReadyView({
             type="button"
             onClick={() => beginCapture(fileRef)}
             disabled={disabled}
-            className="flex h-12 w-full flex-1 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+            className="flex h-12 w-full flex-1 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
-            <FileUp className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            <FileUp className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
             Upload file
           </button>
           {/* The phone's only paste. A keyboard paste arrives as an event and
               needs no button, but a phone has no keyboard, and its long-press
-              Paste menu appears only over an editable field — so asking the
+              Paste menu appears only over an editable field - so asking the
               clipboard directly is the sole way to paste a photo here.
               Hidden where the browser cannot be asked. */}
           {canPasteFromClipboard && (
@@ -294,19 +314,19 @@ export function ReadyView({
               type="button"
               onClick={() => void handlePaste()}
               disabled={disabled}
-              className="flex h-12 shrink-0 items-center justify-center gap-sm rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+              className="flex h-12 shrink-0 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
             >
-              <ClipboardPaste className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              <ClipboardPaste className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
               Paste
             </button>
           )}
         </div>
         {pasteHint && (
-          <p role="status" className="mt-xs text-center text-[12px] text-accent">
+          <p role="status" className="mt-sm text-center text-ledger text-accent">
             {pasteHint}
           </p>
         )}
-        <p className="mt-xs text-center text-[12px] text-grey">
+        <p className="mt-sm text-center text-ledger text-grey">
           {isBottle
             ? "JPG or PNG · up to 20MB · drag one in or paste it"
             : "JPG, PNG, or PDF · up to 10MB · multi-page invoices welcome · drag them in or paste them · a .csv or .xlsx cellar list opens in Import"}

@@ -108,7 +108,7 @@ export function SnoozedAlertsCard({
   }
 
   return (
-    <article className="rounded-card card-surface p-md md:p-lg">
+    <article className="border-y border-rule py-md">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -116,10 +116,10 @@ export function SnoozedAlertsCard({
         className="flex w-full items-center justify-between rounded-sm text-left focus-ring"
       >
         <div>
-          <h3 className="font-serif text-[18px] text-ink">
+          <h3 className="font-serif text-body-lg font-normal text-ink">
             Snoozed alerts
           </h3>
-          <p className="mt-2xs text-[12px] text-grey">
+          <p className="mt-2xs text-ledger text-grey">
             {entries.length} active snooze{entries.length === 1 ? "" : "s"}.
             Tap to view + unsnooze early.
           </p>
@@ -149,16 +149,16 @@ export function SnoozedAlertsCard({
                 <div className="min-w-0 flex-1">
                   <Link
                     href={metricHref("wine", e.wineId)}
-                    className="font-serif text-[17px] font-medium text-ink transition-colors hover:text-accent"
+                    className="font-serif text-body-lg font-normal text-ink transition-colors hover:text-accent"
                   >
                     {wineTitle(e.producer, e.name, ", ")}
                   </Link>
                   {e.vintage && (
-                    <span className="ml-xs text-[11px] font-light text-grey">
+                    <span className="ml-xs text-ledger text-grey">
                       {e.vintage}
                     </span>
                   )}
-                  <div className="mt-2xs flex items-center gap-xs text-[11px] text-grey">
+                  <div className="mt-2xs flex items-center gap-xs text-ledger text-grey">
                     {e.kind === "drink-window" ? (
                       <>
                         <Clock
@@ -187,7 +187,7 @@ export function SnoozedAlertsCard({
                     type="button"
                     disabled={isBusy}
                     onClick={() => onUnsnooze(e.wineId, e.kind)}
-                    className="inline-flex min-h-11 items-center gap-2xs rounded-pill border border-edge bg-surface px-sm text-[12px] font-medium text-ink hover:bg-wash focus-ring disabled:opacity-60"
+                    className="inline-flex min-h-11 items-center gap-2xs rounded-pill border border-rule-strong bg-transparent px-sm text-ledger font-medium text-ink hover:bg-surface-raised focus-ring disabled:opacity-60"
                   >
                     <RotateCcw
                       className="h-3 w-3"
@@ -204,7 +204,7 @@ export function SnoozedAlertsCard({
       )}
 
       {errorMsg && (
-        <p role="alert" className="mt-sm text-[12px] text-risk-ink">
+        <p role="alert" className="mt-sm text-ledger text-risk-ink">
           {errorMsg}
         </p>
       )}

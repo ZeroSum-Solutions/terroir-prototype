@@ -31,17 +31,19 @@ export function TemplatePicker({
           disabled={disabled}
           aria-pressed={current === t}
           className={cn(
-            "flex min-h-11 items-center justify-between rounded-pill px-sm py-xs text-[13px] transition-colors focus-ring disabled:pointer-events-none",
+            "flex min-h-11 items-center justify-between rounded-pill border px-md py-xs transition-colors focus-ring disabled:pointer-events-none",
             current === t
-              ? "bg-wash font-medium text-ink"
-              : "text-grey hover:bg-wash hover:text-ink",
+              ? "border-accent font-medium text-accent"
+              : "border-transparent text-grey hover:text-ink",
           )}
         >
-          <span>{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+          <span className="text-control">
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </span>
           {current === t && (
             <Check
               className="h-3.5 w-3.5 text-accent"
-              strokeWidth={2.5}
+              strokeWidth={1.9}
             />
           )}
         </button>

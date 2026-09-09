@@ -59,16 +59,27 @@ export interface WineThumbProps {
   producer: string | null | undefined;
   name: string | null | undefined;
   colour?: string | null;
-  /** Rendered size in px. The image is requested at 2× for retina. */
+  /** Rendered WIDTH in px; the box is 2:3 portrait. Requested at 2× for retina. */
   size: number;
   className?: string;
 }
 
+/** A bottle is taller than it is wide (DESIGN.md — Imagery: "Thumbnails are
+ *  2:3 portrait at radius `lg`, never square"). A square box cropped or
+ *  letterboxed every bottle it held. */
+export function thumbHeight(size: number): number {
+  return Math.round(size * 1.5);
+}
+
 export function WineThumb({ src, producer, name, colour, size, className }: WineThumbProps) {
   const referenceNote = wineImageReferenceNote(src);
-  // Sharp geometry, small radii (DESIGN.md — Controls): a thumbnail this
-  // small reads as a chip, not a card, so it takes the small radius.
-  const shared = cn("shrink-0 rounded-sm object-contain", className);
+  const height = thumbHeight(size);
+  // 2:3 portrait at the tile radius with a glass hairline, so a row of
+  // bottles reads as a row of bottles (DESIGN.md — Imagery, Index Row).
+  const shared = cn(
+    "shrink-0 rounded-lg border border-glass-edge object-contain",
+    className,
+  );
 
   if (src) {
     return (
@@ -77,9 +88,9 @@ export function WineThumb({ src, producer, name, colour, size, className }: Wine
         alt={referenceNote ?? ""}
         title={referenceNote ?? undefined}
         width={size * 2}
-        height={size * 2}
+        height={height * 2}
         unoptimized
-        style={{ width: size, height: size }}
+        style={{ width: size, height }}
         className={shared}
       />
     );
@@ -92,15 +103,14 @@ export function WineThumb({ src, producer, name, colour, size, className }: Wine
     <span
       aria-hidden="true"
       data-wine-image-fallback="true"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }}
+      style={{ width: size, height, fontSize: Math.round(size * 0.34) }}
       className={cn(
         shared,
         tint.surface,
         tint.ink,
-        // Confident, not apologetic: the same heavy grotesque as the
-        // headings, tight-tracked rather than loosened, so a no-photo row
-        // reads as a deliberate mark and not a softened placeholder.
-        "flex items-center justify-center font-serif font-bold leading-none tracking-[-0.01em]",
+        // Confident, not apologetic: the named face at its ordinary weight —
+        // authority comes from size, never from bold (DESIGN.md — Typography).
+        "flex items-center justify-center font-serif leading-none tracking-[-0.01em]",
       )}
     >
       {initials}

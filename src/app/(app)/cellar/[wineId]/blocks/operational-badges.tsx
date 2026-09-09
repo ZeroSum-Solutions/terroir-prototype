@@ -31,10 +31,10 @@ export function OperationalBadges({ badges }: { badges: Sourced<Badge[]> }) {
                 aria-expanded={isOpen}
                 aria-controls={`badge-rule-${badge.kind}`}
                 onClick={() => setOpen(isOpen ? null : badge.kind)}
-                className={`min-h-11 rounded-pill border px-md text-body-sm transition-colors ${
+                className={`focus-ring min-h-11 rounded-pill border px-md text-body-sm transition-colors ${
                   isOpen
-                    ? "border-ink bg-ink text-canvas"
-                    : "border-rule bg-surface text-ink-soft hover:border-ink"
+                    ? "border-accent bg-accent/15 text-ink"
+                    : "border-rule-strong bg-transparent text-ink-soft hover:border-accent"
                 }`}
               >
                 {badge.label}

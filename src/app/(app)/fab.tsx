@@ -51,16 +51,32 @@ const ACTIONS: Action[] = [
 // the FAB would otherwise be serving.
 const HIDE_ON: ReadonlyArray<string> = [
   "/scan",
+  "/scan-bottle",
+  "/scans",
   "/login",
   "/atlas",
   "/import",
   "/get-started",
-  "/cellar/reconcile",
   "/bins",
   "/insights",
+  "/lists",
+  "/team",
+  "/reconcile-queue",
+  "/price-comparison",
+  "/catalogue",
 ];
 
+/**
+ * The speed-dial lives where the cellar lives: on the cellar index itself.
+ * Every page that carries its own primary action (a bottom rail, a
+ * "Create …" pill, a save bar) hides it, because a second floating circle
+ * beside a page's own action reads as a competing primary and, at 390px,
+ * lands on top of the rail (Gemini audit, 2026-09-09). Cellar sub-routes —
+ * the wine page, open bottles, reconcile, config — all carry their own
+ * actions, so anything under /cellar/ hides it too.
+ */
 function shouldHide(pathname: string): boolean {
+  if (pathname.startsWith("/cellar/")) return true;
   return HIDE_ON.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

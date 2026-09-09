@@ -258,12 +258,12 @@ export function SessionStep({
 
   if (notFound) {
     return (
-      <div className="rounded-card card-surface p-lg">
-        <p className="text-[14px] text-ink">This import session could not be found.</p>
+      <div className="glass rounded-card p-lg">
+        <p className="text-control text-ink">This import session could not be found.</p>
         <button
           type="button"
           onClick={onDone}
-          className="mt-md min-h-11 rounded-pill px-lg text-[14px] font-medium text-grey underline underline-offset-4 hover:text-ink"
+          className="mt-md min-h-11 rounded-pill px-lg text-control font-medium text-accent underline underline-offset-4 hover:text-ink"
         >
           Start a new import
         </button>
@@ -273,15 +273,15 @@ export function SessionStep({
 
   if (!progress && loadError) {
     return (
-      <div className="rounded-card card-surface p-lg">
-        <p role="alert" className="flex items-start gap-xs text-[14px] text-risk-ink">
+      <div className="glass rounded-card p-lg">
+        <p role="alert" className="flex items-start gap-xs text-control text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {loadError}
         </p>
         <button
           type="button"
           onClick={() => void refresh()}
-          className="mt-md min-h-11 rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+          className="mt-md min-h-11 rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink hover:bg-primary-hover focus-ring"
         >
           Retry
         </button>
@@ -291,7 +291,7 @@ export function SessionStep({
 
   if (!progress) {
     return (
-      <div className="flex min-h-11 items-center justify-center gap-xs rounded-card card-surface p-lg text-[14px] text-grey">
+      <div className="glass flex min-h-11 items-center justify-center gap-xs rounded-card p-lg text-control text-grey">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         Loading session…
       </div>
@@ -304,16 +304,16 @@ export function SessionStep({
   });
 
   return (
-    <div className="rounded-card card-surface p-lg">
+    <div className="glass rounded-card p-lg">
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-[20px] text-ink">{label}</h2>
-        <span className="inline-flex items-center gap-2xs rounded-pill bg-wash px-sm py-2xs text-caption font-medium text-ink">
+        <h2 className="font-serif text-subheading font-normal text-ink">{label}</h2>
+        <span className="inline-flex items-center gap-2xs rounded-pill bg-peak-wash px-sm py-2xs text-caption font-medium uppercase text-peak-ink">
           {progress.status === "completed" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
           {progress.status === "in_progress" ? "In progress" : progress.status === "completed" ? "Completed" : "Reverted"}
         </span>
       </div>
 
-      <dl className="mt-md grid grid-cols-2 gap-sm text-[13px]">
+      <dl className="mt-md grid grid-cols-2 gap-sm text-body-sm">
         <MiniStat label="Total rows" value={progress.totals.total} />
         <MiniStat label="Applied" value={progress.totals.applied} />
         <MiniStat label="Needs resolution" value={progress.totals.pending} />
@@ -323,7 +323,7 @@ export function SessionStep({
       <SessionChunkList progress={progress} skippedChunks={skippedChunks} />
 
       {actionError && (
-        <p role="alert" className="mt-md flex items-start gap-xs text-[13px] text-risk-ink">
+        <p role="alert" className="mt-md flex items-start gap-xs text-body-sm text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {actionError}
         </p>
@@ -345,7 +345,7 @@ export function SessionStep({
             type="button"
             disabled={applying}
             onClick={() => void applyAllChunks()}
-            className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {applying ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {applying
@@ -358,7 +358,7 @@ export function SessionStep({
           <button
             type="button"
             onClick={() => setRevertDialogOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+            className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
             Revert this import
@@ -368,7 +368,7 @@ export function SessionStep({
         <button
           type="button"
           onClick={onDone}
-          className="min-h-11 rounded-pill px-lg text-[14px] font-medium text-grey underline underline-offset-4 hover:text-ink focus-ring"
+          className="min-h-11 rounded-pill px-lg text-control font-medium text-accent underline underline-offset-4 hover:text-ink focus-ring"
         >
           Start a new import
         </button>
@@ -391,7 +391,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <dt className="text-caption text-grey">{label}</dt>
-      <dd className="tabular text-[20px] font-medium text-ink">{value}</dd>
+      <dd className="tabular text-subheading font-medium text-ink">{value}</dd>
     </div>
   );
 }

@@ -8,7 +8,7 @@
  */
 export function CorpusUnavailableNote() {
   return (
-    <p className="mt-xl rounded-card border border-rule bg-surface-sunken px-lg py-md text-body-sm text-grey">
+    <p className="card-surface mt-xl rounded-card px-lg py-md text-body-sm text-grey">
       The reference corpus couldn&rsquo;t be reached, so taste structure, grapes
       and pairings aren&rsquo;t shown for this bottle. That&rsquo;s a problem at
       our end rather than a gap in the reference — try again shortly.
@@ -32,7 +32,7 @@ export function CorpusUnavailableNote() {
 export function NoProfileNote({ producer }: { producer: string }) {
   const subject = producer.trim();
   return (
-    <p className="mt-xl rounded-card border border-rule bg-surface-sunken px-lg py-md text-body-sm text-grey">
+    <p className="card-surface mt-xl rounded-card px-lg py-md text-body-sm text-grey">
       No reference entry matched {subject === "" ? "this wine" : subject}{" "}
       closely enough to trust, so taste structure, grapes and pairings
       aren&rsquo;t shown for this bottle.

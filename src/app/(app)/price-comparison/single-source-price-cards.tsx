@@ -14,21 +14,13 @@ import { wineDisplayName } from "@/lib/wine-display-name";
 // distributor — the small-screen counterpart to SingleSourcePriceTable.
 export function SingleSourcePriceCards({ wines }: { wines: WineComparison[] }) {
   return (
-    <div className="flex flex-col gap-sm md:hidden">
+    <div className="border-t border-rule md:hidden">
       {wines.map((comp) => {
         const latest = pickMostRecent(comp.prices);
         const latestDate = formatInvoiceDate(latest?.invoiceDate ?? null);
         return (
-          <div
-            key={comp.wine.id}
-            className={`rounded-card p-md ${
-              comp.variancePct != null && comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD
-                ? "border border-risk-ink/30 bg-risk-wash/20"
-                : comp.variancePct != null && comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD
-                  ? "border border-ready/30 bg-ready-wash/10"
-                  : "card-surface"
-            }`}
-          >
+          // A hairline index row; the variance seal carries the state.
+          <div key={comp.wine.id} className="border-b border-rule py-md">
             <div className="flex items-start justify-between gap-sm">
               <div className="flex items-start gap-xs min-w-0 flex-1">
                 <Link
@@ -36,7 +28,7 @@ export function SingleSourcePriceCards({ wines }: { wines: WineComparison[] }) {
                   aria-label={`View ${comp.wine.producer} ${wineDisplayName(comp.wine.producer, comp.wine.name)} in cellar`}
                   className="group min-w-0 flex-1 rounded-md focus-ring"
                 >
-                  <div className="font-serif text-body-lg font-medium text-ink group-hover:text-accent">
+                  <div className="font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                     {wineDisplayName(comp.wine.producer, comp.wine.name)}
                     {comp.wine.vintage ? ` ${comp.wine.vintage}` : ""}
                   </div>
@@ -62,7 +54,7 @@ export function SingleSourcePriceCards({ wines }: { wines: WineComparison[] }) {
                   </span>
                   {comp.variancePct != null && Math.abs(comp.variancePct) > VARIANCE_HIGHLIGHT_THRESHOLD && (
                     <span
-                      className={`rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${
+                      className={`rounded-pill px-sm py-2xs text-caption font-medium uppercase ${
                         comp.variancePct > 0
                           ? "bg-risk-wash text-risk-ink"
                           : "bg-ready-wash text-ready-ink"

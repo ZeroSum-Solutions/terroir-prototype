@@ -105,7 +105,7 @@ export function PriceStepper({
           }}
           // 17px keeps iOS from zooming the page on focus; 14px once there is
           // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
-          className="min-h-11 w-full rounded-md border-2 border-mark bg-surface py-2xs pl-md pr-xs text-right tabular text-body-lg text-ink focus-ring md:text-control"
+          className="min-h-11 w-full rounded-md border-2 border-accent bg-surface-sunken py-2xs pl-md pr-xs text-right tabular text-body-lg text-ink focus-ring md:text-control"
         />
       </div>
     );
@@ -113,7 +113,7 @@ export function PriceStepper({
 
   return (
     <div>
-      <div className="flex items-center justify-end overflow-hidden rounded-pill border border-edge bg-surface">
+      <div className="flex items-center justify-end overflow-hidden rounded-pill border border-rule-strong bg-surface-sunken">
         <button
           type="button"
           aria-label={`Decrease ${label}`}
@@ -121,7 +121,7 @@ export function PriceStepper({
           onClick={() => step(-1)}
           className="flex h-11 w-11 shrink-0 items-center justify-center text-grey hover:text-ink focus-ring-inset disabled:text-grey/40"
         >
-          <Minus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
+          <Minus className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -131,7 +131,7 @@ export function PriceStepper({
             setEditing(true);
           }}
           className={cn(
-            "min-h-11 flex-1 px-2xs text-center tabular text-control transition-colors hover:bg-wash",
+            "min-h-11 flex-1 px-2xs text-center tabular text-control transition-colors hover:text-accent",
             isSuggestion
               ? "italic text-grey"
               : muted
@@ -153,11 +153,11 @@ export function PriceStepper({
           onClick={() => step(1)}
           className="flex h-11 w-11 shrink-0 items-center justify-center text-grey hover:text-ink focus-ring-inset disabled:text-grey/40"
         >
-          <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
+          <Plus className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
         </button>
       </div>
       {isSuggestion && (
-        <div className="mt-2xs text-center text-micro uppercase text-grey">
+        <div className="mt-2xs text-center text-micro uppercase tracking-[0.12em] text-accent">
           Suggested
         </div>
       )}

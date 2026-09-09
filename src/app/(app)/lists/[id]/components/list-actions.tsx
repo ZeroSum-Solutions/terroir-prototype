@@ -66,11 +66,11 @@ export function ListActions({
   className?: string;
 }) {
   const secondaryClassName = cn(
-    "items-center gap-xs rounded-pill border border-rule bg-canvas px-sm text-[13px] font-medium text-ink hover:bg-wash focus-ring",
+    "items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-sm text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring",
     "inline-flex min-h-11 md:px-md",
   );
   const publishClassName = cn(
-    "items-center gap-xs rounded-pill bg-primary px-sm text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring",
+    "items-center gap-xs rounded-pill bg-primary px-sm text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring",
     "inline-flex min-h-11 md:px-md",
   );
 
@@ -121,12 +121,12 @@ export function ListActions({
           rel="noopener noreferrer"
           className={secondaryClassName}
         >
-          <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+          <Eye className="h-3.5 w-3.5" strokeWidth={1.9} />
           <span>Preview</span>
         </a>
         {canManage && (
           <button type="button" onClick={onPublish} className={publishClassName}>
-            <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+            <Share2 className="h-3.5 w-3.5" strokeWidth={1.9} />
             <span>Publish</span>
           </button>
         )}
@@ -144,9 +144,9 @@ export function ListActions({
         className={cn(secondaryClassName, "disabled:opacity-60")}
       >
         {generatingPdf ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.9} />
         ) : (
-          <Download className="h-3.5 w-3.5" strokeWidth={2} />
+          <Download className="h-3.5 w-3.5" strokeWidth={1.9} />
         )}
         <span>{downloadLabel}</span>
       </button>
@@ -155,7 +155,7 @@ export function ListActions({
         download="toast-import.csv"
         className={secondaryClassName}
       >
-        <FileSpreadsheet className="h-3.5 w-3.5" strokeWidth={2} />
+        <FileSpreadsheet className="h-3.5 w-3.5" strokeWidth={1.9} />
         <span>Toast Export</span>
       </a>
       <a
@@ -163,7 +163,7 @@ export function ListActions({
         download
         className={secondaryClassName}
       >
-        <FileText className="h-3.5 w-3.5" strokeWidth={2} />
+        <FileText className="h-3.5 w-3.5" strokeWidth={1.9} />
         <span>CSV</span>
       </a>
       <a
@@ -172,7 +172,7 @@ export function ListActions({
         rel="noopener noreferrer"
         className={secondaryClassName}
       >
-        <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+        <Eye className="h-3.5 w-3.5" strokeWidth={1.9} />
         <span>Preview</span>
       </a>
       <a
@@ -181,18 +181,18 @@ export function ListActions({
         rel="noopener noreferrer"
         className={secondaryClassName}
       >
-        <Printer className="h-3.5 w-3.5" strokeWidth={2} />
+        <Printer className="h-3.5 w-3.5" strokeWidth={1.9} />
         <span>Print</span>
       </a>
       {isPublished && slug && (
         <button type="button" onClick={onCopyUrl} className={secondaryClassName}>
-          <Copy className="h-3.5 w-3.5" strokeWidth={2} />
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.9} />
           <span>Copy URL</span>
         </button>
       )}
       {canManage && (
         <button type="button" onClick={onPublish} className={publishClassName}>
-          <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+          <Share2 className="h-3.5 w-3.5" strokeWidth={1.9} />
           <span>Publish</span>
         </button>
       )}

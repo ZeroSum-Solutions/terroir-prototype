@@ -124,7 +124,7 @@ export function CellarControlBar({
           {openBottleCount > 0 && (
             <Link
               href="/cellar/open"
-              className="hidden h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-pill border border-edge px-md text-ledger font-medium text-ink hover:bg-surface/60 focus-ring sm:inline-flex"
+              className="glass hidden h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-pill px-md text-ledger font-medium text-ink hover:bg-surface/60 focus-ring sm:inline-flex"
             >
               Open bottles {openBottleCount}
             </Link>
@@ -134,7 +134,7 @@ export function CellarControlBar({
             <button
               type="button"
               onClick={onReconcile}
-              className="hidden min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-pill bg-primary px-md text-ledger font-medium text-seal-ink hover:bg-primary-hover focus-ring sm:inline-flex"
+              className="hidden min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-pill bg-primary px-md text-ledger font-semibold text-seal-ink hover:bg-primary-hover focus-ring sm:inline-flex"
             >
               {reconcileLabel} →
             </button>
@@ -143,7 +143,7 @@ export function CellarControlBar({
           <button
             type="button"
             onClick={onOpenFilters}
-            className="inline-flex h-11 shrink-0 items-center gap-xs whitespace-nowrap rounded-pill border border-edge bg-surface px-sm text-ledger font-medium text-ink hover:bg-wash focus-ring"
+            className="glass inline-flex h-11 shrink-0 items-center gap-xs whitespace-nowrap rounded-pill px-sm text-ledger font-medium text-ink focus-ring"
           >
             <SlidersHorizontal className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             Filters
@@ -190,7 +190,7 @@ function ViewToggle({
       type="button"
       onClick={() => onViewChange(next)}
       aria-label={next === "grid" ? "Grid view" : "List view"}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-edge bg-surface text-ink-soft transition-colors hover:bg-wash focus-ring"
+      className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft transition-colors hover:text-ink focus-ring"
     >
       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
     </button>

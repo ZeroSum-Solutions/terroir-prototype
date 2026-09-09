@@ -17,10 +17,10 @@ import { wineDisplayName } from "@/lib/wine-display-name";
 // all of a wine's rows.
 export function ComparablePriceTable({ wines }: { wines: WineComparison[] }) {
   return (
-    <div className="hidden md:block overflow-hidden rounded-card card-surface">
+    <div className="hidden md:block">
       <table className="w-full text-body-sm">
         <thead>
-          <tr className="bg-wash text-caption font-medium uppercase text-grey">
+          <tr className="border-y border-rule text-caption font-medium uppercase text-grey">
             <th scope="col" className="px-md py-sm text-left font-medium">Wine</th>
             <th scope="col" className="px-md py-sm text-left font-medium">Distributor</th>
             <th scope="col" className="px-md py-sm text-right font-medium">Unit cost</th>
@@ -39,15 +39,7 @@ export function ComparablePriceTable({ wines }: { wines: WineComparison[] }) {
             return distPrices.map((price, i) => (
               <tr
                 key={`${comp.wine.id}-${price.distributor}-${i}`}
-                className={`border-t border-dashed border-rule ${
-                  price.unitCost === comp.cheapest
-                    ? "bg-ready-wash/40"
-                    : comp.variancePct != null && comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD
-                      ? "bg-risk-wash/25"
-                      : comp.variancePct != null && comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD
-                        ? "bg-ready-wash/15"
-                        : ""
-                }`}
+                className="border-b border-rule"
               >
                 {i === 0 ? (
                   <td className="px-md py-sm align-top" rowSpan={distPrices.length}>
@@ -64,7 +56,7 @@ export function ComparablePriceTable({ wines }: { wines: WineComparison[] }) {
                         aria-label={`View ${comp.wine.producer} ${wineDisplayName(comp.wine.producer, comp.wine.name)} in cellar`}
                         className="group block min-w-0 flex-1 rounded-md focus-ring"
                       >
-                        <div className="font-serif text-body-lg font-medium text-ink group-hover:text-accent">
+                        <div className="font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                           {comp.wine.producer}
                         </div>
                         <div className="text-grey group-hover:text-accent">
@@ -103,7 +95,7 @@ export function ComparablePriceTable({ wines }: { wines: WineComparison[] }) {
                 {i === 0 ? (
                   <td className="px-md py-sm text-right align-top" rowSpan={distPrices.length}>
                     {comp.spread >= 0.1 ? (
-                      <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-risk-ink">
+                      <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-2xs text-caption font-medium uppercase text-risk-ink">
                         {Math.round(comp.spread * 100)}% spread
                       </span>
                     ) : (
@@ -141,12 +133,12 @@ export function ComparablePriceTable({ wines }: { wines: WineComparison[] }) {
                   <td className="px-md py-sm text-right align-top tabular" rowSpan={distPrices.length}>
                     {comp.variancePct != null ? (
                       comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD ? (
-                        <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-risk-ink">
+                        <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-2xs text-caption font-medium uppercase text-risk-ink">
                           <TrendingUp className="h-3 w-3" strokeWidth={2.5} />
                           +{formatPct(comp.variancePct)}
                         </span>
                       ) : comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD ? (
-                        <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-ready-ink">
+                        <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-2xs text-caption font-medium uppercase text-ready-ink">
                           <TrendingDown className="h-3 w-3" strokeWidth={2.5} />
                           {formatPct(comp.variancePct)}
                         </span>

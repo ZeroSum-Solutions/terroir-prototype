@@ -54,29 +54,36 @@ export default async function ReconcilePage() {
 
   return (
     <section>
-      <header className="mb-lg flex items-center gap-sm">
-        <Link
-          href="/cellar"
-          className="flex h-[44px] w-[44px] items-center justify-center rounded-pill text-grey hover:bg-wash transition-colors"
-          aria-label="Back to cellar"
-        >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-serif text-heading-sm md:text-heading font-medium text-ink">Reconcile</h1>
-          <p className="text-[12px] text-grey tabular">
-            {reconcileItems.length} open bottle
-            {reconcileItems.length !== 1 ? "s" : ""} to verify
-          </p>
+      {/* Masthead (DESIGN.md — Components, Masthead) over the copper glow:
+          the count that used to be a second line under the title is now the
+          eyebrow, which is where the section and the tally belong. */}
+      <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-2xl">
+        <div className="flex items-start gap-sm">
+          <Link
+            href="/cellar"
+            className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft transition-colors hover:text-ink"
+            aria-label="Back to cellar"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={1.9} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+              Cellar ·{" "}
+              <span className="tabular">{reconcileItems.length}</span> to verify
+            </p>
+            <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:text-display">
+              Reconcile
+            </h1>
+          </div>
+          <Link
+            href="/cellar/reconcile/history"
+            aria-label="Reconciliation history"
+            className="glass flex min-h-11 shrink-0 items-center gap-xs rounded-pill px-sm text-control font-medium text-ink-soft transition-colors hover:text-ink"
+          >
+            <History className="h-4 w-4" strokeWidth={1.75} />
+            <span className="hidden sm:inline">History</span>
+          </Link>
         </div>
-        <Link
-          href="/cellar/reconcile/history"
-          aria-label="Reconciliation history"
-          className="flex min-h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-sm text-[13px] font-medium text-grey transition-colors hover:bg-wash hover:text-ink"
-        >
-          <History className="h-4 w-4" strokeWidth={1.5} />
-          <span className="hidden sm:inline">History</span>
-        </Link>
       </header>
 
       <ReconcileList

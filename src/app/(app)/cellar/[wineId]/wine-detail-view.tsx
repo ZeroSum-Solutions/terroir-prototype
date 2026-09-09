@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import type { HouseNote } from "@/domains/notes/note-list";
 import type { Badge } from "@/domains/wine-profile/badges";
 import type { HouseTaste } from "@/domains/wine-profile/resolve-house-profile";
@@ -76,26 +74,15 @@ export function WineDetailView({
       ? `${wine.producer} ${wineDisplayName(wine.producer, wine.name)}`
       : CORPUS_IMAGE_NOTE[corpusImage.kind];
 
-  const facets = [facts.country, facts.region, profile?.type ?? null, facts.varietal].filter(
-    (value): value is string => Boolean(value),
-  );
-
   return (
     <div className="bg-canvas">
-      <div className="mx-auto max-w-[1100px] px-lg pb-3xl">
-        <Link
-          href="/cellar"
-          className="inline-flex items-center gap-xs pt-lg text-caption uppercase text-grey transition-colors hover:text-accent"
-        >
-          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-          The cellar
-        </Link>
-
+      <div className="mx-auto max-w-[1100px] pb-3xl">
         <HeroSection
           wine={wine}
           profile={profile}
           bottleCount={bottleCount}
-          facets={facets}
+          locations={locations}
+          facts={facts}
           heroSrc={heroSrc}
           heroAlt={heroAlt}
           corpusImage={corpusImage}
@@ -110,11 +97,13 @@ export function WineDetailView({
 
         <TasteBlock taste={house.taste} structure={reference.structure} notes={house.notes} />
 
-        <ScorePair house={house.score} reference={reference.score} />
-
+        {/* The window a bottle is IN outranks the score it was given: it is
+            the fact that changes what you do with the bottle tonight. */}
         {reference.window !== null && (
           <DrinkWindowBlock window={reference.window} currentYear={currentYear} />
         )}
+
+        <ScorePair house={house.score} reference={reference.score} />
 
         {profile && profile.pairings.length > 0 && (
           <PairingSection pairings={profile.pairings} />

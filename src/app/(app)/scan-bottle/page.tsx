@@ -260,26 +260,29 @@ export default function ScanBottlePage() {
 
   return (
     <div className="mx-auto max-w-[480px]">
-      <header className="mb-lg md:mb-xl">
-        <div className="flex items-center justify-between gap-sm">
-          <div>
-            <h1 className="font-serif text-[22px] text-ink md:text-[28px]">
+      <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-2xl">
+        <div className="flex items-start justify-between gap-sm">
+          <div className="min-w-0">
+            <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+              Scan · Bottle
+            </p>
+            <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
               Scan Bottle
             </h1>
-            <p className="mt-xs text-[14px] text-grey md:text-[15px]">
+            <p className="mt-sm max-w-[52ch] text-body text-ink-soft">
               Scan a bottle&rsquo;s QR code to look up its wine.
             </p>
           </div>
           {showSessionBadge && phase !== "summary" && (
-            <div className="flex items-center gap-sm">
-              <span className="inline-flex items-center gap-xs rounded-pill bg-surface-sunken px-sm py-xs text-[13px] font-medium text-ink-soft">
-                <List className="h-3.5 w-3.5" strokeWidth={2.5} />
+            <div className="flex shrink-0 items-center gap-xs">
+              <span className="inline-flex items-center gap-xs rounded-pill border border-rule-strong px-sm py-2xs text-caption font-medium uppercase tracking-[0.14em] text-ink-soft">
+                <List className="h-3.5 w-3.5" strokeWidth={1.9} />
                 <span className="tabular">{session.length}</span> scanned
               </span>
               <button
                 type="button"
                 onClick={handleEndSession}
-                className="flex h-11 items-center gap-xs rounded-pill border border-edge bg-surface px-sm text-[12px] font-medium text-ink hover:bg-wash transition-colors focus-ring"
+                className="flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-caption font-medium uppercase tracking-[0.18em] text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
               >
                 End session
               </button>

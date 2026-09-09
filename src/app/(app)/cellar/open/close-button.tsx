@@ -72,7 +72,7 @@ export function CloseBottleButton({ bottleId, remainingOz }: Props) {
         <button
           type="button"
           onClick={handleCancel}
-          className="min-h-11 min-w-11 rounded-pill px-2 py-1 text-[11px] text-grey transition-colors hover:text-ink"
+          className="min-h-11 min-w-11 rounded-pill px-xs text-caption font-medium uppercase tracking-[0.13em] text-grey transition-colors hover:text-ink"
           aria-label="Cancel close"
         >
           Cancel
@@ -88,8 +88,8 @@ export function CloseBottleButton({ bottleId, remainingOz }: Props) {
         disabled={isPending}
         className={
           confirming
-            ? "inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-pill bg-risk-wash px-2.5 py-1 text-[11px] font-medium text-risk-ink transition-colors hover:bg-risk-wash/70"
-            : "inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-pill px-2 py-1 text-[11px] text-grey transition-colors hover:bg-risk-wash/40 hover:text-risk-ink"
+            ? "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-risk-ink/40 bg-risk-wash px-sm text-caption font-medium uppercase tracking-[0.13em] text-risk-ink transition-colors hover:bg-risk-wash/70"
+            : "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-sm text-caption font-medium uppercase tracking-[0.13em] text-ink transition-colors hover:text-risk-ink"
         }
         aria-label={confirming ? `Confirm discard ${remainingOz.toFixed(1)} oz` : "Close bottle"}
       >

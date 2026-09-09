@@ -79,7 +79,7 @@ export function ReconcileModal({
       aria-labelledby={headingId}
       className="fixed inset-0 z-[var(--z-dialog)] flex flex-col bg-canvas md:items-center md:justify-center md:bg-scrim md:p-lg"
     >
-      <div className="flex h-full w-full flex-col overflow-hidden bg-surface md:h-[min(720px,90vh)] md:max-w-[640px] md:rounded-card md:border md:border-rule">
+      <div className="glass flex h-full w-full flex-col overflow-hidden rounded-none md:h-[min(720px,90vh)] md:max-w-[640px] md:rounded-card">
         <header
           className="flex items-center justify-between border-b border-rule px-md py-md md:px-lg"
           style={{ paddingTop: "calc(var(--safe-top) + var(--spacing-lg))" }}
@@ -87,11 +87,11 @@ export function ReconcileModal({
           <div>
             <h2
               id={headingId}
-              className="font-serif text-[20px] font-medium text-ink md:text-[22px]"
+              className="font-serif text-subheading font-normal text-ink md:text-heading-sm"
             >
               Reconcile open bottles
             </h2>
-            <p className="mt-2xs text-[13px] text-grey">
+            <p className="mt-2xs text-body-sm text-grey">
               End-of-shift correction. Set each open bottle to its actual
               remaining level.
             </p>
@@ -101,7 +101,7 @@ export function ReconcileModal({
             onClick={close}
             disabled={editState.busy}
             aria-label="Close reconcile mode"
-            className="ml-md flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash"
+            className="ml-md flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink-soft hover:bg-wash hover:text-ink"
           >
             <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>

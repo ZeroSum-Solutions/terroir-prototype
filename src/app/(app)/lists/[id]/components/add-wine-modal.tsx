@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Plus, Search } from "lucide-react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
-import { WineThumb } from "@/components/wine-thumb";
+import { PortraitThumb } from "./portrait-thumb";
 import { sectionIdForColour } from "@/domains/wine-lists/section-for-colour";
 import { listSectionNames, type AddWineRequest } from "../use-add-wine";
 import { AddWinePricing } from "./add-wine-pricing";
@@ -299,13 +299,13 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
       <div
         ref={trapRef}
         data-add-wine-panel
-        className="flex max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-[20px] card-surface md:max-h-[calc(100dvh-2rem)] md:max-w-[480px] md:rounded-card"
+        className="glass flex max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-card md:max-h-[calc(100dvh-2rem)] md:max-w-[480px] md:rounded-card"
       >
         <div className="shrink-0 border-b border-rule px-lg py-md">
-          <h2 id="add-wine-title" className="font-serif text-[20px] text-ink">
+          <h2 id="add-wine-title" className="font-serif text-subheading font-normal text-ink">
             Add wine to {destinationName}
           </h2>
-          <p className="mt-xs text-[13px] text-grey">
+          <p className="mt-xs text-body-sm text-ink-soft">
             {selected
               ? "Filed by the wine's own style — change the section below."
               : "Search your inventory or the LWIN catalog."}
@@ -314,14 +314,14 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
 
         {!selected ? (
           <>
-            <div className="flex shrink-0 gap-xs border-b border-rule px-lg">
+            <div className="glass mx-lg mb-sm flex shrink-0 gap-2xs rounded-pill p-3xs">
               <button
                 type="button"
                 onClick={() => { setSearchMode("inventory"); setQuery(""); setCatalogError(null); }}
-                className={`min-h-11 px-sm py-xs text-[13px] font-medium border-b-2 transition-colors ${
+                className={`min-h-11 flex-1 rounded-pill px-sm text-control font-medium transition-colors focus-ring ${
                   searchMode === "inventory"
-                    ? "border-mark text-mark"
-                    : "border-transparent text-grey hover:text-ink"
+                    ? "bg-primary text-seal-ink"
+                    : "text-grey hover:text-ink"
                 }`}
               >
                 My inventory
@@ -329,16 +329,16 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
               <button
                 type="button"
                 onClick={() => { setSearchMode("catalog"); setQuery(""); setCatalogError(null); }}
-                className={`min-h-11 px-sm py-xs text-[13px] font-medium border-b-2 transition-colors ${
+                className={`min-h-11 flex-1 rounded-pill px-sm text-control font-medium transition-colors focus-ring ${
                   searchMode === "catalog"
-                    ? "border-mark text-mark"
-                    : "border-transparent text-grey hover:text-ink"
+                    ? "bg-primary text-seal-ink"
+                    : "text-grey hover:text-ink"
                 }`}
               >
                 LWIN catalog
               </button>
             </div>
-            <div className="shrink-0 border-b border-rule px-lg py-sm">
+            <div className="shrink-0 border-b border-rule px-lg pb-sm">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-sm top-1/2 h-4 w-4 -translate-y-1/2 text-grey" strokeWidth={2} aria-hidden="true" />
                 <input
@@ -350,7 +350,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                   }}
                   placeholder="Search by producer or wine name…"
                   aria-label="Search wines"
-                  className="h-11 w-full rounded-pill border border-rule bg-surface pl-xl pr-sm text-[16px] text-ink placeholder:text-grey focus-visible:border-accent focus-ring md:text-[14px]"
+                  className="min-h-11 h-[52px] w-full rounded-pill border border-rule-strong bg-surface-sunken pl-xl pr-sm text-[16px] text-ink placeholder:text-grey focus-visible:border-accent focus-ring md:text-control"
                 />
               </div>
             </div>
@@ -358,7 +358,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
               <div className="border-b border-rule px-lg py-sm">
                 <p
                   role="alert"
-                  className="rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[12px] text-risk-ink"
+                  className="rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-ledger text-risk-ink"
                 >
                   {catalogError}
                 </p>
@@ -374,7 +374,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                 </div>
               ) : searchMode === "inventory" ? (
                 results.length === 0 ? (
-                  <div className="px-lg py-xl text-center text-[13px] text-grey">
+                  <div className="px-lg py-xl text-center text-body-sm text-grey">
                     {query ? "No wines found." : "No wines in inventory yet. Scan an invoice first."}
                   </div>
                 ) : (
@@ -383,23 +383,21 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                       key={wine.id}
                       type="button"
                       onClick={() => selectWine(wine)}
-                      className="flex w-full items-center gap-md border-b border-rule/50 px-lg py-sm text-left transition-colors hover:bg-wash"
+                      className="flex w-full items-center gap-md border-b border-rule px-lg py-sm text-left transition-colors last:border-b-0 hover:bg-surface-raised"
                     >
-                      <WineThumb
+                      <PortraitThumb
                         src={wine.hero_image_url}
                         producer={wine.producer}
                         name={wine.name}
                         colour={wine.colour}
-                        size={36}
+                        width={36}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="font-serif text-[17px] text-ink">
+                        <div className="font-serif text-body-lg font-normal text-ink">
                           {wineTitle(wine.producer, wine.name, ", ")}
                         </div>
-                        <div className="mt-2xs flex items-center gap-xs text-[12px] text-grey">
-                          <span className="font-mono text-grey">
-                            {wine.vintage ?? "NV"}
-                          </span>
+                        <div className="mt-2xs flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                          <span className="tabular">{wine.vintage ?? "NV"}</span>
                           {wine.region && (
                             <>
                               <span className="text-grey">·</span>
@@ -413,7 +411,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                   ))
                 )
               ) : catalogResults.length === 0 ? (
-                <div className="px-lg py-xl text-center text-[13px] text-grey">
+                <div className="px-lg py-xl text-center text-body-sm text-grey">
                   {query.length < 2
                     ? "Type at least 2 characters to search the LWIN catalog."
                     : "No matches in LWIN catalog."}
@@ -424,24 +422,24 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                     key={wine.lwin_id}
                     type="button"
                     onClick={() => handleSelectCatalog(wine)}
-                    className="flex w-full items-center gap-md border-b border-rule/50 px-lg py-sm text-left transition-colors hover:bg-wash"
+                    className="flex w-full items-center gap-md border-b border-rule px-lg py-sm text-left transition-colors last:border-b-0 hover:bg-surface-raised"
                   >
                     {/* A catalog row is a reference entry, not a wine in this
                         cellar, so it can never have a picture — but it gets the
                         same stand-in, or one search renders as two
                         differently-shaped lists. */}
-                    <WineThumb
+                    <PortraitThumb
                       src={null}
                       producer={wine.producer}
                       name={wine.display_name}
                       colour={null}
-                      size={36}
+                      width={36}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="font-serif text-[17px] text-ink">
+                      <div className="font-serif text-body-lg font-normal text-ink">
                         {wine.display_name}
                       </div>
-                      <div className="mt-2xs flex items-center gap-xs text-[12px] text-grey">
+                      <div className="mt-2xs flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
                         {wine.producer && <span>{wine.producer}</span>}
                         {wine.region && (
                           <>
@@ -465,11 +463,11 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
           </>
         ) : (
           <div className="min-h-0 overflow-y-auto overscroll-contain px-lg py-md">
-            <div className="rounded-md border border-rule bg-wash px-md py-sm">
-              <div className="font-serif text-[17px] font-medium text-ink">
+            <div className="rounded-card border border-rule-strong bg-surface-sunken px-md py-sm">
+              <div className="font-serif text-body-lg font-normal text-ink">
                 {wineTitle(selected.producer, selected.name, ", ")}
               </div>
-              <div className="mt-2xs text-[12px] text-grey">
+              <div className="mt-2xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
                 {selected.vintage ?? "NV"}
                 {selected.region && ` · ${selected.region}`}
               </div>
@@ -479,7 +477,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                 active section is pre-checked, user can select additional sections. */}
             {sections.length > 1 && (
               <div className="mt-md">
-                <div className="text-caption font-medium uppercase text-grey">
+                <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
                   Add to {destinationName}
                 </div>
                 <div className="mt-sm flex flex-col gap-2xs">
@@ -488,17 +486,17 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                     return (
                       <label
                         key={s.id}
-                        className="flex min-h-11 cursor-pointer items-center gap-sm rounded-pill px-sm py-xs transition-colors hover:bg-wash"
+                        className="flex min-h-11 cursor-pointer items-center gap-sm rounded-pill px-sm py-xs transition-colors hover:bg-surface-raised"
                       >
                         <span
                           className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-xs border-2 transition-colors ${
                             checked
                               ? "border-primary bg-primary"
-                              : "border-edge bg-surface"
+                              : "border-rule-strong bg-surface-sunken"
                           }`}
                         >
                           {checked && (
-                            <Check className="h-3 w-3 text-seal-ink" strokeWidth={3} aria-hidden="true" />
+                            <Check className="h-3 w-3 text-seal-ink" strokeWidth={2} aria-hidden="true" />
                           )}
                         </span>
                         <input
@@ -508,7 +506,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                           className="sr-only"
                           aria-label={`Add to ${s.name}`}
                         />
-                        <span className="text-[14px] font-medium text-ink">
+                        <span className="text-control font-medium text-ink">
                           {s.name}
                         </span>
                       </label>
@@ -540,7 +538,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
               <button
                 type="button"
                 onClick={clearSelection}
-                className="min-h-11 rounded-pill border border-rule px-md text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+                className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
               >
                 Back
               </button>
@@ -548,7 +546,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 rounded-pill border border-rule px-md text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+              className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
             >
               Cancel
             </button>
@@ -557,7 +555,7 @@ export function AddWineModal({ sections, activeSectionId, onAdd, onClose }: AddW
                 type="button"
                 onClick={handleAdd}
                 disabled={adding || selectedSectionIds.size === 0}
-                className="min-h-11 rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60"
+                className="min-h-11 rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60"
               >
                 {adding ? "Adding..." : `Add to ${destinationName}`}
               </button>

@@ -60,7 +60,7 @@ export function SettingsDropdown() {
         aria-label="Settings"
         aria-expanded={open}
         aria-haspopup="true"
-        className="flex h-11 w-11 items-center justify-center rounded-pill text-grey transition-colors hover:bg-wash hover:text-ink focus-ring md:h-auto md:w-auto md:border md:border-rule-strong md:bg-surface md:px-md md:py-sm"
+        className="glass flex h-11 w-11 items-center justify-center rounded-pill text-grey transition-colors hover:text-accent focus-ring md:h-auto md:w-auto md:px-md md:py-sm"
       >
         <Settings className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
@@ -76,7 +76,7 @@ export function SettingsDropdown() {
         />
       )}
       {open && (
-        <div className="absolute right-0 top-full z-[var(--z-overlay)] mt-xs w-[180px] rounded-card card-surface" role="menu">
+        <div className="glass absolute right-0 top-full z-[var(--z-overlay)] mt-xs w-[180px] rounded-card" role="menu">
           <div className="flex flex-col py-xs">
             <Link
               ref={(el) => { itemsRef.current[0] = el; }}
@@ -84,7 +84,7 @@ export function SettingsDropdown() {
               onClick={close}
               role="menuitem"
               tabIndex={-1}
-              className="flex min-h-11 items-center gap-sm px-md py-sm text-[14px] text-ink transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
             >
               <DollarSign className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Pricing
@@ -95,7 +95,7 @@ export function SettingsDropdown() {
               onClick={close}
               role="menuitem"
               tabIndex={-1}
-              className="flex min-h-11 items-center gap-sm px-md py-sm text-[14px] text-ink transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
             >
               <Archive className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Bins
@@ -109,7 +109,7 @@ export function SettingsDropdown() {
               onClick={close}
               role="menuitem"
               tabIndex={-1}
-              className="flex min-h-11 items-center gap-sm px-md py-sm text-[14px] text-ink transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
             >
               <Users className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Team
@@ -120,7 +120,7 @@ export function SettingsDropdown() {
               onClick={close}
               role="menuitem"
               tabIndex={-1}
-              className="flex min-h-11 items-center gap-sm px-md py-sm text-[14px] text-ink transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
             >
               <Upload className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Import
@@ -131,7 +131,7 @@ export function SettingsDropdown() {
               onClick={close}
               role="menuitem"
               tabIndex={-1}
-              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
             >
               <BookOpen className="h-4 w-4 text-grey" aria-hidden="true" />
               Setup guide
@@ -145,7 +145,7 @@ export function SettingsDropdown() {
                 type="submit"
                 role="menuitem"
                 tabIndex={-1}
-                className="flex min-h-11 w-full items-center gap-sm px-md py-sm text-[14px] text-ink transition-colors hover:bg-wash focus-ring"
+                className="flex min-h-11 w-full items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
               >
                 <LogOut className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
                 Sign out

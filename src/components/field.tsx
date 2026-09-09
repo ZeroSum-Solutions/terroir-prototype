@@ -40,18 +40,26 @@ export function Field({
 
   return (
     <div className={className}>
+      {/* The eyebrow (DESIGN.md — Components, Eyebrow). `text-caption` is
+          concatenated OUTSIDE cn(): tailwind-merge cannot tell a custom
+          `text-<size>` from a `text-<colour>`, keeps only the last, and was
+          silently dropping the size from every field label. Everything a
+          caller may override still goes through cn(). */}
       <label
         htmlFor={id}
-        className={cn(
-          "text-caption font-medium uppercase tracking-[0.18em] text-grey",
-          srOnlyLabel && "sr-only",
-          labelClassName,
-        )}
+        className={
+          "text-caption " +
+          cn(
+            "block font-medium uppercase tracking-[0.18em] text-grey",
+            srOnlyLabel && "sr-only",
+            labelClassName,
+          )
+        }
       >
         {label}
       </label>
       {description ? (
-        <p id={`${id}-description`} className="mt-2xs text-[12px] text-grey">
+        <p id={`${id}-description`} className="mt-2xs text-ledger text-grey">
           {description}
         </p>
       ) : null}

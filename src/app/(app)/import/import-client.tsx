@@ -448,9 +448,9 @@ export function ImportClient() {
           aria-hidden="true"
           className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim p-lg"
         >
-          <div className="rounded-card border-2 border-dashed border-surface-sunken bg-surface px-xl py-lg text-center">
-            <p className="font-serif text-[20px] text-ink">Drop your cellar file</p>
-            <p className="mt-xs text-[13px] text-grey">.csv or .xlsx — one file at a time</p>
+          <div className="glass rounded-card border border-dashed border-accent px-xl py-lg text-center">
+            <p className="font-serif text-subheading font-normal text-ink">Drop your cellar file</p>
+            <p className="mt-xs text-body-sm text-ink-soft">.csv or .xlsx — one file at a time</p>
           </div>
         </div>
       )}

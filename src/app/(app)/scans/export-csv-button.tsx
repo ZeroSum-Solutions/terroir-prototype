@@ -61,10 +61,10 @@ export function ExportCsvButton({ rows }: { rows: ScanHistoryCsvRow[] }) {
     <button
       type="button"
       onClick={handleClick}
-      className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-edge bg-surface px-md text-[12px] font-medium text-ink hover:bg-wash focus-ring"
+      className="flex min-h-11 items-center justify-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-caption font-medium uppercase tracking-[0.18em] text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
       title="Download this page of scan history as CSV"
     >
-      <Download className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+      <Download className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
       <span className="hidden sm:inline">Export CSV</span>
       <span className="sm:hidden">CSV</span>
     </button>

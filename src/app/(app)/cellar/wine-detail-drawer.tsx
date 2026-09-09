@@ -280,7 +280,7 @@ export function WineDetailDrawer({
           role="dialog"
           aria-modal="true"
           aria-labelledby={headingId}
-          className="fixed inset-x-0 bottom-0 z-[var(--z-dialog)] flex flex-col rounded-t-lg bg-surface md:top-[var(--chrome-header-total)] md:bottom-0 md:right-0 md:left-auto md:w-[420px] md:rounded-none md:border-l md:border-rule"
+          className="glass fixed inset-x-0 bottom-0 z-[var(--z-dialog)] flex flex-col rounded-t-card md:top-[var(--chrome-header-total)] md:bottom-0 md:right-0 md:left-auto md:w-[420px] md:rounded-none md:border-l md:border-glass-edge"
           style={{ maxHeight: "calc(100dvh - 3.5rem)" }}
         >
           {/* Grab handle — mobile sheet affordance */}
@@ -291,17 +291,17 @@ export function WineDetailDrawer({
           {/* Header */}
           <div className="flex items-center justify-between border-b border-rule px-md py-sm">
             <div className="min-w-0">
-              <h2 id={headingId} className="font-serif text-[19px] font-medium text-ink leading-snug">
+              <h2 id={headingId} className="font-serif text-subheading font-normal text-ink leading-snug">
                 {/* BUG-01 — the name is rendered with the producer lifted off
                     its front, because the producer is already the span beside
                     it. See src/lib/wine-display-name.ts: this heading is the
                     "Benoit Ente Benoit Ente, Puligny-Montrachet" Devin
                     photographed. */}
-                <span>{row.producer}</span>{" "}
+                <span className="block font-sans text-caption font-medium uppercase text-accent">{row.producer}</span>{" "}
                 <span>{wineDisplayName(row.producer, row.name)}</span>
               </h2>
               {row.vintage != null && (
-                <p className="mt-2xs font-mono text-[11px] tracking-[0.12em] text-grey">
+                <p className="mt-2xs tabular text-ledger text-grey">
                   {row.vintage}
                 </p>
               )}
@@ -311,7 +311,7 @@ export function WineDetailDrawer({
                   for. */}
               <Link
                 href={`/cellar/${row.wine_id}`}
-                className="mt-2xs inline-block text-[11px] uppercase tracking-[0.12em] text-accent hover:underline"
+                className="mt-2xs inline-block text-caption uppercase text-accent hover:underline"
               >
                 Full detail
               </Link>
@@ -343,7 +343,7 @@ export function WineDetailDrawer({
             {/* Stock breakdown */}
             <section
               aria-label="Stock"
-              className="rounded-lg card-surface p-md"
+              className="card-surface rounded-card p-md"
             >
               <div className="grid grid-cols-3 gap-md text-center">
                 <Stat
@@ -358,7 +358,7 @@ export function WineDetailDrawer({
                 />
               </div>
               {glassesLeft !== null && (
-                <p className="mt-sm text-center text-[12px] text-grey">
+                <p className="mt-sm text-center text-ledger text-grey">
                   ~{glassesLeft} glass{glassesLeft === 1 ? "" : "es"} left
                   {row.glass_pour_ml &&
                     ` · pour size ${(row.glass_pour_ml / ML_PER_OZ).toFixed(1)} oz`}
@@ -367,7 +367,7 @@ export function WineDetailDrawer({
               {row.bin_placements.map((placement) => (
                 <p
                   key={placement.binId}
-                  className="mt-2xs text-center font-mono text-[12px] text-grey"
+                  className="mt-2xs text-center font-mono text-ledger text-grey"
                 >
                   Bin {placement.zone ? `${placement.zone} › ` : ""}
                   {placement.code} · {placement.quantity}
@@ -377,12 +377,12 @@ export function WineDetailDrawer({
                   one line ("Unplaced 8 · marked Row F14" read as a
                   contradiction — Kimi UX audit). */}
               {row.unplaced_count > 0 && row.bin_location && (
-                <p className="mt-2xs text-center font-mono text-[13px] text-ink-soft">
+                <p className="mt-2xs text-center font-mono text-body-sm text-ink-soft">
                   Marked {row.bin_location}
                 </p>
               )}
               {row.unplaced_count > 0 && (
-                <p className="mt-2xs text-center font-mono text-[12px] text-grey">
+                <p className="mt-2xs text-center tabular text-ledger text-grey">
                   {row.unplaced_count} unplaced
                   {row.suggested_bin && (
                     <> · Suggested {row.suggested_bin.zone ? `${row.suggested_bin.zone} › ` : ""}
@@ -400,10 +400,10 @@ export function WineDetailDrawer({
             {row.tasting_notes && (
               <section
                 aria-label="Tasting notes"
-                className="mt-md rounded-lg card-surface p-md"
+                className="card-surface mt-md rounded-card p-md"
               >
                 <h3 className="text-caption font-medium uppercase text-grey mb-sm">Tasting notes</h3>
-                <p className="text-[13px] text-ink-soft leading-relaxed whitespace-pre-wrap">
+                <p className="text-body-sm text-ink-soft leading-relaxed whitespace-pre-wrap">
                   {row.tasting_notes}
                 </p>
               </section>
@@ -426,7 +426,7 @@ export function WineDetailDrawer({
             {errorMsg && eightysix.pendingDirection === null && (
               <div
                 role="alert"
-                className="mt-md rounded-md border border-risk-ink/30 bg-risk-wash px-md py-sm text-[13px] text-risk-ink"
+                className="mt-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
               >
                 {errorMsg}
               </div>
@@ -449,13 +449,13 @@ export function WineDetailDrawer({
             {/* Quick actions */}
             <section aria-label="Actions" className="mt-md flex flex-col gap-sm">
               {(row.sealed_count > 0 || canPour) && (
-                <label className="text-[12px] text-grey">
+                <label className="text-ledger text-grey">
                   Preservation method
                   <select
                     aria-label="Preservation method"
                     value={preservationMethod}
                     onChange={(event) => setPreservationMethod(event.target.value as PreservationMethod)}
-                    className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm text-[13px] text-ink"
+                    className="mt-xs h-11 w-full rounded-pill border border-rule-strong bg-surface-sunken px-sm text-control text-ink"
                   >
                     <option value="none">None</option>
                     <option value="coravin">Coravin</option>
@@ -480,8 +480,8 @@ export function WineDetailDrawer({
                     className={cn(
                       "inline-flex h-11 items-center justify-center gap-xs rounded-pill border px-md text-body-sm font-medium transition-colors disabled:opacity-60",
                       row.is_eightysixed
-                        ? "border-accent bg-primary text-seal-ink hover:bg-primary-hover"
-                        : "border-edge bg-surface text-ink hover:bg-wash",
+                        ? "border-accent bg-accent/15 text-ink hover:border-accent"
+                        : "border-rule-strong bg-transparent text-ink hover:border-accent",
                     )}
                   >
                     <PowerOff className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -491,7 +491,7 @@ export function WineDetailDrawer({
                   <button
                     type="button"
                     onClick={() => setEditOpen(true)}
-                    className="inline-flex h-11 items-center justify-center gap-xs rounded-pill border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash transition-colors"
+                    className="inline-flex h-11 items-center justify-center gap-xs rounded-pill border border-rule-strong px-md text-body-sm font-medium text-ink hover:border-accent transition-colors"
                   >
                     <Edit3 className="h-4 w-4" strokeWidth={2} aria-hidden />
                     Edit metadata
@@ -552,7 +552,7 @@ export function WineDetailDrawer({
                 />
                 <label
                   htmlFor="hero-image-upload"
-                  className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-xs rounded-lg border border-rule bg-surface text-[12px] font-medium uppercase tracking-[0.1em] text-grey hover:bg-wash hover:text-ink transition-colors"
+                  className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-xs rounded-pill border border-rule-strong text-caption font-medium uppercase text-grey hover:border-accent hover:text-ink transition-colors"
                 >
                   {heroImageUploading ? (
                     <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />

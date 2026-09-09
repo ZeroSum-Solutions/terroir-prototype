@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import {
   formatPricingStatusLabel,
   type PricingStatus,
@@ -77,17 +76,14 @@ export function PricingReviewCard({
 
   return (
     <article
-      className={cn(
-        "rounded-card card-surface p-md md:p-lg",
-        "border-l-[3px] border-l-primary",
-      )}
+      className="border-y border-rule py-md"
     >
       {/* Fact first — the "Hey {firstName}" salutation leaked email
           local-parts like "Owner+local" (Kimi audit 2026-08-26). */}
-      <h3 className="font-serif text-[18px] text-ink md:text-[20px]">
+      <h3 className="font-serif text-body-lg font-normal text-ink md:text-subheading">
         <span className="tabular">{alerts.length}</span> wine{alerts.length === 1 ? "" : "s"} off your pricing targets
       </h3>
-      <p className="mt-xs text-[12px] text-grey">
+      <p className="mt-xs text-ledger text-grey">
         Worth a review when ready
         {bottleCount > 0 && (
           <>
@@ -116,18 +112,18 @@ export function PricingReviewCard({
       </ul>
 
       {alerts.length > 5 && (
-        <p className="mt-sm text-[12px] text-grey">
+        <p className="mt-sm text-ledger text-grey">
           + {alerts.length - 5} more — view full pricing review →
         </p>
       )}
 
       {errorMsg && (
-        <p role="alert" className="mt-sm text-[12px] text-risk-ink">
+        <p role="alert" className="mt-sm text-ledger text-risk-ink">
           {errorMsg}
         </p>
       )}
 
-      <p className="mt-md border-t border-rule pt-md text-[11px] italic text-grey">
+      <p className="mt-md border-t border-rule pt-md text-micro italic text-grey">
         Heuristic — based on your house targets + category bands. Velocity-driven
         recommendations available after 12 weeks of pour data.
       </p>
@@ -172,25 +168,25 @@ function PricingReviewRow({
       className="flex items-center justify-between gap-md py-sm"
     >
       <div className="min-w-0 flex-1">
-        <span className="font-serif text-[17px] font-medium text-ink">
+        <span className="font-serif text-body-lg font-normal text-ink">
           {wineTitle(alert.producer, alert.name, ", ")}
         </span>
         {alert.vintage && (
-          <span className="ml-xs text-[11px] font-light text-grey">
+          <span className="ml-xs text-ledger text-grey">
             {alert.vintage}
           </span>
         )}
-        <span className="block text-[11px] text-grey md:inline md:ml-xs">
+        <span className="block text-ledger text-grey md:ml-xs md:inline">
           {reasons.length > 0 && `· ${reasons.join(" · ")}`}
         </span>
       </div>
       <div className="flex items-center gap-xs">
-        <span className="hidden tabular text-[12px] text-grey md:inline">
+        <span className="hidden tabular text-ledger text-grey md:inline">
           {ratioDisplay}
         </span>
         <Link
           href={metricHref("wine", alert.wine_id)}
-          className="inline-flex min-h-11 items-center gap-2xs rounded-pill border border-edge bg-surface px-sm text-[12px] font-medium text-ink hover:bg-wash focus-ring"
+          className="inline-flex min-h-11 items-center gap-2xs rounded-pill border border-rule-strong bg-transparent px-sm text-ledger font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
         >
           Review
           <ChevronRight className="h-3 w-3" strokeWidth={2} aria-hidden />
@@ -205,7 +201,7 @@ function PricingReviewRow({
             // floor by design rather than by accident, and the one that
             // dismisses an alert: a mis-tap costs the sommelier that alert for
             // 30 days. Layout only; the SD-24 role gate above is untouched.
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash focus-ring disabled:opacity-60"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-pill text-grey transition-colors hover:bg-surface-raised focus-ring disabled:opacity-60"
           >
             <X className="h-3 w-3" strokeWidth={2} aria-hidden />
           </button>

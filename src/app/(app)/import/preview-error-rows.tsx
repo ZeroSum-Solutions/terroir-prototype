@@ -78,7 +78,7 @@ export function PreviewErrorRows({
           Import in progress — row edits are locked during upload.
         </p>
       )}
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {shownErrorRows.map((row) => (
           <RowFixItem
             key={row.rowNumber}
@@ -100,7 +100,7 @@ export function PreviewErrorRows({
           <button
             type="button"
             onClick={() => setShownCount((count) => count + MAX_SHOWN_ERROR_ROWS)}
-            className="mt-xs min-h-11 rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink transition-colors hover:bg-wash focus-ring"
+            className="mt-xs min-h-11 rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             Show {Math.min(hiddenCount, MAX_SHOWN_ERROR_ROWS)} more row(s) with errors
           </button>
@@ -166,7 +166,7 @@ function RowFixItem({
       : `Row ${row.rowNumber}`;
 
   return (
-    <li className="rounded-md bg-wash px-sm py-xs text-[13px] text-ink">
+    <li className="border-b border-rule px-2xs py-sm text-body-sm text-ink">
       <div className="flex items-center gap-xs">
         <span>{label}</span>
         {!disabled && live.state === "valid" && (
@@ -199,7 +199,7 @@ function RowFixItem({
               disabled={disabled}
               readOnly={disabled}
               className={cn(
-                "min-h-11 w-32 rounded-pill border border-rule bg-surface px-sm text-[13px] text-ink focus:border-accent focus-ring",
+                "min-h-11 w-32 rounded-pill border border-rule bg-surface px-sm text-body-sm text-ink focus:border-accent focus-ring",
                 disabled && "cursor-not-allowed opacity-60",
               )}
             />

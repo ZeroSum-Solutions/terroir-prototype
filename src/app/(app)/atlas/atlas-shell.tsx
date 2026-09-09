@@ -40,11 +40,11 @@ export function AtlasShell({
   return (
     <section className="min-w-0 max-w-full overflow-x-hidden">
       <div className="-mx-md -mt-lg dawn-gradient px-md pb-lg pt-lg md:-mx-lg md:-mt-xl md:px-lg md:pb-2xl md:pt-xl">
-        <p className="truncate text-caption font-medium uppercase text-grey">
+        <p className="truncate text-caption font-medium uppercase tracking-[0.18em] text-accent">
           {restaurantName} · Atlas
         </p>
-        <h1 className="mt-xs max-w-[560px] font-serif text-heading-sm font-light leading-[1.1] text-ink md:text-heading lg:max-w-[820px] lg:text-display">
-          Every bottle has a <em className="italic font-normal text-mark">home</em>
+        <h1 className="mt-xs max-w-[560px] font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:max-w-[820px] lg:text-display">
+          Every bottle has a <em className="font-normal italic text-primary">home</em>
         </h1>
       </div>
 
@@ -73,11 +73,11 @@ export function AtlasShell({
           <p className="mt-2xs text-body-sm text-grey">
             These country labels on your wines didn&apos;t match a place on the map.
           </p>
-          <ul className="mt-sm flex flex-col divide-y divide-rule rounded-card card-surface">
+          <ul className="mt-sm flex flex-col divide-y divide-rule border-y border-rule">
             {unmatched.map((entry) => (
-              <li key={entry.label} className="flex items-center justify-between px-md py-sm">
+              <li key={entry.label} className="flex items-center justify-between py-sm">
                 <span className="text-body-sm text-ink">{entry.label}</span>
-                <span className="font-mono tabular-nums text-body-sm text-grey">
+                <span className="tabular text-body-sm text-grey">
                   {entry.bottles}
                 </span>
               </li>
@@ -121,11 +121,11 @@ function AtlasCountryList({
   return (
     <div className="mt-md">
       <h2 className="text-caption font-medium uppercase text-grey">Countries</h2>
-      <ul className="mt-sm flex flex-wrap gap-xs" aria-label="Countries in your cellar">
+      <ul className="mt-sm grid grid-cols-2 gap-xs md:grid-cols-4" aria-label="Countries in your cellar">
         {withBottles.map((country) => {
           const selected = country.key === selectedKey;
           return (
-            <li key={country.key}>
+            <li key={country.key} className="min-w-0">
               <button
                 type="button"
                 onClick={() => onSelect(country.key)}
@@ -136,14 +136,14 @@ function AtlasCountryList({
                     : "open bottle only"
                 }`}
                 className={cn(
-                  "inline-flex min-h-11 items-center gap-xs whitespace-nowrap rounded-pill border px-md transition-colors focus-ring",
+                  "flex min-h-11 w-full min-w-0 items-center justify-between gap-xs rounded-pill px-md transition-colors focus-ring",
                   selected
-                    ? "border-mark bg-mark/10 text-mark"
-                    : "border-rule bg-surface text-ink hover:bg-wash",
+                    ? "bg-primary text-seal-ink"
+                    : "glass text-ink",
                 )}
               >
-                <span className="text-body-sm">{country.label}</span>
-                <span className="font-mono tabular-nums text-body-sm">
+                <span className="min-w-0 truncate text-body-sm">{country.label}</span>
+                <span className="shrink-0 tabular text-body-sm">
                   {country.bottles > 0 ? country.bottles : "open"}
                 </span>
               </button>
@@ -198,17 +198,17 @@ function AtlasRegionSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-card bg-surface md:max-w-[440px] md:rounded-card md:border md:border-rule"
+        className="glass flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-card md:max-w-[440px] md:rounded-card"
       >
         <header className="flex items-center justify-between border-b border-rule px-md py-sm">
-          <h2 id={headingId} className="font-serif text-subheading font-medium text-ink">
+          <h2 id={headingId} className="font-serif text-subheading font-normal text-ink">
             {country.label}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-11 w-11 items-center justify-center rounded-pill text-grey hover:bg-wash focus-ring"
+            className="flex h-11 w-11 items-center justify-center rounded-pill text-grey transition-colors hover:bg-surface-raised focus-ring"
           >
             <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
@@ -226,14 +226,14 @@ function AtlasRegionSheet({
                     className="flex min-h-11 items-center justify-between gap-md py-sm text-body-sm text-ink hover:text-accent"
                   >
                     <span className="truncate">{region.label}</span>
-                    <span className="font-mono tabular-nums text-grey">{region.count}</span>
+                    <span className="tabular text-grey">{region.count}</span>
                   </Link>
                 </li>
               ))}
               {unknownRegion && (
                 <li className="flex min-h-11 items-center justify-between gap-md py-sm text-body-sm text-grey">
                   <span>Unknown</span>
-                  <span className="font-mono tabular-nums">{unknownRegion.count}</span>
+                  <span className="tabular">{unknownRegion.count}</span>
                 </li>
               )}
             </ul>
@@ -243,7 +243,7 @@ function AtlasRegionSheet({
         <footer className="border-t border-rule px-md py-sm">
           <Link
             href={`/cellar?country=${encodeURIComponent(countryParam)}`}
-            className="flex min-h-11 items-center justify-center rounded-pill text-body-sm font-medium text-accent hover:underline"
+            className="flex min-h-11 items-center justify-center rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
           >
             View all {country.wines} in {country.label}
           </Link>

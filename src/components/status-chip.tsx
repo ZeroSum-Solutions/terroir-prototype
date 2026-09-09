@@ -28,19 +28,25 @@ export function StatusChip({
   children: React.ReactNode;
   className?: string;
 }) {
+  // The size token is concatenated OUTSIDE cn(): tailwind-merge reads
+  // `text-caption` and `text-grey` as the same group and would keep only the
+  // tone colour, silently dropping the seal's caption size (DESIGN.md —
+  // Components, Status Seal).
   return (
     <span
       data-tone={tone}
-      className={cn(
-        "inline-flex items-center gap-2xs whitespace-nowrap rounded-pill border px-sm py-2xs text-[10px] font-medium uppercase tracking-[0.13em]",
+      className={`text-caption ${cn(
+        "inline-flex items-center gap-2xs whitespace-nowrap rounded-pill border px-sm py-2xs font-medium uppercase tracking-[0.13em]",
         tone === "muted" && "border-transparent bg-wash text-grey",
         tone === "neutral" && "border-edge bg-transparent text-ink-soft",
         tone === "optimal" && "border-rule-strong bg-peak-wash text-peak-ink",
         tone === "attention" && "border-risk-ink/40 bg-risk-wash text-risk-ink",
+        // The wax seal keeps its inner impression ring, struck in the one
+        // metal rather than a tint of its own label.
         tone === "urgent" &&
-          "border-primary bg-primary text-seal-ink shadow-[inset_0_0_0_2px_var(--t-primary),inset_0_0_0_3px_color-mix(in_srgb,var(--t-seal-ink)_35%,transparent)]",
+          "border-primary bg-primary text-seal-ink shadow-[inset_0_0_0_2px_var(--t-primary),inset_0_0_0_3px_var(--t-accent)]",
         className,
-      )}
+      )}`}
     >
       {children}
     </span>

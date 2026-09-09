@@ -26,14 +26,14 @@ export function RecentImports({
           — showing all of them (rather than adding a new search UI) is the
           smallest change that keeps every non-reverted batch reachable and
           revertable from here. */}
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {batches.map((b) => (
           <li key={b.id}>
             <button
               type="button"
               onClick={() => onOpen(b.id)}
               className={cn(
-                "flex min-h-11 w-full items-center justify-between rounded-card card-surface px-sm text-left text-[13px] text-ink transition-colors hover:bg-wash focus-ring",
+                "flex min-h-11 w-full items-center justify-between border-b border-rule px-2xs text-left text-body-sm text-ink transition-colors hover:text-accent focus-ring",
               )}
             >
               <span className="truncate">{b.filename}</span>

@@ -35,7 +35,7 @@ export function PricingPlaysSection({
           >
             Pricing plays
           </h2>
-          <p className="mt-2xs text-[12px] text-grey">
+          <p className="mt-2xs text-ledger text-grey">
             Price moves based on how your wines sell
           </p>
         </div>
@@ -49,12 +49,12 @@ export function PricingPlaysSection({
       {recommendations.length === 0 ? (
         /* Two quiet lines, not a full-height dashed box — an empty module
            must never outweigh populated ones (Kimi audit 2026-08-26). */
-        <p className="rounded-card card-surface px-md py-sm text-[13px] text-grey">
+        <p className="glass rounded-card px-md py-sm text-body-sm text-grey">
           No pricing plays yet — they appear once cellar health and pour data
           are current.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-card card-surface">
+        <div className="border-t border-rule">
           {PRICING_RECOMMENDATION_CLASSES.map((recommendationClass) => {
             const rows = recommendations.filter(
               (row) => row.class === recommendationClass,
@@ -85,18 +85,18 @@ function PricingGroup({
     <section
       data-pricing-class={recommendationClass}
       aria-labelledby={`pricing-class-${recommendationClass}`}
-      className="border-b border-rule last:border-b-0"
+      className="border-b border-rule"
     >
-      <div className="flex items-center justify-between bg-surface-sunken px-md py-sm">
+      <div className="flex items-center justify-between border-b border-rule py-sm">
         <h3
           id={`pricing-class-${recommendationClass}`}
           className="text-caption font-medium uppercase text-ink-soft"
         >
           {LABELS[recommendationClass]}
         </h3>
-        <span className="tabular text-[11px] text-grey">{rows.length}</span>
+        <span className="tabular text-micro tracking-[0.12em] text-accent">{rows.length}</span>
       </div>
-      <ul className="divide-y divide-rule bg-surface">
+      <ul className="divide-y divide-rule">
         {rows.map((row) => <PricingRow key={row.wineId} row={row} />)}
       </ul>
     </section>
@@ -107,22 +107,22 @@ function PricingRow({ row }: { row: PricingPlay }) {
   return (
     <li
       data-metric={`pricing-play-${row.wineId}`}
-      className="grid gap-sm px-md py-md md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-center"
+      className="grid gap-sm py-md md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-center"
     >
       <Link
         href={metricHref("wine", row.wineId)}
         className="group min-w-0 rounded-sm focus-ring"
       >
-        <span className="block truncate font-serif text-[17px] font-medium text-ink group-hover:text-accent">
+        <span className="block truncate font-serif text-body-lg font-normal text-ink group-hover:text-accent">
           {wineTitle(row.wine.producer, row.wine.name, ", ")}
         </span>
-        <span className="mt-2xs block text-[11px] font-light text-grey">
+        <span className="mt-2xs block text-ledger text-grey">
           {row.wine.vintage ?? "NV"}
         </span>
       </Link>
       <div>
-        <p className="text-[13px] leading-relaxed text-ink">{row.rationale}</p>
-        <p className="mt-2xs text-[11px] text-grey">
+        <p className="text-body-sm leading-relaxed text-ink">{row.rationale}</p>
+        <p className="mt-2xs text-ledger text-grey">
           {formatEvidence(row)}
         </p>
       </div>
@@ -130,7 +130,7 @@ function PricingRow({ row }: { row: PricingPlay }) {
         {row.timing ? (
           <StatusChip tone="attention">{row.timing}</StatusChip>
         ) : (
-          <span className="text-[11px] text-grey">No timing action</span>
+          <span className="text-ledger text-grey">No timing action</span>
         )}
       </div>
     </li>

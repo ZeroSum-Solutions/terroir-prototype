@@ -18,38 +18,44 @@ export default async function GetStartedPage() {
 
   return (
     <section className="mx-auto max-w-[640px]">
-      <header className="mb-lg">
-        <p className="text-caption text-grey">{auth.restaurantName}</p>
-        <h1 className="mt-xs font-serif text-heading-sm text-ink">{canManage ? "Get ready for service" : "Your guide to service"}</h1>
-        <p className="mt-sm text-body text-grey">{canManage ? "Start with the stock you have. Work through these steps at your own pace, and return here from Settings → Setup guide." : "Find a wine, record a pour and keep the guest list current from your phone."}</p>
-      </header>
+      {/* The masthead pattern (DESIGN.md — Masthead), without a photograph:
+          the copper glow is what a masthead with no image band gets. */}
+      <div className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-xl md:-mx-lg md:-mt-xl md:px-lg md:pb-xl md:pt-2xl">
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">{auth.restaurantName}</p>
+        <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">{canManage ? "Get ready for service" : "Your guide to service"}</h1>
+        <p className="mt-sm text-body text-ink-soft">{canManage ? "Start with the stock you have. Work through these steps at your own pace, and return here from Settings → Setup guide." : "Find a wine, record a pour and keep the guest list current from your phone."}</p>
+      </div>
 
       {auth.userRole === "owner" && (
-        <details className="mb-lg rounded-card card-surface p-md">
-          <summary className="min-h-11 cursor-pointer text-body font-medium text-ink focus-ring">Restaurant details</summary>
+        <details className="glass mb-lg rounded-card p-md">
+          <summary className="min-h-11 cursor-pointer text-control font-medium text-ink focus-ring">Restaurant details</summary>
           <RestaurantNameForm restaurantId={auth.restaurantId} initialName={auth.restaurantName} />
         </details>
       )}
 
-      {steps.length > 0 && <ol className="mb-xl divide-y divide-rule rounded-card card-surface px-md">
-        {steps.map((step, index) => <li key={step.href} className="py-lg">
-          <p className="text-caption text-grey">Step {index + 1}</p>
-          <h2 className="mt-xs font-serif text-subheading text-ink">{step.title}</h2>
-          <p className="mt-xs text-control text-grey">{step.body}</p>
-          <GuideLink href={step.href}>{step.action}</GuideLink>
+      {/* A numbered sequence, one glass panel per step, one primary in each. */}
+      {steps.length > 0 && <ol className="mb-xl flex flex-col gap-md">
+        {steps.map((step, index) => <li key={step.href} className="glass rounded-card p-lg">
+          <p className="text-micro uppercase tracking-[0.12em] text-accent">Step {index + 1}</p>
+          <h2 className="mt-xs font-serif text-subheading font-normal text-ink">{step.title}</h2>
+          <p className="mt-xs text-body-sm text-ink-soft">{step.body}</p>
+          <Link href={step.href} className="mt-md inline-flex min-h-11 items-center gap-sm rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring">
+            {step.action}
+            <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={1.9} aria-hidden />
+          </Link>
         </li>)}
       </ol>}
 
-      <h2 className="font-serif text-subheading text-ink">On the floor</h2>
-      <p className="mt-xs text-control text-grey">Use the search at the top of any screen. Match the producer, vintage and bottle size before recording a pour.</p>
-      <div className="mt-sm space-y-xs">
+      <h2 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">On the floor</h2>
+      <p className="mt-sm text-body-sm text-ink-soft">Use the search at the top of any screen. Match the producer, vintage and bottle size before recording a pour.</p>
+      <div className="mt-md border-t border-rule">
         <GuideLink href="/cellar?mode=pour">Find a wine and pour</GuideLink>
         <GuideLink href="/cellar?mode=eightysix">Mark a wine unavailable</GuideLink>
         <GuideLink href="/cellar/open">Check open bottles</GuideLink>
         {canManage && <GuideLink href="/cellar/reconcile">Reconcile open bottles after service</GuideLink>}
       </div>
-      <p className="mt-md text-control text-grey">Reconciliation checks the remaining volume in open bottles. It is not a full count of sealed stock. Confirm a save has succeeded before moving on; changes need a connection.</p>
-      {canManage && <div className="mt-xl border-t border-rule pt-md">
+      <p className="mt-md text-body-sm text-ink-soft">Reconciliation checks the remaining volume in open bottles. It is not a full count of sealed stock. Confirm a save has succeeded before moving on; changes need a connection.</p>
+      {canManage && <div className="mt-xl border-t border-rule">
         <GuideLink href="/scan">Receive an invoice photo or PDF</GuideLink>
         <GuideLink href="/reconcile-queue">Review inventory issues and placement</GuideLink>
       </div>}
@@ -57,6 +63,7 @@ export default async function GetStartedPage() {
   );
 }
 
+/** A hairline index row — the secondary destinations, never a second primary. */
 function GuideLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="mt-sm flex min-h-11 items-center justify-between gap-sm rounded-md border border-rule bg-surface px-sm py-xs text-control font-medium text-ink hover:bg-wash focus-ring">{children}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden /></Link>;
+  return <Link href={href} className="flex min-h-11 items-center justify-between gap-sm border-b border-rule px-2xs py-sm text-control font-medium text-ink transition-colors hover:text-accent focus-ring">{children}<ArrowRight className="h-4 w-4 shrink-0 text-grey" strokeWidth={1.9} aria-hidden /></Link>;
 }

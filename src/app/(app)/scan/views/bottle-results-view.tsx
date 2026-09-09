@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, Check, Pencil, RotateCcw, Save } from "lucide-react";
+import { AlertCircle, Check, Pencil, RotateCcw, Save } from "lucide-react";
 import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { BottleCandidate, BottleField, BottleScanResult } from "@/lib/scanner/types";
 import { TextInput, VintageInput, MoneyInput, QtyStepper } from "../components/field-inputs";
+import { IdentitySeal, InfoRow, LabelPhotoBand } from "./bottle-identity";
 import { needsCorrectionBeforeSave } from "./bottle-confirm-gate";
 
 interface BottleResultsViewProps {
@@ -37,50 +38,6 @@ function confidenceBadgeClass(confidence: number) {
   return "bg-risk-wash text-risk-ink";
 }
 
-/**
- * Read-only identity field row used before the user chooses to correct
- * details. `emphasis` renders the value in the DESIGN.md wine-name
- * treatment (Cormorant Garamond, 17px, weight 500, never bold, never
- * smaller than 17px) — used for the wine-name row only; every other
- * identity field stays Inter body text.
- */
-function InfoRow({
-  label,
-  value,
-  low,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  low?: boolean;
-  emphasis?: boolean;
-}) {
-  return (
-    <div>
-      <div className="mb-2xs flex flex-wrap items-center gap-xs">
-        <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
-          {label}
-        </span>
-        {low && (
-          <span className="inline-flex items-center gap-[3px] rounded-pill bg-risk-wash px-xs py-[1px] text-[10px] font-medium uppercase tracking-wide text-risk-ink">
-            <AlertTriangle className="h-3 w-3" strokeWidth={2.25} aria-hidden="true" />
-            Needs review
-          </span>
-        )}
-      </div>
-      <div
-        className={cn(
-          "rounded-sm border border-transparent px-sm py-xs text-ink",
-          emphasis ? "font-serif text-[17px] font-medium" : "text-[14px]",
-          low && "border-l-[3px] border-l-primary bg-risk-wash/60",
-        )}
-      >
-        {value ? value : <span className="text-grey">Not detected</span>}
-      </div>
-    </div>
-  );
-}
-
 export function BottleResultsView({
   result,
   previewUrl,
@@ -108,6 +65,7 @@ export function BottleResultsView({
   // Issue #118: route an unidentifiable result through Correct details.
   const mustCorrect = needsCorrectionBeforeSave(active);
   const isLow = useCallback((field: BottleField) => active.lowFields.includes(field), [active]);
+  const showBanner = lowConfidence || mustCorrect;
 
   const handleCorrect = useCallback(() => {
     setName(active.name);
@@ -157,36 +115,30 @@ export function BottleResultsView({
   return (
     <section>
       <header className="mb-lg md:mb-xl">
-        <h1 className="font-serif text-heading-sm text-ink md:text-heading">
+        <IdentitySeal confirmable={!mustCorrect} />
+        <h1 className="mt-sm font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
           Wine identified
         </h1>
-        <p className="mt-xs text-[14px] text-grey md:text-[15px]">
+        <p className="mt-sm max-w-[52ch] text-body text-ink-soft">
           {stage === "review"
             ? "Confirm the AI match is right, or correct the details yourself."
             : "Update the fields, then save to inventory."}
         </p>
       </header>
 
-      {previewUrl && (
-        <div className="mb-md">
-          <div className="mb-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
-            Your label photo
-          </div>
-          {/* Plain <img>: previewUrl is a local object URL, never a remote
-              asset — next/image adds nothing here. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt="Label you captured"
-            className="max-h-[38vh] w-full rounded-lg bg-wash object-contain"
-          />
-        </div>
-      )}
+      {previewUrl && <LabelPhotoBand src={previewUrl} />}
 
-      {(lowConfidence || mustCorrect) && (
-        <div className="mb-md flex items-start gap-sm rounded-card border border-risk-ink/40/20 bg-risk-wash/60 px-md py-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-risk-ink" strokeWidth={2} />
-          <div className="text-[13px] text-ink">
+      {/* Whatever comes first after the band sits OVER it, so the photograph
+          keeps going behind the glass (DESIGN.md — Do's). */}
+      {showBanner && (
+        <div
+          className={cn(
+            "glass relative flex items-start gap-sm rounded-card px-md py-sm",
+            previewUrl ? "-mt-2xl" : "mt-md",
+          )}
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.9} />
+          <div className="text-body-sm text-ink">
             <span className="font-medium">
               {mustCorrect
                 ? "Confirm & save is off for this result."
@@ -199,13 +151,20 @@ export function BottleResultsView({
         </div>
       )}
 
-      <div className="rounded-card card-surface p-md md:p-lg">
+      {/* The sheet sits OVER the photograph, so the band keeps going behind
+          it (DESIGN.md — Do's). */}
+      <div
+        className={cn(
+          "glass relative rounded-card p-md md:p-lg",
+          previewUrl && !showBanner ? "-mt-2xl" : "mt-md",
+        )}
+      >
         {/* Confidence badge — the model's self-assessment, never a measured accuracy. */}
-        <div className="mb-md flex items-center justify-between">
+        <div className="mb-md flex items-center justify-between border-b border-rule pb-sm">
           <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             AI match confidence
           </span>
-          <span className={cn("rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide", confidenceBadgeClass(active.confidence))}>
+          <span className={"text-caption " + cn("rounded-pill px-sm py-2xs font-medium uppercase tracking-[0.14em]", confidenceBadgeClass(active.confidence))}>
             <span className="tabular">{Math.round(active.confidence * 100)}%</span>
           </span>
         </div>
@@ -222,15 +181,18 @@ export function BottleResultsView({
                   type="button"
                   aria-pressed={i === activeIndex}
                   onClick={() => setActiveIndex(i)}
-                  className={cn(
-                    "flex min-h-11 items-center gap-xs rounded-pill border px-sm py-xs text-[13px] font-medium transition-colors focus-ring",
-                    i === activeIndex
-                      ? "border-ink bg-ink text-on-inverse"
-                      : "border-rule bg-surface text-ink hover:bg-wash",
-                  )}
+                  className={
+                    "text-control " +
+                    cn(
+                      "flex min-h-11 items-center gap-xs rounded-pill border px-sm py-xs font-medium transition-colors focus-ring",
+                      i === activeIndex
+                        ? "border-primary bg-primary text-seal-ink"
+                        : "border-rule-strong bg-transparent text-ink hover:border-accent hover:text-accent",
+                    )
+                  }
                 >
                   <span className="max-w-[160px] truncate">{candidate.name || "Unnamed match"}</span>
-                  <span className="tabular text-[11px] opacity-75">
+                  <span className="tabular opacity-75">
                     {Math.round(candidate.confidence * 100)}%
                   </span>
                 </button>
@@ -240,34 +202,38 @@ export function BottleResultsView({
         )}
 
         {stage === "review" ? (
-          <div className="flex flex-col gap-md">
+          <div className="flex flex-col">
             <InfoRow label="Wine name" value={active.name} low={isLow("name")} emphasis />
             <InfoRow label="Producer" value={active.producer} low={isLow("producer")} />
-            <div className="grid grid-cols-2 gap-sm md:grid-cols-3">
-              <InfoRow
-                label="Vintage"
-                value={active.vintage === null ? "NV" : String(active.vintage)}
-                low={isLow("vintage")}
-              />
-              <InfoRow label="Varietal" value={active.varietal} />
-              <div className="col-span-2 md:col-span-1">
-                <InfoRow label="Region" value={active.region} low={isLow("region")} />
-              </div>
-            </div>
+            <InfoRow
+              label="Vintage"
+              value={active.vintage === null ? "NV" : String(active.vintage)}
+              low={isLow("vintage")}
+            />
+            <InfoRow label="Varietal" value={active.varietal} />
+            <InfoRow label="Region" value={active.region} low={isLow("region")} />
             <InfoRow label="Format" value={active.format ?? ""} low={isLow("format")} />
 
             {active.notes && (
-              <div className="rounded-md bg-wash px-md py-sm text-[13px] text-grey">
-                {active.notes}
-              </div>
+              <p className="mt-md text-body-sm text-ink-soft">{active.notes}</p>
             )}
 
             <button
               type="button"
               onClick={handleCorrect}
-              className="flex h-11 items-center justify-center gap-xs self-start rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+              /* When the confirm path is off, correcting the details IS the
+                 primary action, so it carries the one bone fill. */
+              className={
+                "text-control " +
+                cn(
+                  "mt-md flex h-12 items-center justify-center gap-xs self-start rounded-pill px-md font-medium focus-ring",
+                  mustCorrect
+                    ? "bg-primary font-semibold text-seal-ink transition-colors hover:bg-primary-hover"
+                    : "border border-rule-strong bg-transparent text-ink transition-colors hover:border-accent hover:text-accent",
+                )
+              }
             >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
               Something&rsquo;s off — correct details
             </button>
           </div>
@@ -289,7 +255,7 @@ export function BottleResultsView({
                 low={isLow("name")}
                 onCommit={setName}
                 label="Wine name"
-                className="font-serif text-[17px] font-medium"
+                variant="name"
               />
             </div>
 
@@ -329,15 +295,13 @@ export function BottleResultsView({
             </div>
 
             {active.notes && (
-              <div className="rounded-md bg-wash px-md py-sm text-[13px] text-grey">
-                {active.notes}
-              </div>
+              <p className="text-body-sm text-ink-soft">{active.notes}</p>
             )}
           </div>
         )}
 
         {/* Separator */}
-        <div className="my-lg border-t border-dashed border-rule" />
+        <div className="my-lg border-t border-rule-strong" />
 
         {/* User-provided fields */}
         <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
@@ -360,32 +324,43 @@ export function BottleResultsView({
         {/* eslint-enable jsx-a11y/label-has-associated-control */}
       </div>
 
-      {/* Actions */}
-      <div className="mt-md grid grid-cols-2 gap-sm">
+      {/* The sticky bottom glass rail (DESIGN.md — Layout). */}
+      <div
+        className="glass sticky bottom-[var(--chrome-tabbar-total)] z-[var(--z-sticky)] mt-md grid grid-cols-2 gap-sm rounded-card p-md md:static md:bottom-auto"
+        style={{ marginBottom: "calc(var(--safe-bottom) + var(--spacing-xs))" }}
+      >
         <button
           type="button"
           onClick={onScanAnother}
-          className="flex h-12 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring md:h-[38px]"
+          className="flex h-12 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
         >
-          <RotateCcw className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          <RotateCcw className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
           Scan another
         </button>
         <button
           type="button"
           onClick={stage === "review" ? handleConfirm : handleSaveCorrected}
           disabled={isSaving || !canCommit}
-          className="flex h-12 items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-50 md:h-[38px]"
+          className={
+            "text-control " +
+            cn(
+              "flex h-12 items-center justify-center gap-sm rounded-pill font-medium focus-ring disabled:opacity-50",
+              canCommit
+                ? "bg-primary font-semibold text-seal-ink transition-colors hover:bg-primary-hover"
+                : "border border-rule-strong bg-transparent text-ink",
+            )
+          }
         >
           {isSaving ? (
             <>Saving...</>
           ) : stage === "review" ? (
             <>
-              <Check className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              <Check className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
               Confirm & save
             </>
           ) : (
             <>
-              <Save className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              <Save className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
               Save to inventory
             </>
           )}

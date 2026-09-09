@@ -39,7 +39,10 @@ export function CatalogueAddButton({ payload }: { payload: CatalogueAddPayload }
       type="button"
       onClick={add}
       disabled={state === "pending" || state === "added"}
-      className="rounded-pill border border-edge px-lg py-sm text-body-sm text-ink-soft transition-colors hover:bg-wash focus-ring disabled:opacity-70"
+      /* The one action on this page, so it wears the one primary fill
+         (DESIGN.md — Components, Primary Button): bone, seal ink, 52px pill.
+         Full width inside the phone's sticky rail, its own width at md. */
+      className="focus-ring inline-flex min-h-11 h-[52px] w-full items-center justify-center rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover disabled:opacity-70 md:w-auto"
     >
       {state === "added"
         ? "Added to your cellar"

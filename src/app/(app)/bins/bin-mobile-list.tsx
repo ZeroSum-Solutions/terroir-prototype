@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Archive, ChevronDown, Pencil } from "lucide-react";
-import { WineThumb } from "@/components/wine-thumb";
-import { IconButton } from "@/components/icon-button";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BottleInventoryRow } from "@/lib/bins";
 import { wineDisplayName } from "@/lib/wine-display-name";
 import { BinForm, type BinDraft } from "./bin-form";
 import type { BinViewModel } from "./bin-view-model";
+import { BinActions, BinThumb, OccupancyMeter } from "./bin-row-parts";
 
 /**
  * Defect 8 (2026-09-08 demo screenshots, 390-bins.png): a six-column table
@@ -50,11 +49,11 @@ export function MobileBinList(props: Props) {
     <div className="md:hidden">
       {groups.map((group) => (
         <div key={group.zone}>
-          <div className="flex items-baseline justify-between gap-sm border-t border-rule bg-wash px-md py-2xs first:border-t-0">
-            <span className="text-caption font-medium uppercase tracking-[0.14em] text-grey">
+          <div className="flex items-baseline justify-between gap-sm border-b border-rule-strong px-md pb-2xs pt-lg">
+            <span className="text-caption font-medium uppercase text-ink-soft">
               {group.zone}
             </span>
-            <span className="tabular text-caption text-grey">
+            <span className="tabular text-ledger text-grey">
               {group.bins.length} {group.bins.length === 1 ? "bin" : "bins"}
             </span>
           </div>
@@ -102,7 +101,7 @@ function MobileBinRow({
 }: SharedProps & { bin: BinViewModel }) {
   if (editingId === bin.id) {
     return (
-      <li data-bin-row className="border-t border-rule bg-wash px-md py-md">
+      <li data-bin-row className="border-b border-rule px-md py-md">
         <BinForm
           draft={draft}
           busy={busy}
@@ -116,10 +115,8 @@ function MobileBinRow({
   }
   const wines = inventory.filter((item) => item.binId === bin.id);
   const expanded = expandedId === bin.id;
-  const hasCapacity = bin.capacity != null && bin.capacity > 0;
-  const pct = hasCapacity ? Math.min(100, (bin.bottleCount / bin.capacity!) * 100) : 0;
   return (
-    <li data-bin-row className="border-t border-rule px-md py-sm">
+    <li data-bin-row className="border-b border-rule px-md py-sm">
       <div className="flex justify-between gap-sm">
         <button
           type="button"
@@ -137,59 +134,32 @@ function MobileBinRow({
             strokeWidth={1.75}
             aria-hidden
           />
-          <span className="truncate font-medium text-ink">{bin.code}</span>
-          <span className="shrink-0 truncate text-body-sm text-grey">
+          <span className="truncate font-serif text-body-lg font-normal text-ink">{bin.code}</span>
+          <span className="shrink-0 truncate text-caption font-medium uppercase text-grey">
             {bin.zone ?? "Unzoned"}
           </span>
         </button>
         {canManage && (
-          <div className="flex shrink-0 justify-end gap-2xs">
-            <IconButton
-              label={`Edit bin ${bin.code}`}
-              onClick={() => onEdit(bin)}
-              className="rounded-md text-grey hover:bg-wash hover:text-ink focus-ring"
-            >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
-            <IconButton
-              label={`Retire bin ${bin.code}`}
-              onClick={() => onRetire(bin)}
-              disabled={busy}
-              className="rounded-md text-grey hover:bg-risk-wash hover:text-risk-ink disabled:opacity-50"
-            >
-              <Archive className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
-          </div>
+          <BinActions bin={bin} busy={busy} onEdit={onEdit} onRetire={onRetire} />
         )}
       </div>
-      <div className="mt-sm">
-        <div className="flex items-center justify-between text-caption font-medium uppercase tracking-wide text-grey">
-          <span>Occupancy</span>
-          <span className="tabular normal-case text-ink">
-            {bin.bottleCount}
-            {hasCapacity ? ` / ${bin.capacity}` : ""}
-          </span>
-        </div>
-        {hasCapacity && (
-          <div className="mt-2xs h-1.5 w-full overflow-hidden rounded-pill bg-surface-sunken">
-            <div className="h-full rounded-pill bg-primary" style={{ width: `${pct}%` }} />
-          </div>
-        )}
-        <p className="mt-2xs text-caption text-grey">{bin.occupancy}</p>
+      <div className="mt-xs flex items-baseline justify-between gap-sm">
+        <OccupancyMeter bin={bin} className="min-w-0 flex-1" />
+        <p className="shrink-0 text-ledger text-grey">{bin.occupancy}</p>
       </div>
       {expanded && wines.length > 0 && (
-        <div data-bin-wines={bin.code} className="mt-sm flex flex-col gap-xs">
+        <div data-bin-wines={bin.code} className="mt-sm border-t border-rule">
           {wines.map((wine) => (
             <Link
               key={`${wine.wineId}:${wine.binId}`}
               href={`/cellar?wine=${wine.wineId}`}
               data-bin-wine={wine.wineId}
-              className="flex min-h-11 items-center gap-sm rounded-md border border-rule bg-surface px-sm py-xs transition-colors hover:bg-wash focus-ring"
+              className="flex min-h-11 items-center gap-sm border-b border-rule px-sm py-xs transition-colors last:border-b-0 hover:bg-wash focus-ring"
             >
-              <WineThumb src={wine.heroImageUrl} producer={wine.producer} name={wine.name} colour={wine.colour} size={40} />
+              <BinThumb src={wine.heroImageUrl} producer={wine.producer} name={wine.name} colour={wine.colour} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-caption font-medium uppercase text-grey">{wine.producer}</span>
-                <span className="block truncate font-serif text-body-lg font-medium text-ink">{wineDisplayName(wine.producer, wine.name)}</span>
+                <span className="block truncate font-serif text-body-lg font-normal text-ink">{wineDisplayName(wine.producer, wine.name)}</span>
               </span>
               <span className="shrink-0 tabular text-body-sm text-grey">
                 {wine.quantity} {wine.quantity === 1 ? "bottle" : "bottles"}

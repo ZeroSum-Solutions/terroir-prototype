@@ -42,7 +42,7 @@ export function RestaurantNameForm({ restaurantId, initialName = "", onboarding 
 
   return (
     <form onSubmit={submit} className="mt-md space-y-sm" aria-busy={saving}>
-      <label className="block text-control text-ink">
+      <label className="block text-caption font-medium uppercase tracking-[0.18em] text-grey">
         Restaurant name
         <input
           autoFocus={onboarding}
@@ -53,12 +53,12 @@ export function RestaurantNameForm({ restaurantId, initialName = "", onboarding 
           disabled={saving}
           onChange={(event) => { setName(event.target.value); setSaved(false); }}
           placeholder="Your restaurant"
-          className="mt-xs h-11 w-full rounded-pill border border-edge bg-canvas px-md text-body-lg text-ink focus-ring"
+          className="mt-xs min-h-11 h-[52px] w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-body-lg text-ink placeholder:text-grey focus-visible:border-accent focus-ring md:text-control"
         />
       </label>
-      {error && <p role="alert" className="text-control text-risk-ink">{error}</p>}
-      {saved && <p role="status" className="text-control text-ready-ink">Restaurant name saved.</p>}
-      <button disabled={saving || !name.trim()} className="min-h-11 w-full rounded-pill bg-primary px-md text-control font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60">
+      {error && <p role="alert" className="text-body-sm text-risk-ink">{error}</p>}
+      {saved && <p role="status" className="text-body-sm text-ready-ink">Restaurant name saved.</p>}
+      <button disabled={saving || !name.trim()} className="min-h-11 h-[52px] w-full rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60">
         {saving ? "Saving…" : onboarding ? "Continue to setup" : "Save restaurant name"}
       </button>
     </form>

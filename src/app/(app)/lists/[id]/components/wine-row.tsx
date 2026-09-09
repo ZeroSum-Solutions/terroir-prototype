@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { WineThumb } from "@/components/wine-thumb";
 import { IconButton } from "@/components/icon-button";
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { ML_PER_OZ } from "@/lib/units";
 import { wineTitle } from "@/lib/wine-display-name";
 import { PriceStepper } from "./price-stepper";
 import { NameEdit, NameEditField } from "./wine-row-name";
+import { PortraitThumb } from "./portrait-thumb";
+import { PourConfigRow } from "./pour-config-row";
 
 type Wine = {
   id: string;
@@ -79,88 +79,6 @@ interface WineRowProps {
   dragHandleProps?: Record<string, unknown>;
 }
 
-/**
- * BND-038: compact per-wine pour config. An integer ml input with an
- * "≈ X.X oz" hint + a Fixed/Picker radio toggle. The radios disable
- * when ml is blank (pour tracking is off). Renders identically on
- * desktop and mobile — the parent row places it in the right slot.
- */
-function PourConfigRow({
-  item,
-  onPourChange,
-}: {
-  item: ListItem;
-  onPourChange: WineRowProps["onPourChange"];
-}) {
-  const pour = item.glass_pour_ml;
-  const ozHint = pour != null ? `≈ ${(pour / ML_PER_OZ).toFixed(1)} oz` : "";
-  const tracked = pour != null;
-  const nameRadio = `pour-mode-${item.id}`;
-
-  return (
-    <div className="flex flex-wrap items-center gap-sm text-[12px] text-grey">
-      <label className="flex min-h-11 items-center gap-xs">
-        <span className="shrink-0">Pour</span>
-        <input
-          type="number"
-          min={1}
-          max={2000}
-          value={pour ?? ""}
-          onChange={(e) => {
-            const v = e.target.value.trim();
-            if (v === "") {
-              onPourChange(item.id, "glass_pour_ml", null);
-              return;
-            }
-            const n = Number(v);
-            if (!Number.isFinite(n) || n <= 0) return;
-            onPourChange(
-              item.id,
-              "glass_pour_ml",
-              Math.max(1, Math.min(2000, Math.round(n))),
-            );
-          }}
-          placeholder="148"
-          aria-label={`Pour size in ml for ${item.wines.name}`}
-          className="h-11 w-[64px] rounded-md border border-rule bg-surface px-xs text-right font-mono text-[12px] text-ink outline-none focus:border-accent focus-ring"
-        />
-        <span className="shrink-0 text-[11px] text-grey">ml</span>
-        {ozHint && (
-          <span className="shrink-0 text-[11px] text-grey">{ozHint}</span>
-        )}
-      </label>
-      <fieldset
-        className={cn(
-          "flex items-center gap-sm",
-          !tracked && "pointer-events-none opacity-40",
-        )}
-      >
-        <legend className="sr-only">Pour size mode</legend>
-        <label className="flex min-h-11 items-center gap-xs">
-          <input
-            type="radio"
-            name={nameRadio}
-            checked={item.pour_size_mode === "fixed"}
-            disabled={!tracked}
-            onChange={() => onPourChange(item.id, "pour_size_mode", "fixed")}
-          />
-          Fixed
-        </label>
-        <label className="flex min-h-11 items-center gap-xs">
-          <input
-            type="radio"
-            name={nameRadio}
-            checked={item.pour_size_mode === "picker"}
-            disabled={!tracked}
-            onChange={() => onPourChange(item.id, "pour_size_mode", "picker")}
-          />
-          Picker
-        </label>
-      </fieldset>
-    </div>
-  );
-}
-
 export function WineRow({
   item,
   canManage,
@@ -179,28 +97,26 @@ export function WineRow({
   return (
     <>
       {/* Desktop row — grid + compact pour-config sub-row stacked below. */}
-      <div className="group hidden border-b border-rule transition-colors last:border-b-0 hover:bg-wash md:block">
-      <div className="grid grid-cols-[28px_40px_1fr_136px_136px_36px] items-center px-lg py-sm">
+      <div className="group hidden border-b border-rule transition-colors last:border-b-0 hover:bg-surface-raised md:block">
+      <div className="grid grid-cols-[28px_44px_1fr_136px_136px_36px] items-center px-lg py-sm">
         <div
           aria-label={canManage ? "Drag to reorder" : undefined}
           className="flex min-h-11 min-w-11 cursor-grab items-center justify-center text-grey opacity-0 transition-opacity group-hover:opacity-100"
           {...(canManage ? dragHandleProps : {})}
         >
-          {canManage && <GripVertical className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />}
+          {canManage && <GripVertical className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />}
         </div>
-        <WineThumb
+        <PortraitThumb
           src={wine.hero_image_url}
           producer={wine.producer}
           name={wine.name}
           colour={wine.colour}
-          size={32}
+          width={32}
         />
         <div>
           <NameEdit item={item} onNameChange={onNameChange} canManage={canManage} />
-          <div className="mt-2xs flex items-center gap-xs text-[12px] text-grey">
-            <span className="font-mono text-grey">
-              {wine.vintage ?? "NV"}
-            </span>
+          <div className="mt-2xs flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
+            <span className="tabular">{wine.vintage ?? "NV"}</span>
             {wine.region && (
               <>
                 <span className="text-grey">·</span>
@@ -243,7 +159,7 @@ export function WineRow({
             onClick={() => onDelete(item.id)}
             className="flex h-11 w-11 items-center justify-center rounded-pill text-grey opacity-0 transition-opacity hover:bg-risk-wash hover:text-risk-ink group-hover:opacity-100"
           >
-            <Trash2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
           </button>
         )}
       </div>
@@ -251,7 +167,7 @@ export function WineRow({
           SD-12: pour size, the guest note and the hide toggle are all item
           PATCHes, so the whole sub-row is owner/manager. */}
       {canManage && (
-      <div className="hidden border-t border-rule/40 bg-wash/30 px-lg pb-sm pt-xs md:grid md:grid-cols-[28px_40px_1fr]">
+      <div className="hidden border-t border-rule px-lg pb-sm pt-xs md:grid md:grid-cols-[28px_44px_1fr]">
         {/* Two spacers, one per leading column above (drag handle, thumbnail),
             so this sub-row stays aligned under the wine's name. */}
         <div />
@@ -266,14 +182,14 @@ export function WineRow({
               onBlur={(e) => { if (!e.target.value.trim()) onBlurbChange(item.id, null); }}
               placeholder="Add a note for guests (e.g., sommelier pick, pairing suggestion)"
               rows={2}
-              className="min-h-11 min-w-0 flex-1 resize-none rounded-md border border-rule bg-surface px-xs py-1 text-[12px] text-ink outline-none placeholder:text-grey/50 focus:border-accent focus-ring"
+              className="min-h-11 min-w-0 flex-1 resize-none rounded-md border border-rule-strong bg-surface-sunken px-xs py-1 text-ledger text-ink outline-none placeholder:text-grey focus:border-accent focus-ring"
             />
             {/* BND-171: hide toggle */}
             <button
               type="button"
               onClick={() => onHiddenChange(item.id, !item.hidden)}
               className={cn(
-                "min-h-11 shrink-0 rounded-pill px-sm py-1 text-[10.5px] font-medium uppercase tracking-wide transition-colors",
+                "min-h-11 shrink-0 rounded-pill px-sm py-1 text-caption font-medium uppercase tracking-[0.18em] transition-colors",
                 item.hidden ? "bg-risk-wash text-risk-ink" : "bg-surface-sunken text-ink-soft hover:text-ink"
               )}
               title={item.hidden ? "Hidden from public list" : "Visible on public list"}
@@ -294,33 +210,36 @@ export function WineRow({
               deleting now says Remove. */}
           <Link
             href={`/cellar?wine=${item.wine_id}`}
-            className="flex min-h-11 min-w-0 flex-1 items-start gap-sm rounded-md transition-colors hover:bg-wash focus-ring"
+            className="flex min-h-11 min-w-0 flex-1 items-start gap-sm rounded-lg transition-colors hover:bg-surface-raised focus-ring"
           >
-            <WineThumb
+            <PortraitThumb
               src={wine.hero_image_url}
               producer={wine.producer}
               name={wine.name}
               colour={wine.colour}
-              size={40}
+              width={40}
             />
             <div className="min-w-0 flex-1">
               <div
                 className={cn(
-                  "font-serif text-body-lg font-medium",
+                  "font-serif text-body-lg font-normal",
                   item.name_override != null ? "text-accent italic" : "text-ink",
                 )}
               >
                 {item.name_override ??
                   `${wineTitle(wine.producer, wine.name, ", ")}`}
               </div>
-              <div className="mt-2xs flex flex-wrap items-center gap-xs text-[12px] text-grey">
-                <span className="rounded-pill bg-surface-sunken px-sm py-2xs font-mono text-[11px] text-ink-soft">
-                  {wine.vintage ?? "NV"}
-                </span>
-                {wine.region && <span>{wine.region}</span>}
+              <div className="mt-2xs flex flex-wrap items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
+                <span className="tabular">{wine.vintage ?? "NV"}</span>
+                {wine.region && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{wine.region}</span>
+                  </>
+                )}
               </div>
               {(wine.serving_temp_label || wine.drink_window_start) && (
-                <div className="mt-xs flex items-center gap-sm text-[11px] text-grey">
+                <div className="mt-xs flex items-center gap-sm text-ledger text-grey">
                   {wine.serving_temp_label && (
                     <span>{wine.serving_temp_min}–{wine.serving_temp_max}°F</span>
                   )}
@@ -334,10 +253,10 @@ export function WineRow({
           {canManage && (
             <>
               <IconButton label={`Rename ${item.wines.name}`} onClick={() => setRenaming(true)} className="shrink-0 rounded-pill text-grey hover:text-accent">
-                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                <Pencil className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
               </IconButton>
               <IconButton label={`Remove ${item.wines.name}`} onClick={() => onDelete(item.id)} className="shrink-0 rounded-pill text-grey hover:bg-risk-wash hover:text-risk-ink">
-                <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                <Trash2 className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
               </IconButton>
             </>
           )}
@@ -349,7 +268,7 @@ export function WineRow({
         )}
         <div className="mt-sm grid grid-cols-2 gap-sm">
           <div>
-            <div className="text-caption uppercase text-grey">
+            <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
               Glass
             </div>
             <div className="mt-2xs">
@@ -364,7 +283,7 @@ export function WineRow({
             </div>
           </div>
           <div>
-            <div className="text-caption uppercase text-grey">
+            <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
               Bottle
             </div>
             <div className="mt-2xs">
@@ -380,8 +299,8 @@ export function WineRow({
         </div>
         {/* BND-038: mobile pour-config block. */}
         {canManage && (
-          <div className="mt-sm border-t border-rule/50 pt-sm">
-            <div className="text-caption uppercase text-grey">
+          <div className="mt-sm border-t border-rule pt-sm">
+            <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
               Pour
             </div>
             <div className="mt-xs">
@@ -391,8 +310,8 @@ export function WineRow({
         )}
         {/* BND-170/171: blurb + hide toggle (mobile) */}
         {canManage && (
-        <div className="mt-sm border-t border-rule/50 pt-sm">
-          <div className="text-caption uppercase text-grey">
+        <div className="mt-sm border-t border-rule pt-sm">
+          <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Note
           </div>
           <textarea
@@ -401,13 +320,13 @@ export function WineRow({
             onBlur={(e) => { if (!e.target.value.trim()) onBlurbChange(item.id, null); }}
             placeholder="Sommelier pick, pairing suggestion..."
             rows={2}
-            className="mt-xs w-full rounded-md border border-rule bg-surface px-xs py-1 text-[12px] text-ink resize-none outline-none focus:border-accent focus-ring placeholder:text-grey/50"
+            className="mt-xs w-full resize-none rounded-md border border-rule-strong bg-surface-sunken px-xs py-1 text-ledger text-ink outline-none placeholder:text-grey focus:border-accent focus-ring"
           />
           <button
             type="button"
             onClick={() => onHiddenChange(item.id, !item.hidden)}
             className={cn(
-              "mt-xs min-h-11 rounded-pill px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide transition-colors",
+              "mt-xs min-h-11 rounded-pill px-sm py-xs text-caption font-medium uppercase tracking-[0.18em] transition-colors",
               item.hidden ? "bg-risk-wash text-risk-ink" : "bg-surface-sunken text-ink-soft hover:text-ink"
             )}
             title={item.hidden ? "Hidden from public list" : "Visible on public list"}

@@ -54,7 +54,7 @@ export function SortableSectionItem({
       style={style}
       className={cn(
         "flex items-center justify-between px-md py-sm",
-        isDragging && "touch-none bg-wash rounded-md",
+        isDragging && "touch-none rounded-card bg-wash",
       )}
     >
       {editingId === section.id ? (
@@ -67,7 +67,7 @@ export function SortableSectionItem({
               if (e.key === "Enter") onCommitEdit(section.id);
               if (e.key === "Escape") onCancelEdit();
             }}
-            className="min-h-11 min-w-0 flex-1 rounded-pill border border-rule px-sm py-sm text-control text-ink focus-ring"
+            className="glass min-h-11 min-w-0 flex-1 rounded-pill px-sm py-sm text-control text-ink focus-ring"
             autoFocus
           />
           <button
@@ -111,7 +111,7 @@ export function SortableSectionItem({
               <GripVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
 
-            <span className="min-w-0 flex-1 break-words text-control font-medium text-ink">
+            <span className="min-w-0 flex-1 break-words font-serif text-body-lg font-normal text-ink">
               {section.name}
             </span>
           </div>
@@ -121,7 +121,7 @@ export function SortableSectionItem({
               onClick={() => onStartEdit(section)}
               disabled={busy}
               aria-label={`Rename ${section.name}`}
-              className="flex h-11 w-11 items-center justify-center rounded-pill text-grey hover:bg-wash disabled:opacity-40 focus-ring"
+              className="glass flex h-11 w-11 items-center justify-center rounded-pill text-grey hover:text-ink disabled:opacity-40 focus-ring"
             >
               <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
@@ -130,7 +130,7 @@ export function SortableSectionItem({
               onClick={() => onDelete(section)}
               disabled={busy}
               aria-label={`Delete ${section.name}`}
-              className="flex h-11 w-11 items-center justify-center rounded-pill text-risk-ink/70 hover:bg-risk-wash hover:text-risk-ink disabled:opacity-40 focus-ring"
+              className="glass flex h-11 w-11 items-center justify-center rounded-pill text-risk-ink/70 hover:text-risk-ink disabled:opacity-40 focus-ring"
             >
               <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>

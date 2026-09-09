@@ -315,7 +315,7 @@ export function SearchPalette({ className }: { className?: string }) {
             setActive((i) => (i > 0 ? i - 1 : rows.length - 1));
           }
         }}
-        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink md:text-control outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
+        className="glass min-h-11 h-[52px] w-full rounded-pill pl-[32px] pr-[36px] text-body-lg text-ink outline-none placeholder:text-grey focus-visible:border-accent focus-ring md:text-control"
       />
       {query ? (
         <button
@@ -325,7 +325,7 @@ export function SearchPalette({ className }: { className?: string }) {
             clear();
             inputRef.current?.focus();
           }}
-          className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-pill text-grey hover:bg-surface/60 hover:text-ink-soft focus-ring"
+          className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-pill text-grey transition-colors hover:text-accent focus-ring"
         >
           <X className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>

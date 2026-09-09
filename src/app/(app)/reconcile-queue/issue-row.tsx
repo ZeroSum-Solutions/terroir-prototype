@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { WineThumb } from "@/components/wine-thumb";
 import { cn } from "@/lib/utils";
 import type { ReconcileQueueKind, ReconcileQueueRow } from "@/lib/reconcile-queue";
 import { buildAcceptAction } from "./accept-action";
@@ -44,8 +45,8 @@ export function QueueIssueRow(props: Props) {
       className={cn(
         "grid gap-sm border-t border-rule px-md py-md first:border-t-0 md:items-center",
         canManage
-          ? "md:grid-cols-[44px_minmax(0,1fr)_minmax(180px,auto)_100px]"
-          : "md:grid-cols-[minmax(0,1fr)_minmax(180px,auto)_100px]",
+          ? "md:grid-cols-[44px_minmax(0,1fr)_minmax(180px,auto)_110px]"
+          : "md:grid-cols-[minmax(0,1fr)_minmax(180px,auto)_110px]",
       )}
     >
       {canManage && (
@@ -63,13 +64,18 @@ export function QueueIssueRow(props: Props) {
       )}
       <IssueIdentity row={row} />
       <IssueControl row={row} bins={bins} binId={binId} canManage={canManage} onBinChange={onBinChange} />
+      {/* Capital at risk is what this queue is sorted by, so it is the one
+          figure the row sets big — Manrope with tabular-nums, never mono
+          (DESIGN.md — Typography, Source Code Pro is identifiers only). */}
       <div className="flex items-baseline justify-between gap-md md:block md:text-right">
         <span className="text-caption uppercase text-grey md:hidden">At risk</span>
-        <span className="font-mono text-[14px] font-medium tabular-nums text-ink">
-          ${formatRisk(row.atRisk)}
-        </span>
-        <span className="ml-xs text-[11px] tabular-nums text-grey md:block md:ml-0">
-          {row.units} units
+        <span className="text-right">
+          <span className="text-body-lg font-semibold tabular-nums text-ink">
+            ${formatRisk(row.atRisk)}
+          </span>
+          <span className="ml-xs text-ledger tabular-nums text-grey md:ml-0 md:block">
+            {row.units} units
+          </span>
         </span>
       </div>
     </article>
@@ -78,22 +84,38 @@ export function QueueIssueRow(props: Props) {
 
 function IssueIdentity({ row }: { row: ReconcileQueueRow }) {
   return (
-    <div className="min-w-0">
-      <div className="mb-xs flex flex-wrap items-center gap-xs">
-        <span className={`rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${KIND_STYLES[row.kind]}`}>
-          {KIND_LABELS[row.kind]}
-        </span>
-        {row.suggestion && <BasisChip row={row} />}
+    <div className="flex min-w-0 gap-sm">
+      {/* A queue row carries no photograph — the subject may not be a wine
+          record yet — so it takes the same initials stand-in every other
+          index row falls back to, cropped to the 2:3 window (DESIGN.md —
+          Imagery: thumbnails are portrait, never square). */}
+      <span className="relative mt-3xs block h-12 w-8 shrink-0 overflow-hidden rounded-lg border border-glass-edge">
+        <WineThumb
+          src={null}
+          producer={null}
+          name={row.title}
+          colour={null}
+          size={48}
+          className="absolute left-1/2 top-0 -translate-x-1/2 rounded-none"
+        />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-xs">
+          <span className={`rounded-pill px-sm py-2xs text-caption font-medium uppercase tracking-[0.13em] ${KIND_STYLES[row.kind]}`}>
+            {KIND_LABELS[row.kind]}
+          </span>
+          {row.suggestion && <BasisChip row={row} />}
+        </div>
+        {row.deepLink ? (
+          <Link href={row.deepLink} className="group inline-flex min-h-11 items-center gap-xs font-serif text-body-lg font-normal text-ink hover:text-accent">
+            {row.title}
+            <ArrowUpRight className="h-3.5 w-3.5 text-grey group-hover:text-accent" aria-hidden />
+          </Link>
+        ) : (
+          <p className="py-xs font-serif text-body-lg font-normal text-ink">{row.title}</p>
+        )}
+        <p className="text-ledger text-grey">{row.detail}</p>
       </div>
-      {row.deepLink ? (
-        <Link href={row.deepLink} className="group inline-flex min-h-11 items-center gap-xs font-serif text-[17px] font-medium text-ink hover:text-accent">
-          {row.title}
-          <ArrowUpRight className="h-3.5 w-3.5 text-grey group-hover:text-accent" aria-hidden />
-        </Link>
-      ) : (
-        <p className="py-xs font-serif text-[17px] font-medium text-ink">{row.title}</p>
-      )}
-      <p className="text-[12px] text-grey">{row.detail}</p>
     </div>
   );
 }
@@ -102,19 +124,23 @@ function BasisChip({ row }: { row: ReconcileQueueRow }) {
   const basis = row.suggestion!.basis;
   const label = basis.kind === "lwin" ? "LWIN" : "Field match";
   const detail = basis.kind === "lwin" ? basis.lwin : basis.fields.join(" · ");
+  // The basis is an eyebrow, not a status: the label carries the caption
+  // weight and the field list rides behind it at micro size, so a four-field
+  // match no longer paints a two-line green block across the row.
   return (
-    <span data-basis={basis.kind} className="rounded-pill bg-ready-wash px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide text-ready-ink">
-      <span>{label}</span><span className="sr-only">{detail}</span>
-      <span aria-hidden className="ml-2xs opacity-75">{detail}</span>
+    <span data-basis={basis.kind} className="inline-flex min-w-0 max-w-full items-center gap-2xs rounded-pill border border-ready-ink/40 px-sm py-2xs text-ready-ink">
+      <span className="shrink-0 text-caption font-medium uppercase tracking-[0.13em]">{label}</span>
+      <span className="sr-only">{detail}</span>
+      <span aria-hidden className="truncate text-micro opacity-75">{detail}</span>
     </span>
   );
 }
 
 function IssueControl({ row, bins, binId, canManage, onBinChange }: Pick<Props, "row" | "bins" | "binId" | "canManage" | "onBinChange">) {
   if (row.kind !== "unplaced" || !canManage) {
-    return <p className="text-[12px] text-grey">{row.action?.label ?? "Review in cellar"}</p>;
+    return <p className="text-ledger text-grey">{row.action?.label ?? "Review in cellar"}</p>;
   }
-  if (bins.length === 0) return <p className="text-[12px] text-risk-ink">Create an active bin first</p>;
+  if (bins.length === 0) return <p className="text-ledger text-risk-ink">Create an active bin first</p>;
   return (
     <label className="block">
       <span className="sr-only">Bin for {row.title}</span>
@@ -122,7 +148,7 @@ function IssueControl({ row, bins, binId, canManage, onBinChange }: Pick<Props, 
         aria-label={`Bin for ${row.title}`}
         value={binId ?? ""}
         onChange={(event) => onBinChange(event.target.value)}
-        className="h-11 w-full rounded-pill border border-rule-strong bg-surface px-md text-[13px] text-ink focus:border-accent focus-ring"
+        className="h-11 w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink focus:border-accent focus-ring"
       >
         <option value="">Choose bin</option>
         {bins.map((bin) => <option key={bin.id} value={bin.id}>{bin.zone ? `${bin.zone} · ` : ""}{bin.code}</option>)}

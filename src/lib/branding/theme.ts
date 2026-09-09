@@ -119,7 +119,29 @@ export function themeCssVariables(value: unknown): ThemeCssProperties | undefine
   const theme = parseStoredTheme(value);
   if (!theme) return undefined;
   const spacing = SPACING[theme.spacing.scale];
+  // Tailwind's theme is declared `@theme inline`, so a utility such as
+  // bg-surface compiles to `background: var(--t-surface)` — the RUNTIME
+  // variable — not to var(--color-surface). Overriding only the --color-*
+  // names therefore never reached the page; the white background the
+  // branded-menu journey asserted came from the old paper surface by
+  // coincidence. The --t-* names below are what actually paints; the
+  // --color-* names stay for anything that reads them directly.
   return {
+    "--t-surface": theme.palette.background,
+    "--t-canvas": theme.palette.background,
+    "--t-surface-raised": theme.palette.surface,
+    "--t-surface-sunken": theme.palette.surface,
+    "--t-wash": theme.palette.surface,
+    "--t-ink": theme.palette.text,
+    "--t-ink-soft": theme.palette.mutedText,
+    "--t-grey": theme.palette.mutedText,
+    "--t-accent": theme.palette.accent,
+    "--t-mark": theme.palette.accent,
+    "--t-rule": theme.palette.border,
+    "--t-rule-strong": theme.palette.border,
+    "--t-edge": theme.palette.border,
+    "--font-cormorant": fontStack(theme.typography.heading),
+    "--font-manrope": fontStack(theme.typography.body),
     "--color-surface": theme.palette.background,
     "--color-surface-muted": theme.palette.surface,
     "--color-surface-sunken": theme.palette.surface,

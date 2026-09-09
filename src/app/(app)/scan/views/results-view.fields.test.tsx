@@ -71,7 +71,9 @@ describe("ResultsView correction field accessibility", () => {
 
     for (const name of ["Clear", "Scan another", "CSV", "JSON", "Save to Inventory"]) {
       const action = buttonContaining(container, name);
-      expect(action.className).toContain("min-h-11");
+      // 44px floor, however it is spelled: the primary is a 48px pill
+      // (DESIGN.md — Primary Button), the ghosts beside it stay at min-h-11.
+      expect(action.className).toMatch(/(?:^|\s)(?:min-h-11|min-h-12|h-11|h-12)(?:\s|$)/);
       expect(action.className).not.toContain("md:h-[38px]");
     }
   });

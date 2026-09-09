@@ -9,7 +9,7 @@
 // link and no on-hand count, because saying nothing is the only honest thing
 // a row can say about a bottle that isn't in the cellar.
 
-import { WineThumb } from "@/components/wine-thumb";
+import { PortraitThumb } from "@/app/(app)/lists/[id]/components/portrait-thumb";
 import type {
   AssistantCellarWine,
   AssistantCorpusWine,
@@ -45,22 +45,22 @@ export function CellarResult({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-start gap-sm rounded-md border border-edge px-md py-sm text-left transition-colors hover:bg-wash focus-ring"
+      className="flex w-full items-start gap-sm border-b border-rule px-2xs py-sm text-left transition-colors hover:bg-surface-raised focus-ring"
     >
       {/* The label is the fastest way a sommelier recognises a bottle, so it
           leads the row. WineThumb rather than a bare <img>: it falls back to
           the producer's initials tinted by wine colour, which keeps the list
           even instead of ragged when a wine has no photograph. */}
-      <WineThumb
+      <PortraitThumb
         src={wine.imageUrl}
         producer={wine.producer}
         name={wine.name}
         colour={wine.colour}
-        size={44}
+        width={36}
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-sm">
-          <span className="text-control text-ink">
+          <span className="font-serif text-body-lg font-normal text-ink">
             {wineTitle(wine.producer, wine.name)}
             {wine.vintage ? ` ${wine.vintage}` : ""}
           </span>
@@ -70,7 +70,7 @@ export function CellarResult({
             </span>
           ) : null}
         </span>
-        <span className="mt-2xs flex flex-wrap items-center gap-x-sm text-ledger font-light text-grey">
+        <span className="mt-2xs flex flex-wrap items-center gap-x-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
           {facts.length > 0 ? <span>{facts.join(" · ")}</span> : null}
           <Rating avg={wine.ratingAvg} count={wine.ratingCount} />
           <span className={wine.onHand > 0 ? "text-ready-ink" : "text-risk-ink"}>
@@ -85,20 +85,20 @@ export function CellarResult({
 export function CorpusResult({ wine }: { wine: AssistantCorpusWine }) {
   const facts = [wine.grapes[0], wine.region ?? wine.country, wine.body].filter(Boolean);
   return (
-    <div className="flex items-start gap-sm rounded-md border border-edge px-md py-sm">
-      <WineThumb
+    <div className="flex items-start gap-sm border-b border-rule px-2xs py-sm">
+      <PortraitThumb
         src={wine.imageUrl}
         producer={wine.winery}
         name={wine.name}
         colour={wine.type}
-        size={44}
+        width={36}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-control text-ink">
+        <p className="font-serif text-body-lg font-normal text-ink">
           {wine.winery ? `${wine.winery} ` : ""}
           {wine.name}
         </p>
-        <p className="mt-2xs flex flex-wrap items-center gap-x-sm text-ledger font-light text-grey">
+        <p className="mt-2xs flex flex-wrap items-center gap-x-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
           {facts.length > 0 ? <span>{facts.join(" · ")}</span> : null}
           <Rating avg={wine.ratingAvg} count={wine.ratingCount} />
         </p>

@@ -40,42 +40,37 @@ interface SummaryRowProps {
 function SummaryRow({ items, bottles, total, lowCount }: SummaryRowProps) {
   const stats: Array<{
     label: string;
-    value: React.ReactNode;
+    value: string;
     tone?: "warning" | "success";
   }> = [
-    { label: "Line items", value: <span className="tabular">{items}</span> },
-    { label: "Bottles", value: <span className="tabular">{bottles}</span> },
-    { label: "Invoice total", value: <span className="tabular">${formatMoney(total)}</span> },
+    { label: "Line items", value: String(items) },
+    { label: "Bottles", value: String(bottles) },
+    { label: "Invoice total", value: `$${formatMoney(total)}` },
     {
       label: "Need review",
-      value: (
-        <>
-          <span className="tabular">{lowCount}</span>
-          <span className="ml-xs text-[12px] font-normal text-grey">fields</span>
-        </>
-      ),
+      value: `${lowCount} field${lowCount === 1 ? "" : "s"}`,
       tone: lowCount > 0 ? "warning" : "success",
     },
   ];
+  // One glass strip rather than four stat cards (DESIGN.md — Surfaces).
   return (
-    <div className="grid grid-cols-2 gap-sm md:grid-cols-4 md:gap-md">
+    <div className="glass grid grid-cols-2 gap-md rounded-card p-md md:grid-cols-4 md:p-lg">
       {stats.map((s) => (
-        <div
-          key={s.label}
-          className="rounded-card card-surface p-md"
-        >
+        <div key={s.label}>
           <div className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             {s.label}
           </div>
-          <div
-            className={cn(
-              "mt-xs text-[20px] font-medium",
-              s.tone === "warning" && "text-risk-ink",
-              s.tone === "success" && "text-ready-ink",
-              !s.tone && "text-ink",
-            )}
-          >
-            {s.value}
+          <div className="mt-2xs text-subheading">
+            <span
+              className={cn(
+                "tabular",
+                s.tone === "warning" && "text-accent",
+                s.tone === "success" && "text-ready-ink",
+                !s.tone && "text-ink",
+              )}
+            >
+              {s.value}
+            </span>
           </div>
         </div>
       ))}
@@ -185,7 +180,7 @@ export function ResultsView({
           <button
             type="button"
             onClick={() => setRawTextOpen(!rawTextOpen)}
-            className="flex w-full items-center justify-between rounded-card card-surface p-md text-[13px] font-medium text-ink focus-ring"
+            className="flex min-h-11 w-full items-center justify-between rounded-card card-surface p-md text-body-sm font-medium text-ink focus-ring"
           >
             <span className="flex items-center gap-sm">
               <FileText className="h-4 w-4 text-grey" strokeWidth={1.75} />
@@ -197,8 +192,8 @@ export function ResultsView({
             />
           </button>
           {rawTextOpen && (
-            <div className="mt-xs rounded-md border border-rule bg-wash p-md">
-              <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-grey">
+            <div className="mt-xs rounded-card border border-rule bg-surface-sunken p-md">
+              <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap text-ledger leading-relaxed text-grey">
                 {rawText}
               </pre>
             </div>
@@ -209,32 +204,35 @@ export function ResultsView({
       <div className={rawText ? "md:min-w-0 md:flex-1" : ""}>
       <header className="mb-lg flex flex-col gap-sm md:mb-xl md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-serif text-heading-sm text-ink md:text-heading">
+          <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+            Scan · Invoice · Review
+          </p>
+          <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink">
             Invoice scan results
           </h1>
-          <p className="mt-xs text-[14px] text-grey md:text-[15px]">
+          <p className="mt-sm max-w-[52ch] text-body text-ink-soft">
             Review, correct, and export. Flagged fields need a second look.
           </p>
         </div>
         <div className="flex items-center gap-sm self-start md:self-auto">
-          <div className="flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-xs text-[11px] font-medium uppercase tracking-wide text-ready-ink">
-            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          <span className="inline-flex items-center gap-xs rounded-pill bg-ready-wash px-sm py-2xs text-caption font-medium uppercase tracking-[0.14em] text-ready-ink">
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
             <span>Parsed accuracy</span>
             <span className="tabular">{accuracy}%</span>
-          </div>
+          </span>
           <button
             type="button"
             onClick={() => setDiscardOpen(true)}
-            className="flex min-h-11 items-center gap-xs rounded-pill border border-edge px-sm text-[12px] font-medium text-grey hover:bg-wash hover:text-accent focus-ring"
+            className="flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong px-md text-caption font-medium uppercase tracking-[0.18em] text-grey transition-colors hover:border-accent hover:text-accent focus-ring"
           >
-            <Trash2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden="true" />
             Clear
           </button>
         </div>
       </header>
 
       {scanId != null && capturedImageUrl && (
-        <div className="mb-lg rounded-card card-surface p-md">
+        <div className="mb-lg rounded-card bg-surface-sunken p-md">
           <div className="mb-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Captured photo
           </div>
@@ -258,16 +256,16 @@ export function ResultsView({
         </div>
       )}
 
-      <div className="mb-lg rounded-card card-surface p-md">
+      <div className="glass mb-lg rounded-card p-md md:p-lg">
         <div className="flex flex-col gap-sm">
           <Field id="scan-supplier" label="Supplier">
             {(a11y) => (
-              <div className="relative mt-xs flex w-full items-center rounded-pill border border-rule bg-surface px-md py-xs transition-colors focus-within:border-accent focus-ring">
+              <div className="relative mt-xs flex min-h-12 w-full items-center rounded-pill border border-rule-strong bg-surface-sunken px-md transition-colors focus-within:border-accent focus-ring">
                 <input
                   {...a11y}
                   value={source.distributor}
                   onChange={(e) => onUpdateSource("distributor", e.target.value)}
-                  className="min-h-11 w-full bg-transparent text-[14px] font-medium text-ink outline-none"
+                  className="min-h-11 w-full bg-transparent text-control font-medium text-ink outline-none"
                 />
               </div>
             )}
@@ -275,34 +273,34 @@ export function ResultsView({
           <div className="flex items-center gap-sm">
             <Field id="scan-invoice-number" label="Invoice number" className="flex-1">
               {(a11y) => (
-                <div className="relative mt-xs flex w-full items-center rounded-pill border border-rule bg-surface px-md py-xs transition-colors focus-within:border-accent focus-ring">
+                <div className="relative mt-xs flex min-h-12 w-full items-center rounded-pill border border-rule-strong bg-surface-sunken px-md transition-colors focus-within:border-accent focus-ring">
                   <input
                     {...a11y}
                     value={source.invoiceNo}
                     onChange={(e) => onUpdateSource("invoiceNo", e.target.value)}
-                    className="min-h-11 w-full bg-transparent text-[14px] text-ink outline-none"
+                    className="min-h-11 w-full bg-transparent text-control text-ink outline-none"
                   />
                 </div>
               )}
             </Field>
             <Field id="scan-delivery-date" label="Delivery date" className="flex-1">
               {(a11y) => (
-                <div className="relative mt-xs flex w-full items-center rounded-pill border border-rule bg-surface px-md py-xs transition-colors focus-within:border-accent focus-ring">
+                <div className="relative mt-xs flex min-h-12 w-full items-center rounded-pill border border-rule-strong bg-surface-sunken px-md transition-colors focus-within:border-accent focus-ring">
                   <input
                     {...a11y}
                     type="date"
                     value={source.invoiceDate}
                     onChange={(e) => onUpdateSource("invoiceDate", e.target.value)}
-                    className="min-h-11 w-full bg-transparent text-[14px] text-ink outline-none"
+                    className="min-h-11 w-full bg-transparent text-control text-ink outline-none"
                   />
                 </div>
               )}
             </Field>
           </div>
         </div>
-        <div className="mt-sm flex justify-between items-center">
-          <span className="rounded-pill bg-wash px-sm py-xs text-[11px] uppercase tracking-[0.1em] text-grey">
-            {items.length} items
+        <div className="mt-md flex items-center justify-between">
+          <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
+            <span className="tabular">{items.length}</span> items
           </span>
         </div>
       </div>
@@ -315,10 +313,10 @@ export function ResultsView({
       />
 
       {/* Desktop table (md+) */}
-      <div className="mt-lg hidden overflow-hidden rounded-card card-surface md:block">
-        <table className="w-full border-collapse text-[14px]">
+      <div className="glass mt-lg hidden overflow-hidden rounded-card md:block">
+        <table className="w-full border-collapse text-control">
           <thead>
-            <tr className="bg-wash">
+            <tr className="border-b border-rule-strong">
               <Th className="w-[32%]">Wine</Th>
               <Th className="w-[14%]">Varietal</Th>
               <Th className="w-[9%]">Vintage</Th>
@@ -332,7 +330,7 @@ export function ResultsView({
             {items.map((it) => (
               <tr
                 key={it.id}
-                className="border-t border-rule align-middle hover:bg-wash"
+                className="border-t border-rule align-middle transition-colors hover:bg-surface-raised"
               >
                 <td className="p-sm">
                   <TextInput
@@ -343,7 +341,7 @@ export function ResultsView({
                     low={isLow(it, "name")}
                     edited={isEdited(it, "name")}
                     onCommit={(v) => onUpdate(it.id, "name", v)}
-                    className="font-serif text-[17px] font-medium"
+                    variant="name"
                   />
                   <div className="mt-2xs">
                     <TextInput
@@ -354,7 +352,7 @@ export function ResultsView({
                       low={isLow(it, "producer")}
                       edited={isEdited(it, "producer")}
                       onCommit={(v) => onUpdate(it.id, "producer", v)}
-                      className="text-[12px] text-grey"
+                      variant="secondary"
                     />
                   </div>
                 </td>
@@ -414,7 +412,7 @@ export function ResultsView({
                   <IconButton
                     label={`Remove ${it.name}`}
                     onClick={() => onRemove(it.id)}
-                    className="rounded-pill text-grey hover:bg-wash hover:text-accent focus-ring"
+                    className="text-grey transition-colors hover:text-accent focus-ring"
                   >
                     <Trash2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                   </IconButton>
@@ -425,8 +423,8 @@ export function ResultsView({
         </table>
       </div>
 
-      {/* Mobile cards (< md) */}
-      <div className="mt-md flex flex-col gap-sm md:hidden">
+      {/* Mobile: hairline index rows inside one sheet (< md) */}
+      <div className="glass mt-md overflow-hidden rounded-card md:hidden">
         {items.map((it) => (
           <LineItemCard
             key={it.id}
@@ -440,20 +438,21 @@ export function ResultsView({
       </div>
 
       {/* Action bar */}
+      {/* The sticky bottom glass rail: one primary, ghosts beside it. */}
       <div
-        className="sticky bottom-[var(--chrome-tabbar-total)] z-[var(--z-sticky)] mt-md flex flex-col gap-sm rounded-card card-surface p-md md:static md:bottom-auto md:mt-lg md:flex-row md:items-center md:justify-between"
+        className="glass sticky bottom-[var(--chrome-tabbar-total)] z-[var(--z-sticky)] mt-md flex flex-col gap-sm rounded-card p-md md:static md:bottom-auto md:mt-lg md:flex-row md:items-center md:justify-between"
         style={{ marginBottom: "calc(var(--safe-bottom) + var(--spacing-xs))" }}
       >
-        <div className="text-[13px] text-grey md:text-[14px]">
-          <span className="font-medium text-ink">{items.length} wines</span>
-          <span className="mx-xs text-grey">·</span>
+        <div className="tabular text-caption font-medium uppercase tracking-[0.18em] text-grey">
+          <span className="text-ink">{items.length} wines</span>
+          <span className="mx-xs">·</span>
           <span>{Object.keys(edits).length} corrections</span>
         </div>
         <div className="grid grid-cols-2 gap-sm md:flex md:gap-md">
           <button
             type="button"
             onClick={() => setDiscardOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring md:px-md"
+            className="flex min-h-11 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring md:px-md"
           >
             <ScanLine className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
             <span className="hidden sm:inline">Scan another</span>
@@ -463,7 +462,7 @@ export function ResultsView({
             <button
               type="button"
               onClick={onExportCsv}
-              className="flex min-h-11 flex-1 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring md:flex-none md:px-md"
+              className="flex min-h-11 flex-1 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring md:flex-none md:px-md"
               title="Export as CSV"
             >
               <Download className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -472,7 +471,7 @@ export function ResultsView({
             <button
               type="button"
               onClick={onExportAccuracy}
-              className="flex min-h-11 flex-1 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring md:flex-none md:px-md"
+              className="flex min-h-11 flex-1 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring md:flex-none md:px-md"
               title="Export accuracy JSON (source + items + per-field edits)"
             >
               <FileJson className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -483,7 +482,7 @@ export function ResultsView({
             type="button"
             onClick={onSaveToInventory}
             disabled={isSaving}
-            className="col-span-2 flex min-h-11 items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60 md:px-md"
+            className="col-span-2 flex min-h-12 items-center justify-center gap-sm rounded-pill bg-primary text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60 md:px-md"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden="true" />
@@ -499,15 +498,15 @@ export function ResultsView({
       {/* Desktop: raw text sidebar */}
       {rawText && (
         <aside className="hidden shrink-0 md:block md:w-[320px]">
-          <div className="sticky top-[72px] rounded-card card-surface">
+          <div className="glass sticky top-[72px] rounded-card">
             <div className="flex items-center gap-sm border-b border-rule p-md">
               <FileText className="h-4 w-4 text-grey" strokeWidth={1.75} />
-              <span className="text-[13px] font-medium text-ink">
+              <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
                 Raw invoice text
               </span>
             </div>
             <div className="p-md">
-              <pre className="max-h-[calc(100vh-200px)] overflow-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-grey">
+              <pre className="max-h-[calc(100vh-200px)] overflow-auto whitespace-pre-wrap text-ledger leading-relaxed text-grey">
                 {rawText}
               </pre>
             </div>

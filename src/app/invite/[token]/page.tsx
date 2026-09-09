@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Check, Loader2, X } from "lucide-react";
+import { AuthShell } from "@/app/login/auth-shell";
 import { readApiError } from "@/lib/api/client-error";
 
 export default function AcceptInvitePage() {
@@ -50,44 +51,52 @@ export default function AcceptInvitePage() {
   }, [params.token, router]);
 
   return (
-    <main className="dawn-gradient flex min-h-screen items-center justify-center px-md py-lg sm:px-lg sm:py-xl">
-      <div className="glass w-full max-w-[420px] rounded-card p-lg text-center sm:p-xl">
-        <div className="mb-lg font-sans text-[13px] font-medium uppercase tracking-[0.22em] text-ink">
-          TERR<span className="text-mark">OIR</span>
-        </div>
+    <AuthShell eyebrow="Cellar access" title="Invitation">
+      <div className="text-center">
         {status === "loading" && (
           <>
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-accent" aria-hidden="true" />
-            <p className="mt-md text-[15px] text-ink">Joining restaurant…</p>
+            <Loader2
+              className="mx-auto h-8 w-8 animate-spin text-accent"
+              aria-hidden="true"
+            />
+            <p className="mt-md text-body text-ink">Joining restaurant…</p>
           </>
         )}
         {status === "success" && (
           <>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ready-wash">
-              <Check className="h-6 w-6 text-ready-ink" strokeWidth={2.5} aria-hidden="true" />
+              <Check
+                className="h-6 w-6 text-ready-ink"
+                strokeWidth={2}
+                aria-hidden="true"
+              />
             </div>
-            <p className="mt-md font-serif text-[19px] font-medium text-ink">{message}</p>
-            <p className="mt-xs text-[13px] text-grey">
-              Redirecting to Terroir…
+            <p className="mt-md font-serif text-subheading font-normal text-ink">
+              {message}
             </p>
+            <p className="mt-xs text-ledger text-grey">Redirecting to Terroir…</p>
           </>
         )}
         {status === "error" && (
           <>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-risk-wash">
-              <X className="h-6 w-6 text-risk-ink" strokeWidth={2.5} aria-hidden="true" />
+              <X
+                className="h-6 w-6 text-risk-ink"
+                strokeWidth={2}
+                aria-hidden="true"
+              />
             </div>
-            <p className="mt-md text-[15px] font-medium text-ink">{message}</p>
+            <p className="mt-md text-body font-medium text-ink">{message}</p>
             <button
               type="button"
               onClick={() => router.push("/login")}
-              className="mx-auto mt-lg flex min-h-11 items-center rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
+              className="mx-auto mt-lg flex min-h-11 items-center rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
             >
               Go to login
             </button>
           </>
         )}
       </div>
-    </main>
+    </AuthShell>
   );
 }

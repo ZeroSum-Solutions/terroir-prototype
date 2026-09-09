@@ -8,7 +8,7 @@ export function SummaryStat({ label, value }: { label: string; value: number }) 
   return (
     <div>
       <dt className="text-caption text-grey">{label}</dt>
-      <dd className="tabular text-[20px] font-medium text-ink">{value}</dd>
+      <dd className="tabular text-subheading font-medium text-ink">{value}</dd>
     </div>
   );
 }

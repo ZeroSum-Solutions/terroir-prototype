@@ -80,11 +80,11 @@ export function ChunkUploadProgress({
       <h3 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
         Upload progress ({confirmedCount} of {chunkTotal} chunks)
       </h3>
-      <ul className="mt-xs space-y-2xs">
+      <ul className="mt-xs border-t border-rule">
         {chunks.map((c) => (
           <li
             key={c.index}
-            className="flex items-center justify-between gap-sm rounded-md bg-wash px-sm py-xs text-[13px] text-ink"
+            className="flex items-center justify-between gap-sm border-b border-rule px-2xs py-sm text-body-sm text-ink"
           >
             <span>Chunk {c.index}</span>
             <span className="flex items-center gap-xs text-caption text-grey">
@@ -101,7 +101,7 @@ export function ChunkUploadProgress({
                   onClick={() => onImportAnyway(c.index)}
                   disabled={frozen}
                   title="Imports this chunk's identical rows as a separate tracked upload."
-                  className="min-h-11 rounded-pill border border-edge bg-surface px-sm py-2xs text-caption font-medium text-ink hover:bg-wash focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-sm py-2xs text-caption font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Import anyway
                 </button>
@@ -111,7 +111,7 @@ export function ChunkUploadProgress({
                   type="button"
                   onClick={() => onSkipChunk(c.index)}
                   disabled={frozen}
-                  className="min-h-11 rounded-pill border border-edge bg-surface px-sm py-2xs text-caption font-medium text-ink hover:bg-wash focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-sm py-2xs text-caption font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Skip this chunk
                 </button>
@@ -125,7 +125,7 @@ export function ChunkUploadProgress({
                   type="button"
                   onClick={() => onUndoSkip(c.index)}
                   disabled={frozen}
-                  className="min-h-11 rounded-pill border border-edge bg-surface px-sm py-2xs text-caption font-medium text-ink hover:bg-wash focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-pill border border-rule-strong bg-transparent px-sm py-2xs text-caption font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Undo skip
                 </button>

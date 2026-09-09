@@ -10,6 +10,10 @@ interface MatchedViewProps {
   onConfirm: () => void;
 }
 
+const ROW =
+  "flex items-baseline justify-between gap-md border-b border-rule py-sm last:border-b-0";
+const ROW_LABEL = "text-caption font-medium uppercase tracking-[0.18em] text-grey";
+
 export function MatchedView({ wine, onCorrect, onConfirm }: MatchedViewProps) {
   return (
     <div className="space-y-md">
@@ -18,40 +22,42 @@ export function MatchedView({ wine, onCorrect, onConfirm }: MatchedViewProps) {
           <span className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Matched wine
           </span>
-          <span className="rounded-pill bg-ready-wash px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide text-ready-ink">
+          <span className="rounded-pill bg-ready-wash px-sm py-2xs text-caption font-medium uppercase tracking-[0.14em] text-ready-ink">
             Match found
           </span>
         </div>
-        <h2 className="font-serif text-[20px] text-ink md:text-[22px]">
+        <h2 className="font-serif text-heading-sm font-normal leading-[1.15] text-ink">
           {wine.producer}
         </h2>
-        <p className="mt-xs font-serif text-[18px] text-ink md:text-[20px]">
+        <p className="mt-2xs font-serif text-subheading text-ink-soft">
           {wineDisplayName(wine.producer, wine.name)}
         </p>
-        <dl className="mt-md grid grid-cols-2 gap-x-md gap-y-sm text-[13px]">
+        {/* Hairline rows, not a two-column key/value grid (DESIGN.md —
+            Index Row): the eyebrow names the field, the value answers. */}
+        <dl className="mt-md">
           {wine.vintage && (
-            <>
-              <dt className="text-grey">Vintage</dt>
-              <dd className="tabular text-ink">{wine.vintage}</dd>
-            </>
+            <div className={ROW}>
+              <dt className={ROW_LABEL}>Vintage</dt>
+              <dd className="tabular text-control text-ink">{wine.vintage}</dd>
+            </div>
           )}
           {wine.varietal && (
-            <>
-              <dt className="text-grey">Varietal</dt>
-              <dd className="text-ink">{wine.varietal}</dd>
-            </>
+            <div className={ROW}>
+              <dt className={ROW_LABEL}>Varietal</dt>
+              <dd className="text-control text-ink">{wine.varietal}</dd>
+            </div>
           )}
           {wine.region && (
-            <>
-              <dt className="text-grey">Region</dt>
-              <dd className="text-ink">{wine.region}</dd>
-            </>
+            <div className={ROW}>
+              <dt className={ROW_LABEL}>Region</dt>
+              <dd className="text-control text-ink">{wine.region}</dd>
+            </div>
           )}
           {wine.country && (
-            <>
-              <dt className="text-grey">Country</dt>
-              <dd className="text-ink">{wine.country}</dd>
-            </>
+            <div className={ROW}>
+              <dt className={ROW_LABEL}>Country</dt>
+              <dd className="text-control text-ink">{wine.country}</dd>
+            </div>
           )}
         </dl>
       </div>
@@ -59,17 +65,17 @@ export function MatchedView({ wine, onCorrect, onConfirm }: MatchedViewProps) {
         <button
           type="button"
           onClick={onCorrect}
-          className="flex h-[44px] items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+          className="flex h-12 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
         >
-          <X className="h-4 w-4" strokeWidth={2} />
+          <X className="h-4 w-4" strokeWidth={1.9} />
           Correct
         </button>
         <button
           type="button"
           onClick={onConfirm}
-          className="flex h-[44px] items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+          className="flex h-12 items-center justify-center gap-sm rounded-pill bg-primary text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
         >
-          <Check className="h-4 w-4" strokeWidth={2} />
+          <Check className="h-4 w-4" strokeWidth={1.9} />
           Confirm
         </button>
       </div>

@@ -37,16 +37,16 @@ export function TeamActions({
           data-testid="team-toolbar"
           className="mb-md flex flex-wrap items-center justify-between gap-sm"
         >
-          <h2 id="members-heading" className="text-[15px] font-semibold text-ink">
+          <h2 id="members-heading" className="text-caption font-medium uppercase tracking-[0.18em] text-grey">
             Members ({members.length})
           </h2>
           {canInvite && members.length > 0 && (
             <button
               type="button"
               onClick={actions.openInvite}
-              className="flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+              className="flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
             >
-              <Link2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              <Link2 className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
               Create invite link
             </button>
           )}
@@ -55,7 +55,7 @@ export function TeamActions({
         {actions.error && confirmTarget === null && (
           <div
             role="alert"
-            className="mb-sm flex items-start justify-between gap-sm rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"
+            className="mb-sm flex items-start justify-between gap-sm rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"
           >
             <span>{actions.error}</span>
             <IconButton
@@ -70,7 +70,7 @@ export function TeamActions({
 
         {members.length === 0 ? (
           <RouteDataEmpty
-            icon={<Users className="h-6 w-6" strokeWidth={1.5} />}
+            icon={<Users className="h-6 w-6" strokeWidth={1.6} />}
             title="No team members yet"
             description="Invite a teammate to start building your roster."
             action={
@@ -78,37 +78,39 @@ export function TeamActions({
                 <button
                   type="button"
                   onClick={actions.openInvite}
-                  className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+                  className="inline-flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
                 >
-                  <Link2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  <Link2 className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
                   Create invite link
                 </button>
               ) : undefined
             }
           />
         ) : (
-          <ul className="grid gap-sm">
+          <ul className="border-t border-rule">
             {members.map((member) => {
               const isCurrentUser = member.user_id === currentUserId;
               return (
                 <li
                   key={member.id}
-                  className="grid min-w-0 gap-md rounded-card card-surface p-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  className="grid min-w-0 gap-md border-b border-rule py-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="break-words font-medium text-ink">
+                    <p className="break-words font-serif text-body-lg font-normal text-ink">
                       {member.name}{" "}
                       {isCurrentUser && (
-                        <span className="text-grey">(You)</span>
+                        <span className="font-sans text-ledger text-grey">
+                          (You)
+                        </span>
                       )}
                     </p>
-                    <p className="mt-2xs break-all text-[13px] text-grey">
+                    <p className="mt-2xs break-all text-ledger text-grey">
                       {member.email}
                     </p>
-                    <p className="mt-xs text-[13px] leading-relaxed text-ink-soft">
+                    <p className="mt-xs text-body-sm leading-relaxed text-ink-soft">
                       {ROLE_DESCRIPTIONS[member.role]}
                     </p>
-                    <p className="mt-xs font-mono text-[11px] text-grey">
+                    <p className="mt-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
                       Joined <TimeAgo iso={member.created_at} />
                     </p>
                   </div>
@@ -119,15 +121,17 @@ export function TeamActions({
                         aria-label={`Change role for ${member.name}`}
                         value={member.role}
                         onChange={(e) => actions.changeRole(member.id, e.target.value)}
-                        className="min-h-11 rounded-pill border border-rule bg-surface px-sm text-[13px] text-ink focus-ring"
+                        className="min-h-11 rounded-pill border border-rule-strong bg-surface-sunken px-sm text-control text-ink focus-ring"
                       >
                         <option value="owner">Owner</option>
                         <option value="manager">Manager</option>
                         <option value="staff">Staff</option>
                       </select>
                     ) : (
-                      <span className="inline-flex min-h-11 items-center rounded-pill bg-surface-sunken px-sm text-[11px] font-medium capitalize text-ink-soft">
-                        {member.role}
+                      <span className="inline-flex min-h-11 items-center rounded-pill bg-peak-wash px-md uppercase text-peak-ink">
+                        <span className="text-caption font-medium tracking-[0.18em]">
+                          {member.role}
+                        </span>
                       </span>
                     )}
                     {isOwner && !isCurrentUser && (
@@ -155,11 +159,11 @@ export function TeamActions({
         <section className="mb-xl" aria-labelledby="pending-heading">
           <h2
             id="pending-heading"
-            className="mb-md text-[15px] font-semibold text-grey"
+            className="mb-md text-caption font-medium uppercase tracking-[0.18em] text-grey"
           >
             Pending ({invitations.length})
           </h2>
-          <ul className="grid gap-sm">
+          <ul className="border-t border-rule">
             {invitations.map((inv) => {
               const justCopied = actions.copiedInvitationId === inv.id;
               const expiry = describeExpiry(inv.expires_at);
@@ -167,18 +171,20 @@ export function TeamActions({
               return (
                 <li
                   key={inv.id}
-                  className={`grid min-w-0 gap-md rounded-card card-surface p-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${expiry.status === "expired" ? "opacity-60" : ""}`}
+                  className={`grid min-w-0 gap-md border-b border-rule py-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${expiry.status === "expired" ? "opacity-60" : ""}`}
                 >
                   <div className="min-w-0">
-                    <p className="break-all font-medium text-ink">{identity}</p>
-                    <p className="mt-xs text-[13px] capitalize text-ink-soft">
+                    <p className="break-all font-serif text-body-lg font-normal text-ink">
+                      {identity}
+                    </p>
+                    <p className="mt-xs text-caption font-medium uppercase tracking-[0.18em] text-accent">
                       {inv.role}
                     </p>
-                    <p className="mt-2xs text-[13px] leading-relaxed text-ink-soft">
+                    <p className="mt-2xs text-body-sm leading-relaxed text-ink-soft">
                       {ROLE_DESCRIPTIONS[inv.role]}
                     </p>
-                    <div className="mt-xs flex flex-wrap items-center gap-xs text-[11px] text-grey">
-                      <span className="font-mono">
+                    <div className="mt-xs flex flex-wrap items-center gap-xs text-ledger text-grey">
+                      <span>
                         Created <TimeAgo iso={inv.created_at} />
                       </span>
                       <span aria-hidden>·</span>
@@ -188,7 +194,7 @@ export function TeamActions({
                             ? "font-medium text-risk-ink"
                             : expiry.status === "soon"
                               ? "font-medium text-risk-ink"
-                              : "font-mono"
+                              : ""
                         }
                         title={new Intl.DateTimeFormat(undefined, {
                           dateStyle: "medium",
@@ -211,12 +217,12 @@ export function TeamActions({
                           type="button"
                           onClick={() => actions.copyInvitationLink(inv)}
                           aria-label={`Copy invite link for ${identity}`}
-                          className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-surface px-sm text-[12px] font-medium text-ink hover:bg-wash focus-ring"
+                          className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-ledger font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
                         >
                           {justCopied ? (
-                            <Check className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                            <Check className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
                           ) : (
-                            <Copy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                            <Copy className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
                           )}
                           {justCopied ? "Copied" : "Copy link"}
                         </button>
@@ -225,15 +231,15 @@ export function TeamActions({
                         type="button"
                         onClick={() => actions.resendInvitation(inv.id)}
                         aria-label={`Resend invitation for ${identity}`}
-                        className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-surface px-sm text-[12px] font-medium text-ink hover:bg-wash focus-ring"
+                        className="inline-flex min-h-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-md text-ledger font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
                       >
-                        <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                        <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
                         Resend
                       </button>
                       <IconButton
                         label={`Revoke invitation for ${identity}`}
                         onClick={() => actions.requestInvitationRevocation(inv)}
-                        className="rounded-pill border border-rule-strong bg-surface text-grey hover:bg-risk-wash hover:text-risk-ink focus-ring"
+                        className="rounded-pill border border-rule-strong bg-transparent text-grey hover:bg-risk-wash hover:text-risk-ink focus-ring"
                       >
                         <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                       </IconButton>
@@ -279,7 +285,7 @@ export function TeamActions({
         {actions.error && (
           <p
             role="alert"
-            className="rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"
+            className="rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"
           >
             {actions.error}
           </p>
@@ -302,7 +308,7 @@ export function TeamActions({
         {actions.error && (
           <p
             role="alert"
-            className="rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"
+            className="rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"
           >
             {actions.error}
           </p>

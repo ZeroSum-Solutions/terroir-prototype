@@ -71,11 +71,11 @@ export function UploadStep({
   error: string | null;
 }) {
   return (
-    <div className="rounded-card card-surface p-lg">
+    <div className="glass rounded-card p-lg">
       <p className="mb-md text-control text-grey">On your phone, choose a file from Files or your cloud drive. Nothing changes in your stock during preview.</p>
       <label
         htmlFor="import-file"
-        className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-sm rounded-card border-2 border-dashed border-rule-strong bg-wash px-lg py-xl text-center transition-colors hover:border-risk-ink/40 hover:bg-risk-wash/40 focus-ring"
+        className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-sm rounded-card border border-dashed border-rule-strong px-lg py-xl text-center transition-colors hover:border-accent focus-ring"
       >
         <input
           ref={fileInputRef}
@@ -97,15 +97,15 @@ export function UploadStep({
       </label>
 
       {dropNotice && (
-        <p role="status" className="mt-md text-[13px] text-grey">{dropNotice}</p>
+        <p role="status" className="mt-md text-body-sm text-ink-soft">{dropNotice}</p>
       )}
 
       {conversionNotice && (
-        <p className="mt-md text-[13px] text-grey">{conversionNotice}</p>
+        <p className="mt-md text-body-sm text-ink-soft">{conversionNotice}</p>
       )}
 
       {error && (
-        <p role="alert" className="mt-md flex items-start gap-xs text-[13px] text-risk-ink">
+        <p role="alert" className="mt-md flex items-start gap-xs text-body-sm text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
@@ -118,7 +118,7 @@ export function UploadStep({
           file is previewed one chunk at a time, so this is the total for
           the whole (sequential) phase, not any one chunk's own budget. */}
       {previewUnits !== null && (
-        <p className="mt-md text-[13px] text-grey">
+        <p className="mt-md text-body-sm text-ink-soft">
           {previewUnits > 1
             ? `This file needs ${previewUnits} chunks, uploaded one at a time — previewing it is estimated to take `
             : "Previewing this file is estimated to take "}
@@ -153,15 +153,15 @@ export function UploadStep({
       <a
         href="/api/import/template"
         download="cellar-import-template.csv"
-        className="mt-md flex min-h-11 items-center justify-center text-[13px] font-medium text-grey underline underline-offset-4 hover:text-ink focus-ring"
+        className="mt-md flex min-h-11 items-center justify-center text-body-sm font-medium text-accent underline underline-offset-4 hover:text-ink focus-ring"
       >
         Download CSV template
       </a>
-      <details className="mt-md border-t border-rule pt-sm text-control text-grey">
+      <details className="mt-md border-t border-rule pt-sm text-control text-ink-soft">
         <summary className="min-h-11 cursor-pointer font-medium text-ink focus-ring">Which file should I use?</summary>
         <p className="mt-xs">Use the CSV template for column names and examples. Include the wine name, quantity and bottle size; keep the producer and vintage in separate columns when available.</p>
         <p className="mt-sm">Excel imports read the first worksheet only. Export Apple Numbers, Google Sheets or older .xls workbooks as CSV or .xlsx first.</p>
-        <Link href="/scan" className="mt-sm flex min-h-11 items-center text-ink underline underline-offset-4 focus-ring">Have an invoice photo or PDF? Open Scan</Link>
+        <Link href="/scan" className="mt-sm flex min-h-11 items-center text-accent underline underline-offset-4 focus-ring">Have an invoice photo or PDF? Open Scan</Link>
       </details>
     </div>
   );

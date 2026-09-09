@@ -142,16 +142,16 @@ export function ReconcileList({
           is no separate dismiss because the notice clears itself the moment the
           user edits a count or saves. */}
       {draftNotice && (
-        <div role="status" className="mb-md flex items-center justify-between gap-sm rounded-md border border-rule bg-wash px-md py-sm text-[13px] text-ink">
+        <div role="status" className="glass mb-md flex items-center justify-between gap-sm rounded-card px-md py-sm text-body-sm text-ink">
           <span>{draftNotice.message}</span>
           {draftNotice.canUndo && <button type="button" onClick={discardDraft} className="min-h-11 shrink-0 rounded-pill px-sm text-ledger font-medium text-accent hover:underline">Undo</button>}
         </div>
       )}
-      {success && <p role="status" className="mb-md text-[14px] text-ready-ink">{success}</p>}
+      {success && <p role="status" className="mb-md text-control text-ready-ink">{success}</p>}
       {error && (
         <div
           role="alert"
-          className="mb-md rounded-md border border-risk-ink/30 bg-risk-wash px-md py-sm text-[13px] text-risk-ink"
+          className="mb-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
         >
           {error}
         </div>
@@ -177,13 +177,14 @@ export function ReconcileList({
       </ul>
       </fieldset>
 
-      <div className={cn("fixed left-0 right-0 z-[var(--z-chrome)] border-t border-rule bg-surface px-lg py-sm md:static md:mt-lg md:border-0 md:px-0 md:py-0", inDialog ? "bottom-0 pb-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-xs))]")}>
+      {/* The one action, on a floating glass rail clearing the nav dock. */}
+      <div className={cn("glass fixed left-md right-md z-[var(--z-chrome)] rounded-card px-md py-sm md:static md:mt-lg", inDialog ? "bottom-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--chrome-fab)+var(--spacing-xl))]")}>
         <button
           type="button"
           onClick={onSaveAll}
           disabled={changedCount === 0 || busy}
           className={cn(
-            "h-[48px] w-full rounded-pill font-medium transition-colors",
+            "h-[48px] w-full rounded-pill font-semibold transition-colors",
             changedCount > 0 && !busy
               ? "bg-primary text-seal-ink hover:bg-primary-hover"
               : "bg-wash text-grey",
@@ -235,12 +236,12 @@ function ReconcileRow({
           <div className="min-w-0">
             {/* The wine itself opens the wine. Everything else on this card is
                 a counting control, so only the name is the link. */}
-            {inDialog ? <p className="flex min-h-11 items-center font-serif text-body-lg font-medium leading-snug text-ink">
+            {inDialog ? <p className="flex min-h-11 items-center font-serif text-body-lg font-normal leading-snug text-ink">
               {wineTitle(item.producer, item.name)} {item.vintage ?? ""}
             </p> : (
             <Link
               href={`/cellar?wine=${item.wine_id}`}
-              className="flex min-h-11 items-center rounded-md font-serif text-[17px] font-medium text-ink leading-snug transition-colors hover:text-accent focus-ring"
+              className="flex min-h-11 items-center rounded-pill font-serif text-body-lg font-normal leading-snug text-ink transition-colors hover:text-accent focus-ring"
             >
               {wineTitle(item.producer, item.name)}
               {item.vintage !== null && (
@@ -264,10 +265,10 @@ function ReconcileRow({
         </div>
       </div>
 
-      <div className="mb-sm rounded-md bg-wash px-sm py-sm">
+      <div className="mb-sm rounded-card bg-surface-sunken px-sm py-sm">
         <div className="flex flex-wrap items-baseline gap-sm">
           <span className="text-ledger text-grey">Tracked:</span>
-          <span className="font-mono text-[15px] font-semibold text-ink tabular-nums">
+          <span className="font-mono text-body font-medium text-ink tabular-nums">
             {trackedOz.toFixed(1)} oz
           </span>
           <span className="text-ledger text-grey tabular-nums">
@@ -279,7 +280,7 @@ function ReconcileRow({
 
       <div className="mb-sm">
         <div className="flex flex-wrap items-center gap-sm">
-          <label className="flex min-h-11 items-center gap-xs text-[13px] text-grey">
+          <label className="flex min-h-11 items-center gap-xs text-body-sm text-grey">
             <span>Actual:</span>
             <input
               type="number"
@@ -309,13 +310,13 @@ function ReconcileRow({
               aria-label="Actual remaining volume in ml"
             />
           </label>
-          <span className="text-[13px] text-grey tabular-nums">
+          <span className="text-body-sm text-grey tabular-nums">
             = {currentOz.toFixed(1)} oz
           </span>
         </div>
         {pending !== null && (
           <div
-            className={`mt-xs inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${badgeToneClasses[tone]}`}
+            className={`mt-xs inline-flex items-center gap-xs rounded-pill px-sm py-2xs text-caption font-medium uppercase tracking-[0.13em] ${badgeToneClasses[tone]}`}
           >
             {formatSignedVarianceOz(variance.deltaMl)} · {variance.label}
           </div>
@@ -342,7 +343,7 @@ function ReconcileRow({
                 "h-[44px] rounded-pill border text-ledger font-medium transition-colors",
                 isActive
                   ? "border-accent bg-primary text-seal-ink"
-                  : "border-rule bg-surface text-ink hover:bg-wash",
+                  : "border-rule-strong bg-transparent text-ink hover:bg-wash",
               )}
             >
               {f.short ?? f.label}

@@ -10,17 +10,19 @@ export type StatTileMetrics = {
 };
 
 /**
+ * The current-snapshot strip (DESIGN.md — Components, Glass Panel).
+ *
+ * This was four separate glass tiles with four separate edges, which drew four
+ * boxes around one fact. It is now ONE glass panel divided by hairlines: two
+ * cells per row on a phone, four across from `md:`. Each cell keeps its own
+ * `data-metric` and its own drill-down link, so the behaviour is unchanged —
+ * only the number of edges is.
+ *
  * Defect 9 (2026-09-08 demo screenshots, 390-insights.png): the inventory
- * value figure ("$656,531") overflowed its tile at 390px. The prior tile
- * (insights-drilldown.tsx's OwnerMetricGrid, still used elsewhere) fixed the
- * value at a mono-face 26-pixel step that does not shrink, and a typeface
- * DESIGN.md reserves for bin codes, not money (Typography: mono is for the
- * code roles only — prices and counts are Inter with tabular-nums). This
- * grid steps the value down to the `subheading` token below `sm:` and back
- * up to `heading-sm` (close to the original step) from `sm:` on, with
- * `truncate` as a last-resort guard rather than a silent cut of the actual
- * number. Applies to all four tiles, not just inventory value, since bottle
- * counts grow the same way.
+ * value figure ("$656,531") overflowed its tile at 390px. The value is set in
+ * the serif at the `heading-sm` role, which is narrower per character than the
+ * mono face it replaced, with `truncate` and a `title` as the last-resort
+ * guard rather than a silent cut of the actual number.
  */
 export function StatTileGrid({ metrics }: { metrics: StatTileMetrics }) {
   const items: Array<{
@@ -50,25 +52,38 @@ export function StatTileGrid({ metrics }: { metrics: StatTileMetrics }) {
     },
   ];
 
+  // Four fixed cells, so the hairlines are written per position rather than
+  // derived: a phone divides 2×2, desktop divides 1×4.
+  const cellEdges = [
+    "",
+    "border-l border-rule",
+    "border-t border-rule md:border-t-0 md:border-l",
+    "border-l border-t border-rule md:border-t-0",
+  ];
+
   return (
-    <div className="grid grid-cols-2 gap-sm md:grid-cols-4 md:gap-md">
-      {items.map((item) => (
-        <div key={item.key} data-metric={item.key} className="min-w-0">
+    <div className="glass grid grid-cols-2 overflow-hidden rounded-card md:grid-cols-4">
+      {items.map((item, i) => (
+        <div
+          key={item.key}
+          data-metric={item.key}
+          className={`min-w-0 ${cellEdges[i]}`}
+        >
           <Link
             href={metricHref(item.key)}
-            className="glass group block min-w-0 rounded-lg p-md transition-transform hover:-translate-y-0.5 focus-ring"
+            className="group block min-w-0 p-md focus-ring"
           >
-            <span className="flex items-center gap-xs text-caption font-medium uppercase text-grey">
-              {item.label}
+            <span className="flex items-center gap-xs text-caption font-medium uppercase tracking-[0.18em] text-grey">
+              <span className="truncate">{item.label}</span>
               <ArrowUpRight
-                className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                strokeWidth={2}
+                className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                strokeWidth={1.75}
                 aria-hidden
               />
             </span>
             <span
               title={item.value}
-              className="mt-xs block truncate text-subheading font-medium leading-none tabular text-ink sm:text-heading-sm"
+              className="mt-xs block truncate font-serif text-heading-sm font-normal leading-none tabular text-ink"
             >
               {item.value}
             </span>

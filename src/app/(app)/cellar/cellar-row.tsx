@@ -60,8 +60,33 @@ export type CellarRowDragHandle = {
  */
 function BinBadge({ children }: { children: string }) {
   return (
-    <span className="inline-flex w-fit items-center rounded-sm border border-primary px-3xs py-2xs font-mono text-micro font-medium tracking-[0.04em] text-primary">
+    <span className="inline-flex w-fit items-center rounded-pill border border-accent/40 px-xs py-2xs font-mono text-micro tracking-[0.12em] text-accent">
       {children}
+    </span>
+  );
+}
+
+/**
+ * The index row's picture (DESIGN.md — Imagery): 2:3 portrait at radius `lg`
+ * behind a glass hairline, never square. WineThumb paints a square at an
+ * inline size, so it is centred inside a 2:3 window and cropped by it — the
+ * initials stand-in crops the same way.
+ */
+function PortraitThumb({
+  row,
+}: {
+  row: Pick<CellarWineRow, "hero_image_url" | "producer" | "name" | "colour">;
+}) {
+  return (
+    <span className="relative block h-12 w-8 shrink-0 overflow-hidden rounded-lg border border-glass-edge">
+      <WineThumb
+        src={row.hero_image_url}
+        producer={row.producer}
+        name={row.name}
+        colour={row.colour}
+        size={48}
+        className="absolute left-1/2 top-0 -translate-x-1/2 rounded-none object-cover"
+      />
     </span>
   );
 }
@@ -141,16 +166,10 @@ export function CellarRow({
             right-aligned stock count on the right. Open, not boxed — the
             hairline between rows comes from the list's own divide-y. */}
         <div className="flex items-center gap-sm lg:hidden">
-          <WineThumb
-            src={row.hero_image_url}
-            producer={row.producer}
-            name={row.name}
-            colour={row.colour}
-            size={44}
-          />
+          <PortraitThumb row={row} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-xs">
-              <span className="min-w-0 truncate font-serif text-body-lg font-semibold text-ink">
+              <span className="min-w-0 truncate font-serif text-body-lg font-normal text-ink">
                 {wineDisplayName(row.producer, row.name)}
               </span>
               {chip && (
@@ -173,13 +192,11 @@ export function CellarRow({
               </div>
             )}
           </div>
-          <div className="shrink-0 text-right">
-            <div
-              className={cn(
-                "text-heading-sm font-bold tabular",
-                onHand === 0 ? "text-grey" : "text-ink",
-              )}
-            >
+          {/* The size token sits on the wrapper, never through cn() beside a
+              colour token — tailwind-merge reads the two as one group and
+              would keep only the colour. */}
+          <div className="shrink-0 text-right text-body-lg">
+            <div className={cn("font-semibold tabular", onHand === 0 ? "text-grey" : "text-ink")}>
               {onHand}
             </div>
             <div className="text-micro uppercase tracking-[0.08em] text-grey">
@@ -191,18 +208,12 @@ export function CellarRow({
         {/* Desktop ledger-table row (D4) */}
         <div className={cn("hidden items-center gap-md lg:grid", LEDGER_COLS)}>
           <div className="flex min-w-0 items-center gap-sm">
-            <WineThumb
-              src={row.hero_image_url}
-              producer={row.producer}
-              name={row.name}
-              colour={row.colour}
-              size={40}
-            />
+            <PortraitThumb row={row} />
             <div className="min-w-0">
               <div className="truncate text-caption font-medium uppercase text-grey">
                 {row.producer}
               </div>
-              <div className="truncate font-serif text-body-lg font-semibold text-ink">
+              <div className="truncate font-serif text-body-lg font-normal text-ink">
                 {wineDisplayName(row.producer, row.name)}
               </div>
             </div>
@@ -223,13 +234,10 @@ export function CellarRow({
               <span className="text-ledger text-grey">—</span>
             )}
           </span>
-          <span
-            className={cn(
-              "text-right tabular text-control",
-              onHand === 0 ? "text-grey" : "text-ink",
-            )}
-          >
-            ×{onHand}
+          <span className="text-right text-body-lg">
+            <span className={cn("tabular font-semibold", onHand === 0 ? "text-grey" : "text-ink")}>
+              ×{onHand}
+            </span>
           </span>
         </div>
       </button>

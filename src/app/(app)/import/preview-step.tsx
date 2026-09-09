@@ -216,10 +216,10 @@ export function PreviewStep({
   const blocksConfirmButton = hasChunkContentMismatch || hasUnresolvedDuplicateChunkContent;
 
   return (
-    <div className="rounded-card card-surface p-lg">
-      <h2 className="font-serif text-[20px] text-ink">Preview: {filename}</h2>
+    <div className="glass rounded-card p-lg">
+      <h2 className="font-serif text-subheading font-normal text-ink">Preview: {filename}</h2>
       {chunkTotal !== undefined ? (
-        <p className="mt-2xs text-[13px] text-grey">
+        <p className="mt-2xs text-body-sm text-ink-soft">
           This file will be split into {chunkTotal} chunk{chunkTotal === 1 ? "" : "s"} of up to{" "}
           {CLIENT_CHUNK_TARGET_ROWS} rows, uploaded one at a time under a single import session.{" "}
           {/* BLOCK 1 (round-11 fix, was WARN 4 round-29 audit): each chunk
@@ -236,7 +236,7 @@ export function PreviewStep({
         // a single unit, bounded by the exact same per-unit budget a
         // chunked file's own first chunk is, so the same estimate applies
         // here, stated before the operator clicks Confirm.
-        <p className="mt-2xs text-[13px] text-grey">
+        <p className="mt-2xs text-body-sm text-ink-soft">
           Confirming it is estimated to take up to {describeWaitEstimate(estimateChunkedPhaseWaitSeconds(1))}.
         </p>
       )}
@@ -250,7 +250,7 @@ export function PreviewStep({
           : "Source not recognised — using the generic column mapping. Rename a column in your file if something below landed in the wrong field."}
       </p>
 
-      <dl className="mt-md grid grid-cols-2 gap-sm text-[13px]">
+      <dl className="mt-md grid grid-cols-2 gap-sm text-body-sm">
         <SummaryStat label="Total rows" value={summary.totalRows} />
         <SummaryStat label="Passing validation" value={effectivePassingValidationRows} />
         <SummaryStat label="Needs resolution" value={summary.pendingResolutionRows} />
@@ -282,9 +282,9 @@ export function PreviewStep({
       {chunkBreakdown && (
         <div className="mt-lg">
           <h3 className="text-caption font-medium uppercase tracking-[0.18em] text-grey">Chunk breakdown</h3>
-          <ul className="mt-xs space-y-2xs">
+          <ul className="mt-xs border-t border-rule">
             {chunkBreakdown.map((chunk) => (
-              <li key={chunk.index} className="rounded-md bg-wash px-sm py-xs text-[13px] text-ink">
+              <li key={chunk.index} className="border-b border-rule px-2xs py-sm text-body-sm text-ink">
                 Chunk {chunk.index} (rows {chunk.startRow}–{chunk.endRow}): {chunk.summary.validRows} valid,{" "}
                 {chunk.summary.errorRows} error(s)
               </li>
@@ -349,7 +349,7 @@ export function PreviewStep({
           (blocksConfirmButton no longer treats either code as terminal);
           recovery for multiple_live_batches is under Recent imports. */}
       {error && (
-        <p role="alert" className="mt-md flex items-start gap-xs text-[13px] text-risk-ink">
+        <p role="alert" className="mt-md flex items-start gap-xs text-body-sm text-risk-ink">
           <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
@@ -360,7 +360,7 @@ export function PreviewStep({
           type="button"
           onClick={onBack}
           disabled={confirming}
-          className="min-h-11 flex-1 rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink transition-colors hover:bg-wash focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 flex-1 rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:cursor-not-allowed disabled:opacity-60"
         >
           Choose a different file
         </button>
@@ -369,7 +369,7 @@ export function PreviewStep({
             type="button"
             disabled={!canConfirm || producerBlocked || confirming}
             onClick={() => onConfirm(effectiveMissingProducerRows)}
-            className="flex min-h-11 flex-1 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-[14px] font-medium text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-11 flex-1 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {confirming ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {confirming ? "Creating import…" : hasFailedChunk ? "Retry upload" : "Confirm import"}

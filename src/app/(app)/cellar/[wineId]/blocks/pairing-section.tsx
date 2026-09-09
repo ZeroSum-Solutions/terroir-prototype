@@ -7,7 +7,7 @@ export function PairingSection({ pairings }: { pairings: string[] }) {
         {pairings.map((pairing) => (
           <li
             key={pairing}
-            className="rounded-pill border border-rule bg-surface px-md py-xs text-body-sm text-ink-soft"
+            className="rounded-pill border border-rule-strong px-md py-xs text-body-sm text-ink-soft"
           >
             {pairing}
           </li>

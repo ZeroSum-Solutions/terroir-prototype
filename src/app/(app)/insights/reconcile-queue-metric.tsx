@@ -24,19 +24,18 @@ export function ReconcileQueueMetric() {
 
   return (
     <div data-metric="reconcile-queue-count" className="mb-lg md:mb-xl">
-      <Link href="/reconcile-queue" className="group flex min-h-11 items-center justify-between gap-md rounded-card card-surface px-md py-sm transition-colors hover:bg-surface-sunken focus-ring">
+      <Link href="/reconcile-queue" className="glass group flex min-h-11 items-center justify-between gap-md rounded-card px-md py-sm transition-colors focus-ring">
         <span className="flex min-w-0 items-center gap-sm">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10 text-accent">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
             <ClipboardCheck className="h-4 w-4" strokeWidth={1.75} aria-hidden />
           </span>
           <span>
             <span className="block text-caption font-medium uppercase text-grey">Reconciliation queue</span>
-            <span className="mt-2xs block text-[12px] text-grey">Inventory records needing review</span>
+            <span className="mt-2xs block text-ledger text-grey">Inventory records needing review</span>
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-sm">
-          {/* Data speaks Courier, Bodoni is display-only (DESIGN.md). */}
-          <span className="font-mono text-[20px] font-medium tabular text-ink" aria-label={metricLabel(count)}>{metricValue(count)}</span>
+                    <span className="font-serif text-subheading font-normal tabular text-ink" aria-label={metricLabel(count)}>{metricValue(count)}</span>
           <ArrowUpRight className="h-4 w-4 text-grey transition-colors group-hover:text-accent" aria-hidden />
         </span>
       </Link>

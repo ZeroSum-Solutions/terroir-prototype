@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Minus, Plus } from "lucide-react";
+import { AlertCircle, Minus, Plus } from "lucide-react";
 import { useId, useState } from "react";
 import { Field, type FieldA11yProps } from "@/components/field";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,10 @@ export function formatMoney(n: number) {
   });
 }
 
+/* DESIGN.md - Spacing & Shapes: a form control is a 48px pill on the vault
+   ground, hairline at rest, copper on focus. */
 const FIELD_WRAP =
-  "relative flex w-full items-center rounded-sm border border-transparent bg-transparent px-sm py-xs transition-colors focus-within:border-accent focus-within:bg-surface focus-ring hover:border-rule hover:bg-surface";
+  "relative flex min-h-12 w-full items-center gap-xs rounded-pill border border-rule-strong bg-surface-sunken px-md transition-colors focus-within:border-accent focus-ring";
 
 interface FieldWrapProps {
   low?: boolean;
@@ -27,20 +29,21 @@ export function FieldWrap({ low, edited, invalid, children }: FieldWrapProps) {
     <div
       className={cn(
         FIELD_WRAP,
-        low && "border-l-[3px] border-l-primary bg-risk-wash/60",
-        edited && !low && "bg-ready-wash/40",
+        low && "border-accent/60",
+        edited && !low && "border-ready-ink/40",
         // DESIGN.md — State: the error row is a solid `edge` boundary on the
         // risk wash, not a tint you have to already know about.
         invalid && "border-edge bg-risk-wash",
       )}
     >
       {children}
+      {/* The copper seal, not a red flag: a low-confidence field is unread,
+          not wrong (DESIGN.md — Status Seal). */}
       {low && (
-        <AlertTriangle
-          className="ml-xs h-4 w-4 shrink-0 text-risk-ink"
-          strokeWidth={2}
-          aria-label="Needs review"
-        />
+        <span className="inline-flex shrink-0 items-center gap-3xs rounded-pill border border-accent/60 px-xs py-2xs text-micro font-medium uppercase tracking-[0.14em] text-accent">
+          <AlertCircle className="h-3 w-3" strokeWidth={1.9} aria-hidden="true" />
+          Verify
+        </span>
       )}
     </div>
   );
@@ -72,6 +75,27 @@ function BareField({
   );
 }
 
+/**
+ * What a scanned field IS, in type (DESIGN.md — Typography): a wine name is
+ * the serif at body-lg, a producer is a ledger-sized grey line under it, and
+ * everything else is the working face — 17px so iOS does not zoom the page on
+ * focus, 14px once there is a pointer.
+ *
+ * These strings are concatenated OUTSIDE cn() on purpose. tailwind-merge
+ * cannot tell a custom `text-<size>` from a `text-<colour>` and keeps only the
+ * last of the two, which is how `text-body-lg` used to disappear from every
+ * one of these inputs the moment `text-ink` followed it.
+ */
+const TEXT_VARIANT = {
+  default: "text-body-lg text-ink md:text-control",
+  /** The wine name. Serif, never bold (DESIGN.md — Do's). */
+  name: "font-serif text-body-lg font-medium text-ink md:text-body-lg",
+  /** The producer line beneath a name. */
+  secondary: "text-ledger text-grey md:text-ledger",
+} as const;
+
+export type TextInputVariant = keyof typeof TEXT_VARIANT;
+
 interface TextInputProps {
   id?: string;
   label?: string;
@@ -80,6 +104,7 @@ interface TextInputProps {
   edited?: boolean;
   onCommit: (v: string) => void;
   className?: string;
+  variant?: TextInputVariant;
   srOnlyLabel?: boolean;
 }
 
@@ -89,6 +114,7 @@ export function TextInput({
   edited,
   onCommit,
   className,
+  variant = "default",
   label,
   id,
   srOnlyLabel = false,
@@ -107,12 +133,11 @@ export function TextInput({
         onChange={(e) => setVal(e.target.value)}
         onBlur={() => val !== value && onCommit(val)}
         aria-label={a11y ? undefined : label}
-        className={cn(
-          // 17px keeps iOS from zooming the page on focus; 14px once there is
-          // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
-          "min-h-11 w-full bg-transparent text-body-lg text-ink outline-none md:text-control",
-          className,
-        )}
+        className={
+          TEXT_VARIANT[variant] +
+          " " +
+          cn("min-h-11 w-full bg-transparent outline-none", className)
+        }
       />
     </FieldWrap>
   );
@@ -192,7 +217,7 @@ export function VintageInput({
         aria-label={a11y ? undefined : "Vintage"}
         // 17px keeps iOS from zooming the page on focus; 14px once there is
         // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
-        className="min-h-11 w-full bg-transparent font-mono text-body-lg text-ink outline-none md:text-control"
+        className="tabular min-h-11 w-full bg-transparent text-body-lg text-ink outline-none md:text-control"
       />
     </FieldWrap>
   );
@@ -251,7 +276,7 @@ export function MoneyInput({
   };
   const input = (a11y?: FieldA11yProps) => (
     <FieldWrap low={low} edited={edited} invalid={error !== null}>
-      <span className="mr-2xs font-mono text-[13px] text-grey">$</span>
+      <span className="shrink-0 text-control text-grey">$</span>
       <input
         aria-invalid={error !== null || undefined}
         aria-describedby={error !== null ? errorId : undefined}
@@ -263,7 +288,7 @@ export function MoneyInput({
         aria-label={a11y ? undefined : "Unit cost"}
         // 17px keeps iOS from zooming the page on focus; 14px once there is
         // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
-        className="min-h-11 w-full bg-transparent text-right font-mono text-body-lg font-medium text-ink outline-none md:text-control"
+        className="tabular min-h-11 w-full bg-transparent text-right text-body-lg font-medium text-ink outline-none md:text-control"
       />
     </FieldWrap>
   );
@@ -286,7 +311,7 @@ interface QtyStepperProps {
 
 export function QtyStepper({ value, onChange }: QtyStepperProps) {
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-pill border border-rule bg-surface">
+    <div className="inline-flex items-center overflow-hidden rounded-pill border border-rule-strong bg-surface-sunken">
       <button
         type="button"
         aria-label="Decrease quantity"
@@ -295,7 +320,7 @@ export function QtyStepper({ value, onChange }: QtyStepperProps) {
       >
         <Minus className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
       </button>
-      <span className="min-w-10 text-center font-mono text-[14px] font-medium text-ink tabular">
+      <span className="tabular min-w-10 text-center text-control font-medium text-ink">
         {value}
       </span>
       <button

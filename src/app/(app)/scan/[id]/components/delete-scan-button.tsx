@@ -78,7 +78,7 @@ export function DeleteScanButton({
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="flex h-11 min-w-11 items-center justify-center gap-sm rounded-pill border border-edge bg-surface px-md text-body-sm font-medium text-risk-ink hover:bg-risk-wash focus-ring"
+        className="flex h-11 min-w-11 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent px-md text-caption font-medium uppercase tracking-[0.18em] text-risk-ink transition-colors hover:border-risk-ink focus-ring"
       >
         <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
         Delete invoice
@@ -91,7 +91,7 @@ export function DeleteScanButton({
       role="alertdialog"
       aria-labelledby="delete-scan-title"
       aria-describedby="delete-scan-impact"
-      className="rounded-card border border-rule-strong bg-risk-wash p-md"
+      className="rounded-card border border-risk-ink/40 bg-risk-wash p-md"
     >
       <div className="flex items-start gap-sm">
         <AlertTriangle className="mt-[2px] h-4 w-4 shrink-0 text-risk-ink" aria-hidden="true" />
@@ -110,7 +110,7 @@ export function DeleteScanButton({
           type="button"
           onClick={() => void handleDelete()}
           disabled={deleting}
-          className="flex h-11 items-center justify-center gap-xs rounded-pill bg-primary px-md text-body-sm font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60"
+          className="flex h-12 items-center justify-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60"
         >
           {deleting ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -127,7 +127,7 @@ export function DeleteScanButton({
           type="button"
           onClick={() => setConfirming(false)}
           disabled={deleting}
-          className="flex h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring disabled:opacity-60"
+          className="flex h-12 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring disabled:opacity-60"
         >
           Keep it
         </button>

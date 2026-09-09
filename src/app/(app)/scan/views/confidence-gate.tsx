@@ -30,26 +30,29 @@ export function ConfidenceGateView({
 
   return (
     <section className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-[480px] rounded-card card-surface p-xl text-center">
-        <div className="mx-auto mb-md flex h-14 w-14 items-center justify-center rounded-full bg-risk-wash text-risk-ink">
+      <div className="glass w-full max-w-[480px] rounded-card p-xl text-center">
+        <div className="mx-auto mb-md flex h-14 w-14 items-center justify-center rounded-full border border-accent/60 text-accent">
           <AlertTriangle className="h-6 w-6" strokeWidth={1.75} />
         </div>
-        <h2 className="font-serif text-[22px] text-ink">
+        <span className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+          Verify
+        </span>
+        <h2 className="mt-xs font-serif text-heading-sm font-normal text-ink">
           {heading}
         </h2>
-        <p className="mt-sm text-[14px] text-grey">{message}</p>
+        <p className="mt-sm text-body-sm text-ink-soft">{message}</p>
         <div className="mt-lg grid grid-cols-1 gap-sm md:grid-cols-2 md:gap-md">
           <button
             type="button"
             onClick={onReviewResults}
-            className="flex h-11 items-center justify-center gap-sm rounded-pill bg-primary text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring md:h-[38px]"
+            className="flex h-12 items-center justify-center gap-sm rounded-pill bg-primary text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
           >
             Review AI results
           </button>
           <button
             type="button"
             onClick={onManualEntry}
-            className="flex h-11 items-center justify-center gap-sm rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash focus-ring md:h-[38px]"
+            className="flex h-12 items-center justify-center gap-sm rounded-pill border border-rule-strong bg-transparent text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
           >
             Enter manually
           </button>

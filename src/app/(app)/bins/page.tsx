@@ -32,7 +32,7 @@ type JoinedBin = {
 
 export default async function BinsPage() {
   const auth = (await getAuthContext())!;
-  const { supabase, restaurantId, userRole } = auth;
+  const { supabase, restaurantId, userRole, restaurantName } = auth;
   const [binResult, unplacedResult] = await Promise.all([
     supabase
       .from("bins")
@@ -74,19 +74,27 @@ export default async function BinsPage() {
 
   return (
     <section>
-      {/* Masthead, matching /cellar: the page names itself and then counts
-          what is on it. The grey eyebrow above the title used to repeat the
-          restaurant name, which the app header already carries on every
-          route -- the same string twice on one 390px screen, the second time
-          in the position a subtitle would occupy. */}
-      <header className="mb-lg md:mb-xl">
-        <h1 className="font-serif text-heading-sm font-normal leading-[1.05] tracking-[-0.02em] text-ink md:text-heading">
+      {/* Masthead (DESIGN.md — Components, Masthead), matching /cellar: one
+          eyebrow carrying the tenant, the section and the count, then the room
+          name in the serif. The count used to be a second line under the
+          title; it belongs in the eyebrow, which is also where the unplaced
+          figure now sits instead of taking a line of its own. No photograph
+          here -- the copper glow gives the page its light instead. */}
+      <header className="dawn-gradient relative -mx-md -mt-lg mb-lg overflow-hidden px-md pb-lg pt-2xl md:-mx-lg md:-mt-xl md:mb-xl md:px-lg md:pb-xl md:pt-3xl">
+        <p className="text-caption font-medium uppercase tracking-[0.18em] text-accent">
+          {restaurantName?.trim() ? <>{restaurantName.trim()} · </> : null}
+          Bins · <span className="tabular">{viewModels.length}</span>{" "}
+          bin{viewModels.length === 1 ? "" : "s"}
+          {unplacedCount > 0 ? (
+            <>
+              {" · "}
+              <span className="tabular">{unplacedCount}</span> unplaced
+            </>
+          ) : null}
+        </p>
+        <h1 className="mt-xs font-serif text-heading font-normal leading-[1.0] tracking-[-0.02em] text-ink lg:text-display">
           Bins
         </h1>
-        <p className="mt-2xs text-body-sm font-medium tabular text-grey">
-          {viewModels.length} bin{viewModels.length === 1 ? "" : "s"}
-          {unplacedCount > 0 ? ` · ${unplacedCount} unplaced` : ""}
-        </p>
       </header>
       <BinManager
         bins={viewModels}

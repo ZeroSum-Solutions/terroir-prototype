@@ -36,7 +36,7 @@ export function InviteModal({
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop-click-to-dismiss is a mouse-only convenience; this dialog already has full keyboard access via useFocusTrap (Escape + a visible Close button).
     <div
-      className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-dialog)] flex items-end justify-center bg-scrim p-md sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="invite-modal-title"
@@ -46,15 +46,15 @@ export function InviteModal({
     >
       <div
         ref={trapRef}
-        className="glass mx-md w-full max-w-[420px] rounded-card p-lg"
+        className="glass w-full rounded-t-card p-lg pb-[calc(var(--safe-bottom)+var(--spacing-lg))] sm:max-w-[420px] sm:rounded-card sm:pb-lg"
       >
         <h3
           id="invite-modal-title"
-          className="text-[18px] font-serif font-medium text-ink"
+          className="font-serif text-subheading font-normal leading-tight text-ink"
         >
           Invite team member
         </h3>
-        <p className="mt-xs text-[13px] text-grey">
+        <p className="mt-xs text-body-sm text-ink-soft">
           Create a shareable link. Anyone with the link can join your
           restaurant as the selected role.
         </p>
@@ -64,7 +64,7 @@ export function InviteModal({
             <div className="mt-lg">
               <label
                 htmlFor="invite-email"
-                className="block text-caption font-medium uppercase text-grey"
+                className="block text-caption font-medium uppercase tracking-[0.18em] text-grey"
               >
                 Email
               </label>
@@ -83,9 +83,9 @@ export function InviteModal({
                     onCreate();
                   }
                 }}
-                className="mt-xs min-h-11 w-full rounded-pill border border-rule bg-surface px-md text-[14px] text-ink focus:border-accent focus-ring"
+                className="mt-xs min-h-11 h-[52px] w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink focus:border-accent focus-ring"
               />
-              <p className="mt-xs text-[12px] text-grey">
+              <p className="mt-xs text-ledger text-grey">
                 The link will only work for this address.
               </p>
             </div>
@@ -93,7 +93,7 @@ export function InviteModal({
             <div className="mt-md">
               <label
                 htmlFor="invite-role"
-                className="block text-caption font-medium uppercase text-grey"
+                className="block text-caption font-medium uppercase tracking-[0.18em] text-grey"
               >
                 Role
               </label>
@@ -103,12 +103,12 @@ export function InviteModal({
                 onChange={(e) =>
                   setInviteRole(e.target.value as "manager" | "staff")
                 }
-                className="mt-xs min-h-11 w-full rounded-pill border border-rule bg-surface px-md text-[14px] text-ink focus:border-accent focus-ring"
+                className="mt-xs min-h-11 h-[52px] w-full rounded-pill border border-rule-strong bg-surface-sunken px-md text-control text-ink focus:border-accent focus-ring"
               >
                 <option value="manager">Manager</option>
                 <option value="staff">Staff</option>
               </select>
-              <p className="mt-xs text-[12px] text-grey">
+              <p className="mt-xs text-ledger text-grey">
                 {ROLE_DESCRIPTIONS[inviteRole]}
               </p>
             </div>
@@ -116,17 +116,17 @@ export function InviteModal({
             {error && (
               <p
                 role="alert"
-                className="mt-md rounded-md border border-risk-ink/30 bg-risk-wash px-sm py-xs text-[13px] text-risk-ink"
+                className="mt-md rounded-card border border-risk-ink/30 bg-risk-wash px-sm py-xs text-body-sm text-risk-ink"
               >
                 {error}
               </p>
             )}
 
-            <div className="mt-lg flex justify-end gap-sm">
+            <div className="mt-lg flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex min-h-11 items-center rounded-pill border border-rule-strong bg-surface px-md text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+                className="flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
               >
                 Cancel
               </button>
@@ -134,12 +134,12 @@ export function InviteModal({
                 type="button"
                 onClick={onCreate}
                 disabled={creating || inviteEmail.trim().length === 0}
-                className="flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring disabled:opacity-60"
+                className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring disabled:opacity-60"
               >
                 {creating && (
                   <Loader2
                     className="h-4 w-4 animate-spin"
-                    strokeWidth={2}
+                    strokeWidth={1.9}
                   />
                 )}
                 Generate link
@@ -148,28 +148,28 @@ export function InviteModal({
           </>
         ) : (
           <>
-            <div className="mt-lg rounded-md border border-rule bg-wash p-md">
-              <p className="break-all font-mono text-[12px] text-ink">
+            <div className="mt-lg rounded-card border border-rule-strong bg-surface-sunken p-md">
+              <p className="break-all text-ledger text-ink">
                 {inviteUrl}
               </p>
             </div>
-            <div className="mt-md flex justify-end gap-sm">
+            <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex min-h-11 items-center rounded-pill border border-rule-strong bg-surface px-md text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+                className="flex min-h-11 items-center justify-center rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
               >
                 Done
               </button>
               <button
                 type="button"
                 onClick={onCopy}
-                className="flex min-h-11 items-center gap-xs rounded-pill bg-primary px-md text-[14px] font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+                className="flex min-h-11 items-center justify-center gap-xs rounded-pill bg-primary px-lg text-control font-semibold text-seal-ink transition-colors hover:bg-primary-hover focus-ring"
               >
                 {copied ? (
-                  <Check className="h-4 w-4" strokeWidth={2} />
+                  <Check className="h-4 w-4" strokeWidth={1.9} />
                 ) : (
-                  <Copy className="h-4 w-4" strokeWidth={2} />
+                  <Copy className="h-4 w-4" strokeWidth={1.9} />
                 )}
                 {copied ? "Copied" : "Copy link"}
               </button>

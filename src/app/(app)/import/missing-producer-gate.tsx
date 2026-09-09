@@ -28,7 +28,7 @@ export function MissingProducerGate({
   if (missingProducerRows <= 0) return null;
   const plural = missingProducerRows === 1;
   return (
-    <div className="mt-xs rounded-md bg-risk-wash px-sm py-xs text-body-sm text-risk-ink">
+    <div className="mt-xs rounded-card border border-accent px-sm py-xs text-body-sm text-ink-soft">
       <p>
         {missingProducerRows} row{plural ? " has" : "s have"} no producer. {plural ? "It" : "They"} will import, but a
         wine with no producer cannot be matched to the shared catalogue — so it will never gain a label photograph, a
@@ -43,9 +43,9 @@ export function MissingProducerGate({
           checked={acknowledged}
           disabled={disabled}
           onChange={(e) => onAcknowledge(e.target.checked)}
-          className="h-5 w-5 rounded-sm border-rule"
+          className="h-5 w-5 rounded-sm border-rule accent-[var(--color-accent)]"
         />
-        <span>Import {plural ? "it" : "them"} without a producer</span>
+        <span className="text-ink">Import {plural ? "it" : "them"} without a producer</span>
       </label>
     </div>
   );

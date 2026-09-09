@@ -11,7 +11,7 @@
 // reordering, so ArrowDown walks the ranking.
 
 import { createPortal } from "react-dom";
-import { WineThumb } from "@/components/wine-thumb";
+import { PortraitThumb } from "@/app/(app)/lists/[id]/components/portrait-thumb";
 import { cn } from "@/lib/utils";
 import { catalogueWineTitle, wineDisplayName } from "@/lib/wine-display-name";
 import type { CompanionHint, CompanionReason } from "@/lib/unified-search/companion-hint";
@@ -108,7 +108,7 @@ export function PaletteResultsPanel({
   return createPortal(
     <div
       data-global-search-panel="true"
-      className="fixed z-[var(--z-overlay)] max-h-[60vh] overflow-y-auto rounded-card card-surface"
+      className="glass fixed z-[var(--z-overlay)] max-h-[60vh] overflow-y-auto rounded-card"
       style={{ top: anchor.top, left: anchor.left, width: anchor.width, minWidth: 280 }}
     >
       <div className="flex items-center gap-sm border-b border-rule px-md py-xs">
@@ -117,8 +117,8 @@ export function PaletteResultsPanel({
           aria-pressed={scope === "cellar"}
           onClick={onToggleScope}
           className={cn(
-            "rounded-pill border border-edge px-sm py-[2px] text-ledger transition-colors focus-ring",
-            scope === "cellar" ? "bg-accent/15 text-ink" : "text-grey hover:text-ink-soft",
+            "rounded-pill border border-rule-strong px-sm py-[2px] text-ledger transition-colors focus-ring",
+            scope === "cellar" ? "border-accent text-accent" : "text-grey hover:text-ink-soft",
           )}
         >
           My cellar
@@ -135,7 +135,7 @@ export function PaletteResultsPanel({
               key={term}
               type="button"
               onClick={() => onRunRecent(term)}
-              className="rounded-pill border border-edge px-sm py-[2px] text-ledger text-ink-soft transition-colors hover:bg-wash focus-ring"
+              className="rounded-pill border border-rule-strong px-sm py-[2px] text-ledger text-ink-soft transition-colors hover:border-accent hover:text-accent focus-ring"
             >
               {term}
             </button>
@@ -156,7 +156,7 @@ export function PaletteResultsPanel({
             <button
               type="button"
               onClick={onScanInstead}
-              className="mt-xs text-body-sm text-ink-soft underline-offset-2 hover:underline focus-ring"
+              className="mt-xs text-body-sm text-accent underline-offset-2 hover:underline focus-ring"
             >
               Scan a label instead
             </button>
@@ -170,7 +170,7 @@ export function PaletteResultsPanel({
             <button
               type="button"
               onClick={onAskCompanion}
-              className="mt-xs text-body-sm text-ink-soft underline-offset-2 hover:underline focus-ring"
+              className="mt-xs text-body-sm text-accent underline-offset-2 hover:underline focus-ring"
             >
               Ask the companion
             </button>
@@ -184,7 +184,7 @@ export function PaletteResultsPanel({
           <button
             type="button"
             onClick={onAskCompanion}
-            className="mt-xs text-body-sm text-ink-soft underline-offset-2 hover:underline focus-ring"
+            className="mt-xs text-body-sm text-accent underline-offset-2 hover:underline focus-ring"
           >
             Ask the companion
           </button>
@@ -195,7 +195,7 @@ export function PaletteResultsPanel({
         <ul id={listboxId} role="listbox" aria-label="Wine search results">
           {cellarRows.length > 0 ? (
             <li role="presentation" data-palette-section="cellar"
-              className="px-md pt-sm text-ledger uppercase tracking-wide text-grey">
+              className="px-md pt-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
               In your cellar
             </li>
           ) : null}
@@ -205,7 +205,7 @@ export function PaletteResultsPanel({
           ))}
           {catalogueRows.length > 0 ? (
             <li role="presentation" data-palette-section="catalogue"
-              className={cn("px-md pt-sm text-ledger uppercase tracking-wide text-grey",
+              className={cn("px-md pt-sm text-caption font-medium uppercase tracking-[0.18em] text-grey",
                 cellarRows.length > 0 && "border-t border-rule mt-xs")}>
               Catalogue
             </li>
@@ -221,7 +221,7 @@ export function PaletteResultsPanel({
         <button
           type="button"
           onClick={onSeeAll}
-          className="flex min-h-11 w-full items-center border-t border-rule px-md py-sm text-left text-body-sm text-ink-soft transition-colors hover:bg-wash focus-ring"
+          className="flex min-h-11 w-full items-center border-t border-rule px-md py-sm text-left text-body-sm text-accent transition-colors hover:text-ink focus-ring"
         >
           See all matches in the cellar
         </button>
@@ -265,24 +265,24 @@ function ResultRow({
     <li id={`${optionId}-${index}`} role="option" aria-selected={index === active}>
       <div
         className={cn(
-          "flex w-full items-center gap-sm px-md py-sm transition-colors",
-          index === active && "bg-wash",
+          "flex w-full items-center gap-sm border-b border-rule px-md py-sm transition-colors",
+          index === active && "bg-surface-raised",
         )}
       >
         <button
           type="button"
           onClick={() => onPick(row)}
-          className="flex min-w-0 flex-1 items-center gap-sm text-left hover:bg-wash focus-ring"
+          className="flex min-w-0 flex-1 items-center gap-sm text-left focus-ring"
         >
-          <WineThumb
+          <PortraitThumb
             src={row.imageUrl}
             producer={row.producer ?? ""}
             name={row.name}
             colour={row.colour}
-            size={32}
+            width={32}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-control text-ink">
+            <span className="block truncate font-serif text-body-lg font-normal text-ink">
               {row.kind === "cellar" ? (
                 <>
                   {row.producer ? `${row.producer} ` : ""}
@@ -293,7 +293,9 @@ function ResultRow({
                 catalogueWineTitle(row.producer, row.name)
               )}
             </span>
-            <span className="block truncate text-ledger font-light text-grey">{meta}</span>
+            <span className="mt-2xs block truncate text-caption font-medium uppercase tracking-[0.18em] text-grey">
+              {meta}
+            </span>
           </span>
         </button>
         {row.isEightysixed === true ? (
@@ -302,12 +304,12 @@ function ResultRow({
           </span>
         ) : null}
         {row.provisional ? (
-          <span className="shrink-0 rounded-pill border border-edge px-sm py-[2px] text-ledger text-grey">
+          <span className="shrink-0 rounded-pill border border-rule-strong px-sm py-[2px] text-ledger text-grey">
             unresolved
           </span>
         ) : null}
         {badge ? (
-          <span className="shrink-0 rounded-pill border border-edge px-sm py-[2px] text-ledger text-grey">
+          <span className="shrink-0 rounded-pill border border-rule-strong px-sm py-[2px] text-ledger text-grey">
             {badge}
           </span>
         ) : null}
@@ -317,7 +319,7 @@ function ResultRow({
             data-palette-add="true"
             disabled={addState === "pending" || addState === "added"}
             onClick={() => onAdd(row)}
-            className="shrink-0 rounded-pill border border-edge px-sm py-[2px] text-ledger text-ink-soft transition-colors hover:bg-wash focus-ring disabled:opacity-70"
+            className="shrink-0 rounded-pill border border-rule-strong px-sm py-[2px] text-ledger text-accent transition-colors hover:border-accent focus-ring disabled:opacity-70"
           >
             {addState === "added" ? "Added" : addState === "pending" ? "Adding…" : addState === "error" ? "Retry add" : "Add"}
           </button>

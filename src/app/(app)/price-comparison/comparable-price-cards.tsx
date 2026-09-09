@@ -16,21 +16,15 @@ import { wineDisplayName } from "@/lib/wine-display-name";
 // the small-screen counterpart to ComparablePriceTable.
 export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
   return (
-    <div className="flex flex-col gap-md md:hidden">
+    <div className="border-t border-rule md:hidden">
       {wines.map((comp) => {
         const distPrices = latestPriceByDistributor(comp.prices);
 
         return (
-          <div
-            key={comp.wine.id}
-            className={`rounded-card p-md ${
-              comp.variancePct != null && comp.variancePct > VARIANCE_HIGHLIGHT_THRESHOLD
-                ? "border border-risk-ink/30 bg-risk-wash/20"
-                : comp.variancePct != null && comp.variancePct < -VARIANCE_HIGHLIGHT_THRESHOLD
-                  ? "border border-ready/30 bg-ready-wash/10"
-                  : "card-surface"
-            }`}
-          >
+          // A hairline index row, not a tinted card: the variance seal below
+          // carries the over/under-market reading on its own (DESIGN.md —
+          // Components, Index Row / Status Seal).
+          <div key={comp.wine.id} className="border-b border-rule py-md">
             <div className="mb-sm flex items-start justify-between">
               <div className="flex items-start gap-xs min-w-0 flex-1">
                 <WineThumb
@@ -45,7 +39,7 @@ export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
                   aria-label={`View ${comp.wine.producer} ${wineDisplayName(comp.wine.producer, comp.wine.name)} in cellar`}
                   className="group min-w-0 flex-1 rounded-md focus-ring"
                 >
-                  <div className="font-serif text-body-lg font-medium text-ink group-hover:text-accent">
+                  <div className="font-serif text-body-lg font-normal text-ink group-hover:text-accent">
                     {wineDisplayName(comp.wine.producer, comp.wine.name)}
                     {comp.wine.vintage ? ` ${comp.wine.vintage}` : ""}
                   </div>
@@ -57,7 +51,7 @@ export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
               </div>
               <div className="flex flex-col items-end gap-xs">
                 {comp.spread >= 0.1 && (
-                  <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-xs text-[10.5px] font-medium uppercase tracking-wide text-risk-ink">
+                  <span className="inline-flex items-center gap-xs rounded-pill bg-risk-wash px-sm py-2xs text-caption font-medium uppercase text-risk-ink">
                     {Math.round(comp.spread * 100)}%
                   </span>
                 )}
@@ -70,7 +64,7 @@ export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
             </div>
 
             {/* BND-138: Market comparison row */}
-            <div className="mb-sm flex items-center justify-between rounded-md bg-wash px-sm py-sm">
+            <div className="mb-sm flex items-center justify-between rounded-lg bg-surface-raised px-sm py-sm">
               <span className="text-caption font-medium uppercase text-grey">
                 Last paid
               </span>
@@ -85,7 +79,7 @@ export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
                   </span>
                   {comp.variancePct != null && Math.abs(comp.variancePct) > VARIANCE_HIGHLIGHT_THRESHOLD && (
                     <span
-                      className={`ml-sm rounded-pill px-sm py-2xs text-[10.5px] font-medium uppercase tracking-wide ${
+                      className={`ml-sm rounded-pill px-sm py-2xs text-caption font-medium uppercase ${
                         comp.variancePct > 0
                           ? "bg-risk-wash text-risk-ink"
                           : "bg-ready-wash text-ready-ink"
@@ -103,11 +97,7 @@ export function ComparablePriceCards({ wines }: { wines: WineComparison[] }) {
               {distPrices.map((price) => (
                 <div
                   key={price.distributor}
-                  className={`flex items-center justify-between rounded-pill px-sm py-xs ${
-                    price.unitCost === comp.cheapest
-                      ? "bg-ready-wash/40"
-                      : ""
-                  }`}
+                  className="flex items-center justify-between rounded-pill px-sm py-xs"
                 >
                   <span className="min-w-0 text-body-sm text-ink">
                     <span className="block truncate">{price.distributor}</span>

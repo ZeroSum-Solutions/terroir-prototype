@@ -47,23 +47,23 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
   const activeIndex = steps.indexOf(activeStep);
   return (
     <section className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-[420px] rounded-card card-surface p-xl text-center">
+      <div className="glass w-full max-w-[420px] rounded-card p-xl text-center">
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- Browser-local blob preview must render directly without image optimization or generated attributes.
           <img
             src={previewUrl}
             alt="What you captured"
-            className="mx-auto mb-md h-20 w-20 rounded-lg border border-rule object-cover"
+            className="mx-auto mb-md h-20 w-20 rounded-lg border border-glass-edge object-cover"
           />
         ) : (
-          <div className="mx-auto mb-md flex h-16 w-16 items-center justify-center rounded-full bg-risk-wash text-risk-ink">
+          <div className="mx-auto mb-md flex h-16 w-16 items-center justify-center rounded-full border border-accent/60 text-accent">
             <Sparkles className="h-7 w-7" strokeWidth={1.5} aria-hidden="true" />
           </div>
         )}
-        <h2 className="font-serif text-[22px] text-ink">
+        <h2 className="font-serif text-heading-sm font-normal text-ink">
           {isBottle ? "Reading the label" : "Reading your invoice"}
         </h2>
-        <p className="mt-xs text-[14px] text-grey">
+        <p className="mt-xs text-body-sm text-ink-soft">
           {capped
             ? isBottle
               ? "Still working — this should finish shortly."
@@ -74,7 +74,7 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
         </p>
 
         <div
-          className="relative mt-md h-1.5 overflow-hidden rounded-pill bg-surface-sunken"
+          className="relative mt-lg h-[3px] overflow-hidden rounded-pill bg-rule-strong"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
@@ -82,12 +82,12 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
           aria-valuetext={`${activeStep.label}, estimated ${progress}% complete`}
         >
           <div
-            className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-100 ease-out"
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-accent to-primary transition-[width] duration-100 ease-out"
             style={{ width: `${progress}%` }}
             aria-hidden="true"
           />
         </div>
-        <div className="mt-xs flex items-center justify-between text-[11px] tabular text-grey">
+        <div className="tabular mt-xs flex items-center justify-between text-caption uppercase tracking-[0.18em] text-grey">
           <span>Estimated progress: {progress}%</span>
           <span>{isBottle ? "Reading label details" : "Reading invoice details"}</span>
         </div>
@@ -96,7 +96,7 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
           {activeStep.label}
         </span>
 
-        <ul className="mt-lg flex flex-col gap-sm text-left">
+        <ul className="mt-lg flex flex-col gap-sm text-left text-body-sm">
           {steps.map((step, i) => {
             const done = i < activeIndex;
             const active = step.stage === stage;
@@ -105,9 +105,9 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
                 key={step.stage}
                 aria-current={active ? "step" : undefined}
                 className={cn(
-                  "flex items-center gap-sm text-[14px]",
+                  "flex items-center gap-sm",
                   done && "text-ink",
-                  active && "text-mark",
+                  active && "text-accent",
                   !done && !active && "text-grey",
                 )}
               >
@@ -126,7 +126,7 @@ export function ProcessingView({ progress, stage, mode, onCancel, previewUrl }: 
         <button
           type="button"
           onClick={onCancel}
-          className="mt-lg h-11 rounded-pill border border-edge bg-surface px-lg text-[14px] font-medium text-ink hover:bg-wash focus-ring"
+          className="mt-lg h-11 rounded-pill border border-rule-strong bg-transparent px-lg text-control font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
         >
           Cancel scan
         </button>

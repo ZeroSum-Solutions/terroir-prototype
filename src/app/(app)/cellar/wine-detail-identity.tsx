@@ -20,9 +20,9 @@ import type { CellarWineRow } from "./types";
  *     falls back to the X-Wines corpus image its identity link points at
  *     (GLOBAL-04), captioned with what that picture actually is, and then to
  *     the same producer-initials stand-in every cellar row already uses.
- *   • It follows DESIGN.md's `bottle` recipe — 3:4 portrait, object-contain,
- *     on a cool mat — instead of the 2:1 banner crop the design contract calls
- *     out by name for cutting the tops off bottles.
+ *   • It follows DESIGN.md's imagery rule — 2:3 portrait at radius `lg` with a
+ *     glass hairline, object-contain — instead of the 2:1 banner crop the
+ *     design contract calls out by name for cutting the tops off bottles.
  *
  * The identity LINK is not the only way to a picture, and for a cellar built
  * by CSV import it is not the usual one. When neither the tenant's own
@@ -69,13 +69,13 @@ export function WineDetailIdentity({
   return (
     <section aria-label="Wine" className="mb-md flex gap-md">
       <div className="w-[112px] shrink-0">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-rule bg-surface-raised">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-glass-edge bg-surface-raised">
           {hero ? (
             <Image
               src={hero.src}
               alt={hero.alt}
               width={448}
-              height={598}
+              height={672}
               unoptimized
               className="h-full w-full object-contain"
             />

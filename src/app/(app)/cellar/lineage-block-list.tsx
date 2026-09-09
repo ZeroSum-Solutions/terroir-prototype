@@ -129,7 +129,7 @@ export function LineageBlockList({
                 <span className="block text-caption font-medium uppercase text-ink-soft">
                   {block.producer}
                 </span>
-                <span className="block truncate font-serif text-body-lg font-medium text-ink">
+                <span className="block truncate font-serif text-body-lg font-normal text-ink">
                   {wineDisplayName(block.producer, block.name)}
                 </span>
               </span>
