@@ -211,7 +211,7 @@ function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueRespo
  */
 function BulkRail({ busy, selectedCount, readyCount, allReadySelected, accept, toggleAll }: { busy: boolean; selectedCount: number; readyCount: number; allReadySelected: boolean; accept: () => void; toggleAll: () => void }) {
   return (
-    <div data-bulk-rail className="glass fixed inset-x-md bottom-[calc(var(--chrome-tabbar-total)+var(--chrome-fab)+var(--spacing-xl))] z-[var(--z-chrome)] flex flex-nowrap items-center justify-between gap-sm rounded-card px-sm py-sm md:static md:mt-md md:px-md">
+    <div data-bulk-rail className="glass fixed inset-x-md bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-md)+var(--spacing-md))] z-[var(--z-chrome)] flex flex-nowrap items-center justify-between gap-sm rounded-card px-sm py-sm md:static md:mt-md md:px-md">
       <button type="button" onClick={toggleAll} disabled={busy || readyCount === 0} className="h-11 shrink-0 whitespace-nowrap rounded-pill px-xs text-body-sm font-medium text-ink-soft hover:bg-wash hover:text-ink focus-ring disabled:opacity-40">
         {allReadySelected ? "Clear actionable" : `Select actionable (${readyCount})`}
       </button>

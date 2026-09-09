@@ -178,7 +178,7 @@ export function ReconcileList({
       </fieldset>
 
       {/* The one action, on a floating glass rail clearing the nav dock. */}
-      <div className={cn("glass fixed left-md right-md z-[var(--z-chrome)] rounded-card px-md py-sm md:static md:mt-lg", inDialog ? "bottom-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--chrome-fab)+var(--spacing-xl))]")}>
+      <div className={cn("glass fixed left-md right-md z-[var(--z-chrome)] rounded-card px-md py-sm md:static md:mt-lg", inDialog ? "bottom-[calc(var(--safe-bottom)+var(--spacing-sm))]" : "bottom-[calc(var(--chrome-tabbar-total)+var(--spacing-md)+var(--spacing-md))]")}>
         <button
           type="button"
           onClick={onSaveAll}
