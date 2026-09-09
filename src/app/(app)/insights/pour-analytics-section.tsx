@@ -221,7 +221,11 @@ export function PourAnalyticsContent({ data }: { data: PourData }) {
                 {data.pourVolumeBySection.map(function (s) {
                   return (
                     <div key={s.section} className="flex items-center gap-sm">
-                      <span className="w-[110px] shrink-0 truncate text-[13px] text-ink">
+                      {/* min-w-0 flex-1 (not a fixed pixel width) matches the
+                          wine-name rows below — it adapts to a long section
+                          name (e.g. "Main Dining Room") instead of clipping
+                          it on a narrow phone. */}
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
                         {s.section}
                       </span>
                       <PourBar oz={s.oz} maxOz={maxSectionOz} />

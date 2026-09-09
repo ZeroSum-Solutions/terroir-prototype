@@ -31,11 +31,11 @@ import {
 } from "./date-range";
 import { InsightScope } from "./insight-scope";
 import {
-  OwnerMetricGrid,
   TodayStrip,
   selectTodayExceptions,
   type TodayException,
 } from "./insights-drilldown";
+import { StatTileGrid } from "./insights-stat-tiles";
 import { metricHref } from "./metric-href";
 import { fetchYieldGroups, YieldReportSection } from "./yield-report-section";
 import { summarizeCellarHealth, summarizeUnscoredStock } from "@/lib/cellar-health/summary";
@@ -366,7 +366,7 @@ export default async function DashboardPage({
           <div className="mb-sm">
             <InsightScope metric="inventory" kind="snapshot" />
           </div>
-          <OwnerMetricGrid
+          <StatTileGrid
             metrics={{
               inventoryValue,
               totalBottles,
@@ -714,12 +714,21 @@ export default async function DashboardPage({
                     <div key={label} data-metric={`varietal-${label}`}>
                       <Link
                         href={metricHref("varietal", label)}
-                        className="flex min-h-11 items-center gap-sm rounded-sm transition-colors hover:bg-wash"
+                        className="flex min-h-11 flex-col justify-center gap-2xs rounded-sm transition-colors hover:bg-wash"
                       >
-                        <span className="w-[100px] shrink-0 truncate text-[13px] text-ink">
-                          {label}
-                        </span>
-                        <div className="h-2.5 flex-1 overflow-hidden rounded-pill bg-surface-sunken">
+                        <div className="flex items-center gap-sm">
+                          {/* Adapts to the label instead of clipping it at a
+                              fixed pixel width — a long varietal name (e.g.
+                              "Cabernet Sauvignon") has the full row to grow
+                              into on a narrow phone. */}
+                          <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                            {label}
+                          </span>
+                          <span className="shrink-0 text-right tabular text-[12px] text-grey">
+                            {Math.round(pct * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full overflow-hidden rounded-pill bg-surface-sunken">
                           <div
                             className="h-full rounded-pill bg-primary"
                             style={{
@@ -728,9 +737,6 @@ export default async function DashboardPage({
                             }}
                           />
                         </div>
-                        <span className="w-[36px] shrink-0 text-right tabular text-[12px] text-grey">
-                          {Math.round(pct * 100)}%
-                        </span>
                       </Link>
                     </div>
                   );

@@ -149,7 +149,9 @@ export function AutoEightysixPanel({
                   (e.target as HTMLInputElement).blur();
                 }
               }}
-              className="ml-xs h-[32px] w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-[13px]"
+              // 17px keeps iOS from zooming the page on focus; 14px once
+              // there is a pointer. h-11 meets the 44px touch target.
+              className="ml-xs h-11 w-[80px] rounded-pill border border-rule bg-surface px-sm text-right font-mono text-body-lg md:text-control"
             />
             <span className="text-[11px] text-grey">ml</span>
             <span className="text-[11px] text-grey">

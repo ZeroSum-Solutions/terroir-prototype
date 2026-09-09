@@ -22,6 +22,14 @@ describe("Fab", () => {
     expect(renderToStaticMarkup(<Fab />)).toBe("");
   });
 
+  it.each(["/bins", "/insights"])(
+    "does not cover the row-action column or date-range copy on %s",
+    (pathname) => {
+      navigation.pathname = pathname;
+      expect(renderToStaticMarkup(<Fab />)).toBe("");
+    },
+  );
+
   it("exposes exactly the three working actions and no Voice promise", () => {
     document.body.innerHTML = renderToStaticMarkup(<Fab />);
     const menu = document.querySelector<HTMLElement>('[role="menu"]')!;

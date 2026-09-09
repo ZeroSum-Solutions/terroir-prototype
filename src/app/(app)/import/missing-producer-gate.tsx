@@ -37,7 +37,7 @@ export function MissingProducerGate({
       {/* No size class — the panel's own text-body-sm is the right size
           here, and the typography ratchet has no role for a bare pixel
           value (DESIGN.md scale tokens only). */}
-      <label className="mt-xs flex items-center gap-sm font-medium">
+      <label className="mt-xs -mx-sm flex min-h-11 cursor-pointer items-center gap-sm px-sm font-medium">
         <input
           type="checkbox"
           checked={acknowledged}

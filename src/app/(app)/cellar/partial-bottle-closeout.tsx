@@ -150,7 +150,9 @@ function Field({ name, label, value, onChange }: { name: string; label: string; 
   return (
     <label className="text-[12px] text-grey">
       {label}
-      <input name={name} type="number" min="0" step="1" value={value} onChange={(event) => onChange(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm font-mono text-[13px] text-ink" />
+      {/* 17px keeps iOS from zooming the page on focus; 14px once there is
+          a pointer. */}
+      <input name={name} type="number" min="0" step="1" value={value} onChange={(event) => onChange(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm font-mono text-body-lg text-ink md:text-control" />
     </label>
   );
 }

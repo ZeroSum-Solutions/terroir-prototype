@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generatorVersion": 1,
   "sourceRoot": "src/app/api",
-  "routeFileCount": 98,
-  "discoveredOperationCount": 114,
+  "routeFileCount": 99,
+  "discoveredOperationCount": 115,
   "discoveredOperations": [
     {
       "operationId": "api:GET:/api/assistant",
@@ -376,6 +376,17 @@
         "file": "src/app/api/import/sessions/[id]/revert/route.ts",
         "exportKind": "function-declaration",
         "localName": "POST",
+        "moduleSpecifier": null
+      }
+    },
+    {
+      "operationId": "api:GET:/api/import/template",
+      "method": "GET",
+      "path": "/api/import/template",
+      "source": {
+        "file": "src/app/api/import/template/route.ts",
+        "exportKind": "function-declaration",
+        "localName": "GET",
         "moduleSpecifier": null
       }
     },

@@ -25,7 +25,7 @@ export default async function ReconcilePage() {
   const auth = await getAuthContext();
   if (!auth) redirect("/login");
 
-  const { supabase, restaurantId, userRole } = auth;
+  const { supabase, restaurantId, userRole, user } = auth;
 
   // Role gate: manager or owner only
   if (userRole !== "owner" && userRole !== "manager") {
@@ -82,6 +82,8 @@ export default async function ReconcilePage() {
       <ReconcileList
         initialItems={reconcileItems}
         varianceThresholdOz={varianceThresholdOz}
+        restaurantId={restaurantId}
+        userId={user.id}
       />
     </section>
   );

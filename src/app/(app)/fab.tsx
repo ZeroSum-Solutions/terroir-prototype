@@ -42,8 +42,23 @@ const ACTIONS: Action[] = [
 // tap targets (and the region bottom sheet) sit in the same bottom-right
 // zone the FAB floats in — none of its actions (Scan/Pour/86) are Atlas
 // tasks anyway. Import, setup and reconciliation also own their primary action;
-// floating service shortcuts must not cover their form controls.
-const HIDE_ON: ReadonlyArray<string> = ["/scan", "/login", "/atlas", "/import", "/get-started", "/cellar/reconcile"];
+// floating service shortcuts must not cover their form controls. /bins and
+// /insights join for the same reason, not a new one: /bins pins its
+// row-action column (edit/archive) to the same bottom-right corner the FAB
+// occupies, and /insights runs date-range copy the full width of the same
+// band — both real controls a fixed 56px square would sit on top of at
+// ordinary scroll positions, and neither page has a Scan/Pour/86 use case
+// the FAB would otherwise be serving.
+const HIDE_ON: ReadonlyArray<string> = [
+  "/scan",
+  "/login",
+  "/atlas",
+  "/import",
+  "/get-started",
+  "/cellar/reconcile",
+  "/bins",
+  "/insights",
+];
 
 function shouldHide(pathname: string): boolean {
   return HIDE_ON.some(
@@ -98,7 +113,9 @@ function FabInner() {
         aria-label={open ? "Close actions" : "Open actions"}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-pill bg-primary text-seal-ink transition-transform duration-200",
+          // Squared off, not a capsule (DESIGN.md — Controls: the FAB moves
+          // off rounded-pill in a sharp system).
+          "pointer-events-auto absolute right-md grid h-14 w-14 place-items-center rounded-md bg-primary text-seal-ink transition-transform duration-200",
           "hover:bg-primary-hover active:scale-95 focus-ring",
           open && "rotate-45",
         )}
@@ -159,17 +176,19 @@ function ActionPill({
   const inner = (
     <span
       className={cn(
-        "glass flex items-center gap-sm rounded-pill px-md py-sm text-[13px] font-medium transition-all duration-200",
+        // Opaque, not glass (Concept A bans blur/translucency), and squared
+        // off to match the trigger rather than staying a capsule.
+        "flex items-center gap-sm rounded-md border border-edge bg-surface px-md py-sm text-body-sm font-medium shadow-card transition-all duration-200",
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-2 opacity-0",
       )}
       style={{ transitionDelay }}
     >
-      <span className="text-[12px] uppercase tracking-[0.06em] text-grey">
+      <span className="text-ledger uppercase tracking-[0.06em] text-grey">
         {label}
       </span>
-      <span className="grid h-9 w-9 place-items-center rounded-pill bg-risk-wash text-risk-ink">
+      <span className="grid h-9 w-9 place-items-center rounded-md bg-primary/10 text-primary">
         <Icon className="h-4 w-4" strokeWidth={2} />
       </span>
     </span>
@@ -181,7 +200,7 @@ function ActionPill({
       onClick={onActivate}
       aria-label={label}
       role="menuitem"
-      className="pointer-events-auto inline-flex rounded-pill focus-ring"
+      className="pointer-events-auto inline-flex rounded-md focus-ring"
     >
       {inner}
     </Link>

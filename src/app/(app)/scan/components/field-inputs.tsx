@@ -108,7 +108,9 @@ export function TextInput({
         onBlur={() => val !== value && onCommit(val)}
         aria-label={a11y ? undefined : label}
         className={cn(
-          "min-h-11 w-full bg-transparent text-[14px] text-ink outline-none",
+          // 17px keeps iOS from zooming the page on focus; 14px once there is
+          // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
+          "min-h-11 w-full bg-transparent text-body-lg text-ink outline-none md:text-control",
           className,
         )}
       />
@@ -188,7 +190,9 @@ export function VintageInput({
         onBlur={commit}
         inputMode="numeric"
         aria-label={a11y ? undefined : "Vintage"}
-        className="min-h-11 w-full bg-transparent font-mono text-[13px] text-ink outline-none"
+        // 17px keeps iOS from zooming the page on focus; 14px once there is
+        // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
+        className="min-h-11 w-full bg-transparent font-mono text-body-lg text-ink outline-none md:text-control"
       />
     </FieldWrap>
   );
@@ -257,7 +261,9 @@ export function MoneyInput({
         onBlur={commit}
         inputMode="decimal"
         aria-label={a11y ? undefined : "Unit cost"}
-        className="min-h-11 w-full bg-transparent text-right font-mono text-[13px] font-medium text-ink outline-none"
+        // 17px keeps iOS from zooming the page on focus; 14px once there is
+        // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
+        className="min-h-11 w-full bg-transparent text-right font-mono text-body-lg font-medium text-ink outline-none md:text-control"
       />
     </FieldWrap>
   );

@@ -97,7 +97,9 @@ function StockAdjustmentFields({
       </div>
       <label className="mt-sm block text-[12px] text-grey">
         Quantity
-        <input name="quantity" type="number" step="1" value={form.quantity} onChange={(event) => form.setQuantity(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm font-mono text-[13px] text-ink" />
+        {/* 17px keeps iOS from zooming the page on focus; 14px once there is
+            a pointer. */}
+        <input name="quantity" type="number" step="1" value={form.quantity} onChange={(event) => form.setQuantity(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm font-mono text-body-lg text-ink md:text-control" />
       </label>
       <label className="mt-sm block text-[12px] text-grey">
         Reason
@@ -108,7 +110,9 @@ function StockAdjustmentFields({
       </label>
       <label className="mt-sm block text-[12px] text-grey">
         Note
-        <input name="note" maxLength={500} value={form.note} onChange={(event) => form.setNote(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm text-[13px] text-ink" />
+        {/* 17px keeps iOS from zooming the page on focus; 14px once there is
+            a pointer. */}
+        <input name="note" maxLength={500} value={form.note} onChange={(event) => form.setNote(event.target.value)} className="mt-xs h-11 w-full rounded-pill border border-rule bg-surface px-sm text-body-lg text-ink md:text-control" />
       </label>
       {form.message && <p role="status" className="mt-sm text-[12px] text-grey">{form.message}</p>}
       <button type="button" disabled={form.busy || form.invalid} onClick={form.submit} className="mt-sm h-11 w-full rounded-pill border border-edge bg-surface text-[13px] font-medium text-ink hover:bg-wash disabled:opacity-50">

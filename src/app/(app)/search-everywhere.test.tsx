@@ -1,129 +1,148 @@
-// GLOBAL-02 — "the search bar is present on every page", asserted mechanically.
+// GLOBAL-02 — the mobile entry point for global search.
 //
-// The assertion is made against the SHELL, not against each route's markup, and
-// that is the point rather than a shortcut. Every page.tsx under src/app/(app)
-// renders inside src/app/(app)/layout.tsx by construction of the App Router, so
-// "the shell renders a search field" plus "every route lives under the shell"
-// is the whole rule — and it stays true when a route is added, which a
-// per-route DOM assertion would not.
-//
-// The two halves are tested separately below: the inventory half walks the
-// route tree, the shell half renders the layout.
+// This used to pin the always-on band that rendered a full-width
+// <SearchPalette> under the header on every route (asserted against
+// ./layout directly). That band is gone — cellar-index defect #3: it cost
+// ~140px of an 844px mobile viewport on every screen, duplicating each
+// page's own search on /cellar and /bins, and was pure noise on /insights.
+// What replaces it lives here instead: a single icon, collapsed by
+// default, opening the same palette on demand and closing again on
+// Escape, an outside interaction, or navigating away.
 
-import fs from "node:fs";
-import path from "node:path";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+const navigation = vi.hoisted(() => ({ pathname: "/cellar" }));
 
-const APP_DIR = path.join(process.cwd(), "src/app/(app)");
-
-const mocks = vi.hoisted(() => ({
-  getAuthContext: vi.fn(),
-  redirect: vi.fn(),
-  push: vi.fn(),
-}));
-
-vi.mock("@/lib/auth-context", () => ({
-  getAuthContext: (...args: unknown[]) => mocks.getAuthContext(...args),
-}));
 vi.mock("next/navigation", () => ({
-  redirect: (...args: unknown[]) => mocks.redirect(...args),
-  useRouter: () => ({ push: mocks.push, refresh: vi.fn() }),
-  usePathname: () => "/cellar",
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => navigation.pathname,
 }));
-vi.mock("@/lib/context/restaurant", () => ({
-  RestaurantProvider: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+vi.mock("./search/search-palette", () => ({
+  SearchPalette: () => (
+    <input
+      data-global-search="true"
+      type="search"
+      placeholder="Search cellar and catalogue…"
+    />
   ),
 }));
-vi.mock("./toast-wrapper", () => ({
-  ToastWrapper: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
 
-const { default: AppLayout } = await import("./layout");
+const { SearchEverywhere } = await import("./search-everywhere");
 
-/** Every route path under (app), with route groups stripped the way Next does. */
-function routePaths(): string[] {
-  const found: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name === "page.tsx") {
-        const segments = path
-          .relative(APP_DIR, dir)
-          .split(path.sep)
-          .filter((s) => s !== "" && !s.startsWith("("));
-        found.push(`/${segments.join("/")}`);
-      }
-    }
-  };
-  walk(APP_DIR);
-  return found.sort();
-}
+let container: HTMLDivElement;
+let root: Root;
 
-describe("GLOBAL-02 — search is on every page", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    document.body.innerHTML = "";
-  });
-
-  it("has routes to cover, and every one of them is under the (app) shell", () => {
-    const routes = routePaths();
-    expect(routes.length).toBeGreaterThan(10);
-    // A page.tsx found by this walk is under src/app/(app), and the App Router
-    // wraps it in that segment's layout. There is no opt-out short of moving
-    // the file out of the segment, which changes its URL.
-    expect(fs.existsSync(path.join(APP_DIR, "layout.tsx"))).toBe(true);
-    for (const route of routes) {
-      expect(route.startsWith("/")).toBe(true);
-    }
-  });
-
-  it("renders a visible search field in the shell, above the page content", async () => {
-    const root = await renderShell();
-
-    const fields = root.querySelectorAll<HTMLInputElement>(
-      'input[type="search"][data-global-search="true"]',
-    );
-    // One placement per breakpoint — the header on md+, the band beneath it on
-    // mobile, where the header has no room left at 390px.
-    expect(fields.length).toBe(2);
-
-    const header = root.querySelector("header")!;
-    expect(header.querySelector('input[type="search"]')).not.toBeNull();
-
-    // "At the top" is structural: both fields precede <main> in document order.
-    const main = root.querySelector("main")!;
-    for (const field of fields) {
-      expect(
-        field.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-    }
-  });
-
-  it("labels the field as search rather than hiding it behind a menu", async () => {
-    const root = await renderShell();
-    const form = root.querySelector('form[role="search"]')!;
-
-    expect(form.getAttribute("aria-label")).toBe("Search all wines");
-    const input = form.querySelector<HTMLInputElement>("input")!;
-    expect(input.getAttribute("placeholder")).toBe("Search cellar and catalogue…");
-    // Not a trigger that opens a dialog: the field itself is in the document.
-    expect(input.getAttribute("type")).toBe("search");
-  });
+beforeEach(() => {
+  navigation.pathname = "/cellar";
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
 });
 
-async function renderShell() {
-  mocks.getAuthContext.mockResolvedValue({
-    restaurantId: "restaurant-1",
-    restaurantName: "Bar Norman",
-    userRole: "manager",
-    user: { email: "manager@example.com" },
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+});
+
+function render() {
+  act(() => {
+    root.render(<SearchEverywhere />);
   });
-  const element = await AppLayout({ children: <p>Page</p> });
-  document.body.innerHTML = renderToStaticMarkup(element);
-  return document.body;
 }
+
+function click(el: Element) {
+  act(() => {
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
+function field() {
+  return container.querySelector<HTMLInputElement>('input[type="search"]');
+}
+
+function trigger() {
+  return container.querySelector<HTMLButtonElement>("button")!;
+}
+
+describe("SearchEverywhere", () => {
+  it("collapses to a single icon by default — no permanent band", () => {
+    render();
+
+    expect(field()).toBeNull();
+    expect(trigger().getAttribute("aria-label")).toBe("Search");
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("is mobile-only — desktop keeps the inline header field instead", () => {
+    render();
+    expect(container.firstElementChild?.className).toContain("md:hidden");
+  });
+
+  it("opens the palette on tap", () => {
+    render();
+    click(trigger());
+
+    expect(field()).not.toBeNull();
+    expect(trigger().getAttribute("aria-label")).toBe("Close search");
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("closes again on a second tap", () => {
+    render();
+    click(trigger());
+    expect(field()).not.toBeNull();
+
+    click(trigger());
+    expect(field()).toBeNull();
+  });
+
+  it("closes on Escape", () => {
+    render();
+    click(trigger());
+    expect(field()).not.toBeNull();
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+
+    expect(field()).toBeNull();
+  });
+
+  it("closes on an outside interaction", () => {
+    render();
+    click(trigger());
+    expect(field()).not.toBeNull();
+
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+
+    expect(field()).toBeNull();
+  });
+
+  it("does not close on a click inside the opened panel", () => {
+    render();
+    click(trigger());
+    const input = field()!;
+
+    act(() => {
+      input.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+
+    expect(field()).not.toBeNull();
+  });
+
+  it("closes when the route changes, since this sits in the persistent layout", () => {
+    render();
+    click(trigger());
+    expect(field()).not.toBeNull();
+
+    navigation.pathname = "/bins";
+    render();
+
+    expect(field()).toBeNull();
+  });
+});

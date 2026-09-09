@@ -12,6 +12,7 @@ import {
 } from "@/lib/bins";
 import { BinForm, type BinDraft } from "./bin-form";
 import type { BinViewModel } from "./bin-view-model";
+import { MobileBinList } from "./bin-mobile-list";
 import { useBinEditor, useBinRequests } from "./use-bin-manager";
 import { wineDisplayName } from "@/lib/wine-display-name";
 
@@ -90,7 +91,9 @@ function SearchBox({ query, onChange }: { query: string; onChange: (value: strin
         value={query}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Find a bottle by wine or producer"
-        className="h-11 w-full rounded-pill border border-rule bg-surface pl-[40px] pr-sm text-[14px] text-ink placeholder:text-grey focus:border-accent focus-ring"
+        // 17px keeps iOS from zooming the page on focus; 14px once there is
+        // a pointer (see search-palette.tsx / cellar-shell.tsx).
+        className="h-11 w-full rounded-pill border border-rule bg-surface pl-[40px] pr-sm text-body-lg text-ink placeholder:text-grey focus:border-accent focus-ring md:text-control"
       />
     </label>
   );
@@ -176,10 +179,17 @@ function BinTable(props: TableProps) {
   // clickable but Edit and Retire. Someone sent to Bin A5 for one of ten
   // bottles could not tell which was which. Opening a row now shows what is
   // in it, with the bottle's picture, and each wine goes to its own detail.
+  //
+  // Shared between the mobile list and the desktop table below (defect 8,
+  // 2026-09-08 demo screenshots) — only one is ever visible at a width, but
+  // there is no reason a bin expanded on one layout should collapse on the
+  // other if the viewport is resized.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const onToggle = (id: string) => setExpandedId(expandedId === id ? null : id);
   return (
     <div className="overflow-hidden rounded-card card-surface">
-      <div className="overflow-x-auto">
+      <MobileBinList {...props} expandedId={expandedId} onToggle={onToggle} />
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[720px] text-[13px]">
           <thead><tr className="bg-wash text-[11px] font-medium uppercase tracking-[0.18em] text-grey"><th className="px-md py-sm text-left">Code</th><th className="px-md py-sm text-left">Zone</th><th className="px-md py-sm text-left">Occupancy</th><th className="px-md py-sm text-right">Capacity</th><th className="px-md py-sm text-right">Priority</th>{props.canManage && <th className={cn(ACTIONS_CELL, "bg-wash")} />}</tr></thead>
           <tbody>
@@ -188,7 +198,7 @@ function BinTable(props: TableProps) {
                 key={bin.id}
                 bin={bin}
                 expanded={expandedId === bin.id}
-                onToggle={() => setExpandedId(expandedId === bin.id ? null : bin.id)}
+                onToggle={() => onToggle(bin.id)}
                 {...props}
               />
             ))}

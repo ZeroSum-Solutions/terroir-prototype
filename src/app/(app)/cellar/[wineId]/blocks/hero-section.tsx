@@ -1,21 +1,13 @@
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import { StatusChip } from "@/components/status-chip";
 import { CommunityRating } from "@/components/detail-sections";
-import { WineThumb } from "@/components/wine-thumb";
+import { wineTint, wineInitials } from "@/components/wine-thumb";
 import { CORPUS_IMAGE_NOTE } from "@/lib/wine-intelligence/corpus-image";
 import { wineDisplayName } from "@/lib/wine-display-name";
 import type { XWinesProfile } from "@/lib/wine-intelligence/xwines-profile";
 import type { WineRow } from "./types";
 import { wineImageReferenceNote } from "@/lib/wine-intelligence/wine-image-reference";
-
-// The hero's candlelight: a warm pool behind the bottle that reads as a lit
-// alcove. It is drawn with the `mark` — champagne in Nocturne, claret in
-// Daylight — because that is the one warm value in the system. `accent` is
-// bone in the dark room and would light the alcove in white.
-const HERO_GLOW = {
-  backgroundImage:
-    "radial-gradient(60% 55% at 22% 42%, color-mix(in oklab, var(--t-mark) 22%, transparent) 0%, transparent 70%)",
-} as const;
 
 export type HeroSectionProps = {
   wine: WineRow;
@@ -37,11 +29,14 @@ export function HeroSection({
   corpusImage,
 }: HeroSectionProps) {
   const referenceNote = wineImageReferenceNote(wine.hero_image_url);
+  // The no-photo hero: the same ink/paper/blue tint WineThumb uses, scaled up
+  // to fill the whole reserved image area rather than a small icon floating
+  // inside a bordered frame — a considered graphic element, not a stand-in
+  // for a missing asset (DESIGN.md — Photography).
+  const tint = wineTint(wine.colour);
+  const initials = wineInitials(wine.producer, wine.name);
   return (
-    <header
-      className="relative mt-md grid gap-xl rounded-card py-2xl md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:gap-2xl md:py-3xl"
-      style={HERO_GLOW}
-    >
+    <header className="mt-md grid gap-xl py-2xl md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:gap-2xl md:py-3xl">
       <div className="flex flex-col items-center justify-center gap-sm">
         {heroSrc !== null ? (
           /* unoptimized, as every other hero_image_url render does
@@ -59,15 +54,17 @@ export function HeroSection({
             className="h-auto w-[min(62vw,240px)] object-contain drop-shadow-2xl md:w-full"
           />
         ) : (
-          <div className="flex h-[300px] w-[132px] items-center justify-center rounded-card border border-rule bg-surface md:h-[380px] md:w-[168px]">
-            <WineThumb
-              src={null}
-              colour={wine.colour}
-              producer={wine.producer}
-              name={wine.name}
-              size={96}
-              className="rounded-pill"
-            />
+          <div
+            aria-hidden="true"
+            data-wine-image-fallback="true"
+            className={cn(
+              "flex h-[300px] w-[132px] items-center justify-center rounded-lg md:h-[380px] md:w-[168px]",
+              tint.surface,
+            )}
+          >
+            <span className={cn("font-serif text-heading font-bold leading-none", tint.ink)}>
+              {initials}
+            </span>
           </div>
         )}
         {referenceNote && (
@@ -117,7 +114,7 @@ export function HeroSection({
 
 function StockBadge({ count }: { count: number }) {
   return (
-    <span className="rounded-pill border border-rule bg-surface px-md py-xs text-body-sm text-ink-soft">
+    <span className="rounded-md border border-rule bg-surface px-md py-xs text-body-sm text-ink-soft">
       {count === 0 ? "None on hand" : `${count} on hand`}
     </span>
   );

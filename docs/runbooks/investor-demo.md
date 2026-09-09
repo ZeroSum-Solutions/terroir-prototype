@@ -273,3 +273,118 @@ scripts/local/fix-demo-scan-statuses.mjs    # complete/review, the app's own wor
 scripts/seed-local-operational.ts --place-inventory
 scripts/local/enable-demo-login.mjs     # confirm the user, join the venue
 ```
+
+## Real-wine inventory, bins and metadata (2026-09-08)
+
+Separately from the 250-wine chain above, this tenant also holds 696 REAL,
+recognizable wines (Bollinger, Bérêche & Fils, Domaine du Pelican, Domaine des
+Ardoisières, and more) with real curated bottle photographs
+(`hero_image_url`, see [Curated bottle photos](curated-bottle-photos.md)) but
+that started with **zero inventory, zero bins, and mostly blank colour/region/
+country** — a disjoint population from the 250 synthetic "Lot NNN" wines that
+already had stock. `scripts/local/seed-demo-real-inventory.mjs` gives the
+461 of those 696 that have a usable producer AND vintage real stock, a bin,
+and (conservatively inferred) colour/region/country, so the in-depth demo
+walk can run on real bottles with real photography instead of the synthetic
+seed set.
+
+**What it does**, local-only and additive-and-backfill-only:
+
+- Targets exactly the wines where `hero_image_url is not null and
+  trim(coalesce(producer,'')) <> '' and vintage is not null` (461 wines as of
+  this writing) — never the original 250 synthetic wines or their 400
+  inventory rows.
+- Backfills `colour`, `region`, `country` **only where currently NULL**,
+  from a conservative, auditable name/producer rule table in the script
+  itself (a wrong value is worse than a missing one, per `AGENTS.md` — a
+  wine with no clear textual signal is left NULL, never defaulted to red).
+- Creates a realistic bin layout across the tenant's six existing cellar
+  sections (used as zones) sized off actual bottle demand with headroom, and
+  backfills `bin_id` on the pre-existing 400 inventory rows that had a
+  section but no bin — so `/bins` is no longer empty or half-placed.
+- Creates one inventory row per target wine with a plausible, tiered
+  quantity and unit cost (a deliberate 8-15-wine low-stock band at 1-2
+  bottles so the "Low stock" filter has real content).
+- Calls `backfill_wine_identity(restaurant_id)` afterward, since it writes
+  `wines` directly (same reason `scripts/seed-local-supabase.mjs` does).
+
+**Idempotent**: every bin id and every new inventory row id is deterministic
+(derived from the restaurant id, zone/wine id — never from array position or
+current DB state), and every column backfill is `COALESCE`-guarded, so
+re-running it upserts the same rows in place. Verified 2026-09-08: two
+consecutive `--confirm` runs produced identical `bins_total` (129),
+`inventory_rows_total` (861) and `wine_variant_resolved` (782) counts, with
+`INSERT 0 N ... ON CONFLICT DO UPDATE` (not a growing insert count) each
+time. One exception is on record: an early test of this script, before a bin
+demand-calculation bug was fixed, minted one extra bin (`D05`, in "Dessert &
+Fortified", capacity 30, zero inventory rows ever pointed at it) before the
+fix landed. It was left in place rather than deleted, per this repo's
+no-deletes rule for local seed data — it's inert and harmless, just one more
+empty bin than the script would create from a clean slate.
+
+**Usage** (never loads `.env.local` — export the local API URL yourself
+first, matching this repo's other loopback-guarded scripts):
+
+```bash
+export NEXT_PUBLIC_SUPABASE_URL=$(npx supabase status -o json | \
+  node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).API_URL")
+
+node scripts/local/seed-demo-real-inventory.mjs             # dry run
+node scripts/local/seed-demo-real-inventory.mjs --confirm   # write
+```
+
+### Reconciliation demo, on real wines (2026-09-08)
+
+`/cellar/reconcile` lists a wine only when it has **both** a `wine_list_items`
+row with `glass_pour_ml` set **and** a matching `open_bottles` row
+(`list_open_bottle_items`, migration `0017`). Before this change the tenant's
+only 18 such `wine_list_items` rows ("By the Glass" list) all pointed at the
+250 synthetic seed wines, and only 4 of those also had an `open_bottles` row
+— so the headline reconciliation flow showed nothing but fake names
+("Domaine du Marchand Tuscany Sangiovese Lot 024", "Fable & Stone Mendoza
+Malbec Lot 066") even after the real wines above got stock and photography.
+
+The same script now also opens ~12 bottles on a curated, recognizable subset
+of the 461 real wines — Bollinger, Louis Roederer Cristal, Pol Roger,
+Agrapart, Benjamin Leroux Meursault, Emidio Pepe (Trebbiano and
+Montepulciano), Chartogne-Taillet Le Rosé, Valentini Cerasuolo, Giacomo
+Conterno Barolo, Lignier-Michelot, and Cain Vineyards — spread across all
+five colours the real-wine set actually has (it has no dessert/fortified
+wine to pick). See `OPEN_BOTTLE_PICKS` in the script for the exact list.
+
+**What it does, per pick:**
+
+- Resolves the pick (a producer, optionally narrowed by a name fragment) to
+  one concrete 750ml wine with at least 3 bottles in stock — deterministic
+  (lowest wine id wins on a tie), so re-seeding from scratch picks the same
+  bottles.
+- Inserts a `wine_list_items` row in the tenant's "By the Glass" list, in the
+  section matching the wine's own cellar section, with `glass_pour_ml` set
+  from `cellar_config.pourDefaults` (sparkling 125, white/red/rose 150).
+- Inserts an `open_bottles` row with a varied `remaining_ml` — some near-full
+  (750), some at a quarter (188), half (375) or three-quarter (563) — and an
+  `opened_at` spread over the last 6 days, so "Opened Nd ago" copy isn't
+  identical on every row. One pick (Valentini, 300ml) is deliberately off
+  every fraction the reconcile UI offers, so tapping any of its fraction
+  buttons there shows a real, non-zero variance against the 2oz
+  (`cellar_config.reconcile_variance_threshold_oz`) threshold.
+- Decrements that wine's sealed `inventory_items.quantity` by exactly one —
+  the same accounting `record_pour()` itself does when it opens a bottle
+  from sealed stock — so total (sealed + open) bottle count stays correct.
+  Every pick requires ≥3 bottles in stock precisely so this can never drive
+  a wine's stock negative.
+
+**Idempotent**, same pattern as the rest of the script: `wine_list_items.id`
+and `open_bottles.id` are deterministic per wine id, and `open_bottles` also
+upserts on its own `(wine_id, restaurant_id)` unique constraint. `opened_at`
+is anchored to noon UTC "today" (not the wall-clock instant the script runs),
+so re-running `--confirm` the same day is a true no-op rather than nudging
+every timestamp forward by a few seconds. Verified 2026-09-08: two
+consecutive `--confirm` runs produced identical `remaining_ml` and
+`opened_at` for all 12 rows, with `already open (rerun): 12` reported the
+second time and no growth in `open_bottles` (48 = the pre-existing 36 +
+these 12). Direct SQL confirmed `/cellar/reconcile` now lists all 12 real
+wines alongside the pre-existing 4 real-glass-pour synthetic ones (the
+other 32 of the original 36 `open_bottles` rows have no `wine_list_items`
+row and so were never reconcile-visible in the first place — untouched
+either way).

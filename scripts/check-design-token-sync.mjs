@@ -11,13 +11,15 @@
  * must be identical. When they drift, a user who has never touched the theme
  * toggle sees a different room from one who has.
  *
- * Two tokens are deliberately not one-to-one and are checked by rule instead:
- *   `--t-mark`  — Nocturne's is `dark-champagne`; Daylight has no champagne
- *                 and must never be given one, so its mark is claret, which
- *                 is asserted to equal `--t-focus`.
- *   `--t-*`     — anything the CSS carries that DESIGN.md does not name (glass
- *                 solids, window ramp, card highlight) is implementation, not
- *                 contract, and is left alone.
+ * `mark` and `dark-mark` are ordinary scalar keys in the colours block, like
+ * every other token — the Cellar Index revision removed the champagne-era
+ * special case (Nocturne's `--t-mark` had no Daylight twin at all, because
+ * champagne measured 1.26:1 on white; the generic loop below could not have
+ * verified that asymmetry, which is why it used to be hand-written). There is
+ * no equivalent asymmetry left to special-case.
+ *
+ * `--t-*` tokens the CSS carries that DESIGN.md does not name (window ramp,
+ * card highlight) are implementation, not contract, and are left alone.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -133,7 +135,7 @@ const norm = (v) =>
  * DESIGN.md names a few colours for the role they play; the CSS names them for
  * where they are composed. These are the same token under two names.
  */
-const ALIAS = { champagne: "mark", "shadow-card": "glass-shadow" };
+const ALIAS = { "shadow-card": "glass-shadow" };
 
 /**
  * Documented colours that globals.css composes rather than declares as a flat
@@ -180,14 +182,6 @@ for (const [name, value] of Object.entries(colors)) {
   if (norm(actual) !== norm(value)) {
     fail(`${where}: --t-${cssName} is ${actual}, DESIGN.md says ${value}`);
   }
-}
-
-// Daylight's mark: claret, because champagne on white is 1.26:1.
-if (norm(light["--t-mark"]) !== norm(light["--t-focus"])) {
-  fail(
-    `Daylight: --t-mark (${light["--t-mark"]}) must equal --t-focus ` +
-      `(${light["--t-focus"]}) — Daylight has no champagne and must never be given one`,
-  );
 }
 
 /* ── 3. Every contract colour is exposed as a Tailwind token ───────── */

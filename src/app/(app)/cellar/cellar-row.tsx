@@ -51,6 +51,21 @@ export type CellarRowDragHandle = {
   listeners: Record<string, unknown>;
 };
 
+/**
+ * The bin placement, struck as the board's blue-outlined rectangle rather
+ * than plain grey text (Concept A — "a blue-outlined rectangular bin
+ * badge"). The one element in a row that reads as an instruction ("go
+ * here"), so it earns the brand colour that the rest of the row spends on
+ * nothing else.
+ */
+function BinBadge({ children }: { children: string }) {
+  return (
+    <span className="inline-flex w-fit items-center rounded-sm border border-primary px-3xs py-2xs font-mono text-micro font-medium tracking-[0.04em] text-primary">
+      {children}
+    </span>
+  );
+}
+
 export function CellarRow({
   row,
   onSelect,
@@ -73,6 +88,10 @@ export function CellarRow({
   // the full drink-window instrument in the drawer.
   const chip = pickRowChip(row, lowStockThreshold);
   const onHand = bottlesOnHand(row);
+  // Varietal, vintage and appellation share one grey line beneath the wine
+  // name (Concept A forbids a dense metadata grid — this is prose, not a
+  // column for each fact).
+  const metaLine = [row.varietal, row.vintage, row.region].filter(Boolean).join(" · ");
 
   return (
     <div
@@ -117,46 +136,55 @@ export function CellarRow({
         onClick={selectMode ? undefined : onSelect}
         className="flex-1 min-w-0 px-md py-sm text-left transition-colors hover:bg-wash focus-ring rounded-md"
       >
-        {/* Mobile ledger row — two lines, location top-right, quantity in
-            the Courier column (Kimi audit row anatomy: ~6–7 rows per
-            viewport instead of 3). */}
-        <div className="lg:hidden">
-          <div className="flex items-baseline justify-between gap-sm">
-            <div className="min-w-0 truncate text-caption font-medium uppercase text-grey">
-              <span>{row.producer}</span>
-              {row.vintage && <span className="tabular ml-xs">{row.vintage}</span>}
-              {row.region && <span className="ml-xs">· {row.region}</span>}
-            </div>
-            {row.bin_location && (
-              <span className="shrink-0 font-mono text-[11px] tracking-[0.04em] text-grey">
-                {row.bin_location}
+        {/* Mobile row (Concept A — "The Cellar Index"): identity block on the
+            left (thumbnail, name, appellation/vintage, bin), a large
+            right-aligned stock count on the right. Open, not boxed — the
+            hairline between rows comes from the list's own divide-y. */}
+        <div className="flex items-center gap-sm lg:hidden">
+          <WineThumb
+            src={row.hero_image_url}
+            producer={row.producer}
+            name={row.name}
+            colour={row.colour}
+            size={44}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-xs">
+              <span className="min-w-0 truncate font-serif text-body-lg font-semibold text-ink">
+                {wineDisplayName(row.producer, row.name)}
               </span>
+              {chip && (
+                <StatusChip tone={chip.tone} className="shrink-0">
+                  {chip.label}
+                </StatusChip>
+              )}
+            </div>
+            {row.producer && (
+              <div className="mt-3xs truncate text-caption font-medium uppercase text-grey">
+                {row.producer}
+              </div>
+            )}
+            {metaLine && (
+              <div className="mt-3xs truncate text-body-sm text-grey">{metaLine}</div>
+            )}
+            {row.bin_location && (
+              <div className="mt-3xs">
+                <BinBadge>{row.bin_location}</BinBadge>
+              </div>
             )}
           </div>
-          <div className="mt-2xs flex items-center gap-sm">
-            <WineThumb
-              src={row.hero_image_url}
-              producer={row.producer}
-              name={row.name}
-              colour={row.colour}
-              size={36}
-            />
-            <span className="min-w-0 flex-1 truncate font-serif text-[17px] font-medium text-ink">
-              {wineDisplayName(row.producer, row.name)}
-            </span>
-            {chip && (
-              <StatusChip tone={chip.tone} className="shrink-0">
-                {chip.label}
-              </StatusChip>
-            )}
-            <span
+          <div className="shrink-0 text-right">
+            <div
               className={cn(
-                "w-[38px] shrink-0 text-right font-mono text-[14px] tabular",
+                "text-heading-sm font-bold tabular",
                 onHand === 0 ? "text-grey" : "text-ink",
               )}
             >
-              ×{onHand}
-            </span>
+              {onHand}
+            </div>
+            <div className="text-micro uppercase tracking-[0.08em] text-grey">
+              in stock
+            </div>
           </div>
         </div>
 
@@ -171,31 +199,33 @@ export function CellarRow({
               size={40}
             />
             <div className="min-w-0">
-              <div className="truncate text-[10.5px] font-medium uppercase tracking-[0.14em] text-grey">
+              <div className="truncate text-caption font-medium uppercase text-grey">
                 {row.producer}
               </div>
-              <div className="truncate font-serif text-[17px] font-medium text-ink">
+              <div className="truncate font-serif text-body-lg font-semibold text-ink">
                 {wineDisplayName(row.producer, row.name)}
               </div>
             </div>
           </div>
-          <span className="font-mono text-[13px] tabular text-ink-soft">
-            {row.vintage ?? "—"}
-          </span>
-          <span className="truncate text-[12px] text-grey">{row.region ?? "—"}</span>
+          <span className="tabular text-body-sm text-ink-soft">{row.vintage ?? "—"}</span>
+          <span className="truncate text-ledger text-grey">{row.region ?? "—"}</span>
           <span>
             {chip ? (
               <StatusChip tone={chip.tone}>{chip.label}</StatusChip>
             ) : (
-              <span className="text-[12px] text-grey">—</span>
+              <span className="text-ledger text-grey">—</span>
             )}
           </span>
-          <span className="truncate font-mono text-[12px] text-grey">
-            {row.bin_location ?? "—"}
+          <span className="truncate">
+            {row.bin_location ? (
+              <BinBadge>{row.bin_location}</BinBadge>
+            ) : (
+              <span className="text-ledger text-grey">—</span>
+            )}
           </span>
           <span
             className={cn(
-              "text-right font-mono text-[14px] tabular",
+              "text-right tabular text-control",
               onHand === 0 ? "text-grey" : "text-ink",
             )}
           >

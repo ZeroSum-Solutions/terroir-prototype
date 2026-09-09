@@ -333,9 +333,12 @@ describe("checked-in API contract gate", () => {
       // taste block aggregates — 112 + 1 = 113. Its sibling
       // POST /api/wines/[id]/notes/suggest pre-ticks the composer's chips and
       // writes nothing — 113 + 1 = 114.
-      discoveredOperationCount: 114,
+      // The import template moved off a data: URI onto a real route,
+      // GET /api/import/template, because mobile Safari will not download a
+      // data: URL and navigated the tab to raw CSV instead — 114 + 1 = 115.
+      discoveredOperationCount: 115,
       plannedOperationCount: 15,
-      classificationCount: 114,
+      classificationCount: 115,
     });
     expect(paths.map((file) => readFileSync(resolve(file), "utf8"))).toEqual(
       before,

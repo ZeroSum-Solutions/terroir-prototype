@@ -194,7 +194,10 @@ export function BatchStep({
                       placeholder="Unit cost"
                       value={manualCostDrafts[row.id] ?? ""}
                       onChange={(e) => setManualCostDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                      className="min-h-11 w-28 rounded-pill border border-rule bg-surface px-sm text-[14px] focus:border-accent focus-ring"
+                      // 17px keeps iOS from zooming the page on focus; 14px
+                      // once there is a pointer. Both are scale tokens (see
+                      // add-wine-pricing.tsx).
+                      className="min-h-11 w-28 rounded-pill border border-rule bg-surface px-sm text-body-lg focus:border-accent focus-ring md:text-control"
                     />
                   )}
                   <button

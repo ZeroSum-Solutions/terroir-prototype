@@ -459,7 +459,7 @@ export function ScanDetailView({
                   className="rounded-card card-surface p-md hover:bg-wash focus-ring"
                 >
                   <div className="flex items-start gap-md">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-wash">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wash">
                       <Package className="h-5 w-5 text-grey" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">

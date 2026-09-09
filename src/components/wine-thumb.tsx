@@ -13,20 +13,26 @@ import { wineImageReferenceNote } from "@/lib/wine-intelligence/wine-image-refer
  * carries real information: the producer's initials, tinted by wine colour.
  */
 
-/** LWIN populates `wines.colour` as free text. Normalised and matched against
- * the values that actually appear; anything else takes the neutral tint rather
- * than guessing. */
+/**
+ * Cellar Index tints by ink/paper/blue alone — the old palette borrowed the
+ * status wax colours (risk/hold), which meant a white wine's stand-in used
+ * the same pink wash as an "attention" chip and a sparkling one used the
+ * same blue as a "hold" chip. Wine colour is not a status, so it no longer
+ * shares that vocabulary: darker wines tint the paper with ink, lighter and
+ * brighter ones tint it with the brand blue, and normalised/cased/spaced
+ * lookup is unchanged.
+ */
 const TINTS: Record<string, { surface: string; ink: string }> = {
-  red: { surface: "bg-risk-wash", ink: "text-risk-ink" },
-  white: { surface: "bg-risk-wash", ink: "text-mark" },
-  rose: { surface: "bg-risk-wash", ink: "text-risk-ink" },
-  rosé: { surface: "bg-risk-wash", ink: "text-risk-ink" },
-  sparkling: { surface: "bg-hold-wash", ink: "text-hold-ink" },
-  fortified: { surface: "bg-risk-wash", ink: "text-mark" },
-  sweet: { surface: "bg-risk-wash", ink: "text-mark" },
+  red: { surface: "bg-ink/8", ink: "text-ink" },
+  rose: { surface: "bg-ink/4", ink: "text-ink" },
+  rosé: { surface: "bg-ink/4", ink: "text-ink" },
+  fortified: { surface: "bg-ink/8", ink: "text-ink" },
+  white: { surface: "bg-primary/8", ink: "text-ink" },
+  sweet: { surface: "bg-primary/8", ink: "text-ink" },
+  sparkling: { surface: "bg-primary/14", ink: "text-ink" },
 };
 
-const NEUTRAL = { surface: "bg-wash", ink: "text-grey" };
+const NEUTRAL = { surface: "bg-wash", ink: "text-ink" };
 
 export function wineTint(colour: string | null | undefined) {
   return TINTS[colour?.trim().toLocaleLowerCase() ?? ""] ?? NEUTRAL;
@@ -60,7 +66,9 @@ export interface WineThumbProps {
 
 export function WineThumb({ src, producer, name, colour, size, className }: WineThumbProps) {
   const referenceNote = wineImageReferenceNote(src);
-  const shared = cn("shrink-0 rounded-md object-contain", className);
+  // Sharp geometry, small radii (DESIGN.md — Controls): a thumbnail this
+  // small reads as a chip, not a card, so it takes the small radius.
+  const shared = cn("shrink-0 rounded-sm object-contain", className);
 
   if (src) {
     return (
@@ -89,7 +97,10 @@ export function WineThumb({ src, producer, name, colour, size, className }: Wine
         shared,
         tint.surface,
         tint.ink,
-        "flex items-center justify-center font-serif font-medium leading-none tracking-[0.02em]",
+        // Confident, not apologetic: the same heavy grotesque as the
+        // headings, tight-tracked rather than loosened, so a no-photo row
+        // reads as a deliberate mark and not a softened placeholder.
+        "flex items-center justify-center font-serif font-bold leading-none tracking-[-0.01em]",
       )}
     >
       {initials}

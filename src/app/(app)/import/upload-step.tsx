@@ -7,7 +7,7 @@
 
 import { AlertTriangle, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
-import { CANONICAL_HEADERS, CLIENT_CHUNK_TARGET_ROWS } from "@/domains/import/constants";
+import { CLIENT_CHUNK_TARGET_ROWS } from "@/domains/import/constants";
 import { describeWaitEstimate, estimateChunkedPhaseWaitSeconds } from "@/domains/import/wait-estimate";
 
 /** BLOCK 1 (round-13 fix) — countPreviewUnits (preview-units.ts) resolves
@@ -27,8 +27,6 @@ import { describeWaitEstimate, estimateChunkedPhaseWaitSeconds } from "@/domains
  * decode/split surfaces the actual error, there is nothing more honest to
  * gate on here. */
 export type PreviewUnitsStatus = "idle" | "pending" | "ready" | "unavailable";
-
-const TEMPLATE_CSV = `${CANONICAL_HEADERS.join(",")}\nDomaine Example,Cuvee One,2020,Pinot Noir,Burgundy,France,750,,USD,6,24.50,,\n`;
 
 export function UploadStep({
   file,
@@ -148,8 +146,12 @@ export function UploadStep({
         {previewing ? "Reading file…" : "Preview import"}
       </button>
 
+      {/* A real route, not a `data:` URI `<a download>` — mobile Safari
+          handles download on data: URIs unreliably and tends to navigate
+          the tab to raw text instead. The route sets Content-Disposition
+          so the download attribute below is a hint, not the mechanism. */}
       <a
-        href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE_CSV)}`}
+        href="/api/import/template"
         download="cellar-import-template.csv"
         className="mt-md flex min-h-11 items-center justify-center text-[13px] font-medium text-grey underline underline-offset-4 hover:text-ink focus-ring"
       >

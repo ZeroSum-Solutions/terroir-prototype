@@ -60,7 +60,7 @@ export function LineItemCard({
               low={isLow(item, "producer")}
               edited={isEdited(item, "producer")}
               onCommit={(v) => onUpdate(item.id, "producer", v)}
-              className="text-[13px] text-grey"
+              className="text-grey"
               label="Producer"
             />
           </div>

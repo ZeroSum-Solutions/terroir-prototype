@@ -1,23 +1,25 @@
 #!/usr/bin/env node
 /**
- * DESIGN.md "brown and cream law" gate.
+ * DESIGN.md "paper and blush law" gate.
  *
- * Cantina banned brown in prose and then drifted into it anyway, because a ban
- * nobody can run is a preference.
+ * Nocturne banned brown in prose and then drifted into it anyway, because a
+ * ban nobody can run is a preference. The Cellar Index revision replaces
+ * Nocturne's claret/champagne-specific rules with two general, hue-based
+ * tests — there is no brand red or brand gold left in this palette to carve
+ * out special cases for, so the two rules below are the whole law.
  *
  * Two surfaces are checked, because checking only the frontmatter is how a
- * Cantina brown (#8B6914) and a Cantina cream (#E3D9CB) survived an entire
+ * Nocturne-era brown (#8B6914) and cream (#E3D9CB) survived an entire
  * palette migration inside one component's inline styles:
  *
- *   1. The DESIGN.md frontmatter palette, against the four channel tests in
- *      § "The brown and cream law". Those tests are written for a palette that
- *      is mostly neutrals plus two named hues, and they are exact there.
+ *   1. The DESIGN.md frontmatter palette, against the two rules in
+ *      § "The paper and blush law".
  *
  *   2. Every colour literal written into src/. Channel tests are the wrong
- *      instrument here — #8B6914 is neither a dark neutral nor a light one, it
- *      is a saturated warm mid-tone — so this surface is judged in HSL, which
- *      is how "brown" and "cream" are actually defined: a warm hue that is
- *      either too dark or too pale to be a colour in its own right.
+ *      instrument here — #8B6914 is neither a dark neutral nor a light one,
+ *      it is a saturated warm mid-tone — so this surface is judged in HSL,
+ *      which is how "brown" and "cream" are actually defined: a warm hue
+ *      that is either too dark or too pale to be a colour in its own right.
  *
  * Exit 1 on any violation so CI can hold the line.
  */
@@ -27,11 +29,8 @@ import { dirname, join, relative } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const CLARET = new Set(["96122A", "B01230", "D01A3C", "E23B58", "F2879C", "2A0A11", "F7E4E8"]);
-const CHAMPAGNE = new Set(["E6DCAE"]);
-
 /**
- * Surfaces that are deliberately not Nocturne:
+ * Surfaces that are deliberately not the app's own room:
  *  - printed menus and the standalone HTML export are the CLIENT's artefact,
  *    on paper, with the client's own palette;
  *  - the brand-kit feature exists to ingest arbitrary client colours, and its
@@ -46,44 +45,6 @@ const NOT_THE_APP = [
   "src/test/",
   "src/app/globals.css", // the token layer itself, checked via DESIGN.md
 ];
-
-/* ── 1. The frontmatter palette ────────────────────────────────────── */
-
-const front = readFileSync(join(root, "DESIGN.md"), "utf8").split("---")[1];
-const tokens = [...front.matchAll(/^\s*([\w-]+):\s*"#([0-9A-Fa-f]{6})"/gm)].map(
-  ([, name, hex]) => ({ name, hex: hex.toUpperCase() }),
-);
-const palette = new Set(tokens.map((t) => t.hex));
-
-const failures = [];
-for (const { name, hex } of tokens) {
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const luminous = Math.max(r, g, b);
-
-  if (CHAMPAGNE.has(hex)) {
-    // Rule 4 — pale and bright, so it can only ever be a mark on a dark ground.
-    if (Math.abs(r - g) > 12) failures.push(`${name} #${hex}: champagne needs |r-g| <= 12 (r${r} g${g} b${b}) — this is rotating toward tan`);
-    if (luminous < 0xc0) failures.push(`${name} #${hex}: champagne must stay light (max channel >= C0) — a warm mid-tone is how brown starts`);
-    continue;
-  }
-  if (CLARET.has(hex)) {
-    // Rule 3 — claret stays pink, never peach.
-    if (b <= g) failures.push(`${name} #${hex}: claret must keep b > g (r${r} g${g} b${b})`);
-    continue;
-  }
-  // Rule 1 — neutral darks are cool.
-  if (luminous < 0x40 && b < r) {
-    failures.push(`${name} #${hex}: dark neutral must keep b >= r (r${r} g${g} b${b}) — this is brown`);
-  }
-  // Rule 2 — neutral lights are neutral.
-  if (luminous > 0xc0 && r - b > 4) {
-    failures.push(`${name} #${hex}: light neutral must keep r - b <= 4 (r${r} g${g} b${b}) — this is cream`);
-  }
-}
-
-/* ── 2. Colour literals in the app's own source ────────────────────── */
 
 function hsl(hex) {
   const r = parseInt(hex.slice(0, 2), 16) / 255;
@@ -101,6 +62,83 @@ function hsl(hex) {
   else h = 60 * ((r - g) / d + 4);
   return { h, s, l };
 }
+
+/**
+ * The brown-to-yellow danger wedge. Brown and its light-mode twin, cream, are
+ * both warm hues in this band — orange through yellow — at the wrong
+ * lightness. Anything outside the wedge (blue, green, red, magenta, at any
+ * lightness) was never a brown/cream risk in the first place, whatever its
+ * channel values look like — a saturated dark red is a maroon, not a brown,
+ * and a pale pink status wash is not a cream.
+ */
+const WEDGE_MIN = 15;
+const WEDGE_MAX = 60;
+
+/**
+ * The one warm shape this palette allows: parchment paper. Narrower than the
+ * wedge on both sides, and named after the one colour it exists to describe
+ * (DESIGN.md — "canvas" is #F8F7EF, hue ~53°). A hue outside this window but
+ * still inside the wedge — tan, manila, blush — is rejected by the same test
+ * that admits paper, rather than by a numeric channel threshold that has no
+ * way to tell them apart at the widths they actually differ by.
+ */
+const PAPER_HUE_MIN = 44;
+const PAPER_HUE_MAX = 60;
+const PAPER_SAT_MAX = 0.45;
+const PAPER_LIGHT_MIN = 0.85;
+
+/** Rule 1 — a dark neutral must not be warm. Brown is a dark, warm, at-least-
+ *  somewhat-saturated colour; this rejects anything in the wedge with real
+ *  saturation, regardless of exactly how dark or how saturated. */
+function darkNeutralFault(hex) {
+  const { h, s, l } = hsl(hex);
+  if (s <= 0.05) return null; // a true grey/black has no hue to be brown with
+  if (h < WEDGE_MIN || h >= WEDGE_MAX) return null; // not the brown wedge at all
+  return `dark neutral is brown — hue ${h.toFixed(1)}° is in the brown wedge ` +
+    `(15°–60°) with real saturation (l${l.toFixed(2)} s${s.toFixed(2)})`;
+}
+
+/** Rule 2 — a light neutral must be the one named paper, or no hue at all.
+ *  Cream, tan and blush are all warm hues in the same wedge as brown, just
+ *  pale instead of dark; only the narrow parchment window is exempt. */
+function lightNeutralFault(hex) {
+  const { h, s, l } = hsl(hex);
+  if (s <= 0.05) return null; // true white/grey — never a cream risk
+  if (h < WEDGE_MIN || h >= WEDGE_MAX) return null; // not the brown/cream wedge
+  if (h >= PAPER_HUE_MIN && h <= PAPER_HUE_MAX && s <= PAPER_SAT_MAX && l >= PAPER_LIGHT_MIN) {
+    return null; // inside the parchment window
+  }
+  return (
+    `light neutral is cream/blush — hue ${h.toFixed(1)}° is in the warm wedge ` +
+    `but outside the paper band (${PAPER_HUE_MIN}°–${PAPER_HUE_MAX}°, ` +
+    `s<=${PAPER_SAT_MAX}, l>=${PAPER_LIGHT_MIN}); got s${s.toFixed(2)} l${l.toFixed(2)}`
+  );
+}
+
+/* ── 1. The frontmatter palette ────────────────────────────────────── */
+
+const front = readFileSync(join(root, "DESIGN.md"), "utf8").split("---")[1];
+const tokens = [...front.matchAll(/^\s*([\w-]+):\s*"#([0-9A-Fa-f]{6})"/gm)].map(
+  ([, name, hex]) => ({ name, hex: hex.toUpperCase() }),
+);
+const palette = new Set(tokens.map((t) => t.hex));
+
+const failures = [];
+for (const { name, hex } of tokens) {
+  const r = parseInt(hex.slice(0, 2), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminous = Math.max(r, parseInt(hex.slice(2, 4), 16), b);
+
+  if (luminous < 0x40) {
+    const fault = darkNeutralFault(hex);
+    if (fault) failures.push(`${name} #${hex}: ${fault}`);
+  } else if (luminous > 0xc0) {
+    const fault = lightNeutralFault(hex);
+    if (fault) failures.push(`${name} #${hex}: ${fault}`);
+  }
+}
+
+/* ── 2. Colour literals in the app's own source ────────────────────── */
 
 function warmFault(hex) {
   const { h, s, l } = hsl(hex);
@@ -131,7 +169,7 @@ for (const file of walk(join(root, "src"))) {
     scanned++;
     // A colour that IS in the palette is fine wherever it appears; the
     // frontmatter check above already judged it.
-    if (palette.has(hex) || CHAMPAGNE.has(hex) || CLARET.has(hex)) continue;
+    if (palette.has(hex)) continue;
     const fault = warmFault(hex);
     if (fault) {
       const line = text.slice(0, m.index).split("\n").length;

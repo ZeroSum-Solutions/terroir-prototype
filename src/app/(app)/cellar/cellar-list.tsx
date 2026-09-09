@@ -345,27 +345,27 @@ export function CellarList({
   if (rows.length === 0) {
     return (
       <div className="rounded-card card-surface px-md py-2xl text-center">
-        <p className="font-serif text-[17px] font-medium text-ink">No wines in your cellar yet.</p>
-        <p className="mt-xs text-[13px] text-grey">
+        <p className="font-serif text-body-lg font-semibold text-ink">No wines in your cellar yet.</p>
+        <p className="mt-xs text-body-sm text-grey">
           Scan an invoice, photograph a bottle, or import a spreadsheet to start building your cellar.
         </p>
         <div className="mt-md flex flex-col items-center gap-sm">
           <Link
             href="/scan"
-            className="inline-flex min-h-11 items-center justify-center rounded-pill bg-primary px-md text-[13px] font-medium text-seal-ink hover:bg-primary-hover"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-md text-body-sm font-medium text-seal-ink hover:bg-primary-hover"
           >
             Scan an invoice →
           </Link>
           <div className="flex flex-wrap items-center justify-center gap-sm">
             <Link
               href="/scan?mode=bottle"
-              className="inline-flex min-h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
             >
               Scan a bottle
             </Link>
             <Link
               href="/import"
-              className="inline-flex min-h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
             >
               Import CSV or Excel
             </Link>
@@ -402,11 +402,11 @@ export function CellarList({
           onSortChange={onSortChange}
         />
         <div className="rounded-card card-surface px-md py-lg text-center">
-          <p className="text-[13px] text-grey">{message}</p>
+          <p className="text-body-sm text-grey">{message}</p>
           <button
             type="button"
             onClick={onResetFilters}
-            className="mt-sm inline-flex min-h-11 items-center rounded-pill border border-edge bg-surface px-md text-[12px] font-medium text-ink hover:bg-wash focus-ring"
+            className="mt-sm inline-flex min-h-11 items-center rounded-md border border-edge bg-surface px-md text-ledger font-medium text-ink hover:bg-wash focus-ring"
           >
             Clear filters & search
           </button>
@@ -515,7 +515,7 @@ export function CellarList({
             )}
         </DndContext>
       ) : (
-        <div className="flex flex-col divide-y divide-rule overflow-hidden rounded-card card-surface">
+        <div className="flex flex-col divide-y divide-rule"> {/* Concept A: open index on paper, no card boundary */}
           {/* Ledger-table header — desktop workspace only */}
           <div
             aria-hidden
@@ -524,12 +524,12 @@ export function CellarList({
               LEDGER_COLS,
             )}
           >
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Wine</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Vintage</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Region</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Status</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Bin</span>
-            <span className="text-right text-[10px] font-medium uppercase tracking-[0.18em] text-grey">Qty</span>
+            <span className="text-micro font-medium uppercase tracking-[0.18em] text-grey">Wine</span>
+            <span className="text-micro font-medium uppercase tracking-[0.18em] text-grey">Vintage</span>
+            <span className="text-micro font-medium uppercase tracking-[0.18em] text-grey">Region</span>
+            <span className="text-micro font-medium uppercase tracking-[0.18em] text-grey">Status</span>
+            <span className="text-micro font-medium uppercase tracking-[0.18em] text-grey">Bin</span>
+            <span className="text-right text-micro font-medium uppercase tracking-[0.18em] text-grey">Qty</span>
           </div>
           <LineageBlockList
             wines={visibleRows}
@@ -554,7 +554,7 @@ export function CellarList({
                 count: visibleCount + CELLAR_PAGE_SIZE,
               })
             }
-            className="inline-flex min-h-11 items-center justify-center rounded-pill border border-edge bg-surface px-md text-[13px] font-medium text-ink hover:bg-wash focus-ring"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-surface px-md text-body-sm font-medium text-ink hover:bg-wash focus-ring"
           >
             Show {Math.min(CELLAR_PAGE_SIZE, filtered.length - visibleRows.length)} more · {visibleRows.length} of {filtered.length}
           </button>

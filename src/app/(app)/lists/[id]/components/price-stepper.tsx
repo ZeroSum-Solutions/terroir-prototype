@@ -103,7 +103,9 @@ export function PriceStepper({
             if (event.key === "Enter") commit();
             if (event.key === "Escape") setEditing(false);
           }}
-          className="min-h-11 w-full rounded-md border-2 border-mark bg-surface py-2xs pl-md pr-xs text-right tabular text-control text-ink focus-ring"
+          // 17px keeps iOS from zooming the page on focus; 14px once there is
+          // a pointer. Both are scale tokens (see add-wine-pricing.tsx).
+          className="min-h-11 w-full rounded-md border-2 border-mark bg-surface py-2xs pl-md pr-xs text-right tabular text-body-lg text-ink focus-ring md:text-control"
         />
       </div>
     );

@@ -2,17 +2,21 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ReconcileModal } from "./reconcile-modal";
+import { readReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const RESTAURANT_ID = "restaurant-1";
+const USER_ID = "user-1";
 const item: OpenBottleRow = { wine_id: "wine-1", wine_list_item_id: "item-1", producer: "Producer", name: "Wine", vintage: 2020, size_ml: 750, sealed_count: 2, opened_at: "2026-09-08T12:00:00Z", open_remaining_ml: 500, glass_pour_ml: 150, pour_size_mode: "fixed" };
 let container: HTMLDivElement;
 let root: Root;
 const close = vi.fn();
 beforeEach(async () => {
   close.mockClear();
+  sessionStorage.clear();
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-  await act(async () => root.render(<ReconcileModal open items={[item]} onClose={close} />));
+  await act(async () => root.render(<ReconcileModal open items={[item]} onClose={close} restaurantId={RESTAURANT_ID} userId={USER_ID} />));
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 function click(label: string) {
@@ -48,4 +52,21 @@ it("blocks closing and editing while saving; retains failed counts and reports s
   expect(container.querySelector('[role="status"]')?.textContent).toContain("1 bottle reconciled");
   click("Close reconcile mode");
   expect(close).toHaveBeenCalledTimes(1);
+});
+
+it("clears the persisted draft when the modal's own discard is confirmed, so reopening does not resurrect it", async () => {
+  click("Half");
+  expect(readReconcileDraft(RESTAURANT_ID, USER_ID).kind).toBe("restored");
+  click("Close reconcile mode");
+  click("Discard changes");
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(readReconcileDraft(RESTAURANT_ID, USER_ID)).toEqual({ kind: "none" });
+
+  // Simulate the parent actually closing (unmounting ReconcileList) and
+  // reopening it — this is the regression the adversarial review caught:
+  // without this clear-site, the discarded 375ml would resurface here.
+  await act(async () => root.render(<ReconcileModal open={false} items={[item]} onClose={close} restaurantId={RESTAURANT_ID} userId={USER_ID} />));
+  await act(async () => root.render(<ReconcileModal open items={[item]} onClose={close} restaurantId={RESTAURANT_ID} userId={USER_ID} />));
+  expect(container.textContent).not.toContain("Restored");
+  expect(container.querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe("500");
 });

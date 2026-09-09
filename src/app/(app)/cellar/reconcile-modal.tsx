@@ -6,6 +6,7 @@ import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 import { ReconcileList } from "./reconcile-list";
 import { ActionDialog } from "@/components/action-dialog";
+import { clearReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
 
 /**
  * Reconcile mode (Phase 2 IA redesign — .council/specs/2026-04-24-ux-ia-redesign.md
@@ -30,11 +31,15 @@ export function ReconcileModal({
   items,
   varianceThresholdOz,
   onClose,
+  restaurantId,
+  userId,
 }: {
   open: boolean;
   items: OpenBottleRow[];
   varianceThresholdOz?: number;
   onClose: () => void;
+  restaurantId: string;
+  userId: string;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingId = "reconcile-modal-heading";
@@ -103,10 +108,14 @@ export function ReconcileModal({
         </header>
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-md py-md md:px-lg md:py-lg">
-          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog />
+          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog restaurantId={restaurantId} userId={userId} />
         </div>
       </div>
-      <ActionDialog open={confirmDiscard} title="Discard unsaved counts?" description="Your changes to the remaining bottle volumes have not been saved." confirmLabel="Discard changes" cancelLabel="Keep counting" onClose={() => setConfirmDiscard(false)} onConfirm={() => { setConfirmDiscard(false); setEditState({ dirty: false, busy: false }); onClose(); }} />
+      {/* This confirm flow is independent of ReconcileList's own dirty-state
+          (ReconcileNavigationGuard) — closing the modal unmounts ReconcileList
+          entirely, so the draft is cleared here directly rather than through
+          a callback into a component that is about to disappear. */}
+      <ActionDialog open={confirmDiscard} title="Discard unsaved counts?" description="Your changes to the remaining bottle volumes have not been saved." confirmLabel="Discard changes" cancelLabel="Keep counting" onClose={() => setConfirmDiscard(false)} onConfirm={() => { setConfirmDiscard(false); setEditState({ dirty: false, busy: false }); clearReconcileDraft(restaurantId, userId); onClose(); }} />
     </div>
   );
 }

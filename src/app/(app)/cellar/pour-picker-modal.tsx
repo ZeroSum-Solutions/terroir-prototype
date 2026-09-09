@@ -114,7 +114,6 @@ export function PourPickerModal({ item, defaultOz, onCancel, onConfirm }: Props)
                 min="0.1"
                 max="40"
                 inputMode="decimal"
-                autoFocus
                 value={customValue}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -129,7 +128,10 @@ export function PourPickerModal({ item, defaultOz, onCancel, onConfirm }: Props)
                   }
                 }}
                 placeholder="5.0"
-                className="min-h-11 w-[80px] rounded-pill border border-rule bg-surface px-sm text-[14px] outline-none focus:border-accent focus-ring"
+                // 17px keeps iOS from zooming the page on focus; 14px once
+                // there is a pointer. Both are scale tokens (see
+                // add-wine-pricing.tsx).
+                className="min-h-11 w-[80px] rounded-pill border border-rule bg-surface px-sm text-body-lg outline-none focus:border-accent focus-ring md:text-control"
               />
             )}
           </Field>

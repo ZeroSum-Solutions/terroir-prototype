@@ -13,6 +13,12 @@ import { ML_PER_OZ } from "@/lib/units";
 import { wineTitle } from "@/lib/wine-display-name";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 import { ReconcileNavigationGuard } from "./reconcile-navigation-guard";
+import {
+  clearReconcileDraft,
+  describeReconcileDraft,
+  readReconcileDraft,
+  writeReconcileDraft,
+} from "@/lib/reconcile-draft/draft-storage";
 
 type ReconcileItem = OpenBottleRow;
 
@@ -43,14 +49,20 @@ export function ReconcileList({
   varianceThresholdOz = 1.0,
   onStateChange,
   inDialog = false,
+  restaurantId,
+  userId,
 }: {
   initialItems: ReconcileItem[];
   varianceThresholdOz?: number;
   onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
   inDialog?: boolean;
+  // Draft-storage key (tenant-isolation surface) — required, not optional.
+  restaurantId: string;
+  userId: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<Record<string, PendingChange>>({});
+  const [draftNotice, setDraftNotice] = useState<ReturnType<typeof describeReconcileDraft>>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, startTransition] = useTransition();
@@ -60,6 +72,20 @@ export function ReconcileList({
   const changedCount = Object.keys(pending).length;
   const busy = saving || refreshing;
   useEffect(() => { onStateChange?.({ dirty: changedCount > 0, busy }); }, [changedCount, busy, onStateChange]);
+
+  // Only knowable client-side; SSR renders empty, corrects post-hydration (theme-toggle.tsx's precedent).
+  useEffect(() => {
+    const result = readReconcileDraft(restaurantId, userId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (result.kind === "restored") setPending(result.entries);
+    setDraftNotice(describeReconcileDraft(result));
+  }, [restaurantId, userId]);
+  // Mirrors every change so a Back/Forward loses nothing (draft-storage.ts).
+  useEffect(() => {
+    writeReconcileDraft(restaurantId, userId, pending);
+  }, [pending, restaurantId, userId]);
+
+  const discardDraft = () => { setPending({}); setDraftNotice(null); clearReconcileDraft(restaurantId, userId); };
 
   const onSaveAll = async () => {
     if (changedCount === 0 || inFlight.current || refreshing) return;
@@ -86,6 +112,8 @@ export function ReconcileList({
         throw new Error(message ?? `Could not save (${res.status}). Your counts are still here; try again.`);
       }
       setPending({});
+      setDraftNotice(null);
+      clearReconcileDraft(restaurantId, userId);
       setSuccess(`${entries.length} bottle${entries.length === 1 ? "" : "s"} reconciled.`);
       startTransition(() => router.refresh());
     } catch (e) {
@@ -106,7 +134,16 @@ export function ReconcileList({
 
   return (
     <div className="pb-[120px]">
-      <ReconcileNavigationGuard dirty={changedCount > 0} busy={busy} interceptLinks={!inDialog} onDiscard={() => setPending({})} />
+      <ReconcileNavigationGuard dirty={changedCount > 0} busy={busy} interceptLinks={!inDialog} onDiscard={discardDraft} />
+      {/* One action, not two (GLOBAL-01). Undo discards the restored draft; there
+          is no separate dismiss because the notice clears itself the moment the
+          user edits a count or saves. */}
+      {draftNotice && (
+        <div role="status" className="mb-md flex items-center justify-between gap-sm rounded-md border border-rule bg-wash px-md py-sm text-[13px] text-ink">
+          <span>{draftNotice.message}</span>
+          {draftNotice.canUndo && <button type="button" onClick={discardDraft} className="min-h-11 shrink-0 rounded-pill px-sm text-ledger font-medium text-accent hover:underline">Undo</button>}
+        </div>
+      )}
       {success && <p role="status" className="mb-md text-[14px] text-ready-ink">{success}</p>}
       {error && (
         <div
@@ -128,7 +165,7 @@ export function ReconcileList({
             pending={pending[item.wine_id] ?? null}
             varianceThresholdOz={varianceThresholdOz}
             onChange={(change) =>
-              { setSuccess(null); setPending((prev) => ({ ...prev, [item.wine_id]: change })); }
+              { setSuccess(null); setDraftNotice(null); setPending((prev) => ({ ...prev, [item.wine_id]: change })); }
             }
           />
         ))}
@@ -208,13 +245,13 @@ function ReconcileRow({
             >
               {wineTitle(item.producer, item.name)}
               {item.vintage !== null && (
-                <span className="ml-xs font-sans text-[12px] font-light text-grey">
+                <span className="ml-xs font-sans text-ledger font-light text-grey">
                   {item.vintage}
                 </span>
               )}
             </Link>
             )}
-            <div className="mt-2xs flex flex-wrap items-center gap-xs text-[12px] text-grey">
+            <div className="mt-2xs flex flex-wrap items-center gap-xs text-ledger text-grey">
               <span className="rounded-pill bg-surface-sunken px-sm py-2xs font-mono">
                 {formatBottleSize(item.size_ml)}
               </span>
@@ -230,11 +267,11 @@ function ReconcileRow({
 
       <div className="mb-sm rounded-md bg-wash px-sm py-sm">
         <div className="flex flex-wrap items-baseline gap-sm">
-          <span className="text-[12px] text-grey">Tracked:</span>
+          <span className="text-ledger text-grey">Tracked:</span>
           <span className="font-mono text-[15px] font-semibold text-ink tabular-nums">
             {trackedOz.toFixed(1)} oz
           </span>
-          <span className="text-[12px] text-grey tabular-nums">
+          <span className="text-ledger text-grey tabular-nums">
             ({item.open_remaining_ml} ml ~{glassesLeft} glass
             {glassesLeft === 1 ? "" : "es"})
           </span>
@@ -303,7 +340,7 @@ function ReconcileRow({
                 })
               }
               className={cn(
-                "h-[44px] rounded-pill border text-[12px] font-medium transition-colors",
+                "h-[44px] rounded-pill border text-ledger font-medium transition-colors",
                 isActive
                   ? "border-accent bg-primary text-seal-ink"
                   : "border-rule bg-surface text-ink hover:bg-wash",
@@ -317,7 +354,7 @@ function ReconcileRow({
 
       <div className="flex flex-wrap items-center gap-sm">
         <label className="flex min-h-11 w-full items-center gap-xs sm:w-auto sm:flex-1">
-          <span className="text-[12px] text-grey whitespace-nowrap">
+          <span className="text-ledger text-grey whitespace-nowrap">
             Note:
           </span>
           <input
