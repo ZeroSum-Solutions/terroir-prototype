@@ -255,15 +255,41 @@ test.describe("BND-038 pour → reconcile", () => {
     expect(identityError).toBeNull();
     expect(identity?.name).toBeTruthy();
     await page.goto("/cellar");
-    await page
-      .getByPlaceholder("Search name, producer, region…")
-      .fill(identity!.name);
-    const lineageHeader = page
-      .locator('[data-lineage-header][aria-expanded="false"]', {
-        hasText: nameLabel,
-      })
-      .first();
-    if (await lineageHeader.count()) await lineageHeader.click();
+    const search = page.getByPlaceholder("Search name, producer, region…");
+    await expect(search).toBeVisible();
+    // The search box filters client-side, but the list hydrates after the
+    // server render and the demo tenant now holds ~950 wines, so hydration is
+    // not instant. A fill() that lands before React takes over the input is
+    // discarded when it does: the value reverts, nothing filters, and the
+    // assertions below then run against the whole unfiltered cellar. Retry the
+    // fill until the value sticks AND the list has actually narrowed to
+    // something containing this wine — either the row itself or the collapsed
+    // lineage group holding it.
+    const target = page.locator(`[data-cellar-row="${wine.wine_id}"]`);
+    const collapsed = page.locator(
+      '[data-lineage-header][aria-expanded="false"]',
+    );
+    await expect(async () => {
+      await search.fill(identity!.name);
+      await expect(search).toHaveValue(identity!.name);
+      expect(
+        (await target.count()) + (await collapsed.count()),
+      ).toBeGreaterThan(0);
+    }).toPass({ timeout: 20_000 });
+    // Expand EVERY collapsed lineage group left in the filtered results, not
+    // just one whose header text matches `nameLabel`. A lineage header renders
+    // the shared short name ("Vénus") while `nameLabel` comes from the RPC's
+    // guest-list display name ("Agrapart Vénus"), so the hasText filter this
+    // replaces matched nothing and the row stayed collapsed and invisible.
+    // That stayed hidden for as long as the tenant's pour-tracked wines were
+    // the synthetic one-vintage-per-wine seed; real bottlings have several
+    // vintages under one lineage, so they group. The search has already
+    // narrowed the list, so expanding all of them is cheap and does not depend
+    // on how any header happens to be labelled.
+    for (let i = await collapsed.count(); i > 0; i = await collapsed.count()) {
+      await collapsed.first().click();
+      if ((await collapsed.count()) >= i) break; // no progress — stop, don't spin
+    }
     // Pick the row by WINE ID, not by name. The comment this replaces said the
     // name was "the only reliable discriminator"; it is not one at all. The
     // helper sorts pour-tracked wines by open volume, and the winner is

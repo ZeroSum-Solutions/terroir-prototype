@@ -191,7 +191,7 @@ test.describe("mobile demo critical journeys", () => {
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await page.waitForURL(`**${invitePath}`);
       await page.waitForURL("**/cellar", { timeout: 20_000 });
-      await expect(page.getByRole("heading", { name: /cellar beyond/i })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Cellar", exact: true })).toBeVisible();
       await expectNoDocumentOverflow(page);
       await assertNoSeriousA11yViolations(page, "/cellar (staff)");
 
@@ -286,7 +286,7 @@ test.describe("mobile demo critical journeys", () => {
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await page.waitForURL("**/cellar");
       await page.reload();
-      await expect(page.getByRole("heading", { name: /cellar beyond/i })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Cellar", exact: true })).toBeVisible();
 
       const signOutResponse = await page.request.post(
         "http://127.0.0.1:3000/auth/signout",
