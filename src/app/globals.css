@@ -10,8 +10,8 @@
  *  1. Runtime theme variables (--t-*) — the light "Bone" values on :root,
  *     swapped to the dark "Obsidian" set under [data-theme="dark"], and under
  *     prefers-color-scheme: dark when no explicit choice is stored. The app
- *     defaults to Obsidian (layout.tsx sets data-theme="dark" on first run);
- *     Bone is the print, daylight and guest-menu room.
+ *     defaults to Bone for now (layout.tsx sets data-theme="light" on first
+ *     run); Obsidian is the brand's signature room, chosen in Settings.
  *  2. @theme inline — maps Tailwind tokens onto the runtime variables, so
  *     every token utility (bg-canvas, text-ink, border-rule…) retints per mode
  *     with zero component changes.
@@ -22,7 +22,7 @@
  *            changes ratio with whatever is composited behind it.
  */
 
-/* ── Light — "Bone" (print, daylight, guest menu) ─────────────── */
+/* ── Light — "Bone" (default for now; print, daylight, guest menu) ── */
 :root {
   --t-primary: #141312; /* the primary action: an obsidian fill with a bone label */
   --t-primary-hover: #2a2724;
@@ -76,7 +76,7 @@
   color-scheme: light;
 }
 
-/* ── Dark — "Obsidian" (default): true near-black, NEVER blue-black ── */
+/* ── Dark — "Obsidian" (the signature room): true near-black, NEVER blue-black ── */
 /* Cold law: every ground here is a neutral or a warm neutral; a cool tint
    cannot be expressed. Enforced by check-design-palette.mjs. */
 [data-theme="dark"] {

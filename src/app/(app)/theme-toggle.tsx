@@ -10,9 +10,10 @@ const THEME_COLORS = { light: "#F1EADB", dark: "#0B0B0C" } as const;
 
 type ThemeChoice = "light" | "dark" | "system";
 
-// No stored choice means Obsidian, the brand's first face (DESIGN.md —
+// No stored choice means Bone, the default room for now (DESIGN.md —
 // Theme); "system" is stored explicitly when chosen, so it survives a reload
-// rather than collapsing back to dark. Mirrors layout.tsx's themeInitScript.
+// rather than collapsing back to the default. Mirrors layout.tsx's
+// themeInitScript.
 function readStoredChoice(): ThemeChoice {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -20,7 +21,7 @@ function readStoredChoice(): ThemeChoice {
   } catch {
     // storage unavailable (private mode) — fall through to the default
   }
-  return "dark";
+  return "light";
 }
 
 function applyChoice(choice: ThemeChoice) {
@@ -66,7 +67,7 @@ const OPTIONS: Array<{
 ];
 
 export function ThemeToggle() {
-  const [choice, setChoice] = useState<ThemeChoice>("dark");
+  const [choice, setChoice] = useState<ThemeChoice>("light");
   // The stored choice is only knowable on the client; render the neutral
   // default first so server and client markup agree.
   // The post-hydration correction is intentional and covered by the mount test.

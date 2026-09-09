@@ -38,14 +38,14 @@ function press(label: string) {
 }
 
 describe("ThemeToggle", () => {
-  // Obsidian is the brand's first face (DESIGN.md — Theme): no stored
-  // choice reads as dark, and the boot script in layout.tsx sets the
-  // attribute before this component mounts.
-  it("defaults to the dark choice with no stored theme", () => {
+  // Bone is the default room for now (DESIGN.md — Theme): no stored choice
+  // reads as light, and the boot script in layout.tsx sets the attribute
+  // before this component mounts.
+  it("defaults to the light choice with no stored theme", () => {
     render();
     expect(
       container
-        .querySelector('button[aria-label="Dark theme"]')
+        .querySelector('button[aria-label="Light theme"]')
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
   });

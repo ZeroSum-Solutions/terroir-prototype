@@ -122,7 +122,7 @@ chrome:
 # Terroir — Obsidian Glass — Style Reference
 > a cellar at night, read through glass
 
-**Theme:** dark (default) · light room "Bone" for print, daylight and the guest-facing list
+**Theme:** light "Bone" (default for now — owner's call, 2026-09-09) · dark "Obsidian" is the brand's signature room, one tap away in Settings; the guest-facing list is always Bone
 
 Supersedes **Terroir — Cellar Index** (2026-09-08). The Cellar Index put the
 list on paper with one printmaker blue. The owner's review of the obsidian
@@ -183,11 +183,12 @@ Obsidian room (default). Every pair below is measured by
 | At peak | `#F3EDE2` on `#26211D` | `--color-peak-ink` / `-wash` | Achromatic; also the informational treatment |
 | Window risk | `#F2879C` on `#2A0A11` | `--color-risk-ink` / `-wash` | The only red. A status, never a brand colour |
 
-Bone room (light). Same roles, inverted: canvas `#F1EADB`, surface `#FAF6EC`,
-ink `#141312`, copper darkened to `#8A4419` so it still clears 4.5:1 as text
-on the sunken ground, and the primary fill flips to obsidian with a bone
-label. It exists for printed lists, daylight use and the guest menu; it is
-not the brand's first face.
+Bone room (light, the default for now). Same roles, inverted: canvas
+`#F1EADB`, surface `#FAF6EC`, ink `#141312`, copper darkened to `#8A4419` so
+it still clears 4.5:1 as text on the sunken ground, and the primary fill
+flips to obsidian with a bone label. It is what a first visit lands on, and
+it is always the room of the printed list and the guest menu; Obsidian is
+the brand's signature room and is one tap away.
 
 ### The cold law
 

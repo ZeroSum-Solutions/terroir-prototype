@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { BookOpen, Archive, DollarSign, LogOut, Settings, Upload, Users } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
@@ -9,8 +10,18 @@ export function SettingsDropdown() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemsRef = useRef<(HTMLElement | null)[]>([]);
+  // Where the menu lands, in viewport pixels, measured from the trigger
+  // when it opens. The menu is PORTALLED to <body>: the header is a glass
+  // strip (backdrop-filter) at z-sticky, which makes it a stacking context,
+  // so anything absolutely positioned inside it is capped at the header's
+  // own z-index — and the nav dock, the fixed action rails and the cellar's
+  // compact masthead all sit at z-chrome, one step above. That is why the
+  // menu opened underneath the page's cards. Outside the header it can use
+  // the overlay layer it was always assigned.
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -21,7 +32,9 @@ export function SettingsDropdown() {
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      close();
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -56,7 +69,16 @@ export function SettingsDropdown() {
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          const rect = triggerRef.current?.getBoundingClientRect();
+          if (rect) {
+            setAnchor({
+              top: rect.bottom + 8,
+              right: Math.max(8, window.innerWidth - rect.right),
+            });
+          }
+          setOpen((v) => !v);
+        }}
         aria-label="Settings"
         aria-expanded={open}
         aria-haspopup="true"
@@ -65,18 +87,22 @@ export function SettingsDropdown() {
         <Settings className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
+      {open && typeof document !== "undefined" && createPortal(
+        <>
       {/* Mobile scrim — the menu floated over a busy screen of chips and
           CTAs with no separation (Kimi audit 2026-08-26). Desktop keeps
           the lightweight dropdown convention. */}
-      {open && (
+      <div
+        className="fixed inset-0 z-[var(--z-overlay)] bg-scrim md:hidden"
+        aria-hidden="true"
+        onClick={close}
+      />
         <div
-          className="fixed inset-0 z-[var(--z-overlay)] bg-scrim md:hidden"
-          aria-hidden="true"
-          onClick={close}
-        />
-      )}
-      {open && (
-        <div className="glass absolute right-0 top-full z-[var(--z-overlay)] mt-xs w-[180px] rounded-card" role="menu">
+          ref={menuRef}
+          className="glass fixed z-[var(--z-overlay)] w-[180px] rounded-card"
+          style={{ top: anchor?.top ?? 64, right: anchor?.right ?? 16 }}
+          role="menu"
+        >
           <div className="flex flex-col py-xs">
             <Link
               ref={(el) => { itemsRef.current[0] = el; }}
@@ -153,6 +179,8 @@ export function SettingsDropdown() {
             </form>
           </div>
         </div>
+        </>,
+        document.body,
       )}
     </div>
   );

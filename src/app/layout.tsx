@@ -58,17 +58,17 @@ export const viewport: Viewport = {
  * Applies the stored theme choice before first paint so neither room
  * flashes. "light" | "dark" set data-theme explicitly; "system" leaves the
  * device preference in charge via the prefers-color-scheme blocks in
- * globals.css; NO stored choice means Obsidian — the dark room is the
- * brand's first face (DESIGN.md — Theme), so a first visit lands there
- * whatever the device says. The public guest list (/list/…) is the one
- * exception: it is the venue's artefact, read at a table, and DESIGN.md
- * names Bone as the guest-menu room — so it is always light, and a venue's
- * own brand theme paints over that. An explicit choice also overrides both
+ * globals.css; NO stored choice means Bone — the light room is the default
+ * for now (owner's call, 2026-09-09; DESIGN.md — Theme), so a first visit
+ * lands there whatever the device says, and Obsidian is one tap away in
+ * Settings. The public guest list (/list/…) is always light regardless:
+ * it is the venue's artefact, read at a table, and a venue's own brand
+ * theme paints over it. An explicit choice also overrides both
  * theme-color metas so browser/PWA chrome matches the page (ThemeToggle
  * keeps them in sync on later changes; hexes hand-synced with
  * viewport.themeColor).
  */
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="dark"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0B0B0C":"#F1EADB";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="light"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0B0B0C":"#F1EADB";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
 
 export default function RootLayout({
   children,

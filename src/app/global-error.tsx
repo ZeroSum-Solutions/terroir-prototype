@@ -20,7 +20,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="dark"}if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="light"}if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 const palette = `
 :root{--ge-canvas:#F1EADB;--ge-ink:#141312;--ge-grey:#5F584E;--ge-primary:#8A4419;color-scheme:light}
