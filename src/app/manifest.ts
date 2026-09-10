@@ -7,8 +7,13 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Wine management for upscale restaurants.",
     start_url: "/",
     display: "standalone",
-    background_color: "#F4F5F6",
-    theme_color: "#F4F5F6",
+    // Bone — the default room's canvas (--t-canvas in globals.css). A manifest
+    // cannot read CSS, so these are literals; pwa-manifest.test.ts holds them
+    // to the token so a retheme cannot orphan them again. It has once: these
+    // stayed on Nocturne's #F4F5F6 through the Obsidian Glass retheme, which
+    // an installed app shows as a grey splash and status bar.
+    background_color: "#F1EADB",
+    theme_color: "#F1EADB",
     icons: [
       {
         src: "/icons/icon-192.png",
