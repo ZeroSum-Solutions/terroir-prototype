@@ -3,7 +3,7 @@ import { Cormorant_Garamond, Manrope, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 
 /**
- * Obsidian Glass's three faces (DESIGN.md — Typography). Cormorant Garamond
+ * Claret Cellar's three faces (DESIGN.md — Typography). Cormorant Garamond
  * is the named face — wine names, producers, headlines, the wordmark — with
  * the italic carrying the one emphasised word in a headline. Manrope is the
  * working face for everything you operate. Source Code Pro is unchanged,
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Terroir",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
 };
 
@@ -48,7 +48,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0B0B0C" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E0E0F" },
     { media: "(prefers-color-scheme: light)", color: "#F1EADB" },
   ],
   viewportFit: "cover",
@@ -58,17 +58,17 @@ export const viewport: Viewport = {
  * Applies the stored theme choice before first paint so neither room
  * flashes. "light" | "dark" set data-theme explicitly; "system" leaves the
  * device preference in charge via the prefers-color-scheme blocks in
- * globals.css; NO stored choice means Bone — the light room is the default
- * for now (owner's call, 2026-09-09; DESIGN.md — Theme), so a first visit
- * lands there whatever the device says, and Obsidian is one tap away in
- * Settings. The public guest list (/list/…) is always light regardless:
+ * globals.css; NO stored choice means Claret Cellar — the dark room is the
+ * authenticated default (owner's call, 2026-09-13; DESIGN.md — Theme), so a
+ * first visit matches the approved mobile demo. The public guest list
+ * (/list/…) is always light regardless:
  * it is the venue's artefact, read at a table, and a venue's own brand
  * theme paints over it. An explicit choice also overrides both
  * theme-color metas so browser/PWA chrome matches the page (ThemeToggle
  * keeps them in sync on later changes; hexes hand-synced with
  * viewport.themeColor).
  */
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="light"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0B0B0C":"#F1EADB";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="dark"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0E0E0F":"#F1EADB";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}`;
 
 export default function RootLayout({
   children,

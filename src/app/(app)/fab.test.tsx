@@ -30,6 +30,14 @@ describe("Fab", () => {
     },
   );
 
+  it.each(["/home", "/somm", "/menu"])(
+    "keeps the demo-style primary surface clear on %s",
+    (pathname) => {
+      navigation.pathname = pathname;
+      expect(renderToStaticMarkup(<Fab />)).toBe("");
+    },
+  );
+
   it("exposes exactly the three working actions and no Voice promise", () => {
     document.body.innerHTML = renderToStaticMarkup(<Fab />);
     const menu = document.querySelector<HTMLElement>('[role="menu"]')!;

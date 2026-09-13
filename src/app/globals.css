@@ -2,16 +2,16 @@
 
 /*
  * Terroir Design System — token layer
- * Source: DESIGN.md ("Terroir — Obsidian Glass", revised 2026-09-08).
+ * Source: DESIGN.md ("Terroir — Claret Cellar", revised 2026-09-13).
  * Do not edit values here without updating DESIGN.md first — the two are held
  * in agreement by `scripts/check-design-token-sync.mjs`.
  *
  * Architecture:
  *  1. Runtime theme variables (--t-*) — the light "Bone" values on :root,
- *     swapped to the dark "Obsidian" set under [data-theme="dark"], and under
+ *     swapped to the dark "Claret Cellar" set under [data-theme="dark"], and under
  *     prefers-color-scheme: dark when no explicit choice is stored. The app
- *     defaults to Bone for now (layout.tsx sets data-theme="light" on first
- *     run); Obsidian is the brand's signature room, chosen in Settings.
+ *     defaults to the dark room (layout.tsx sets data-theme="dark" on first
+ *     run); Bone remains available in Settings and is forced for guest lists.
  *  2. @theme inline — maps Tailwind tokens onto the runtime variables, so
  *     every token utility (bg-canvas, text-ink, border-rule…) retints per mode
  *     with zero component changes.
@@ -22,13 +22,13 @@
  *            changes ratio with whatever is composited behind it.
  */
 
-/* ── Light — "Bone" (default for now; print, daylight, guest menu) ── */
+/* ── Light — "Bone" (explicit preference; print and guest menu) ── */
 :root {
-  --t-primary: #141312; /* the primary action: an obsidian fill with a bone label */
-  --t-primary-hover: #2a2724;
-  --t-accent: #8a4419; /* copper, darkened to clear 4.5:1 as text on the sunken ground */
-  --t-mark: #8a4419;
-  --t-focus: #8a4419;
+  --t-primary: #6e1420; /* claret action on the Bone room */
+  --t-primary-hover: #861a28;
+  --t-accent: #6e1420;
+  --t-mark: #6e1420;
+  --t-focus: #6e1420;
 
   --t-canvas: #f1eadb;
   --t-surface: #faf6ec;
@@ -45,7 +45,7 @@
   --t-rule-strong: rgba(20, 19, 18, 0.22);
   --t-edge: #7a7266;
 
-  --t-seal-ink: #f3ede2;
+  --t-seal-ink: #f7f2e8;
 
   --t-ready: #2c774e;
   --t-ready-wash: #e4f0ea;
@@ -59,51 +59,51 @@
   --t-risk-ink: #96122a;
 
   --t-window-ramp-start: #e3d9c3;
-  --t-window-marker: #8a4419;
+  --t-window-marker: #6e1420;
   --t-card-highlight: rgba(255, 255, 255, 0.6); /* inner top light on a raised card */
 
-  --t-surface-inverse: #141312;
-  --t-on-inverse: #f3ede2;
+  --t-surface-inverse: #6e1420;
+  --t-on-inverse: #f7f2e8;
 
   --t-scrim: rgba(20, 19, 18, 0.4);
   --t-glass: rgba(250, 246, 236, 0.72); /* translucent — composed with blur in .glass */
   --t-glass-edge: rgba(20, 19, 18, 0.14);
   --t-glass-shadow: rgba(20, 19, 18, 0.12);
   --t-glass-highlight: rgba(255, 255, 255, 0.7);
-  --t-glow: rgba(181, 103, 47, 0.16); /* the one paint: a copper radial behind a panel */
+  --t-glow: rgba(110, 20, 32, 0.16); /* claret atmosphere behind a panel */
   --t-shadow-card: 0 20px 40px -28px rgba(20, 19, 18, 0.35);
   --t-shadow-glass: 0 30px 60px -30px rgba(20, 19, 18, 0.45);
   color-scheme: light;
 }
 
-/* ── Dark — "Obsidian" (the signature room): true near-black, NEVER blue-black ── */
-/* Cold law: every ground here is a neutral or a warm neutral; a cool tint
-   cannot be expressed. Enforced by check-design-palette.mjs. */
+/* ── Dark — "Claret Cellar" (authenticated default): neutral near-black ── */
+/* Palette law: product chrome is neutral, warm, or claret; cool tint cannot
+   be expressed. Enforced by check-design-palette.mjs. */
 [data-theme="dark"] {
-  --t-primary: #e8d9bf; /* bone: the primary fill */
-  --t-primary-hover: #f0e3c9;
-  --t-accent: #d48c5a; /* copper: 6.3:1 on the raised wall */
-  --t-mark: #d48c5a;
-  --t-focus: #d48c5a;
+  --t-primary: #c2303c; /* accessible claret fill; the demo's deep claret is its shaded edge */
+  --t-primary-hover: #d13a48;
+  --t-accent: #c9868c; /* light claret for text on the dark room */
+  --t-mark: #c9868c;
+  --t-focus: #e3abae;
 
-  --t-canvas: #0b0b0c;
-  --t-surface: #141314;
-  --t-surface-raised: #1d1b1a;
-  --t-surface-sunken: #060606;
-  --t-wash: #171514;
+  --t-canvas: #0e0e0f;
+  --t-surface: #131315;
+  --t-surface-raised: #1b1013;
+  --t-surface-sunken: #090909;
+  --t-wash: #170f10;
 
-  --t-ink: #f3ede2; /* bone ink */
-  --t-ink-soft: #c9bfa9;
-  --t-grey: #a39c8c;
-  --t-ink-disabled: #6f695e;
+  --t-ink: #efe8dc;
+  --t-ink-soft: #ded5c6;
+  --t-grey: #b4aa9c;
+  --t-ink-disabled: #756d64;
 
-  /* Bone hairlines at low alpha: an opaque near-black line vanishes on
-     obsidian and panels fuse into one field. Decorative by contract. */
-  --t-rule: rgba(232, 217, 191, 0.12);
-  --t-rule-strong: rgba(232, 217, 191, 0.22);
+  /* Warm hairlines at low alpha: an opaque near-black line vanishes on
+     cellar black and panels fuse into one field. Decorative by contract. */
+  --t-rule: rgba(239, 232, 220, 0.12);
+  --t-rule-strong: rgba(239, 232, 220, 0.22);
   --t-edge: #7a7266; /* load-bearing, solid: 3.6:1 on the raised wall */
 
-  --t-seal-ink: #0b0b0c; /* obsidian label on the bone fill */
+  --t-seal-ink: #f7f2e8;
 
   --t-ready: #4fb07a;
   --t-ready-wash: #0f2419;
@@ -116,19 +116,19 @@
   --t-risk-wash: #2a0a11;
   --t-risk-ink: #f2879c;
 
-  --t-window-ramp-start: #1d1b1a;
-  --t-window-marker: #d48c5a;
-  --t-card-highlight: rgba(255, 255, 255, 0.16);
+  --t-window-ramp-start: #1b1013;
+  --t-window-marker: #c9868c;
+  --t-card-highlight: rgba(255, 255, 255, 0.08);
 
-  --t-surface-inverse: #e8d9bf;
-  --t-on-inverse: #0b0b0c;
+  --t-surface-inverse: #c2303c;
+  --t-on-inverse: #f7f2e8;
 
   --t-scrim: rgba(0, 0, 0, 0.72);
-  --t-glass: rgba(255, 255, 255, 0.07);
-  --t-glass-edge: rgba(232, 217, 191, 0.18);
+  --t-glass: rgba(239, 232, 220, 0.06);
+  --t-glass-edge: rgba(239, 232, 220, 0.12);
   --t-glass-shadow: rgba(0, 0, 0, 0.6);
-  --t-glass-highlight: rgba(255, 255, 255, 0.28);
-  --t-glow: rgba(181, 103, 47, 0.22);
+  --t-glass-highlight: rgba(255, 255, 255, 0.12);
+  --t-glow: rgba(163, 35, 48, 0.22);
   --t-shadow-card: 0 20px 40px -28px rgba(0, 0, 0, 0.8);
   --t-shadow-glass: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
   color-scheme: dark;
@@ -138,30 +138,30 @@
    [data-theme="dark"] block exactly. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --t-primary: #e8d9bf; /* bone: the primary fill */
-    --t-primary-hover: #f0e3c9;
-    --t-accent: #d48c5a; /* copper: 6.3:1 on the raised wall */
-    --t-mark: #d48c5a;
-    --t-focus: #d48c5a;
+    --t-primary: #c2303c; /* accessible claret fill; the demo's deep claret is its shaded edge */
+    --t-primary-hover: #d13a48;
+    --t-accent: #c9868c; /* light claret for text on the dark room */
+    --t-mark: #c9868c;
+    --t-focus: #e3abae;
 
-    --t-canvas: #0b0b0c;
-    --t-surface: #141314;
-    --t-surface-raised: #1d1b1a;
-    --t-surface-sunken: #060606;
-    --t-wash: #171514;
+    --t-canvas: #0e0e0f;
+    --t-surface: #131315;
+    --t-surface-raised: #1b1013;
+    --t-surface-sunken: #090909;
+    --t-wash: #170f10;
 
-    --t-ink: #f3ede2; /* bone ink */
-    --t-ink-soft: #c9bfa9;
-    --t-grey: #a39c8c;
-    --t-ink-disabled: #6f695e;
+    --t-ink: #efe8dc;
+    --t-ink-soft: #ded5c6;
+    --t-grey: #b4aa9c;
+    --t-ink-disabled: #756d64;
 
-    /* Bone hairlines at low alpha: an opaque near-black line vanishes on
-       obsidian and panels fuse into one field. Decorative by contract. */
-    --t-rule: rgba(232, 217, 191, 0.12);
-    --t-rule-strong: rgba(232, 217, 191, 0.22);
+    /* Warm hairlines at low alpha: an opaque near-black line vanishes on
+       cellar black and panels fuse into one field. Decorative by contract. */
+    --t-rule: rgba(239, 232, 220, 0.12);
+    --t-rule-strong: rgba(239, 232, 220, 0.22);
     --t-edge: #7a7266; /* load-bearing, solid: 3.6:1 on the raised wall */
 
-    --t-seal-ink: #0b0b0c; /* obsidian label on the bone fill */
+    --t-seal-ink: #f7f2e8;
 
     --t-ready: #4fb07a;
     --t-ready-wash: #0f2419;
@@ -174,19 +174,19 @@
     --t-risk-wash: #2a0a11;
     --t-risk-ink: #f2879c;
 
-    --t-window-ramp-start: #1d1b1a;
-    --t-window-marker: #d48c5a;
-    --t-card-highlight: rgba(255, 255, 255, 0.16);
+    --t-window-ramp-start: #1b1013;
+    --t-window-marker: #c9868c;
+    --t-card-highlight: rgba(255, 255, 255, 0.08);
 
-    --t-surface-inverse: #e8d9bf;
-    --t-on-inverse: #0b0b0c;
+    --t-surface-inverse: #c2303c;
+    --t-on-inverse: #f7f2e8;
 
     --t-scrim: rgba(0, 0, 0, 0.72);
-    --t-glass: rgba(255, 255, 255, 0.07);
-    --t-glass-edge: rgba(232, 217, 191, 0.18);
+    --t-glass: rgba(239, 232, 220, 0.06);
+    --t-glass-edge: rgba(239, 232, 220, 0.12);
     --t-glass-shadow: rgba(0, 0, 0, 0.6);
-    --t-glass-highlight: rgba(255, 255, 255, 0.28);
-    --t-glow: rgba(181, 103, 47, 0.22);
+    --t-glass-highlight: rgba(255, 255, 255, 0.12);
+    --t-glow: rgba(163, 35, 48, 0.22);
     --t-shadow-card: 0 20px 40px -28px rgba(0, 0, 0, 0.8);
     --t-shadow-glass: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
     color-scheme: dark;
@@ -316,12 +316,12 @@
   --spacing-2xl: 48px;
   --spacing-3xl: 80px;
 
-  /* Radii (DESIGN.md — Spacing & Shapes). Every interactive element is a
-     pill; every panel is 20px. */
+  /* Radii (DESIGN.md — Spacing & Shapes). Pills frame primary controls;
+     cards use the mobile demo's compact 18px family. */
   --radius-sm: 6px; /* badges, bin chips */
-  --radius-md: 10px; /* inputs, form controls */
-  --radius-lg: 14px; /* tiles, thumbnails */
-  --radius-card: 20px; /* cards, sheets, panels */
+  --radius-md: 12px; /* inputs, form controls */
+  --radius-lg: 16px; /* tiles, thumbnails */
+  --radius-card: 18px; /* cards, sheets, panels */
   --radius-pill: 999px; /* buttons, chips, search, the nav dock, segmented controls */
 
   /* Shadows (DESIGN.md — Elevation). Depth is light first: the inset top
@@ -401,11 +401,15 @@ body {
 /*
  * Card recipe (DESIGN.md — Surfaces, level 2 / Elevation).
  * The glass recipe with the blur omitted, for lists that sit on plain
- * obsidian where there is nothing to blur: the same hairline edge, the
+ * cellar black where there is nothing to blur: the same hairline edge, the
  * same 1px top highlight, no drop.
  */
 .card-surface {
-  background: var(--color-surface);
+  background: linear-gradient(
+    180deg,
+    var(--color-surface) 0%,
+    var(--color-surface-sunken) 140%
+  );
   border: 1px solid var(--color-glass-edge);
   box-shadow:
     inset 0 1px 0 var(--t-card-highlight),
@@ -444,7 +448,7 @@ body {
 
 /*
  * Hero band background (DESIGN.md — Elevation). The one paint in the
- * system: a copper radial glow on the canvas, so a glass panel over a
+ * system: a claret radial glow on the canvas, so a glass panel over a
  * masthead has light to catch. Never a linear gradient across a surface.
  */
 .dawn-gradient {

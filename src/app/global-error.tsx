@@ -11,7 +11,7 @@
  * Styling is inline because this component renders its own <html>
  * and <body> — Tailwind + the root-layout font classes don't apply
  * when the root layout itself crashed. Colors mirror the DESIGN.md
- * ("Terroir — Cantina") tokens and must be hand-synced when the
+ * ("Terroir — Claret Cellar") tokens and must be hand-synced when the
  * contract changes. Both modes are carried by the --ge-* vars below;
  * the init script re-applies a stored explicit choice because React
  * re-renders <html> here, dropping the boot script's data-theme.
@@ -20,12 +20,12 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
-const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="light"}if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+const themeInitScript = `try{var t=localStorage.getItem("terroir-theme");if(t!=="light"&&t!=="dark"&&t!=="system"){t="dark"}if(location.pathname.indexOf("/list/")===0){t="light"}if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 const palette = `
-:root{--ge-canvas:#F1EADB;--ge-ink:#141312;--ge-grey:#5F584E;--ge-primary:#8A4419;color-scheme:light}
-[data-theme="dark"]{--ge-canvas:#0B0B0C;--ge-ink:#F3EDE2;--ge-grey:#A39C8C;--ge-primary:#D48C5A;color-scheme:dark}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-theme="dark"]){--ge-canvas:#0B0B0C;--ge-ink:#F3EDE2;--ge-grey:#A39C8C;--ge-primary:#D48C5A;color-scheme:dark}}
+:root,[data-theme="dark"]{--ge-canvas:#0E0E0F;--ge-ink:#EFE8DC;--ge-grey:#B4AA9C;--ge-primary:#C2303C;color-scheme:dark}
+[data-theme="light"]{--ge-canvas:#F1EADB;--ge-ink:#141312;--ge-grey:#5F584E;--ge-primary:#6E1420;color-scheme:light}
+@media (prefers-color-scheme:light){:root:not([data-theme="light"]):not([data-theme="dark"]){--ge-canvas:#F1EADB;--ge-ink:#141312;--ge-grey:#5F584E;--ge-primary:#6E1420;color-scheme:light}}
 `;
 
 export default function GlobalError({
@@ -46,7 +46,7 @@ export default function GlobalError({
           background: "var(--ge-canvas)",
           color: "var(--ge-ink)",
           fontFamily:
-            'Archivo, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+            'Manrope, system-ui, -apple-system, "Segoe UI", sans-serif',
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -59,7 +59,7 @@ export default function GlobalError({
           <h1
             style={{
               fontFamily:
-                '"Bodoni Moda", Didot, Georgia, "Times New Roman", serif',
+                '"Cormorant Garamond", Georgia, "Times New Roman", serif',
               fontSize: "28px",
               fontWeight: 500,
               margin: "0 0 12px",
@@ -105,7 +105,7 @@ export default function GlobalError({
             style={{
               display: "inline-block",
               background: "var(--ge-primary)",
-              color: "#ffffff",
+              color: "#F7F2E8",
               padding: "12px 24px",
               borderRadius: "999px",
               fontSize: "14px",

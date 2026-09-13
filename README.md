@@ -4,6 +4,24 @@ Restaurant wine-management SaaS. Photograph an invoice on your phone → Azure D
 
 Single Next.js 16 (App Router) deployable backed by Supabase (Postgres + Auth). No separate microservices.
 
+## Authenticated workspace
+
+Authenticated members land on `/home`. The Home view reads the current tenant's
+inventory and presents role-specific priorities, but the owner, manager, and staff
+roles still enforce access. The primary navigation is Home, Cellar, Atlas, Somm,
+and Menu on both desktop and mobile.
+
+`/somm` provides the full cellar assistant. The header opens the same assistant in
+a compact sheet. Both surfaces query recorded inventory and the reference corpus;
+they do not generate tasting notes or invent stock. `/menu` groups the existing
+cellar, receiving, list, pricing, insight, team, and setup workflows, and hides
+management entries from staff.
+
+The authenticated application uses the dark Claret Cellar theme when no preference
+exists. Members can select Bone, Claret, or the device theme in Settings.
+Public guest wine lists remain in the light Bone theme. [`DESIGN.md`](DESIGN.md)
+owns the palette, component, and typography contract.
+
 ## Restaurant workflow
 
 Open **Settings → Setup guide** for the restaurant setup and phone-service guide.

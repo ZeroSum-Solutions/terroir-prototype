@@ -6,11 +6,11 @@ const STORAGE_KEY = "terroir-theme";
 
 // Canvas colors for browser/PWA chrome — hand-synced with the DESIGN.md
 // tokens, viewport.themeColor in layout.tsx, and its themeInitScript.
-const THEME_COLORS = { light: "#F1EADB", dark: "#0B0B0C" } as const;
+const THEME_COLORS = { light: "#F1EADB", dark: "#0E0E0F" } as const;
 
 type ThemeChoice = "light" | "dark" | "system";
 
-// No stored choice means Bone, the default room for now (DESIGN.md —
+// No stored choice means Claret Cellar, the authenticated default (DESIGN.md —
 // Theme); "system" is stored explicitly when chosen, so it survives a reload
 // rather than collapsing back to the default. Mirrors layout.tsx's
 // themeInitScript.
@@ -21,7 +21,7 @@ function readStoredChoice(): ThemeChoice {
   } catch {
     // storage unavailable (private mode) — fall through to the default
   }
-  return "light";
+  return "dark";
 }
 
 function applyChoice(choice: ThemeChoice) {
@@ -54,22 +54,22 @@ function syncBrowserChrome(choice: ThemeChoice) {
 }
 
 // Visible text labels, not icon guessing — the three unlabeled 28px icon
-// buttons were undiscoverable (Kimi audit 2026-08-26). "Cellar" is the dark
-// room's contract name; aria-labels stay descriptive for screen readers.
+// buttons were undiscoverable (Kimi audit 2026-08-26). Aria-labels stay
+// descriptive for screen readers while the short label names the room.
 const OPTIONS: Array<{
   value: ThemeChoice;
   label: string;
   short: string;
 }> = [
   { value: "light", label: "Light theme", short: "Bone" },
-  { value: "dark", label: "Dark theme", short: "Obsidian" },
+  { value: "dark", label: "Dark theme", short: "Claret" },
   { value: "system", label: "Match device theme", short: "Auto" },
 ];
 
 export function ThemeToggle() {
-  const [choice, setChoice] = useState<ThemeChoice>("light");
-  // The stored choice is only knowable on the client; render the neutral
-  // default first so server and client markup agree.
+  const [choice, setChoice] = useState<ThemeChoice>("dark");
+  // The stored choice is only knowable on the client; render the authenticated
+  // dark default first so server and client markup agree.
   // The post-hydration correction is intentional and covered by the mount test.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setChoice(readStoredChoice()), []);

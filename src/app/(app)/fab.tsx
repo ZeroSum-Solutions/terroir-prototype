@@ -50,6 +50,9 @@ const ACTIONS: Action[] = [
 // ordinary scroll positions, and neither page has a Scan/Pour/86 use case
 // the FAB would otherwise be serving.
 const HIDE_ON: ReadonlyArray<string> = [
+  "/home",
+  "/somm",
+  "/menu",
   "/scan",
   "/scan-bottle",
   "/scans",

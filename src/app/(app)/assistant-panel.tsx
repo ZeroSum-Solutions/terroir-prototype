@@ -1,344 +1,55 @@
 "use client";
 
-// The wine assistant, available on every page from the header.
-//
-// Everything it shows comes from /api/assistant, which reads rows and never
-// generates prose (see src/lib/wine-intelligence/assistant-query.ts for the
-// D-006b decision behind that). The UI's job is to keep that honesty legible:
-// it shows the constraints it actually understood as chips, names any word it
-// could not place, and labels corpus suggestions as NOT being cellar stock.
-// A panel that quietly rendered an unfiltered list would look identical to one
-// that answered the question — which is the failure worth designing against.
-
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
-import { MessageCircleQuestion, Search, X } from "lucide-react";
+import { MessageCircle, MoveUpRight, X } from "lucide-react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { AssistantExperience } from "./assistant-experience";
 import { onAssistantRequest } from "./assistant-open";
-import type { AssistantResponse } from "@/lib/wine-intelligence/assistant-types";
-import { CellarResult, CorpusResult } from "./assistant-results";
-
-const EXAMPLES = [
-  "a bold red that pairs with beef",
-  "something under $40 for fish",
-  "a blend from Argentina, $200-400, for meats",
-  "a crisp white from Portugal",
-];
-
-function chipsFor(query: AssistantResponse["query"]): string[] {
-  const chips: string[] = [];
-  // Vintage leads: it is the fact that names a bottling rather than a wine.
-  if (query.vintages?.length) chips.push(query.vintages.join(" or "));
-  if (query.type) chips.push(query.type);
-  if (query.body) chips.push(query.body);
-  if (query.blend === true) chips.push("Blend");
-  if (query.blend === false) chips.push("Single varietal");
-  if (query.grape) chips.push(query.grape);
-  if (query.region) chips.push(query.region);
-  if (query.country) chips.push(query.country);
-  if (query.pairing?.length) chips.push(`Pairs with ${query.pairing.join(" or ")}`);
-  if (query.priceMin != null && query.priceMax != null) {
-    chips.push(`$${query.priceMin}–$${query.priceMax}`);
-  } else if (query.priceMax != null) {
-    chips.push(`Under $${query.priceMax}`);
-  } else if (query.priceMin != null) {
-    chips.push(`Over $${query.priceMin}`);
-  }
-  return chips;
-}
 
 export function AssistantPanel() {
   const [open, setOpen] = useState(false);
   const [seed, setSeed] = useState<string | null>(null);
+  useEffect(() => onAssistantRequest((question) => {
+    setSeed(question);
+    setOpen(true);
+  }), []);
 
-  // The palette's all-scope miss hands its query here (P1 slice 2c) — see
-  // assistant-open.ts for why this is an event rather than context.
-  useEffect(
-    () =>
-      onAssistantRequest((question) => {
-        setSeed(question);
-        setOpen(true);
-      }),
-    [],
-  );
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setSeed(null);
-          setOpen(true);
-        }}
-        aria-haspopup="dialog"
-        aria-label="Ask about your cellar"
-        className="grid h-11 w-11 place-items-center rounded-pill text-ink transition-colors hover:text-accent focus-ring"
-      >
-        <MessageCircleQuestion className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-      </button>
-      {/* Keyed on the seed so a request arriving while the dialog is
-          already open still lands as a fresh, seeded dialog. */}
-      {open ? (
-        <AssistantDialog
-          key={seed ?? ""}
-          seedQuestion={seed}
-          onClose={() => setOpen(false)}
-        />
-      ) : null}
-    </>
-  );
+  return <>
+    <button type="button" onClick={() => { setSeed(null); setOpen(true); }} aria-haspopup="dialog" aria-label="Ask Somm" className="grid h-11 w-11 place-items-center rounded-pill text-ink transition-colors hover:text-accent focus-ring">
+      <MessageCircle className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+    </button>
+    {open ? <AssistantDialog key={seed ?? ""} seedQuestion={seed} onClose={() => setOpen(false)} /> : null}
+  </>;
 }
 
-function AssistantDialog({
-  seedQuestion = null,
-  onClose,
-}: {
-  seedQuestion?: string | null;
-  onClose: () => void;
-}) {
-  const router = useRouter();
+function AssistantDialog({ seedQuestion, onClose }: { seedQuestion: string | null; onClose: () => void }) {
   const titleId = useId();
-  const inputId = useId();
   const trapRef = useRef<HTMLDivElement>(null);
-  const [question, setQuestion] = useState(seedQuestion ?? "");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AssistantResponse | null>(null);
   useFocusTrap({ containerRef: trapRef, onEscape: onClose });
-
-  // The request is keyed to the question that produced it, so a slow earlier
-  // answer cannot overwrite a faster later one.
-  const latest = useRef(0);
-
-  const ask = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const ticket = ++latest.current;
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/assistant?q=${encodeURIComponent(trimmed)}`);
-      if (ticket !== latest.current) return;
-      if (!res.ok) {
-        setError("That search could not be run. Try again.");
-        setResult(null);
-        return;
-      }
-      setResult((await res.json()) as AssistantResponse);
-    } catch {
-      if (ticket === latest.current) {
-        setError("That search could not be run. Try again.");
-        setResult(null);
-      }
-    } finally {
-      if (ticket === latest.current) setPending(false);
-    }
-  }, []);
-
-  // A seeded question was already typed and submitted at the palette;
-  // running it on open is the request the user made, not a new one. Deferred
-  // into a promise continuation because ask() sets state synchronously and
-  // react-hooks/set-state-in-effect (rightly) rejects that in an effect body
-  // — the same pattern import-client.tsx uses for its spreadsheet hand-off.
-  useEffect(() => {
-    if (seedQuestion === null || seedQuestion.trim() === "") return;
-    void Promise.resolve().then(() => ask(seedQuestion));
-  }, [seedQuestion, ask]);
-
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const chips = result ? chipsFor(result.query) : [];
-  const understoodNothing = result != null && result.query.understood.length === 0;
-
-  // Portalled to <body> because the trigger lives in the header, and the
-  // header carries `.glass` — which sets backdrop-filter, and an element with
-  // a backdrop-filter becomes the CONTAINING BLOCK for its position:fixed
-  // descendants. Rendered in place, this dialog's `inset-0` resolved against
-  // the header's own 72px-tall box instead of the viewport, so the panel was
-  // squashed into the header strip. Nothing in the DOM or the tests showed
-  // it: role="dialog" was present and focusable either way. Keep the portal.
   return createPortal(
-    <div
-      className="fixed inset-0 z-[var(--z-dialog)] flex items-end justify-center bg-scrim p-md sm:items-start sm:py-xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
-      <div
-        ref={trapRef}
-        className="glass flex max-h-full w-full flex-col overflow-hidden rounded-t-card sm:max-w-[560px] sm:rounded-card"
-      >
-        <div className="flex items-center justify-between border-b border-rule px-lg py-md">
-          <h2 id={titleId} className="font-serif text-subheading font-normal text-ink">
-            Ask about your cellar
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="grid h-11 w-11 place-items-center rounded-pill text-grey transition-colors hover:text-accent focus-ring"
-          >
+    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-end justify-center bg-scrim md:items-center md:p-lg" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div ref={trapRef} className="glass flex max-h-[min(82dvh,760px)] w-full flex-col overflow-hidden rounded-t-[28px] border-x-0 border-b-0 md:max-w-[620px] md:rounded-card md:border">
+        <header className="flex items-center gap-sm border-b border-rule px-lg py-md">
+          <span className="h-7 w-7 rounded-pill bg-[linear-gradient(160deg,#A32330,#5C121C)]" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="font-serif text-subheading font-normal text-ink">Somm</h2>
+            <p className="text-ledger text-grey">Searching your cellar</p>
+          </div>
+          <Link href="/somm" onClick={onClose} className="inline-flex min-h-11 items-center gap-2xs px-xs text-body-sm text-accent focus-ring">
+            Full chat <MoveUpRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+          <button type="button" onClick={onClose} aria-label="Close" className="grid h-11 w-11 place-items-center rounded-pill text-grey hover:text-ink focus-ring">
             <X className="h-4 w-4" strokeWidth={1.9} aria-hidden />
           </button>
-        </div>
-
-        <form
-          className="flex items-center gap-sm px-lg pt-md"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(question);
-          }}
-        >
-          <label htmlFor={inputId} className="sr-only">
-            Your question
-          </label>
-          <input
-            id={inputId}
-            autoFocus
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="a bold red that pairs with beef…"
-            className="glass min-h-11 h-[52px] min-w-0 flex-1 rounded-pill px-md text-control text-ink placeholder:text-grey focus-visible:border-accent focus-ring"
-          />
-          <button
-            type="submit"
-            disabled={pending || question.trim() === ""}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-pill bg-primary text-seal-ink transition-colors hover:bg-primary-hover disabled:opacity-40 focus-ring sm:h-[52px] sm:w-[52px]"
-            aria-label="Ask"
-          >
-            <Search className="h-4 w-4" strokeWidth={1.9} aria-hidden />
-          </button>
-        </form>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-lg pb-lg pt-md">
-          {result == null && !pending && error == null ? (
-            <div>
-              <p className="text-body-sm font-light text-grey">
-                Answers come from your cellar and the reference corpus — grape, body,
-                pairing, community rating and price. Nothing is written by a model.
-              </p>
-              <ul className="mt-md flex flex-col gap-xs">
-                {EXAMPLES.map((example) => (
-                  <li key={example}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuestion(example);
-                        void ask(example);
-                      }}
-                      className="w-full rounded-pill border border-rule-strong px-md py-sm text-left text-body-sm text-ink transition-colors hover:border-accent hover:text-accent focus-ring"
-                    >
-                      {example}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {pending ? (
-            <p className="text-body-sm font-light text-grey" role="status">
-              Searching…
-            </p>
-          ) : null}
-
-          {error ? (
-            <p className="text-body-sm text-risk-ink" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {result != null && !pending ? (
-            <div>
-              {chips.length > 0 ? (
-                <ul className="mb-md flex flex-wrap gap-xs" aria-label="Understood as">
-                  {chips.map((chip) => (
-                    <li
-                      key={chip}
-                      className="rounded-pill border border-rule-strong px-sm py-2xs text-ledger text-ink-soft"
-                    >
-                      {chip}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              {understoodNothing ? (
-                <p className="text-body-sm font-light text-grey">
-                  I could not read a wine constraint in that. Try a style, a grape, a
-                  country, a price or a food — for example “a bold red for lamb”.
-                </p>
-              ) : null}
-
-              {result.query.unrecognized.length > 0 && !understoodNothing ? (
-                // Load-bearing, not a footnote. "A red from Narnia" matches
-                // every red in the cellar, and without this line that list
-                // reads as an answer about Narnia. Say what was dropped
-                // BEFORE the results, in the results' own type size.
-                <p className="mb-md rounded-card bg-risk-wash px-md py-sm text-body-sm text-risk-ink">
-                  I did not understand{" "}
-                  <strong className="font-medium">
-                    {result.query.unrecognized.join(", ")}
-                  </strong>
-                  , so {result.query.unrecognized.length > 1 ? "those were" : "that was"}{" "}
-                  left out of this search.
-                </p>
-              ) : null}
-
-              {result.cellar.length > 0 ? (
-                <>
-                  <p className="mb-sm text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                    {result.cellarTotal} in your cellar
-                    {result.cellarTotal > result.cellar.length
-                      ? ` · showing ${result.cellar.length}`
-                      : ""}
-                  </p>
-                  <ul className="border-t border-rule">
-                    {result.cellar.map((wine) => (
-                      <li key={wine.wineId}>
-                        <CellarResult
-                          wine={wine}
-                          onOpen={() => {
-                            onClose();
-                            router.push(`/cellar/${wine.wineId}`);
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-
-              {result.cellar.length === 0 && !understoodNothing ? (
-                <p className="text-body-sm font-light text-grey">
-                  Nothing in your cellar matches that.
-                </p>
-              ) : null}
-
-              {result.corpus.length > 0 ? (
-                <>
-                  <p className="mb-sm mt-lg text-caption font-medium uppercase tracking-[0.18em] text-grey">
-                    Not in your cellar — from the reference corpus
-                  </p>
-                  <ul className="border-t border-rule">
-                    {result.corpus.map((wine) => (
-                      <li key={wine.wineId}>
-                        <CorpusResult wine={wine} />
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        </header>
+        <AssistantExperience seedQuestion={seedQuestion} onNavigate={onClose} compact />
       </div>
     </div>,
     document.body,

@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * DESIGN.md "cold law" gate (Obsidian Glass, 2026-09-08).
+ * DESIGN.md palette gate (Claret Cellar, 2026-09-13).
  *
  * The Cellar Index banned brown and cream; Obsidian Glass is built from
- * copper and bone, so that law is gone and its inverse is enforced instead:
- * no cool hue anywhere. A blue-black canvas, a slate status chip or a violet
- * focus ring is the way a dark theme quietly stops being this one.
+ * warm neutrals and claret, so no cool hue belongs in the product chrome. A
+ * blue-black canvas, a slate status chip or a violet focus ring is the way a
+ * dark theme quietly stops being this one.
  *
  * Two surfaces are checked, because checking only the frontmatter is how a
  * previous palette survived an entire migration inside one component's
  * inline styles:
  *
  *   1. The DESIGN.md frontmatter palette — grounds, inks and action tokens
- *      must be true neutrals or warm (copper–bone band); status tokens are
- *      exempt by name because they were never neutrals.
+ *      must be true neutrals, warm, or inside the contract's narrow claret
+ *      band. Status tokens are exempt by name.
  *
  *   2. Every colour literal written into src/ — a saturated cool chromatic
  *      that is not a named token fails, judged in HSL.
@@ -66,19 +66,25 @@ function hsl(hex) {
 const WARM_MIN = 15;
 const WARM_MAX = 60;
 
+/** Claret is the one brand chroma. Keep the band narrow enough that generic
+ *  magenta and violet cannot enter under the guise of a brand red. */
+const CLARET_MIN = 335;
+const CLARET_MAX = 15;
+
 /** The cold band: blue through violet. Nothing in the system lives here. */
 const COLD_MIN = 190;
 const COLD_MAX = 290;
 
 const NEUTRAL_SAT = 0.05;
 
-/** Rule 1 — a ground, ink or action token is a neutral or a warm. */
-function warmOrNeutralFault(hex) {
+/** Rule 1 — product chrome is neutral, warm, or claret. */
+function paletteFault(hex, allowClaret = false) {
   const { h, s, l } = hsl(hex);
   if (s <= NEUTRAL_SAT) return null; // a true grey/black/white has no hue to be cool with
   if (h >= WARM_MIN && h < WARM_MAX) return null; // copper–bone band
-  return `not warm or neutral — hue ${h.toFixed(1)}° is outside the copper–bone band ` +
-    `(${WARM_MIN}°–${WARM_MAX}°) with real saturation (l${l.toFixed(2)} s${s.toFixed(2)})`;
+  if (allowClaret && (h >= CLARET_MIN || h < CLARET_MAX)) return null;
+  return `outside the warm-neutral${allowClaret ? "/claret" : ""} palette — hue ` +
+    `${h.toFixed(1)}° with real saturation (l${l.toFixed(2)} s${s.toFixed(2)})`;
 }
 
 /** Tokens the rule applies to, by bare name (the dark- twin is checked too).
@@ -101,7 +107,7 @@ const failures = [];
 for (const { name, hex } of tokens) {
   const bare = name.startsWith("dark-") ? name.slice(5) : name;
   if (!GOVERNED.has(bare)) continue;
-  const fault = warmOrNeutralFault(hex);
+  const fault = paletteFault(hex, true);
   if (fault) failures.push(`${name} #${hex}: ${fault}`);
 }
 
@@ -111,7 +117,7 @@ function coldFault(hex) {
   const { h, s } = hsl(hex);
   if (s <= 0.15) return null; // a tinted neutral is not an accent
   if (h < COLD_MIN || h >= COLD_MAX) return null; // outside the blue–violet band
-  return "cold accent — the system has one metal, and it is copper";
+  return "cold accent — the product chrome is limited to warm neutrals and claret";
 }
 
 function walk(dir, out = []) {

@@ -38,14 +38,14 @@ function press(label: string) {
 }
 
 describe("ThemeToggle", () => {
-  // Bone is the default room for now (DESIGN.md — Theme): no stored choice
-  // reads as light, and the boot script in layout.tsx sets the attribute
+  // Claret Cellar is the authenticated default (DESIGN.md — Theme): no stored
+  // choice reads as dark, and the boot script in layout.tsx sets the attribute
   // before this component mounts.
-  it("defaults to the light choice with no stored theme", () => {
+  it("defaults to the dark choice with no stored theme", () => {
     render();
     expect(
       container
-        .querySelector('button[aria-label="Light theme"]')
+        .querySelector('button[aria-label="Dark theme"]')
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
   });
@@ -97,7 +97,7 @@ describe("ThemeToggle", () => {
       darkMeta = document.createElement("meta");
       darkMeta.name = "theme-color";
       darkMeta.media = "(prefers-color-scheme: dark)";
-      darkMeta.content = "#0B0B0C";
+      darkMeta.content = "#0E0E0F";
       lightMeta = document.createElement("meta");
       lightMeta.name = "theme-color";
       lightMeta.media = "(prefers-color-scheme: light)";
@@ -110,11 +110,11 @@ describe("ThemeToggle", () => {
       lightMeta.remove();
     });
 
-    it("forces both metas to the obsidian color on an explicit dark choice", () => {
+    it("forces both metas to the cellar-black color on an explicit dark choice", () => {
       render();
       press("Dark theme");
-      expect(darkMeta.content).toBe("#0B0B0C");
-      expect(lightMeta.content).toBe("#0B0B0C");
+      expect(darkMeta.content).toBe("#0E0E0F");
+      expect(lightMeta.content).toBe("#0E0E0F");
     });
 
     it("forces both metas to the bone color on an explicit light choice", () => {
@@ -128,7 +128,7 @@ describe("ThemeToggle", () => {
       render();
       press("Dark theme");
       press("Match device theme");
-      expect(darkMeta.content).toBe("#0B0B0C");
+      expect(darkMeta.content).toBe("#0E0E0F");
       expect(lightMeta.content).toBe("#F1EADB");
     });
   });

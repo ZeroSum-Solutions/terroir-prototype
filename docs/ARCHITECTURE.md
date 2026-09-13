@@ -32,6 +32,30 @@ Non-PNG palette extraction in `src/lib/branding/palette.ts` launches Puppeteer
 directly. Wine-list PDF generation still reaches Puppeteer through
 `src/adapters/pdf`.
 
+## Authenticated Application Shell
+
+- `src/app/page.tsx` sends authenticated members to `/home` and unauthenticated
+  visitors to `/login`.
+- [`nav-links.tsx`](<../src/app/(app)/nav-links.tsx>) owns the five primary
+  destinations that the desktop header and mobile dock use: Home, Cellar,
+  Atlas, Somm, and Menu.
+- [`home`](<../src/app/(app)/home>) owns the role-aware landing view. Its server page reads
+  tenant-scoped inventory, open-bottle, review-scan, and unavailable-wine counts;
+  `home-snapshot.ts` converts those rows into the displayed summary.
+- [`assistant-experience.tsx`](<../src/app/(app)/assistant-experience.tsx>) owns
+  the shared deterministic assistant interface. `/somm` renders it as a full
+  page, while `assistant-panel.tsx` renders it in the header sheet. Both call
+  `GET /api/assistant` and preserve the API's distinction between cellar stock
+  and reference-corpus suggestions.
+- [`operations-launcher.tsx`](<../src/app/(app)/operations-launcher.tsx>) maps
+  existing application workflows into grouped links. `/menu` renders the full
+  launcher, and the settings sheet links to it. The launcher filters management
+  links by role; destination routes remain the authorization boundary.
+- `src/app/layout.tsx`, `src/app/globals.css`, and
+  [`theme-toggle.tsx`](<../src/app/(app)/theme-toggle.tsx>) apply the authenticated theme choice before
+  first paint. `DESIGN.md` owns the design contract. Public `/list/*` routes force
+  the light theme.
+
 ## Database Contracts
 
 - The legacy end-of-shift `POST /api/reconcile` path calls

@@ -60,17 +60,13 @@ describe("SettingsDropdown touch targets", () => {
     });
 
     const actions = [
-      // The menu is portalled to <body> so it can escape the glass header's
+      // The dialog is portalled to <body> so it can escape the glass header's
       // stacking context; the container is appended to body, so document
-      // sees both the trigger and the menu.
-      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      // sees both the trigger and the dialog.
+      ...document.querySelectorAll<HTMLElement>("[data-settings-action]"),
     ];
     expect(actions.map((action) => action.textContent?.trim())).toEqual([
-      "Pricing",
-      "Bins",
-      "Team",
-      "Import",
-      "Setup guide",
+      "Operations menu",
       "Sign out",
     ]);
     for (const action of actions) {
@@ -91,10 +87,10 @@ describe("SettingsDropdown touch targets", () => {
     });
 
     const actions = [
-      // The menu is portalled to <body> so it can escape the glass header's
+      // The dialog is portalled to <body> so it can escape the glass header's
       // stacking context; the container is appended to body, so document
-      // sees both the trigger and the menu.
-      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      // sees both the trigger and the dialog.
+      ...document.querySelectorAll<HTMLElement>("[data-settings-action]"),
     ];
     for (const action of actions) {
       expect.soft(action.className, action.textContent?.trim()).toContain(

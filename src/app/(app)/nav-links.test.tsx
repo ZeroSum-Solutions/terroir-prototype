@@ -12,7 +12,7 @@ describe("primary navigation", () => {
   });
 
   it.each([DesktopNavLinks, MobileNavLinks])(
-    "preserves the five primary destinations, Atlas center",
+    "preserves the mobile-demo destinations as real routes",
     (Navigation) => {
       document.body.innerHTML = renderToStaticMarkup(
         // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is this component's own RBAC prop ("staff"/"owner"/"admin"), not a DOM ARIA role.
@@ -26,11 +26,11 @@ describe("primary navigation", () => {
           link.getAttribute("href"),
         ]),
       ).toEqual([
-        ["Scan", "/scan"],
+        ["Home", "/home"],
         ["Cellar", "/cellar"],
         ["Atlas", "/atlas"],
-        ["Lists", "/lists"],
-        ["Insights", "/insights"],
+        ["Somm", "/somm"],
+        ["Menu", "/menu"],
       ]);
       expect(
         links.find((link) => link.textContent?.trim() === "Cellar")

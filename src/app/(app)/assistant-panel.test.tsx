@@ -108,4 +108,18 @@ describe("AssistantPanel", () => {
     expect(input?.value).toBe("");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("keeps failed grounded searches recoverable", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500 } as Response);
+    await act(async () => root.render(<AssistantPanel />));
+    await act(async () => requestAssistant("white Burgundy"));
+    await act(async () => {});
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+      "could not be run",
+    );
+    expect(document.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe(
+      "white Burgundy",
+    );
+  });
 });
