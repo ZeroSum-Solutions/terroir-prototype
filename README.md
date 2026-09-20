@@ -152,6 +152,7 @@ application modules in `src/lib/`, and database migrations in
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md) is the working contract — read it before your first edit.
+- [`docs/plans/2026-09-20-terroir-product-data-requirements.md`](docs/plans/2026-09-20-terroir-product-data-requirements.md) consolidates the proposed restaurant and personal-collector product and data requirements. It is a planning source, not proof of implementation.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) owns module and database boundaries.
 - [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) owns verified code conventions.
 - [`docs/runbooks/README.md`](docs/runbooks/README.md) indexes the operational runbooks.

@@ -104,6 +104,7 @@ recorded. The required critical subset fails on any skip.
 | Concern | Home |
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
+| Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
