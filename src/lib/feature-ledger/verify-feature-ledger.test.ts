@@ -1,16 +1,21 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
 import {
-  createInitialLedger,
   deriveCriterion,
   metadataForRequirement,
   parseCoreFeatures,
   validateCompletionRules,
   verifyFeatureLedger,
 } from "../../../scripts/verify-feature-ledger.mjs";
+import {
+  createInitialLedger,
+  generateFeatureLedger,
+} from "../../../scripts/generate-feature-ledger.mjs";
 
 const SPEC = `<project_specification>
   <prerequisites>
@@ -111,6 +116,7 @@ describe("metadataForRequirement", () => {
     [57, "TER-028", "bottle-scanning"],
     [180, "TER-023", "operations"],
     [269, "TER-005", "quality-engineering"],
+    [273, "TER-041", "pour-reconciliation"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -118,8 +124,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 269", () => {
-    expect(() => metadataForRequirement(270)).toThrow(
+  it("rejects requirements outside the authoritative 273", () => {
+    expect(() => metadataForRequirement(274)).toThrow(
       "no completion metadata",
     );
   });
@@ -162,6 +168,7 @@ describe("createInitialLedger", () => {
         decision: "all_enumerated_features_active",
         approvedBy: "product_owner",
         approvedOn: "2026-07-23",
+        expandedOn: "2026-09-23",
       },
       items: [
         {
@@ -196,15 +203,152 @@ describe("createInitialLedger", () => {
   });
 });
 
+describe("generateFeatureLedger", () => {
+  const specFor = (assertions: string[]) => `<project_specification>
+  <core_features>
+    <inventory>
+${assertions.map((assertion) => `      - ${assertion}`).join("\n")}
+    </inventory>
+  </core_features>
+</project_specification>`;
+  const rules = (count: number) => [[1, count, "TER-010", "identity"]];
+  const original = [
+    "User can sign in",
+    "API returns 401 without a session",
+    "System records inventory",
+  ];
+
+  it("preserves IDs and status while recomputing reviewed metadata", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const updatedRules = [[1, 4, "TER-020", "data-platform"]];
+    const generated = generateFeatureLedger({
+      source: specFor([...original, "System records a stable operation"]),
+      previousLedger,
+      approvedFeatureCount: 4,
+      completionRules: updatedRules,
+      replacements: [],
+    });
+
+    expect(generated.items.map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-001",
+      "TER-CF-002",
+      "TER-CF-003",
+      "TER-CF-004",
+    ]);
+    expect(generated.items[0]).toMatchObject({
+      id: "TER-CF-001",
+      status: "active",
+      completionSpec: "TER-020",
+      evidenceOwner: "data-platform",
+    });
+    expect(
+      verifyFeatureLedger(specFor([...original, "System records a stable operation"]), generated, "### TER-020: Data", {
+        approvedFeatureCount: 4,
+        completionRules: updatedRules,
+      }),
+    ).toEqual([]);
+  });
+
+  it("refuses changed source text without an explicit ID mapping", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([original[0], "API returns 403 without access", original[2]]),
+        previousLedger,
+        approvedFeatureCount: 3,
+        completionRules: rules(3),
+        replacements: [],
+      }),
+    ).toThrow("changed or was removed without an explicit replacement: TER-CF-002");
+  });
+
+  it("applies an explicit source replacement without changing its ID", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const replacement = "API returns 403 without access";
+    const generated = generateFeatureLedger({
+      source: specFor([original[0], replacement, original[2]]),
+      previousLedger,
+      approvedFeatureCount: 3,
+      completionRules: rules(3),
+      replacements: [{
+        id: "TER-CF-002",
+        domain: "inventory",
+        fromSourceText: original[1],
+        toSourceText: replacement,
+      }],
+    });
+
+    expect(generated.items[1]).toMatchObject({
+      id: "TER-CF-002",
+      sourceText: replacement,
+      actor: "API",
+      action: "returns 403 without access",
+    });
+  });
+
+  it("rejects duplicate source assertions", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([...original, original[0]]),
+        previousLedger,
+        approvedFeatureCount: 4,
+        completionRules: rules(4),
+        replacements: [],
+      }),
+    ).toThrow("duplicate source assertion");
+  });
+
+  it("is idempotent after generation", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const source = specFor([...original, "System records a stable operation"]);
+    const options = {
+      source,
+      approvedFeatureCount: 4,
+      completionRules: rules(4),
+      replacements: [],
+    };
+    const first = generateFeatureLedger({ ...options, previousLedger });
+    expect(generateFeatureLedger({ ...options, previousLedger: first })).toEqual(first);
+  });
+
+  it("refuses to move an existing assertion to a different source order", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([original[1], original[0], original[2]]),
+        previousLedger,
+        approvedFeatureCount: 3,
+        completionRules: rules(3),
+        replacements: [],
+      }),
+    ).toThrow("existing assertion TER-CF-002 moved from source order 2 to 1");
+  });
+
+  it("rejects a malformed previous ID before allocating an appended ID", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    previousLedger.items[2].id = "TER-CF-NaN";
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([...original, "System records a stable operation"]),
+        previousLedger,
+        approvedFeatureCount: 4,
+        completionRules: rules(4),
+        replacements: [],
+      }),
+    ).toThrow("invalid previous ID: TER-CF-NaN");
+  });
+});
+
 describe("verifyFeatureLedger", () => {
   it("accepts a complete ledger that matches its source", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 269 as the default approved source count", () => {
+  it("keeps 273 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 269");
+    ).toContain("source feature count must remain 273");
   });
 
   it.each([
@@ -249,6 +393,16 @@ describe("verifyFeatureLedger", () => {
         ledger.items[1].id = "TER-CF-999";
       },
       expected: "id must remain TER-CF-002",
+    },
+    {
+      name: "stable ID reassignment with the complete ID set retained",
+      mutate: (ledger: ReturnType<typeof createInitialLedger>) => {
+        [ledger.items[0].id, ledger.items[1].id] = [
+          ledger.items[1].id,
+          ledger.items[0].id,
+        ];
+      },
+      expected: "items[0].id must remain TER-CF-001",
     },
     {
       name: "missing required fields",
@@ -325,6 +479,86 @@ describe("verifyFeatureLedger", () => {
       "completionSpec TER-010 is absent",
     );
   });
+
+  it("rejects unknown top-level, budget, and item provenance fields", () => {
+    const ledger = createTestLedger() as ReturnType<typeof createInitialLedger> & Record<string, unknown>;
+    ledger.provenanceNote = "injected";
+    (ledger.budgetResolution as typeof ledger.budgetResolution & Record<string, unknown>).note = "injected";
+    (ledger.items[0] as typeof ledger.items[0] & Record<string, unknown>).injectedProvenance = "injected";
+    const errors = verifyTestLedger(ledger).join("\n");
+    expect(errors).toContain("ledger.provenanceNote is not allowed");
+    expect(errors).toContain("budgetResolution.note is not allowed");
+    expect(errors).toContain("items[0].injectedProvenance is not allowed");
+  });
+
+  it("rejects duplicate source assertions at verifier level", () => {
+    const duplicate = SPEC.replace(
+      "User can view inventory",
+      "User can sign in",
+    );
+    expect(verifyFeatureLedger(duplicate, createTestLedger(), PLAN, {
+      approvedFeatureCount: 3,
+      completionRules: TEST_COMPLETION_RULES,
+    }).join("\n")).toContain("duplicate source assertion at source order 3");
+  });
+});
+
+describe("feature ledger generator CLI", () => {
+  const copyFixture = () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "terroir-ledger-check-"));
+    fs.mkdirSync(path.join(root, "docs/plans"), { recursive: true });
+    for (const file of [
+      "app_spec.txt",
+      "docs/feature-ledger.json",
+      "docs/plans/2026-07-20-terroir-completion-spec.md",
+    ]) {
+      fs.copyFileSync(path.resolve(file), path.join(root, file));
+    }
+    return root;
+  };
+
+  it("checks canonical bytes and rejects injected metadata", () => {
+    const root = copyFixture();
+    try {
+      const script = path.resolve("scripts/generate-feature-ledger.mjs");
+      expect(spawnSync(process.execPath, [script, "--check"], { cwd: root }).status).toBe(0);
+
+      const ledgerPath = path.join(root, "docs/feature-ledger.json");
+      const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+      ledger.items[0].injectedProvenance = "fabricated";
+      fs.writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+      const rejected = spawnSync(process.execPath, [script, "--check"], {
+        cwd: root,
+        encoding: "utf8",
+      });
+      expect(rejected.status).toBe(1);
+      expect(rejected.stderr).toContain("generated feature ledger is stale");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("verifies generated content before replacing the checked-in ledger", () => {
+    const root = copyFixture();
+    try {
+      const ledgerPath = path.join(root, "docs/feature-ledger.json");
+      const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+      ledger.items[0].status = "done";
+      const invalid = `${JSON.stringify(ledger, null, 2)}\n`;
+      fs.writeFileSync(ledgerPath, invalid);
+
+      const result = spawnSync(
+        process.execPath,
+        [path.resolve("scripts/generate-feature-ledger.mjs"), "--write"],
+        { cwd: root, encoding: "utf8" },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("generated ledger failed verification");
+      expect(fs.readFileSync(ledgerPath, "utf8")).toBe(invalid);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("checked-in feature ledger", () => {
@@ -337,8 +571,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 269 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(269);
+  it("accounts for all 273 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(273);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -353,6 +587,17 @@ describe("checked-in feature ledger", () => {
       expect(item.observableOutcome).toBe(item.sourceText);
       expect(item.evidenceOwner).not.toBe("unassigned");
     }
+  });
+
+  it("promotes the atomic service-mutation command without renumbering it", () => {
+    expect(ledger.items[150]).toMatchObject({
+      id: "TER-CF-151",
+      sourceOrder: 151,
+      sourceText:
+        "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+      completionSpec: "TER-041",
+      evidenceOwner: "pour-reconciliation",
+    });
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -385,7 +630,7 @@ describe("checked-in feature ledger", () => {
       "TER-034": 1,
       "TER-035": 2,
       "TER-040": 28,
-      "TER-041": 25,
+      "TER-041": 29,
       "TER-042": 37,
       "TER-043": 3,
       "TER-044": 15,

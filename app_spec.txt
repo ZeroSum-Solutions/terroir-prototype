@@ -6,15 +6,12 @@
   </overview>
 
   <feature_budget>
-    Implement all 269 features enumerated in the core_features section below. The product owner approved this count on 2026-07-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 273 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23 and approved the four C02 operation-integrity additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
   </feature_budget>
 
   <initializer_guidance>
-    - Call `feature_create_bulk` directly. Do NOT write a code generator script to emit features.
-    - If you need to initialize all 269 features, call `feature_create_bulk` in batches of approximately 45–50. That is the intended pattern.
-    - `depends_on_indices` is batch-local. Use `feature_add_dependency` (with returned `feature_id` values) for cross-batch dependencies after all batches are written.
-    - Do NOT run small probe batches to test dependency semantics.
-    - If a Bash command is blocked by the allowlist (e.g., `sqlite3`), use the MCP `feature_*` tools instead — never write workaround scripts.
+    - Run `pnpm generate:feature-ledger` after changing an approved assertion; never hand-edit `docs/feature-ledger.json`.
+    - Existing assertion IDs and reviewed provenance remain stable. Source replacements require an explicit ID-bound mapping in the generator; approved additions are append-only and receive new IDs.
   </initializer_guidance>
 
   <critical_constraints>
@@ -245,8 +242,9 @@
       - User can cancel/undo the most recent pour
       - User can view all currently open bottles at /cellar/open
       - User can manually open a bottle without recording a pour (e.g., for tasting)
-      - User can manually close an open bottle and discard remaining
-      - System exposes record_pour DB function as the only write path for pours
+      - User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume
+      - System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function
+      <compatibility_note>record_pour is retained only as additive legacy compatibility and is not an authorized write path for new callers.</compatibility_note>
       - System rejects pours when no inventory remains
       - User can configure default pour sizes per format (e.g., 5oz red glass)
       - User can record a pour in a custom amount
@@ -390,6 +388,13 @@
       - pnpm types:check verifies Supabase types are in sync
       - pnpm snapshot:check verifies schema snapshot is in sync
     </testing_quality>
+
+    <inventory_operation_integrity>
+      - API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay
+      - API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change
+      - API rejects reuse of an operation UUID with a mismatched payload
+      - System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at
+    </inventory_operation_integrity>
 
   </core_features>
 

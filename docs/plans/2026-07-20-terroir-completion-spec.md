@@ -33,7 +33,7 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 | Type check | `tsc --noEmit` passed | Baseline type gate is green |
 | Production build | Passed | Current source compiles for deployment |
 | Production health | `/api/health` returned 200 with database connected | Process and database are reachable only |
-| Specification inventory | 269 core feature bullets in `app_spec.txt` | Conflicts with the file's 200-feature budget and the diary's 231/231 claim |
+| Specification inventory | 269 core feature bullets at the 2026-07-20 baseline | Conflicted with the file's 200-feature budget and the diary's 231/231 claim |
 | Browser E2E | Login shell, unauthenticated redirect, and invalid public slug only; pour flow is skipped in CI | Critical workflows are not release-gated |
 | Database backup | Scheduled workflow has failed daily because `SUPABASE_DB_URL` is absent | Recovery is not proven |
 | Staging | No active production-like staging environment | Promotion cannot be rehearsed safely |
@@ -43,7 +43,7 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 
 ### 2.1 Specification truth problem
 
-`app_spec.txt` currently contains 269 core bullets across 17 domains:
+At the 2026-07-20 baseline, `app_spec.txt` contained 269 core bullets across 17 domains:
 
 | Domain | Bullets |
 | --- | ---: |
@@ -69,6 +69,8 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 The historical progress diary is useful evidence, but it is not an authoritative completion ledger. It records 231/231 while the original spec said both 269 and at most 200.
 
 Resolution recorded 2026-07-23: the product owner directed the team to implement every enumerated feature. All 269 core-feature bullets are active requirements, the former maximum of 200 is superseded, and `docs/feature-ledger.json` is the authoritative completion ledger.
+
+Expansion recorded 2026-09-23: the owner approved four C02 operation-integrity assertions, bringing the current ledger to 273 while preserving all existing requirement IDs.
 
 ## 3. Definition of done
 
@@ -104,7 +106,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Backup connection | Add a dedicated least-privilege direct database URL to GitHub Actions | Secret creation and production restore require approval |
 | Public list navigation | Show a switcher when the same restaurant has multiple published lists | Safe default |
 | Large-file refactors | Split only code touched by a feature, preserving behavior | Safe default |
-| Core feature count | Keep all 269 enumerated bullets active; the former maximum of 200 is superseded | Approved by product owner on 2026-07-23 |
+| Core feature count | Keep all 273 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02 additions approved 2026-09-23 |
 
 ### 4.1 Human provisioning checklist
 
@@ -205,20 +207,20 @@ Phases are ordered by risk, not visual appeal:
 
 ### TER-001: Establish the authoritative feature ledger
 
-**Outcome:** One machine-checkable ledger replaces the contradictory 200, 231, and 269 completion claims.
+**Outcome:** One machine-checkable ledger replaces earlier contradictory completion claims and preserves stable IDs as approved requirements are promoted.
 
 **Scope:**
 
 - Parse every core feature bullet from `app_spec.txt` and assign a permanent requirement ID.
 - Classify each item as `active`, `amended`, `duplicate`, or `retired` with a reason.
-- Resolve the “at most 200” budget clause explicitly instead of silently treating 269 as valid.
+- Resolve the “at most 200” budget clause explicitly instead of silently treating the approved enumerated count as valid.
 - Link active items to source, tests, operational evidence, and one completion spec in this document.
 - Mark `claude-progress.txt` as historical evidence and prevent it from serving as the completion counter.
 - Add a CI check for duplicate IDs, missing evidence fields, and unknown statuses.
 
 **Acceptance:**
 
-- The ledger accounts for all 269 current bullets exactly once.
+- The ledger accounts for all 273 current bullets exactly once.
 - The generated totals match the checked-in source.
 - Every active criterion names an actor, action, observable outcome, negative case, and evidence owner.
 - Every non-active item has a rationale and recorded product-owner approval.
@@ -873,7 +875,7 @@ These areas should change only when a numbered completion spec requires it. Pass
 The first tranche should run in this exact order:
 
 1. `TER-000`: rotate and constrain the bypass, then require current green checks on `main`.
-2. `TER-001`: produce the 269-item ledger and obtain approval for the budget and classifications.
+2. `TER-001`: produce the original 269-item ledger and obtain approval for the budget and classifications.
 3. `TER-002`: repair scheduled backups and complete a disposable restore.
 4. `TER-003`: create isolated staging and validate auth redirects there.
 5. `TER-004`: establish isolated authenticated E2E fixtures.

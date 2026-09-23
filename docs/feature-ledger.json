@@ -1,13 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 269,
+  "featureCount": 273,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
-    "approvedActiveCount": 269
+    "expandedOn": "2026-09-23",
+    "approvedActiveCount": 273
   },
   "items": [
     {
@@ -1951,11 +1952,11 @@
       "id": "TER-CF-150",
       "domain": "pour_and_open_bottles",
       "sourceOrder": 150,
-      "sourceText": "User can manually close an open bottle and discard remaining",
+      "sourceText": "User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
       "actor": "User",
-      "action": "can manually close an open bottle and discard remaining",
-      "observableOutcome": "User can manually close an open bottle and discard remaining",
-      "negativeCase": "Assertion is not observed: User can manually close an open bottle and discard remaining",
+      "action": "can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
+      "observableOutcome": "User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
+      "negativeCase": "Assertion is not observed: User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
       "status": "active",
       "completionSpec": "TER-041",
       "evidenceOwner": "pour-reconciliation"
@@ -1964,11 +1965,11 @@
       "id": "TER-CF-151",
       "domain": "pour_and_open_bottles",
       "sourceOrder": 151,
-      "sourceText": "System exposes record_pour DB function as the only write path for pours",
+      "sourceText": "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
       "actor": "System",
-      "action": "exposes record_pour DB function as the only write path for pours",
-      "observableOutcome": "System exposes record_pour DB function as the only write path for pours",
-      "negativeCase": "Assertion is not observed: System exposes record_pour DB function as the only write path for pours",
+      "action": "applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+      "observableOutcome": "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+      "negativeCase": "Assertion is not observed: System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
       "status": "active",
       "completionSpec": "TER-041",
       "evidenceOwner": "pour-reconciliation"
@@ -3506,6 +3507,58 @@
       "status": "active",
       "completionSpec": "TER-005",
       "evidenceOwner": "quality-engineering"
+    },
+    {
+      "id": "TER-CF-270",
+      "domain": "inventory_operation_integrity",
+      "sourceOrder": 270,
+      "sourceText": "API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay",
+      "actor": "API",
+      "action": "requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay",
+      "observableOutcome": "API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay",
+      "negativeCase": "Assertion is not observed: API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay",
+      "status": "active",
+      "completionSpec": "TER-041",
+      "evidenceOwner": "pour-reconciliation"
+    },
+    {
+      "id": "TER-CF-271",
+      "domain": "inventory_operation_integrity",
+      "sourceOrder": 271,
+      "sourceText": "API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change",
+      "actor": "API",
+      "action": "returns the original receipt when an operation UUID replays the exact payload without applying a second stock change",
+      "observableOutcome": "API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change",
+      "negativeCase": "Assertion is not observed: API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change",
+      "status": "active",
+      "completionSpec": "TER-041",
+      "evidenceOwner": "pour-reconciliation"
+    },
+    {
+      "id": "TER-CF-272",
+      "domain": "inventory_operation_integrity",
+      "sourceOrder": 272,
+      "sourceText": "API rejects reuse of an operation UUID with a mismatched payload",
+      "actor": "API",
+      "action": "rejects reuse of an operation UUID with a mismatched payload",
+      "observableOutcome": "API rejects reuse of an operation UUID with a mismatched payload",
+      "negativeCase": "Assertion is not observed: API rejects reuse of an operation UUID with a mismatched payload",
+      "status": "active",
+      "completionSpec": "TER-041",
+      "evidenceOwner": "pour-reconciliation"
+    },
+    {
+      "id": "TER-CF-273",
+      "domain": "inventory_operation_integrity",
+      "sourceOrder": 273,
+      "sourceText": "System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at",
+      "actor": "System",
+      "action": "applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at",
+      "observableOutcome": "System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at",
+      "negativeCase": "Assertion is not observed: System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at",
+      "status": "active",
+      "completionSpec": "TER-041",
+      "evidenceOwner": "pour-reconciliation"
     }
   ]
 }

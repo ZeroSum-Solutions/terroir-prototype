@@ -11,13 +11,15 @@ export const ALLOWED_STATUSES = [
   "retired",
 ];
 
-const SCHEMA_VERSION = 2;
-const SOURCE_FILE = "app_spec.txt";
-const BUDGET_DECISION = {
+export const SCHEMA_VERSION = 2;
+export const SOURCE_FILE = "app_spec.txt";
+export const APPROVED_FEATURE_COUNT = 273;
+export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
   approvedBy: "product_owner",
   approvedOn: "2026-07-23",
+  expandedOn: "2026-09-23",
 };
 const REQUIRED_FIELDS = [
   "id",
@@ -32,7 +34,11 @@ const REQUIRED_FIELDS = [
   "evidenceOwner",
   "sourceOrder",
 ];
-const COMPLETION_RULES = [
+const TOP_LEVEL_FIELDS = [
+  "schemaVersion", "sourceFile", "featureCount", "budgetResolution", "items",
+];
+const BUDGET_FIELDS = [...Object.keys(BUDGET_DECISION), "approvedActiveCount"];
+export const COMPLETION_RULES = [
   [1, 13, "TER-010", "identity"],
   [14, 15, "TER-013", "restaurant-admin"],
   [16, 19, "TER-015", "team-invitations"],
@@ -71,6 +77,7 @@ const COMPLETION_RULES = [
   [264, 264, "TER-042", "wine-lists"],
   [265, 265, "TER-043", "team-lifecycle"],
   [266, 269, "TER-005", "quality-engineering"],
+  [270, 273, "TER-041", "pour-reconciliation"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,
@@ -163,30 +170,10 @@ export function validateCompletionRules(rules, approvedFeatureCount) {
   return errors;
 }
 
-export function createInitialLedger(source, approvedFeatureCount = 269) {
-  const features = parseCoreFeatures(source);
-  if (features.length !== approvedFeatureCount) {
-    throw new Error(
-      `source feature count must remain ${approvedFeatureCount}; received ${features.length}`,
-    );
+function rejectUnknownFields(record, allowed, label, errors) {
+  for (const field of Object.keys(record)) {
+    if (!allowed.includes(field)) errors.push(`${label}.${field} is not allowed`);
   }
-
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    sourceFile: SOURCE_FILE,
-    featureCount: features.length,
-    budgetResolution: {
-      ...BUDGET_DECISION,
-      approvedActiveCount: approvedFeatureCount,
-    },
-    items: features.map((feature) => ({
-      id: `TER-CF-${String(feature.sourceOrder).padStart(3, "0")}`,
-      ...feature,
-      ...deriveCriterion(feature.sourceText),
-      status: "active",
-      ...metadataForRequirement(feature.sourceOrder),
-    })),
-  };
 }
 
 export function verifyFeatureLedger(
@@ -198,7 +185,7 @@ export function verifyFeatureLedger(
   const errors = [];
   const expected = parseCoreFeatures(source);
   const {
-    approvedFeatureCount = 269,
+    approvedFeatureCount = APPROVED_FEATURE_COUNT,
     requireAllActive = true,
     completionRules = COMPLETION_RULES,
   } = options;
@@ -229,6 +216,8 @@ export function verifyFeatureLedger(
       (match) => match[1],
     ),
   );
+  rejectUnknownFields(candidate, TOP_LEVEL_FIELDS, "ledger", errors);
+  rejectUnknownFields(budget, BUDGET_FIELDS, "budgetResolution", errors);
 
   if (candidate.schemaVersion !== SCHEMA_VERSION) {
     errors.push(`schemaVersion must be ${SCHEMA_VERSION}`);
@@ -270,6 +259,7 @@ export function verifyFeatureLedger(
     }
 
     const item = /** @type {Record<string, unknown>} */ (rawItem);
+    rejectUnknownFields(item, REQUIRED_FIELDS, label, errors);
     for (const field of REQUIRED_FIELDS) {
       if (
         item[field] === undefined ||
@@ -284,13 +274,11 @@ export function verifyFeatureLedger(
       if (!/^TER-CF-\d{3,}$/.test(item.id)) {
         errors.push(`${label}.id must match TER-CF-NNN`);
       }
-      const expectedId = `TER-CF-${String(index + 1).padStart(3, "0")}`;
-      if (item.id !== expectedId) {
-        errors.push(`${label}.id must remain ${expectedId}`);
-      }
       if (seenIds.has(item.id)) {
         errors.push(`duplicate ID ${item.id}`);
       }
+      const expectedId = `TER-CF-${String(index + 1).padStart(3, "0")}`;
+      if (item.id !== expectedId) errors.push(`${label}.id must remain ${expectedId}`);
       seenIds.add(item.id);
     }
 
@@ -351,6 +339,14 @@ export function verifyFeatureLedger(
       `ledger is missing ${expected.length - items.length} source feature(s)`,
     );
   }
+
+  const seenAssertions = new Set();
+  expected.forEach(({ sourceText }, index) => {
+    if (seenAssertions.has(sourceText)) {
+      errors.push(`duplicate source assertion at source order ${index + 1}: ${sourceText}`);
+    }
+    seenAssertions.add(sourceText);
+  });
 
   return errors;
 }

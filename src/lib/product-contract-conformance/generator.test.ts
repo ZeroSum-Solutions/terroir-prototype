@@ -38,7 +38,7 @@ function fixture() {
     [183, "PATCH /api/cellar/[id]"],
     [212, "All write endpoints"],
   ]);
-  const items = Array.from({ length: 269 }, (_, index) => {
+  const items = Array.from({ length: 273 }, (_, index) => {
     const sourceOrder = index + 1;
     const id = `TER-CF-${String(sourceOrder).padStart(3, "0")}`;
     const actor =
@@ -56,7 +56,7 @@ function fixture() {
   });
   write(root, "docs/feature-ledger.json", {
     schemaVersion: 2,
-    featureCount: 269,
+    featureCount: 273,
     items,
   });
   write(
@@ -190,7 +190,7 @@ describe("product contract conformance generator", () => {
     const root = fixture();
     expect(run(root, "--write").status).toBe(0);
     const generated = output(root);
-    expect(generated.scope.activeFeatureLedgerCount).toBe(269);
+    expect(generated.scope.activeFeatureLedgerCount).toBe(273);
     expect(generated.requirements.map((item: { requirementId: string }) => item.requirementId)).toEqual(
       Array.from({ length: 38 }, (_, index) => `TER-CF-${180 + index}`),
     );
@@ -200,7 +200,7 @@ describe("product contract conformance generator", () => {
     write(root, "docs/feature-ledger.json", ledger);
     const result = run(root, "--write");
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-269");
+    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-273");
   });
 
   it("keeps cross-cutting claims weak with an explicit proof assessment", () => {
