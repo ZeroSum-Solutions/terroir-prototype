@@ -11,7 +11,7 @@
  *
  * This script never receives or accepts a production or backup-role
  * connection string; the restore target is always a Docker container this
- * script starts and tears down on loopback only.
+ * script starts and tears down with no network and cron jobs disabled.
  *
  * Required env:
  *   RESTORE_ARTIFACT_DIR      Directory containing one *.tar.age,
@@ -47,33 +47,13 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { verifyBackupArtifact } from "./backup/verify-artifact.mjs";
 import { compareDatabaseEvidence } from "./backup/compare-database-evidence.mjs";
-
-const PRODUCTION_HOST_FRAGMENTS = [
-  "supabase.co",
-  "pooler.supabase.com",
-  "qcfmwphlaekfkqwkfyth", // Terroir's production Supabase project ref.
-];
-
-export function assertScratchRestoreTarget(host) {
-  if (!["127.0.0.1", "localhost", "::1"].includes(host)) {
-    throw new Error("Restore drill refuses every non-loopback database target.");
-  }
-  const lowered = host.toLowerCase();
-  for (const fragment of PRODUCTION_HOST_FRAGMENTS) {
-    if (lowered.includes(fragment.toLowerCase())) {
-      throw new Error(
-        `Restore drill target must not reference the production/backup host (${fragment}).`,
-      );
-    }
-  }
-}
+import { restoreContainerArguments, assertRestoreContainerIsolation } from "./backup/restore-isolation.mjs";
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -93,6 +73,13 @@ function run(command, args, options = {}) {
     );
   }
   return result.stdout;
+}
+
+function verifyIsolation(container) {
+  const [state] = JSON.parse(run("docker", ["inspect", container]));
+  const cronState = run("docker", ["exec", container, "psql", "-U", "supabase_admin",
+    "-d", "postgres", "-X", "-Atc", "show cron.launch_active_jobs"]);
+  return assertRestoreContainerIsolation(state, cronState);
 }
 
 function findFilesRecursive(dir, suffix) {
@@ -138,17 +125,6 @@ function verifyChecksumFile(checksumsFile) {
       throw new Error(`Checksum mismatch for ${name}.`);
     }
   }
-}
-
-function getFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
-      server.close((error) => (error ? reject(error) : resolve(port)));
-    });
-  });
 }
 
 // The Supabase Postgres image runs its init scripts against a temporary,
@@ -321,23 +297,11 @@ async function main() {
     });
 
     console.log(`Starting disposable ${dockerImage} scratch database...`);
-    assertScratchRestoreTarget("127.0.0.1");
-    const port = await getFreePort();
     containerName = `terroir-restore-drill-${process.pid}`;
     const password = randomBytes(24).toString("hex");
-    run("docker", [
-      "run",
-      "-d",
-      "--rm",
-      "--name",
-      containerName,
-      "-e",
-      `POSTGRES_PASSWORD=${password}`,
-      "-p",
-      `127.0.0.1:${port}:5432`,
-      dockerImage,
-    ]);
+    run("docker", restoreContainerArguments({ name: containerName, image: dockerImage, password }));
     await waitForPostgres(containerName);
+    verifyIsolation(containerName);
     dropNonExtensionEventTriggers(containerName, password);
 
     console.log("Restoring dump into the scratch database...");
@@ -363,29 +327,11 @@ async function main() {
       ],
     );
 
-    const serviceFile = join(workDir, "restore.pg_service.conf");
-    writeFileSync(
-      serviceFile,
-      [
-        "[terroir_restore_drill]",
-        "host=127.0.0.1",
-        `port=${port}`,
-        "dbname=postgres",
-        "user=supabase_admin",
-        `password=${password}`,
-        "sslmode=disable",
-        "",
-      ].join("\n"),
-      { encoding: "utf8", mode: 0o600 },
-    );
-
-    process.env.PGSERVICEFILE = serviceFile;
-    process.env.PGSERVICE = "terroir_restore_drill";
-
+    const isolation = verifyIsolation(containerName);
     console.log("Collecting restored evidence (exact per-table counts)...");
     const { writeDatabaseEvidence } = await import("./backup/collect-database-evidence.mjs");
     const restoredEvidenceFile = join(workDir, "restored-evidence.json");
-    await writeDatabaseEvidence({ file: restoredEvidenceFile });
+    await writeDatabaseEvidence({ file: restoredEvidenceFile, container: containerName });
 
     const sourceEvidence = JSON.parse(readFileSync(sourceEvidenceFile, "utf8"));
     const restoredEvidence = JSON.parse(readFileSync(restoredEvidenceFile, "utf8"));
@@ -397,6 +343,13 @@ async function main() {
       verified_at: new Date().toISOString(),
       artifact_dir: artifactDir,
       ...comparison,
+      isolation,
+      permissions_restored: false,
+      extension_owned_tables_compared: false,
+      artifact: {
+        manifest_sha256: createHash("sha256").update(readFileSync(manifestFile)).digest("hex"),
+        encrypted_sha256: createHash("sha256").update(readFileSync(encryptedFile)).digest("hex"),
+      },
     };
     writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 

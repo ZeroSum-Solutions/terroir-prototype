@@ -25,6 +25,12 @@ business workflows. Adapter modules own external/provider mechanics.
   materialized recompute workflow.
 - `src/lib/branding`: logo palette extraction, theme validation, and shared
   public, print, and PDF theme rendering.
+- `scripts/restore-drill.mjs`: encrypted-backup data-restore rehearsal;
+  `scripts/backup/restore-isolation.mjs` owns scratch container isolation and
+  `scripts/backup/collect-database-evidence.mjs` collects comparison evidence.
+  The backup transport retains its service-file and exported-snapshot path;
+  the restore transport uses the isolated container directly. See
+  [the restore guide](RESTORE-DRILL.md) for coverage and limitations.
 
 Provider boundaries have two branding exceptions. Menu-theme proposals in
 `src/lib/branding/menu-design.ts` call the shared Anthropic client directly.
