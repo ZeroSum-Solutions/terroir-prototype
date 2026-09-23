@@ -5,209 +5,166 @@ const mockRequireMembership = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
 }));
-
 const mockRevalidate = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidate }));
-
-vi.mock("@sentry/nextjs", () => ({
-  captureException: vi.fn(),
-}));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const { POST } = await import("./route");
 
-type BottleRow = {
-  id: string;
-  wine_id: string;
-  remaining_ml: number;
-  closed_at: string | null;
-  restaurant_id: string;
-};
+const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
+const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
+const WINE_ID = "55555555-5555-4555-8555-555555555555";
+const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
+const OPENED_AT = "2026-09-23T12:00:00.000Z";
 
-function makeSupabase(opts: {
-  bottle: BottleRow | null;
-  fetchError?: unknown;
-  recordPourError?: { code?: string; message?: string } | null;
-}) {
-  const rpc = vi.fn((fn: string, _args: unknown) => {
-    if (fn === "record_pour") {
-      return Promise.resolve({ data: null, error: opts.recordPourError ?? null });
-    }
-    return Promise.resolve({ data: null, error: null });
+function makeSupabase(options: {
+  rpcError?: { code?: string; message?: string } | null;
+  closedAt?: string | null;
+  restaurantId?: string;
+  replayed?: boolean;
+} = {}) {
+  const rpc = vi.fn().mockResolvedValue({
+    data: options.rpcError
+      ? null
+      : {
+          operation_id: OPERATION_ID,
+          command: "discard",
+          pour_event_ids: ["77777777-7777-4777-8777-777777777777"],
+          replayed: options.replayed ?? false,
+          open_bottle: {
+            id: "closeout-1",
+            wine_id: WINE_ID,
+            remaining_ml: 0,
+            closed_at: "2026-09-23T13:00:00.000Z",
+          },
+        },
+    error: options.rpcError ?? null,
   });
   const from = vi.fn(() => ({
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: opts.bottle,
-            error: opts.fetchError ?? null,
-          }),
-      }),
-    }),
+    select: () => {
+      const chain = {
+        eq: () => chain,
+        single: async () => ({
+          data: {
+            id: BOTTLE_ID,
+            wine_id: WINE_ID,
+            opened_at: OPENED_AT,
+            closed_at: options.closedAt ?? null,
+            restaurant_id: options.restaurantId ?? RESTAURANT_ID,
+          },
+          error: null,
+        }),
+      };
+      return chain;
+    },
   }));
-  return { supabase: { rpc, from }, rpc };
+  return { rpc, from };
 }
 
-const BOTTLE_ID = "b1b2c3d4-e5f6-4789-8abc-def012345678";
-
-function makeContext(id = BOTTLE_ID) {
-  return { params: Promise.resolve({ id }) };
+function allow(supabase: ReturnType<typeof makeSupabase>) {
+  mockRequireMembership.mockResolvedValue({
+    supabase,
+    restaurantId: RESTAURANT_ID,
+    user: { id: "user-a" },
+    role: "staff",
+  });
 }
 
-const WINE_ID = "a1b2c3d4-e5f6-4789-8abc-def012345678";
+function request(
+  body: unknown = { expected_opened_at: OPENED_AT },
+  operationId: string | null = OPERATION_ID,
+) {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (operationId) headers.set("Idempotency-Key", operationId);
+  return new Request(`http://localhost/api/open-bottles/${BOTTLE_ID}/close`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  }) as unknown as NextRequest;
+}
+
+const context = { params: Promise.resolve({ id: BOTTLE_ID }) };
 
 describe("POST /api/open-bottles/[id]/close", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("401s when unauthenticated", async () => {
+  it("keeps authentication first", async () => {
     mockRequireMembership.mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     );
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(401);
+    expect((await POST(request({}, null), context)).status).toBe(401);
   });
 
-  it("closes an open bottle through record_pour and revalidates open cellar", async () => {
-    const { supabase, rpc } = makeSupabase({
-      bottle: {
-        id: BOTTLE_ID,
-        wine_id: WINE_ID,
-        remaining_ml: 125,
-        closed_at: null,
-        restaurant_id: "r-A",
-      },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({
-      closed: { id: BOTTLE_ID, wine_id: WINE_ID },
-    });
-    expect(rpc).toHaveBeenCalledWith("record_pour", {
-      p_wine_id: WINE_ID,
-      p_ml: 125,
-      p_kind: "spill",
-      p_note: "Bottle closed (discard remaining)",
-    });
-    expect(mockRevalidate).toHaveBeenCalledWith("/cellar/open");
+  it("requires the idempotency UUID and caller-observed opened_at", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    expect((await POST(request(undefined, null), context)).status).toBe(400);
+    expect((await POST(request({}), context)).status).toBe(400);
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when the bottle is missing", async () => {
-    const { supabase } = makeSupabase({ bottle: null });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
+  it("keeps the 200 closed envelope and forwards the lifecycle pair", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).closed).toMatchObject({
+      id: "closeout-1",
+      wine_id: WINE_ID,
     });
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(404);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("false");
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_command: "discard",
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+        p_actual_remaining_ml: undefined,
+        p_reason_code_id: undefined,
+      }),
+    );
   });
 
-  it("returns 404 for the PostgREST no-row code", async () => {
-    const { supabase } = makeSupabase({
-      bottle: null,
-      fetchError: { code: "PGRST116", message: "no rows" },
+  it("never falls back to record_pour", async () => {
+    const supabase = makeSupabase({
+      rpcError: { code: "P0001", message: "open_bottle_changed" },
     });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({
-      error: { code: "not_found", message: "Bottle not found." },
-    });
+    allow(supabase);
+    const response = await POST(request(), context);
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("open_bottle_changed");
+    expect(supabase.rpc).not.toHaveBeenCalledWith("record_pour", expect.anything());
   });
 
-  it("redacts a real bottle-fetch failure instead of reporting 404", async () => {
-    const { supabase } = makeSupabase({
-      bottle: null,
-      fetchError: { code: "XX000", message: "super-secret database failure" },
+  it("replays a stored receipt after a lost successful close response", async () => {
+    const supabase = makeSupabase({
+      closedAt: "2026-09-23T13:00:00.000Z",
+      replayed: true,
     });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
+    allow(supabase);
+    const response = await POST(request(), context);
+    expect(response.status).toBe(200);
+    expect((await response.json()).closed).toMatchObject({
+      id: "closeout-1",
     });
-
-    const res = await POST({} as NextRequest, makeContext());
-    const text = await res.text();
-
-    expect(res.status).toBe(500);
-    expect(JSON.parse(text)).toEqual({
-      error: {
-        code: "internal_error",
-        message: "Internal server error.",
-      },
-    });
-    expect(text).not.toContain("super-secret");
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(supabase.rpc).toHaveBeenCalledOnce();
   });
 
-  it("returns 403 when the bottle belongs to another restaurant", async () => {
-    const { supabase } = makeSupabase({
-      bottle: {
-        id: BOTTLE_ID,
-        wine_id: WINE_ID,
-        remaining_ml: 125,
-        closed_at: null,
-        restaurant_id: "r-B",
-      },
+  it("preserves the existing already_closed compatibility response", async () => {
+    const supabase = makeSupabase({
+      rpcError: { code: "P0001", message: "open_bottle_already_closed" },
     });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
+    allow(supabase);
+
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: { code: "already_closed", message: "Bottle is already closed." },
     });
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({
-      error: {
-        code: "forbidden",
-        message:
-          "This bottle isn't in your restaurant. Refresh the page and try again.",
-      },
-    });
-  });
-
-  it("returns 409 when the bottle is already closed", async () => {
-    const { supabase } = makeSupabase({
-      bottle: {
-        id: BOTTLE_ID,
-        wine_id: WINE_ID,
-        remaining_ml: 125,
-        closed_at: "2026-07-03T00:00:00Z",
-        restaurant_id: "r-A",
-      },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-
-    const res = await POST({} as NextRequest, makeContext());
-
-    expect(res.status).toBe(409);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
   });
 });

@@ -1,75 +1,79 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import {
-  closeOpenBottle,
-  PourAlreadyClosedError,
+  discardOpenBottle,
   PourForbiddenError,
   PourNotFoundError,
-  PourRpcError,
 } from "@/domains/pours/pour-service";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
-import { parseParams } from "@/lib/api/validation";
+import {
+  inventoryCommandErrorResponse,
+  inventoryResponse,
+  requireInventoryOperationId,
+  withInventoryHeaders,
+} from "@/lib/api/inventory-command";
+import { parseJson, parseParams } from "@/lib/api/validation";
 
 export const runtime = "nodejs";
 
 const ParamsSchema = z.strictObject({ id: z.string().uuid() });
+const BodySchema = z.strictObject({
+  expected_opened_at: z.string().datetime({ offset: true }),
+});
 
-/**
- * POST /api/open-bottles/[id]/close
- *
- * BND-122 / ARCH-038. Closes an open bottle via record_pour RPC.
- * Calls record_pour with kind=spill and ml=remaining_ml, which drains
- * the bottle and triggers closed_at=now() via the DB trigger.
- * Direct INSERT/UPDATE on pour_events and open_bottles is blocked by RLS.
- *
- * Auth: any member (staff+) can close bottles.
- *
- * 200: { closed: { id, wine_id, closed_at } }
- * 400: invalid bottle id
- * 401: unauthenticated
- * 403: bottle not in caller's restaurant
- * 404: bottle not found
- * 409: already closed
- * 500: unhandled failure
- */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  return withApiHandler(() => postCloseBottle(params));
+  return withApiHandler(() => postCloseBottle(request, params));
 }
 
-async function postCloseBottle(params: Promise<{ id: string }>) {
+async function postCloseBottle(
+  request: NextRequest,
+  params: Promise<{ id: string }>,
+) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId } = auth;
-  const parsed = await parseParams(params, ParamsSchema);
-  if (!parsed.ok) return parsed.response;
-  const { id } = parsed.data;
+
+  const operationId = requireInventoryOperationId(request);
+  if (operationId instanceof NextResponse) return operationId;
+
+  const parsedParams = await parseParams(params, ParamsSchema);
+  if (!parsedParams.ok) {
+    return withInventoryHeaders(parsedParams.response, operationId);
+  }
+  const parsedBody = await parseJson(request, BodySchema, { message: "Invalid body." });
+  if (!parsedBody.ok) return withInventoryHeaders(parsedBody.response, operationId);
 
   try {
-    const closed = await closeOpenBottle({
-      supabase,
-      restaurantId,
-      bottleId: id,
+    const outcome = await discardOpenBottle({
+      supabase: auth.supabase,
+      operationId,
+      restaurantId: auth.restaurantId,
+      bottleId: parsedParams.data.id,
+      expectedOpenedAt: parsedBody.data.expected_opened_at,
     });
-    return NextResponse.json({ closed });
+    return inventoryResponse(
+      { closed: outcome.closed },
+      200,
+      operationId,
+      outcome.replayed,
+    );
   } catch (error) {
+    const response = inventoryCommandErrorResponse(error, operationId);
+    if (response) return response;
     if (error instanceof PourNotFoundError) {
-      return Errors.notFound("Bottle");
+      return withInventoryHeaders(Errors.notFound("Bottle"), operationId);
     }
     if (error instanceof PourForbiddenError) {
-      return Errors.forbidden(
-        "This bottle isn't in your restaurant. Refresh the page and try again.",
+      return withInventoryHeaders(
+        Errors.forbidden(
+          "This bottle isn't in your restaurant. Refresh the page and try again.",
+        ),
+        operationId,
       );
-    }
-    if (error instanceof PourAlreadyClosedError) {
-      return Errors.conflict("already_closed", "Bottle is already closed.");
-    }
-    if (error instanceof PourRpcError) {
-      return Errors.internal("Failed to close bottle.");
     }
     throw error;
   }

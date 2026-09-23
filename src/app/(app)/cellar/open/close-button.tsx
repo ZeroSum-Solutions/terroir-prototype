@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import { XCircle } from "lucide-react";
 import { readApiError } from "@/lib/api/client-error";
 import { useToast } from "@/lib/toast";
+import {
+  isClosedBottleSuccess,
+  isDefinitiveCommandResponse,
+  isReplayedCommandResponse,
+  useIdempotentCommand,
+} from "../use-idempotent-command";
 
 interface Props {
   bottleId: string;
+  openedAt: string;
   remainingOz: number;
 }
 
@@ -23,31 +30,63 @@ interface Props {
  * why. The failure now reaches the operator through the same toast every
  * other cellar mutation uses (see cellar-list.tsx).
  */
-export function CloseBottleButton({ bottleId, remainingOz }: Props) {
+export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
+  const { begin, retry, finish, pending } = useIdempotentCommand<{
+    bottleId: string;
+    openedAt: string;
+  }>();
+  const retrying = pending?.state === "unresolved";
 
   const handleClose = () => {
-    if (!confirming) {
+    if (!confirming && !retrying) {
       setConfirming(true);
       // Auto-reset after 5 seconds if user doesn't confirm
       setTimeout(() => setConfirming(false), 5000);
       return;
     }
 
+    const nextPayload = { bottleId, openedAt };
+    const fingerprint = JSON.stringify(["legacy-close", bottleId, openedAt]);
+    const retryCommand = retrying ? retry() : null;
+    const operationId = retryCommand?.operationId ?? begin(fingerprint, nextPayload);
+    const command = retryCommand?.payload ?? nextPayload;
+    const commandFingerprint = retryCommand?.fingerprint ?? fingerprint;
+    if (!operationId) return;
+
     startTransition(async () => {
+      let definitive = false;
+      let successful = false;
       try {
-        const res = await fetch(`/api/open-bottles/${bottleId}/close`, {
+        const res = await fetch(`/api/open-bottles/${command.bottleId}/close`, {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": operationId,
+          },
+          body: JSON.stringify({ expected_opened_at: command.openedAt }),
         });
-        if (res.ok) {
+        const body = await res.json().catch(() => null);
+        definitive = isDefinitiveCommandResponse(
+          res,
+          body,
+          isClosedBottleSuccess,
+        );
+        if (res.ok && definitive) {
+          successful = true;
+          if (isReplayedCommandResponse(res)) toast.success("Already recorded");
           router.refresh();
         } else {
-          const body = await res.json().catch(() => null);
           toast.error(
-            readApiError(body, `Couldn't close the bottle (${res.status}).`).message,
+            res.ok
+              ? "Couldn't confirm the bottle was closed. Retry the close."
+              : readApiError(
+                body,
+                `Couldn't close the bottle (${res.status}).`,
+              ).message,
           );
           setConfirming(false);
         }
@@ -56,6 +95,8 @@ export function CloseBottleButton({ bottleId, remainingOz }: Props) {
           err instanceof Error ? err.message : "Couldn't close the bottle.",
         );
         setConfirming(false);
+      } finally {
+        finish(commandFingerprint, definitive, successful);
       }
     });
   };
@@ -91,14 +132,20 @@ export function CloseBottleButton({ bottleId, remainingOz }: Props) {
             ? "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-risk-ink/40 bg-risk-wash px-sm text-caption font-medium uppercase tracking-[0.13em] text-risk-ink transition-colors hover:bg-risk-wash/70"
             : "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-sm text-caption font-medium uppercase tracking-[0.13em] text-ink transition-colors hover:text-risk-ink"
         }
-        aria-label={confirming ? `Confirm discard ${remainingOz.toFixed(1)} oz` : "Close bottle"}
+        aria-label={confirming
+          ? `Confirm discard ${remainingOz.toFixed(1)} oz`
+          : retrying
+            ? "Retry prior action"
+            : "Close bottle"}
       >
         <XCircle className="h-3.5 w-3.5" strokeWidth={2} />
         {confirming
           ? `Discard ${remainingOz.toFixed(1)} oz?`
           : isPending
             ? "Closing..."
-            : "Close"}
+            : retrying
+              ? "Retry prior action"
+              : "Close"}
       </button>
     </div>
   );

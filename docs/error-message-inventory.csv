@@ -4,8 +4,8 @@ ui-001,src/app/(app)/lists/[id]/components/brand-kit-panel.tsx,230,(client fallb
 ui-002,src/app/(app)/scan/scanner.tsx,818,(client fallback),Unknown error.,ui,Scanner capture/upload fails with no error message available on the caught error state,1,,
 api-003,src/app/api/open-bottles/[id]/close/route.ts,64,forbidden,Forbidden.,api,POST /api/open-bottles/:id/close,1,This bottle isn't in your restaurant. Refresh the page and try again.,yes
 api-004,src/app/api/open-bottles/close/route.ts,83,forbidden,Forbidden,api,POST /api/open-bottles/close,1,This bottle isn't in your restaurant. Refresh the page and try again.,yes
-api-005,src/app/api/open-bottles/route.ts,66,forbidden,Forbidden.,api,POST /api/open-bottles,1,This wine isn't in your restaurant. Refresh the page and try again.,yes
-api-006,src/app/api/pour/route.ts,96,forbidden,Forbidden.,api,POST /api/pour,1,This wine isn't in your restaurant. Refresh the page and try again.,yes
+api-005,src/app/api/open-bottles/route.ts,53,wine_not_found,Wine not found.,api,POST /api/open-bottles with a missing or cross-tenant wine,5,Wine not found.,yes
+api-006,src/app/api/pour/route.ts,52,wine_not_found,Wine not found.,api,POST /api/pour with a missing or cross-tenant wine,5,Wine not found.,yes
 api-007,src/app/api/pour/undo/route.ts,62,forbidden,Forbidden.,api,POST /api/pour/undo,1,This wine isn't in your restaurant. Refresh the page and try again.,yes
 api-008,src/app/api/reconcile/route.ts,71,forbidden,Forbidden.,api,POST /api/reconcile,1,One or more of these wines aren't in your restaurant. Refresh the page and try again.,yes
 api-009,src/app/api/restaurant/[id]/route.ts,94,forbidden,Forbidden.,api,PATCH /api/restaurant/:id,1,This restaurant doesn't match your account. Refresh the page and try again.,yes

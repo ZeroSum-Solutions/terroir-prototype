@@ -19,9 +19,13 @@ export function PourActionBar({
   pickerItem,
   busy,
   openBottleBusy,
+  openNeedsReview = false,
+  pourNeedsReview = false,
   lastPour,
   doOpenBottle,
   doPour,
+  retryPriorOpen = doOpenBottle,
+  retryPriorPour = () => row.glass_pour_ml && doPour(row.glass_pour_ml),
   doUndo,
   onOpenPicker,
 }: {
@@ -31,12 +35,18 @@ export function PourActionBar({
   pickerItem: unknown;
   busy: boolean;
   openBottleBusy: boolean;
+  openNeedsReview?: boolean;
+  pourNeedsReview?: boolean;
   lastPour: { ml: number } | null;
   doOpenBottle: () => void;
   doPour: (ml: number) => void;
+  retryPriorOpen?: () => void;
+  retryPriorPour?: () => void;
   doUndo: () => void;
   onOpenPicker: () => void;
 }) {
+  const hasActiveBottle = Boolean(row.open_bottle_id);
+
   return (
     <div
       className="shrink-0 border-t border-rule bg-surface px-md pt-sm md:px-lg"
@@ -56,10 +66,20 @@ export function PourActionBar({
       )}
       <div className="flex gap-xs">
         {/* BND-121: Manually open a bottle without recording a pour */}
-        {row.sealed_count > 0 && (
+        {openNeedsReview ? (
           <button
             type="button"
             disabled={openBottleBusy}
+            onClick={retryPriorOpen}
+            className="flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash disabled:opacity-60"
+          >
+            <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
+            Retry prior open
+          </button>
+        ) : row.sealed_count > 0 && (
+          <button
+            type="button"
+            disabled={openBottleBusy || hasActiveBottle}
             onClick={doOpenBottle}
             className={cn(
               "flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill text-[14px] font-medium transition-colors disabled:opacity-60",
@@ -69,10 +89,23 @@ export function PourActionBar({
             )}
           >
             <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {openBottleBusy ? "Opening..." : "Open bottle"}
+            {hasActiveBottle
+              ? "Bottle already open"
+              : openBottleBusy
+                ? "Opening..."
+                : "Open bottle"}
           </button>
         )}
-        {canPour && (
+        {pourNeedsReview ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={retryPriorPour}
+            className="h-[52px] flex-1 rounded-pill bg-primary text-[15px] font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
+          >
+            Retry prior pour
+          </button>
+        ) : canPour && (
           <>
             <button
               type="button"

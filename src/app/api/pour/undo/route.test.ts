@@ -135,4 +135,32 @@ describe("POST /api/pour/undo", () => {
       },
     });
   });
+
+  it("returns a useful 409 when a multi-lifecycle command cannot be undone safely", async () => {
+    const { supabase } = makeSupabase({
+      undo: {
+        data: null,
+        error: {
+          code: "P0001",
+          message: "undo_inventory_command_not_reversible",
+        },
+      },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase,
+      restaurantId: "r-A",
+      user: { id: "u-1" },
+      role: "staff",
+    });
+
+    const res = await POST(makeRequest({ wine_id: WINE_ID }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: {
+        code: "undo_not_reversible",
+        message: "Cannot safely undo this pour; ask a manager to reconcile.",
+      },
+    });
+  });
 });

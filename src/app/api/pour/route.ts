@@ -1,21 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import {
-  PourForbiddenError,
-  PourNoInventoryError,
-  PourRpcError,
-  recordPour,
-} from "@/domains/pours/pour-service";
+import { recordPour } from "@/domains/pours/pour-service";
 import { requireMembership } from "@/lib/api/auth";
-import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import {
+  inventoryCommandErrorResponse,
+  inventoryResponse,
+  requireInventoryOperationId,
+  withInventoryHeaders,
+} from "@/lib/api/inventory-command";
 import { parseJson } from "@/lib/api/validation";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PRESERVATION_METHODS } from "@/lib/partial-bottles/math";
 
 export const runtime = "nodejs";
 
-const BodySchema = z.object({
+const BodySchema = z.strictObject({
   wine_id: z.string().uuid(),
   ml: z.number().int().positive().max(2000),
   kind: z.enum(["pour", "spill"]).default("pour"),
@@ -23,21 +22,6 @@ const BodySchema = z.object({
   preservation_method: z.enum(PRESERVATION_METHODS).optional(),
 });
 
-/**
- * POST /api/pour
- *
- * BND-038. Records a pour (or spill) against the wine's open bottle.
- * Calls record_pour RPC (atomic: opens a new bottle if needed; handles
- * overage across bottles). Role-gated inside the RPC to
- * owner | manager | staff.
- *
- * 200: { open_bottle: { wine_id, remaining_ml, opened_at, ... } }
- * 400: invalid body
- * 401: unauthenticated (from requireMembership)
- * 403: caller not a member of this wine's restaurant (from RPC)
- * 409: NO_INVENTORY — no sealed bottles to open (from RPC)
- * 500: any other RPC error (also reported to Sentry)
- */
 export async function POST(request: NextRequest) {
   return withApiHandler(() => postPour(request));
 }
@@ -45,71 +29,35 @@ export async function POST(request: NextRequest) {
 async function postPour(request: NextRequest) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId } = auth;
+
+  const operationId = requireInventoryOperationId(request);
+  if (operationId instanceof NextResponse) return operationId;
 
   const parsed = await parseJson(request, BodySchema, {
     message: "Invalid body.",
   });
-  if (!parsed.ok) return parsed.response;
-  const { wine_id, ml, kind, note, preservation_method } = parsed.data;
-
-  const { data: wine, error: wineError } = await supabase
-    .from("wines")
-    .select("id")
-    .eq("id", wine_id)
-    .eq("restaurant_id", restaurantId)
-    .maybeSingle();
-  if (wineError) throw wineError;
-  if (!wine) return Errors.notFound("Wine");
+  if (!parsed.ok) return withInventoryHeaders(parsed.response, operationId);
 
   try {
-    const openBottle = await recordPour({
-      supabase,
-      restaurantId,
-      wineId: wine_id,
-      ml,
-      kind,
-      note,
+    const outcome = await recordPour({
+      supabase: auth.supabase,
+      operationId,
+      restaurantId: auth.restaurantId,
+      wineId: parsed.data.wine_id,
+      ml: parsed.data.ml,
+      kind: parsed.data.kind,
+      note: parsed.data.note,
+      preservationMethod: parsed.data.preservation_method,
     });
-    if (preservation_method) {
-      const service = createServiceRoleClient();
-      if (!service) {
-        return preservationWarning(openBottle);
-      }
-      const { error } = await service
-        .from("open_bottles")
-        .update({ preservation_method })
-        .eq("restaurant_id", restaurantId)
-        .eq("wine_id", wine_id)
-        .is("closed_at", null);
-      if (error) {
-        console.error("Failed to update open-bottle preservation method.");
-        return preservationWarning(openBottle);
-      }
-    }
-    return NextResponse.json({ open_bottle: openBottle });
+    return inventoryResponse(
+      { open_bottle: outcome.openBottle },
+      200,
+      operationId,
+      outcome.replayed,
+    );
   } catch (error) {
-    if (error instanceof PourNoInventoryError) {
-      return Errors.conflict("no_inventory", "No inventory available.");
-    }
-    if (error instanceof PourForbiddenError) {
-      return Errors.forbidden(
-        "This wine isn't in your restaurant. Refresh the page and try again.",
-      );
-    }
-    if (error instanceof PourRpcError) {
-      return Errors.internal("Pour failed.");
-    }
+    const response = inventoryCommandErrorResponse(error, operationId);
+    if (response) return response;
     throw error;
   }
-}
-
-function preservationWarning(openBottle: unknown) {
-  return NextResponse.json({
-    open_bottle: openBottle,
-    warning: {
-      code: "preservation_update_failed",
-      message: "Pour recorded, but preservation method was not updated.",
-    },
-  });
 }

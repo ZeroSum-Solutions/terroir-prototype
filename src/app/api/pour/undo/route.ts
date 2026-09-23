@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   PourForbiddenError,
   PourNotFoundError,
+  PourNotReversibleError,
   PourRpcError,
   undoLastPour,
 } from "@/domains/pours/pour-service";
@@ -30,6 +31,7 @@ const BodySchema = z.object({
  * 401: unauthenticated
  * 403: not a member
  * 404: no recent pour to undo
+ * 409: latest pour cannot be reversed safely
  * 500: any other RPC error
  */
 export async function POST(request: NextRequest) {
@@ -61,6 +63,12 @@ async function postUndo(request: NextRequest) {
     if (error instanceof PourForbiddenError) {
       return Errors.forbidden(
         "This wine isn't in your restaurant. Refresh the page and try again.",
+      );
+    }
+    if (error instanceof PourNotReversibleError) {
+      return Errors.conflict(
+        "undo_not_reversible",
+        "Cannot safely undo this pour; ask a manager to reconcile.",
       );
     }
     if (error instanceof PourRpcError) {

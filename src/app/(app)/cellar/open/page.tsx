@@ -141,6 +141,7 @@ export default async function OpenBottlesPage() {
                         </div>
                         <CloseBottleButton
                           bottleId={bottle.id}
+                          openedAt={bottle.opened_at}
                           remainingOz={remainingOz}
                         />
                       </div>
@@ -203,6 +204,7 @@ export default async function OpenBottlesPage() {
                       <div className="text-right">
                         <CloseBottleButton
                           bottleId={bottle.id}
+                          openedAt={bottle.opened_at}
                           remainingOz={remainingOz}
                         />
                       </div>

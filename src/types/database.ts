@@ -751,6 +751,57 @@ export type Database = {
           },
         ]
       }
+      inventory_command_receipts: {
+        Row: {
+          actor_user_id: string
+          command_type: string
+          completed_at: string | null
+          created_at: string
+          operation_id: string
+          request_payload: Json
+          restaurant_id: string
+          result_payload: Json | null
+          wine_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          command_type: string
+          completed_at?: string | null
+          created_at?: string
+          operation_id: string
+          request_payload: Json
+          restaurant_id: string
+          result_payload?: Json | null
+          wine_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          command_type?: string
+          completed_at?: string | null
+          created_at?: string
+          operation_id?: string
+          request_payload?: Json
+          restaurant_id?: string
+          result_payload?: Json | null
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_command_receipts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_command_receipts_wine_restaurant_fkey"
+            columns: ["wine_id", "restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id", "restaurant_id"]
+          },
+        ]
+      }
       inventory_items: {
         Row: {
           added_at: string
@@ -2559,6 +2610,23 @@ export type Database = {
       enrich_wines_batch: {
         Args: { p_enrichments: Json; p_restaurant_id: string }
         Returns: number
+      }
+      execute_inventory_command: {
+        Args: {
+          p_actual_remaining_ml?: number
+          p_command: string
+          p_expected_open_bottle_id?: string
+          p_expected_opened_at?: string
+          p_ml?: number
+          p_note?: string
+          p_operation_id: string
+          p_preservation_method?: string
+          p_reason_code_id?: string
+          p_restaurant_id: string
+          p_wine_id: string
+          p_written_off_ml?: number
+        }
+        Returns: Json
       }
       find_or_create_wine: {
         Args: {

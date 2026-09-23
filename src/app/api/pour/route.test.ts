@@ -2,334 +2,155 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
 
 const mockRequireMembership = vi.fn();
-const mockCreateClient = vi.fn();
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: unknown[]) => mockCreateClient(...args),
-}));
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
 }));
 const mockRevalidate = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidate }));
+const mockRevalidateAutoEightysixedWines = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/api/auto-eightysix-revalidation", () => ({
+  revalidateAutoEightysixedWines: mockRevalidateAutoEightysixedWines,
+}));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const { POST } = await import("./route");
 
-type RpcCall = { fn: string; args: unknown };
+const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
+const WINE_ID = "55555555-5555-4555-8555-555555555555";
 
-/**
- * Minimal mock that satisfies both:
- *   - supabase.rpc('record_pour', ...)  →  pour result
- *   - supabase.rpc('wine_published_list_slugs', ...)  →  slug rows
- *   - supabase.from('availability_events').select(...)
- *       .eq().eq().is().gte().in()  →  auto-86 event rows (ARCH-023)
- *
- * `autoEightysixedWineIds`: the set of wine IDs the DB reports
- *   were just auto-86'd by the pour trigger. Empty = no auto-86.
- * `publishedSlugs`: the slug rows returned by
- *   wine_published_list_slugs when called.
- */
-function makeSupabase(opts: {
-  recordPour: {
-    data?: { wine_id: string; remaining_ml: number; opened_at: string } | null;
-    error?: { code?: string; message?: string } | null;
-  };
-  autoEightysixedWineIds?: string[];
-  publishedSlugs?: Array<{ slug: string }>;
-  wineInRestaurant?: boolean;
-  preservationError?: { code?: string; message?: string } | null;
-}) {
-  const calls: RpcCall[] = [];
-  const rpc = vi.fn((fn: string, args: unknown) => {
-    calls.push({ fn, args });
-    if (fn === "record_pour") {
-      return Promise.resolve(opts.recordPour);
-    }
-    if (fn === "wine_published_list_slugs") {
-      return Promise.resolve({
-        data: opts.publishedSlugs ?? [],
-        error: null,
-      });
-    }
-    return Promise.resolve({ data: null, error: null });
+function makeSupabase(options: {
+  replayed?: boolean;
+  error?: { code?: string; message?: string } | null;
+} = {}) {
+  const rpc = vi.fn().mockResolvedValue({
+    data: options.error
+      ? null
+      : {
+          operation_id: OPERATION_ID,
+          command: "pour",
+          pour_event_ids: ["77777777-7777-4777-8777-777777777777"],
+          replayed: options.replayed ?? false,
+          open_bottle: {
+            id: "66666666-6666-4666-8666-666666666666",
+            wine_id: WINE_ID,
+            remaining_ml: 600,
+            opened_at: "2026-09-23T12:00:00.000Z",
+            preservation_method: "argon",
+          },
+        },
+    error: options.error ?? null,
   });
-  const from = vi.fn((table: string) => {
-    if (table === "open_bottles") {
-      const updateChain = {
-        eq: () => updateChain,
-        is: async () => ({ error: opts.preservationError ?? null }),
-      };
-      return { update: () => updateChain };
-    }
-    const chain: Record<string, unknown> = {};
-    const thenable = {
-      select: () => thenable,
-      eq: () => thenable,
-      is: () => thenable,
-      gte: () => thenable,
-      in: () => thenable,
-      maybeSingle: async () => ({
-        data: opts.wineInRestaurant === false ? null : { id: WINE_ID },
-        error: null,
-      }),
-      then: (resolve: (v: unknown) => void) => {
-        if (table === "availability_events") {
-          resolve({
-            data: (opts.autoEightysixedWineIds ?? []).map((id) => ({
-              wine_id: id,
-            })),
-            error: null,
-          });
-        } else {
-          resolve({ data: null, error: null });
-        }
-      },
-    };
-    Object.assign(chain, thenable);
-    return chain;
-  });
-  const supabase = { rpc, from };
-  return { supabase, calls };
+  return { rpc };
 }
 
-function makeRequest(body: unknown): NextRequest {
+function allow(supabase: ReturnType<typeof makeSupabase>) {
+  mockRequireMembership.mockResolvedValue({
+    supabase,
+    restaurantId: "restaurant-a",
+    user: { id: "user-a" },
+    role: "staff",
+  });
+}
+
+function request(
+  body: unknown = {
+    wine_id: WINE_ID,
+    ml: 150,
+    kind: "pour",
+    note: "glass",
+    preservation_method: "argon",
+  },
+  operationId: string | null = OPERATION_ID,
+) {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (operationId) headers.set("Idempotency-Key", operationId);
   return new Request("http://localhost/api/pour", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   }) as unknown as NextRequest;
 }
 
-const WINE_ID = "a1b2c3d4-e5f6-4789-8abc-def012345678";
-
 describe("POST /api/pour", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-secret");
-  });
+  beforeEach(() => vi.clearAllMocks());
 
-  it("401s when unauthenticated", async () => {
+  it("keeps the current authentication gate first", async () => {
     mockRequireMembership.mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     );
-    const res = await POST(makeRequest({ wine_id: "w-1", ml: 148 }));
-    expect(res.status).toBe(401);
+    expect((await POST(request({}, null))).status).toBe(401);
   });
 
-  it("400s on invalid body", async () => {
-    const { supabase } = makeSupabase({
-      recordPour: { data: null, error: null },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    mockCreateClient.mockReturnValue(supabase);
-    const res = await POST(makeRequest({ ml: "five oz" }));
-    expect(res.status).toBe(400);
+  it("requires an idempotency UUID before parsing the command", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    const response = await POST(request(undefined, null));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe("invalid_idempotency_key");
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 200 + open_bottle on happy path", async () => {
-    const { supabase } = makeSupabase({
-      recordPour: {
-        data: {
-          wine_id: WINE_ID,
-          remaining_ml: 602,
-          opened_at: "2026-04-22T00:00:00Z",
-        },
-        error: null,
-      },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    const res = await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.open_bottle.remaining_ml).toBe(602);
-    expect(mockRevalidate).toHaveBeenCalledWith("/availability");
-  });
-
-  it("EV-10.1: applies a supplied preservation method to the bottle returned by record_pour", async () => {
-    const { supabase } = makeSupabase({
-      recordPour: {
-        data: {
-          wine_id: WINE_ID,
-          remaining_ml: 602,
-          opened_at: "2026-04-22T00:00:00Z",
-        },
-        error: null,
-      },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    mockCreateClient.mockReturnValue(supabase);
-
-    const response = await POST(makeRequest({
-      wine_id: WINE_ID,
-      ml: 148,
-      preservation_method: "argon",
-    }));
+  it("returns the existing 200 envelope with replay headers", async () => {
+    const supabase = makeSupabase({ replayed: true });
+    allow(supabase);
+    const response = await POST(request());
 
     expect(response.status).toBe(200);
-    expect(supabase.from).toHaveBeenCalledWith("open_bottles");
-  });
-
-  it("rejects a wine outside the active restaurant before recording a pour", async () => {
-    const { supabase, calls } = makeSupabase({
-      recordPour: { data: null, error: null },
-      wineInRestaurant: false,
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-
-    const response = await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-
-    expect(response.status).toBe(404);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("returns the recorded pour with a warning when preservation update fails", async () => {
-    const { supabase, calls } = makeSupabase({
-      recordPour: {
-        data: {
-          wine_id: WINE_ID,
-          remaining_ml: 602,
-          opened_at: "2026-04-22T00:00:00Z",
-        },
-        error: null,
-      },
-      preservationError: { code: "XX000", message: "provider detail" },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    mockCreateClient.mockReturnValue(supabase);
-
-    const response = await POST(makeRequest({
+    expect((await response.json()).open_bottle).toMatchObject({
       wine_id: WINE_ID,
-      ml: 148,
+      remaining_ml: 600,
       preservation_method: "argon",
-    }));
-
-    expect(response.status).toBe(200);
-    expect((await response.json()).warning.code).toBe("preservation_update_failed");
-    expect(calls.filter((call) => call.fn === "record_pour")).toHaveLength(1);
-  });
-
-  it("returns 409 on no inventory", async () => {
-    const { supabase } = makeSupabase({
-      recordPour: {
-        data: null,
-        error: { code: "P0001", message: "TERROIR_OUT_OF_STOCK" },
-      },
     });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    const res = await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error.code).toBe("no_inventory");
-  });
-
-  it("returns 403 when RPC raises permission error", async () => {
-    const { supabase } = makeSupabase({
-      recordPour: {
-        data: null,
-        error: { code: "42501", message: "forbidden" },
-      },
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    const res = await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({
-      error: {
-        code: "forbidden",
-        message:
-          "This wine isn't in your restaurant. Refresh the page and try again.",
-      },
-    });
-  });
-
-  // ARCH-023: auto-86 revalidation
-  it("does NOT revalidate /list/* paths when no auto-86 event was inserted", async () => {
-    const { supabase, calls } = makeSupabase({
-      recordPour: {
-        data: { wine_id: WINE_ID, remaining_ml: 602, opened_at: "t" },
-        error: null,
-      },
-      autoEightysixedWineIds: [],
-    });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-    expect(
-      mockRevalidate.mock.calls.some((c) =>
-        String(c[0] ?? "").startsWith("/list/"),
-      ),
-    ).toBe(false);
-    // wine_published_list_slugs should NOT have been called — no event,
-    // nothing to look up.
-    expect(calls.some((c) => c.fn === "wine_published_list_slugs")).toBe(
-      false,
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "pour",
+        p_ml: 150,
+        p_note: "glass",
+        p_preservation_method: "argon",
+      }),
     );
+    expect(mockRevalidateAutoEightysixedWines).toHaveBeenCalledWith({
+      supabase,
+      restaurantId: "restaurant-a",
+      touchedWineIds: [WINE_ID],
+      sinceTs: expect.any(String),
+    });
   });
 
-  it("revalidates /list/<slug> for each published list when the pour auto-86'd the wine", async () => {
-    const { supabase, calls } = makeSupabase({
-      recordPour: {
-        data: { wine_id: WINE_ID, remaining_ml: 0, opened_at: "t" },
-        error: null,
-      },
-      autoEightysixedWineIds: [WINE_ID],
-      publishedSlugs: [{ slug: "dinner-menu" }, { slug: "by-the-glass" }],
+  it("rejects volumes above the preserved 2,000 ml maximum", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    const response = await POST(request({ wine_id: WINE_ID, ml: 2001 }));
+    expect(response.status).toBe(400);
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["wine_not_found", 404, "wine_not_found"],
+    ["no_inventory", 409, "no_inventory"],
+    ["inventory_operation_payload_conflict", 409, "idempotency_conflict"],
+    ["invalid_inventory_command", 422, "invalid_inventory_command"],
+  ])("maps %s to %i/%s", async (message, status, code) => {
+    const supabase = makeSupabase({ error: { code: "P0001", message } });
+    allow(supabase);
+    const response = await POST(request());
+    expect(response.status).toBe(status);
+    expect((await response.json()).error.code).toBe(code);
+  });
+
+  it("maps SQLSTATE 42501 without exposing database text", async () => {
+    const supabase = makeSupabase({
+      error: { code: "42501", message: "sensitive-policy-detail" },
     });
-    mockRequireMembership.mockResolvedValue({
-      supabase,
-      restaurantId: "r-A",
-      user: { id: "u-1" },
-      role: "staff",
-    });
-    const res = await POST(makeRequest({ wine_id: WINE_ID, ml: 148 }));
-    expect(res.status).toBe(200);
-    expect(mockRevalidate).toHaveBeenCalledWith("/list/dinner-menu");
-    expect(mockRevalidate).toHaveBeenCalledWith("/list/by-the-glass");
-    const slugCalls = calls.filter(
-      (c) => c.fn === "wine_published_list_slugs",
-    );
-    expect(slugCalls).toHaveLength(1);
-    expect(slugCalls[0].args).toMatchObject({
-      p_wine_id: WINE_ID,
-      p_restaurant_id: "r-A",
-    });
+    allow(supabase);
+    const response = await POST(request());
+    const text = await response.text();
+    expect(response.status).toBe(403);
+    expect(JSON.parse(text).error.code).toBe("forbidden");
+    expect(text).not.toContain("sensitive-policy-detail");
   });
 });

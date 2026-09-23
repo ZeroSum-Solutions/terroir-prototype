@@ -28,7 +28,7 @@ import { EnrichControl } from "./enrich-control";
 import { PourActionBar } from "./pour-action-bar";
 import { useHeroImageActions } from "./use-hero-image-actions";
 import { useEightysixToggle } from "./use-eightysix-toggle";
-import { useAsyncAction } from "./use-async-action";
+import { useInventoryCommands } from "./use-inventory-commands";
 import { wineDisplayName } from "@/lib/wine-display-name";
 
 export function WineDetailDrawer({
@@ -114,93 +114,17 @@ export function WineDetailDrawer({
     paused: pickerOpen || eightysix.pendingDirection !== null || editOpen,
   });
 
-  // BND-121: manually open a bottle without recording a pour. Its busy
-  // flag has never been shared with any other drawer action, so — unlike
-  // merge/pour/undo/delete/86 above — this is a genuine fit for
-  // useAsyncAction.
   const [preservationMethod, setPreservationMethod] =
     useState<PreservationMethod>(row?.preservation_method ?? "none");
-  const openBottleAction = useAsyncAction();
-
-  const doOpenBottle = useCallback(
-    () => {
-      if (!row) return Promise.resolve();
-      setErrorMsg(null);
-      return openBottleAction.run(
-        async () => {
-          const res = await fetch("/api/open-bottles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              wine_id: row.wine_id,
-              preservation_method: preservationMethod,
-            }),
-          });
-          if (!res.ok) {
-            const payload = (await res.json().catch(() => null)) as
-              | { error?: { message?: string } }
-              | null;
-            throw new Error(
-              payload?.error?.message ?? `Failed to open bottle (${res.status}).`,
-            );
-          }
-          toast.success("Bottle opened");
-          refresh();
-        },
-        {
-          fallbackMessage: "Failed to open bottle.",
-          onError: (message) => {
-            toast.error("Open bottle failed");
-            setErrorMsg(message);
-          },
-        },
-      );
-    },
-    [row, preservationMethod, toast, refresh, openBottleAction],
-  );
-
-  const doPour = useCallback(
-    async (ml: number) => {
-      if (!row || !row.glass_pour_ml) return;
-      setErrorMsg(null);
-      setBusy(true);
-      setLastPour(null);
-
-      try {
-        const res = await fetch("/api/pour", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            wine_id: row.wine_id,
-            ml,
-            kind: "pour",
-            preservation_method: preservationMethod,
-          }),
-        });
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string | { message?: string }; warning?: { message?: string } }
-          | null;
-        if (!res.ok) {
-          const message = typeof payload?.error === "string"
-            ? payload.error
-            : payload?.error?.message;
-          throw new Error(message ?? `Request failed (${res.status}).`);
-        }
-        toast.success("Glass poured");
-        if (payload?.warning?.message) {
-          setErrorMsg(payload.warning.message);
-        }
-        setLastPour({ ml });
-        startTransition(() => router.refresh());
-      } catch (err) {
-        toast.error("Pour failed");
-        setErrorMsg(err instanceof Error ? err.message : "Pour failed.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [row, router, toast, preservationMethod],
-  );
+  const { doOpenBottle, doPour, retryPriorOpen, retryPriorPour, openBottleBusy, openNeedsReview, pourNeedsReview } = useInventoryCommands({
+    row,
+    preservationMethod,
+    setBusy,
+    setErrorMsg,
+    setLastPour,
+    toast,
+    refresh,
+  });
 
   // BND-119: undo the most recent pour.
   const doUndo = useCallback(
@@ -311,7 +235,7 @@ export function WineDetailDrawer({
                   for. */}
               <Link
                 href={`/cellar/${row.wine_id}`}
-                className="mt-2xs inline-block text-caption uppercase text-accent hover:underline"
+                className="mt-2xs inline-flex min-h-11 items-center text-caption uppercase text-accent hover:underline"
               >
                 Full detail
               </Link>
@@ -432,11 +356,12 @@ export function WineDetailDrawer({
               </div>
             )}
 
-            {row.open_bottle_id && row.theoretical_remaining_ml !== null && (
+            {row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null && (
               <PartialBottleCloseout
                 bottle={{
                   id: row.open_bottle_id,
                   wineId: row.wine_id,
+                  openedAt: row.opened_at,
                   theoreticalRemainingMl: row.theoretical_remaining_ml,
                   preservationMethod: row.preservation_method,
                   openedBy: row.opened_by,
@@ -569,14 +494,18 @@ export function WineDetailDrawer({
               Undo) pinned at the foot so they never sit below the fold
               (Kimi audit 2026-08-26). Reference sections scroll; actions
               don't. */}
-          {(canPour || row.sealed_count > 0) && (
+          {(canPour || row.sealed_count > 0 || openNeedsReview || pourNeedsReview) && (
             <PourActionBar
               row={row}
               canPour={canPour}
               outOfStock={outOfStock}
               pickerItem={pickerItem}
               busy={busy}
-              openBottleBusy={openBottleAction.busy}
+              openBottleBusy={openBottleBusy}
+              openNeedsReview={openNeedsReview}
+              pourNeedsReview={pourNeedsReview}
+              retryPriorOpen={retryPriorOpen}
+              retryPriorPour={retryPriorPour}
               lastPour={lastPour}
               doOpenBottle={doOpenBottle}
               doPour={doPour}

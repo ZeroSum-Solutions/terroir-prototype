@@ -29,7 +29,12 @@ describe("PourActionBar", () => {
     await act(async () => {
       root.render(
         <PourActionBar
-          row={baseRow({ sealed_count: 2, glass_pour_ml: null })}
+          row={baseRow({
+            sealed_count: 2,
+            glass_pour_ml: null,
+            open_bottle_id: null,
+            opened_at: null,
+          })}
           canPour={false}
           outOfStock={false}
           pickerItem={null}
@@ -53,6 +58,33 @@ describe("PourActionBar", () => {
       button("Open bottle")!.click();
     });
     expect(doOpenBottle).toHaveBeenCalledOnce();
+  });
+
+  it("shows a disabled truthful state when a lifecycle is already open", async () => {
+    const doOpenBottle = vi.fn();
+    await act(async () => {
+      root.render(
+        <PourActionBar
+          row={baseRow({ sealed_count: 6, glass_pour_ml: null })}
+          canPour={false}
+          outOfStock={false}
+          pickerItem={null}
+          busy={false}
+          openBottleBusy={false}
+          lastPour={null}
+          doOpenBottle={doOpenBottle}
+          doPour={vi.fn()}
+          doUndo={vi.fn()}
+          onOpenPicker={vi.fn()}
+        />,
+      );
+    });
+
+    const activeState = button("Bottle already open")!;
+    expect(activeState.disabled).toBe(true);
+    activeState.click();
+    expect(doOpenBottle).not.toHaveBeenCalled();
+    expect(button("Open bottle")).toBeUndefined();
   });
 
   it("calls doPour with the glass pour size", async () => {
@@ -82,6 +114,59 @@ describe("PourActionBar", () => {
       pourButton.click();
     });
     expect(doPour).toHaveBeenCalledWith(150);
+  });
+
+  it("makes an unresolved pour an explicit retry and blocks the size picker", async () => {
+    const doPour = vi.fn();
+    const retryPriorPour = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 0, glass_pour_ml: 150, pour_size_mode: "picker" })}
+        canPour
+        outOfStock={false}
+        pickerItem={{}}
+        busy={false}
+        openBottleBusy={false}
+        pourNeedsReview
+        lastPour={null}
+        doOpenBottle={vi.fn()}
+        doPour={doPour}
+        retryPriorPour={retryPriorPour}
+        doUndo={vi.fn()}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+
+    await act(async () => button("Retry prior pour")!.click());
+    expect(retryPriorPour).toHaveBeenCalledOnce();
+    expect(doPour).not.toHaveBeenCalled();
+    expect(container.querySelector(
+      'button[aria-label="Pick a custom pour size"]',
+    )).toBeNull();
+  });
+
+  it("keeps open recovery reachable after stock and lifecycle state change", async () => {
+    const retryPriorOpen = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 0, glass_pour_ml: null })}
+        canPour={false}
+        outOfStock
+        pickerItem={null}
+        busy={false}
+        openBottleBusy={false}
+        openNeedsReview
+        lastPour={null}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        retryPriorOpen={retryPriorOpen}
+        doUndo={vi.fn()}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+
+    await act(async () => button("Retry prior open")!.click());
+    expect(retryPriorOpen).toHaveBeenCalledOnce();
   });
 
   it("shows the undo button only when there is a last pour and canPour", async () => {

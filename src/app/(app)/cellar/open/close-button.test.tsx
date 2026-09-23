@@ -37,7 +37,11 @@ describe("CloseBottleButton mobile target", () => {
   it("keeps the close action at least 44px tall", () => {
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <CloseBottleButton bottleId="bottle-1" remainingOz={4.2} />
+        <CloseBottleButton
+          bottleId="bottle-1"
+          openedAt="2026-09-23T12:00:00.000Z"
+          remainingOz={4.2}
+        />
       </ToastProvider>,
     );
 
@@ -87,9 +91,21 @@ describe("CloseBottleButton failure reporting", () => {
   });
 
   it("stays silent and refreshes when the close succeeds", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        closed: {
+          id: "66666666-6666-4666-8666-666666666666",
+          wine_id: "55555555-5555-4555-8555-555555555555",
+          closed_at: "2026-09-23T13:00:00.000Z",
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("{}", { status: 200 })),
+      fetchMock,
     );
 
     const container = await mount();
@@ -97,6 +113,85 @@ describe("CloseBottleButton failure reporting", () => {
     await click(container, "Confirm discard 4.2 oz");
 
     expect(document.body.querySelector('[role="alert"]')).toBeNull();
+    expect(refresh).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(JSON.parse(String(init?.body))).toEqual({
+      expected_opened_at: "2026-09-23T12:00:00.000Z",
+    });
+  });
+
+  it("reuses the UUID when a proxy 503 makes the first response uncertain", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Bad gateway", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          closed: {
+            id: "66666666-6666-4666-8666-666666666666",
+            wine_id: "55555555-5555-4555-8555-555555555555",
+            closed_at: "2026-09-23T13:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "Idempotency-Replayed": "true",
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const container = await mount();
+    await click(container, "Close bottle");
+    await click(container, "Confirm discard 4.2 oz");
+    await click(container, "Retry prior action");
+
+    const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const retry = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(retry.get("Idempotency-Key")).toBe(first.get("Idempotency-Key"));
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(document.body.querySelector('[role="status"]')?.textContent).toContain(
+      "Already recorded",
+    );
+  });
+
+  it("reuses the UUID after a wrong-typed 200 response", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        closed: {
+          id: 123,
+          wine_id: "55555555-5555-4555-8555-555555555555",
+          closed_at: "not-a-date",
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          closed: {
+            id: "66666666-6666-4666-8666-666666666666",
+            wine_id: "55555555-5555-4555-8555-555555555555",
+            closed_at: "2026-09-23T13:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const container = await mount();
+    await click(container, "Close bottle");
+    await click(container, "Confirm discard 4.2 oz");
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
+      "Couldn't confirm the bottle was closed",
+    );
+    await click(container, "Retry prior action");
+
+    const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const retry = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(retry.get("Idempotency-Key")).toBe(first.get("Idempotency-Key"));
     expect(refresh).toHaveBeenCalledOnce();
   });
 });
@@ -109,7 +204,11 @@ async function mount(): Promise<HTMLElement> {
   await act(async () =>
     root.render(
       <ToastProvider>
-        <CloseBottleButton bottleId="bottle-1" remainingOz={4.2} />
+        <CloseBottleButton
+          bottleId="bottle-1"
+          openedAt="2026-09-23T12:00:00.000Z"
+          remainingOz={4.2}
+        />
       </ToastProvider>,
     ),
   );
