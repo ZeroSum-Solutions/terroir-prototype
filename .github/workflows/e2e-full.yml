@@ -40,7 +40,7 @@ permissions:
 jobs:
   e2e:
     name: E2E — full suite
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # The two-spec subset fits inside ci.yml's 25 min alongside everything
     # else; the complete suite against a cold stack needs its own headroom.
     timeout-minutes: 45

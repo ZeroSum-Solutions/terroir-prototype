@@ -41,7 +41,7 @@ jobs:
     # once an isolated preview base environment exists, and the fail-closed
     # gate arms again unchanged. Until then the check reports "skipped".
     if: ${{ vars.RAILWAY_PR_PREVIEWS_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 8
     permissions:
       deployments: read
