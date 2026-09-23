@@ -10,8 +10,8 @@ would ever have said so out loud. This is that procedure.
 **Railway deploys `main`. Nothing deploys migrations.** `railway.toml` sets
 `startCommand = "pnpm start"` and that is the whole deploy. A merge to `main` ships
 application code to *both* the `production` and `staging` Railway environments at the
-same SHA — see `.github/workflows/staging-smoke.yml` — and touches the database not at
-all.
+same SHA — see the [staging smoke workflow](../../.github/workflows/staging-smoke.yml) —
+and touches the database not at all.
 
 **There is one Supabase project.** `terroir` / `qcfmwphlaekfkqwkfyth`, in the
 `Zerosumsolutions-Projects` org. Railway production and staging both point at it, so
@@ -26,8 +26,10 @@ code is still talking to.
 
 ### 1. Find the gap
 
+Put a PostgreSQL client compatible with the production database on `PATH` before
+starting.
+
 ```bash
-export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
 DB_URL=$(zsvault get terroir_supabase_admin_db_url)
 psql "$DB_URL" -Atc "select max(version) from supabase_migrations.schema_migrations;"
 ls supabase/migrations/*.sql | tail -1
@@ -92,7 +94,28 @@ done
 ```
 
 Note `--single-transaction` will not protect a migration containing
-`CREATE INDEX CONCURRENTLY`. Check for it first; none exist as of `0136`.
+`CREATE INDEX CONCURRENTLY`. Check for it first; none exist as of `0151`.
+
+### 4a. Special rollback boundary for 0151
+
+The forward `0151` migration follows the one-transaction apply procedure above. Its
+paired down is deliberately different: it owns its own `BEGIN`/`COMMIT`, takes an
+exclusive lock on `inventory_command_receipts`, and refuses before changing any object
+when even one receipt exists. Do not wrap that down in `--single-transaction`, and do
+not run it while application traffic is active.
+
+Receipts are the replay boundary for already-committed physical effects. If the guard
+reports `cannot_down_0151_inventory_command_receipts_not_empty`, stop. Do not truncate,
+delete, or bypass the guard to make the rollback run; retaining or reconciling those
+receipts requires a separate reviewed migration and incident plan. The verified empty
+down restores the prior Undo function before removing the receipt table; reapplying
+`0151` then restores the RPC and an empty receipt table.
+
+A code-only downgrade to an older inventory handler is not retry-safe merely because
+the 0151 table remains. The older handler ignores the new `Idempotency-Key`, so an
+outstanding new-client retry can apply its physical effect twice. Before any application
+downgrade, quiesce affected inventory traffic and assess outstanding client operations;
+otherwise keep the receipt-aware endpoint in service until those operations are resolved.
 
 ### 5. Verify the effect, not the record
 

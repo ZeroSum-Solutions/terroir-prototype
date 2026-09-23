@@ -105,19 +105,24 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 281 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
 | Operational procedures | `docs/runbooks/` (see its README index) |
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
-**Do not trust for current status:** `app_spec.txt` and `claude-progress.txt` — both
-at the **repo root**, not in `docs/_archive/`. Both are frozen historical records, both
-contain drifted claims (including a dead env var name), and both are retained as
-evidence only.
+**Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
+current machine-read source for 281 requirement identities, but the generated
+`docs/feature-ledger.json` owns their completion metadata and status. Active means the
+assertion is in contract scope, not that the behavior is complete; the eight C04
+workspace/site shadow-access assertions remain unimplemented. Non-core `app_spec.txt`
+prose can retain historical or drifted claims (including a dead env var name).
+`claude-progress.txt` is a frozen historical record and does not determine current
+scope or status. Both remain at the **repo root**, not in `docs/_archive/`.
 
-**Do not move them into `docs/_archive/`.** They read like stale documents because they
-are, but they are *machine-read*, not prose: `scripts/verify-feature-ledger.mjs` sets
+**Do not move them into `docs/_archive/`.** They are retained at fixed machine-read
+paths: `scripts/verify-feature-ledger.mjs` sets
 `SOURCE_FILE = "app_spec.txt"`, and `src/lib/feature-ledger/verify-feature-ledger.test.ts`
 resolves both repo-root-relative. Moving either reds `pnpm verify:feature-ledger`, which
 is part of the one required merge check. This has already happened: they were moved to

@@ -8,7 +8,8 @@ business workflows. Adapter modules own external/provider mechanics.
 
 - `src/domains/scanning`: invoice OCR/LLM extraction orchestration.
 - `src/domains/wine-lists`: wine-list PDF generation workflow.
-- `src/domains/pours`: pour transaction orchestration around `record_pour`.
+- `src/domains/pours`: bottle-open, pour, spill, close, discard, and Undo
+  orchestration around `execute_inventory_command` and `undo_last_pour`.
 - `src/domains/cellar`: reconcile transaction orchestration around
   `reconcile_open_bottles_batch`.
 - `src/adapters/ocr`: Azure Document Intelligence boundary.
@@ -50,9 +51,32 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   database transaction.
 - Public wine-list reads stay explicitly protected by RLS policies and contract
   tests.
-- `close_open_bottle` records the bottle close-out and finish event in one
-  transaction. Reconciliation batches persist ordered before-and-after state so
-  undo restores actions in reverse application order.
+- First-party open, pour, spill, and measured-close routes send a caller-generated UUID
+  to `execute_inventory_command`; quantity-bearing fields use integer milliliters. The RPC applies
+  the physical effects and durable receipt atomically, returns the stored outcome for
+  an exact replay without applying stock twice, and rechecks current membership before
+  replay. Close commands bind to both the reusable `open_bottles` row ID and its
+  `opened_at` lifecycle timestamp.
+- `execute_inventory_command` and the C02 Undo path serialize on the wine row with
+  `FOR NO KEY UPDATE` before locking the reusable bottle slot. That lock still excludes
+  another C02 writer, but permits the wine foreign key's `FOR KEY SHARE` after a
+  retained legacy RPC has locked the slot first. This avoids the mixed-version
+  expand-contract deadlock without weakening per-wine command serialization.
+- Deprecated `POST /api/open-bottles/[id]/close` has a strict current contract: a UUID
+  `Idempotency-Key` header and JSON `expected_opened_at` with an offset are required.
+  It invokes the internal `discard` command, which derives and spills the locked
+  lifecycle's full remainder, closes it without opening a replacement, and creates no
+  `bottle_closeouts` row. This is not an external backward-compatibility guarantee;
+  callers of the deprecated endpoint must send the current header and body.
+- `POST /api/pour/undo` still uses `undo_last_pour`. When a command crossed multiple
+  physical lifecycles or a replacement lifecycle has opened, the RPC refuses the
+  unsafe partial reversal and the route returns `409 undo_not_reversible`.
+- `record_pour` and `close_open_bottle` remain during expand-contract deployment, but
+  migrated first-party inventory routes no longer call them. Authenticated direct
+  `bottle_closeouts` insertion also remains a receipt-bypass until the separately
+  reviewed contraction removes the legacy grants and policy.
+- Reconciliation batches persist ordered before-and-after state so undo restores
+  actions in reverse application order.
 - First-class bins, cellar-health rows, reconciliation history, bottle
   close-outs, stock adjustments, brand kits, and pricing recommendations are
   restaurant-scoped and protected by RLS. Ordinary authenticated app clients
