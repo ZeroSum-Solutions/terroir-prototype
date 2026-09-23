@@ -72,6 +72,8 @@ Resolution recorded 2026-07-23: the product owner directed the team to implement
 
 Expansion recorded 2026-09-23: the owner approved four C02 operation-integrity assertions, bringing the current ledger to 273 while preserving all existing requirement IDs.
 
+Second expansion recorded 2026-09-23: the owner approved eight C04 Slice 1 workspace/site shadow-access assertions, bringing the current ledger to 281. Legacy membership helpers remain authoritative until the separately gated cost/RPC conversion; the shadow resolver does not itself enforce application, RLS, or direct-RPC access.
+
 ## 3. Definition of done
 
 Terroir is complete only when all of the following are true:
@@ -106,7 +108,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Backup connection | Add a dedicated least-privilege direct database URL to GitHub Actions | Secret creation and production restore require approval |
 | Public list navigation | Show a switcher when the same restaurant has multiple published lists | Safe default |
 | Large-file refactors | Split only code touched by a feature, preserving behavior | Safe default |
-| Core feature count | Keep all 273 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02 additions approved 2026-09-23 |
+| Core feature count | Keep all 281 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02 and eight C04 Slice 1 additions approved 2026-09-23 |
 
 ### 4.1 Human provisioning checklist
 
@@ -220,7 +222,7 @@ Phases are ordered by risk, not visual appeal:
 
 **Acceptance:**
 
-- The ledger accounts for all 273 current bullets exactly once.
+- The ledger accounts for all 281 current bullets exactly once.
 - The generated totals match the checked-in source.
 - Every active criterion names an actor, action, observable outcome, negative case, and evidence owner.
 - Every non-active item has a rationale and recorded product-owner approval.

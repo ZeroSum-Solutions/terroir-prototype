@@ -146,8 +146,8 @@ export function validateReconciliationSemantics({
     );
   }
   const ledgerById = new Map(ledger.items.map((item) => [item.id, item]));
-  if (ledger.items.length !== 273 || ledger.items.some((item) => item.status !== "active")) {
-    errors.push("all 273 feature-ledger requirements must remain active");
+  if (ledger.items.length !== 281 || ledger.items.some((item) => item.status !== "active")) {
+    errors.push("all 281 feature-ledger requirements must remain active");
   }
   for (let order = 180; order <= 211; order += 1) {
     const requirementId = `TER-CF-${order}`;

@@ -279,7 +279,7 @@ describe("reconciliation semantics", () => {
     expect(errors).toContain(
       "reconciliation summary must be derived from contract documents",
     );
-    expect(errors).toContain("all 273 feature-ledger requirements must remain active");
+    expect(errors).toContain("all 281 feature-ledger requirements must remain active");
     expect(errors).toContain("TER-020 plan leaf IDs must be unique, exact, and ordered");
   });
 

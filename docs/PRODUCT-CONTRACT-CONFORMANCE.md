@@ -2,7 +2,7 @@
 
 `docs/product-contract-conformance.json` is the deterministic classification
 snapshot for `TER-CF-180` through `TER-CF-217`. The generator reads only the
-273 active feature-ledger requirements and a fresh discovery of route files
+281 active feature-ledger requirements and a fresh discovery of route files
 beneath `src/app/api`.
 
 - A ledger route whose canonical method and route identity exist is `weak`,

@@ -12,7 +12,7 @@ const LEDGER = "docs/feature-ledger.json";
 const OUTPUT = "docs/product-contract-conformance.json";
 const FIRST = 180;
 const LAST = 217;
-const ACTIVE_COUNT = 273;
+const ACTIVE_COUNT = 281;
 const requirementIds = Array.from(
   { length: LAST - FIRST + 1 },
   (_, index) => `TER-CF-${FIRST + index}`,
@@ -38,7 +38,7 @@ function readLedger(projectRoot) {
     activeIds.some((id) => !actualIds.has(id))
   ) {
     throw new Error(
-      "active feature ledger IDs must remain TER-CF-001 through TER-CF-273",
+      "active feature ledger IDs must remain TER-CF-001 through TER-CF-281",
     );
   }
   const byId = new Map(active.map((item) => [item.id, item]));

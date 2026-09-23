@@ -6,7 +6,7 @@
   </overview>
 
   <feature_budget>
-    Implement all 273 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23 and approved the four C02 operation-integrity additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 281 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions on 2026-09-23, and eight C04 workspace/site shadow-access additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
   </feature_budget>
 
   <initializer_guidance>
@@ -396,20 +396,42 @@
       - System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at
     </inventory_operation_integrity>
 
+    <workspace_site_access_foundation>
+      - System models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities
+      - System preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace
+      - System keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone
+      - System rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site
+      - Migrations backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access
+      - System computes effective site access in shadow mode while legacy membership helpers remain authoritative
+      - System shadow effective-site access denies revoked or expired site or workspace membership
+      - System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority
+    </workspace_site_access_foundation>
+
   </core_features>
 
   <database_schema>
     <tables>
+      <workspaces>
+        - id (uuid, PK), kind (restaurant or personal), name
+        - created_at
+      </workspaces>
+      <workspace_memberships>
+        - id (uuid, PK), workspace_id (FK workspaces), user_id (FK auth.users)
+        - governance_role (workspace_owner or group_admin, nullable), status, expires_at, revoked_at, created_by
+        - Workspace membership alone grants no site access
+      </workspace_memberships>
       <restaurants>
-        - id (uuid, PK)
+        - id (uuid, PK), workspace_id (FK workspaces; exactly one restaurant workspace per site)
         - name, slug, logo_url
         - created_at, updated_at
       </restaurants>
       <memberships>
         - user_id (FK auth.users)
         - restaurant_id (FK restaurants)
+        - workspace_membership_id (FK workspace_memberships; same user and workspace as the restaurant)
         - role (enum: owner, manager, staff)
-        - created_at
+        - status, expires_at, revoked_at, granted_by, created_at
+        - Sole explicit site-access grant; workspace membership alone is insufficient
       </memberships>
       <invitations>
         - id, restaurant_id, email, token (unique), role, expires_at, accepted_at
@@ -537,10 +559,10 @@
     </invoice_scan_flow>
     <pour_flow>
       1. Staff opens cellar, taps a wine, selects pour
-      2. Client POSTs to /api/pour with oz amount
-      3. record_pour DB function opens a new bottle if none open
-      4. record_pour decrements remaining_oz on the open bottle
-      5. UI updates inventory and open-bottle indicators optimistically
+      2. Client POSTs to /api/pour with an integer milliliter amount
+      3. Client sends a caller-generated stable operation UUID and immutable pour payload to execute_inventory_command
+      4. execute_inventory_command atomically opens or selects the bottle lifecycle and decrements remaining volume; an exact replay returns the original outcome without a second stock change
+      5. After a confirmed command outcome, the UI refreshes inventory and open-bottle indicators
     </pour_flow>
     <publish_list_flow>
       1. User edits sections and items in /lists/[id]

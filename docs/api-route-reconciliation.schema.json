@@ -108,7 +108,7 @@
       ],
       "properties": {
         "activeRequirementCount": {
-          "const": 273
+          "const": 281
         },
         "concreteRequirementCount": {
           "const": 32

@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 273,
+  "featureCount": 281,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
     "expandedOn": "2026-09-23",
-    "approvedActiveCount": 273
+    "approvedActiveCount": 281
   },
   "items": [
     {
@@ -3559,6 +3559,110 @@
       "status": "active",
       "completionSpec": "TER-041",
       "evidenceOwner": "pour-reconciliation"
+    },
+    {
+      "id": "TER-CF-274",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 274,
+      "sourceText": "System models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities",
+      "actor": "System",
+      "action": "models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities",
+      "observableOutcome": "System models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities",
+      "negativeCase": "Assertion is not observed: System models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities",
+      "status": "active",
+      "completionSpec": "TER-012",
+      "evidenceOwner": "tenant-access"
+    },
+    {
+      "id": "TER-CF-275",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 275,
+      "sourceText": "System preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace",
+      "actor": "System",
+      "action": "preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace",
+      "observableOutcome": "System preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace",
+      "negativeCase": "Assertion is not observed: System preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace",
+      "status": "active",
+      "completionSpec": "TER-012",
+      "evidenceOwner": "tenant-access"
+    },
+    {
+      "id": "TER-CF-276",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 276,
+      "sourceText": "System keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone",
+      "actor": "System",
+      "action": "keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone",
+      "observableOutcome": "System keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone",
+      "negativeCase": "Assertion is not observed: System keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone",
+      "status": "active",
+      "completionSpec": "TER-012",
+      "evidenceOwner": "tenant-access"
+    },
+    {
+      "id": "TER-CF-277",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 277,
+      "sourceText": "System rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site",
+      "actor": "System",
+      "action": "rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site",
+      "observableOutcome": "System rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site",
+      "negativeCase": "Assertion is not observed: System rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site",
+      "status": "active",
+      "completionSpec": "TER-012",
+      "evidenceOwner": "tenant-access"
+    },
+    {
+      "id": "TER-CF-278",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 278,
+      "sourceText": "Migrations backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access",
+      "actor": "Migrations",
+      "action": "backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access",
+      "observableOutcome": "Migrations backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access",
+      "negativeCase": "Assertion is not observed: Migrations backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access",
+      "status": "active",
+      "completionSpec": "TER-012",
+      "evidenceOwner": "tenant-access"
+    },
+    {
+      "id": "TER-CF-279",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 279,
+      "sourceText": "System computes effective site access in shadow mode while legacy membership helpers remain authoritative",
+      "actor": "System",
+      "action": "computes effective site access in shadow mode while legacy membership helpers remain authoritative",
+      "observableOutcome": "System computes effective site access in shadow mode while legacy membership helpers remain authoritative",
+      "negativeCase": "Assertion is not observed: System computes effective site access in shadow mode while legacy membership helpers remain authoritative",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-280",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 280,
+      "sourceText": "System shadow effective-site access denies revoked or expired site or workspace membership",
+      "actor": "System",
+      "action": "shadow effective-site access denies revoked or expired site or workspace membership",
+      "observableOutcome": "System shadow effective-site access denies revoked or expired site or workspace membership",
+      "negativeCase": "Assertion is not observed: System shadow effective-site access denies revoked or expired site or workspace membership",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-281",
+      "domain": "workspace_site_access_foundation",
+      "sourceOrder": 281,
+      "sourceText": "System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority",
+      "actor": "System",
+      "action": "maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority",
+      "observableOutcome": "System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority",
+      "negativeCase": "Assertion is not observed: System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
     }
   ]
 }
