@@ -71,7 +71,7 @@ export function PourActionBar({
             type="button"
             disabled={openBottleBusy}
             onClick={retryPriorOpen}
-            className="flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-[14px] font-medium text-ink hover:bg-wash disabled:opacity-60"
+            className="flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-control font-medium text-ink hover:bg-wash disabled:opacity-60"
           >
             <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
             Retry prior open
@@ -101,7 +101,7 @@ export function PourActionBar({
             type="button"
             disabled={busy}
             onClick={retryPriorPour}
-            className="h-[52px] flex-1 rounded-pill bg-primary text-[15px] font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
+            className="h-[52px] flex-1 rounded-pill bg-primary text-body font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
           >
             Retry prior pour
           </button>
