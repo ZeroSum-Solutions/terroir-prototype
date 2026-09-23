@@ -13,6 +13,7 @@ import {
   verifyFeatureLedger,
 } from "../../../scripts/verify-feature-ledger.mjs";
 import {
+  APPROVED_SOURCE_REPLACEMENTS,
   createInitialLedger,
   generateFeatureLedger,
 } from "../../../scripts/generate-feature-ledger.mjs";
@@ -599,6 +600,24 @@ describe("checked-in feature ledger", () => {
         "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
       completionSpec: "TER-041",
       evidenceOwner: "pour-reconciliation",
+    });
+  });
+
+  it("retains TER-CF-244 while replacing the superseded canonical pour writer", () => {
+    expect(APPROVED_SOURCE_REPLACEMENTS).toContainEqual({
+      id: "TER-CF-244",
+      domain: "database_constraints_and_functions",
+      fromSourceText: "record_pour is the canonical pour-write entry point",
+      toSourceText:
+        "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+    });
+    expect(ledger.items[243]).toMatchObject({
+      id: "TER-CF-244",
+      sourceOrder: 244,
+      sourceText:
+        "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+      completionSpec: "TER-020",
+      evidenceOwner: "data-platform",
     });
   });
 

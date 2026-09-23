@@ -34,6 +34,13 @@ export const APPROVED_SOURCE_REPLACEMENTS = [
     toSourceText:
       "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
   },
+  {
+    id: "TER-CF-244",
+    domain: "database_constraints_and_functions",
+    fromSourceText: "record_pour is the canonical pour-write entry point",
+    toSourceText:
+      "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+  },
 ];
 
 const keyFor = (domain, sourceText) => `${domain}\u0000${sourceText}`;

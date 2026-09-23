@@ -355,7 +355,7 @@
       - match_lwin and match_lwin_batch enrich wines from LWIN catalog
       - lwin_search exposes Postgres full-text search over the catalog
       - cleanup_scan_idempotency periodically clears stale idempotency keys
-      - record_pour is the canonical pour-write entry point
+      - System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility
       - reconcile_open_bottle and reconcile_open_bottles_batch settle inventory
       - auto_eightysix_on_low_inventory flips availability when stock hits zero
       - enrich_wines_batch performs AI enrichment in a single DB-coordinated batch
@@ -617,7 +617,7 @@
     <step number="5">
       <title>Pour + Reconcile</title>
       <tasks>
-        - record_pour wired to UI with optimistic updates
+        - execute_inventory_command wired to the pour UI with caller-stable operation IDs and confirmed-result refresh
         - Open bottles view
         - Reconcile UI driven by reconcile_open_bottles_batch
       </tasks>
