@@ -1,9 +1,20 @@
 # Terroir Product and Data Requirements
 
-**Status:** Draft for owner review. This document does not authorize implementation,
-schema migrations, provider calls, deployment, or production data changes.
+**Status:** Product direction and Q6–Q15 recommendations approved by the owner on
+2026-09-23, followed by an explicit autonomous implementation request. Promote each
+new requirement through the source ledger before implementation. This approval does
+not establish unknown pilot facts or authorize production data changes/deployment.
+The [execution contract](2026-09-23-terroir-production-execution.md) maps approved
+behavior to implementation tasks and proof; it does not replace this product PRD.
 
 **Date:** 2026-09-20
+
+**Last revised:** 2026-09-23, after the owner's offline decision, request for
+recommended interview answers, and identification of Toast as the likely primary POS.
+Restaurants launch first; serious private collectors follow. This is an evolving
+PRD, not a claim that all listed capabilities belong in the first release.
+See [the audit and revised planning sequence](2026-09-22-terroir-plan-audit.md)
+for evidence corrections, recommendations, and remaining interview topics.
 
 **Repository baseline:** `main` at `9ac5a932a099be3bfda6eb59f9682eb0affcd81e`
 
@@ -29,6 +40,40 @@ note, rating, pricing, provenance, search, and audit foundations. Restaurant-onl
 capabilities sit on top of that shared core. A personal collection must not be stored
 as a restaurant merely to reuse existing tables.
 
+### Owner decisions recorded through 2026-09-23
+
+- Prioritize restaurants and serious private collectors; launch restaurants first.
+- Target a sophisticated wine program with multiple locations. The owner's initial
+  profile is “70 people,” “35 wines,” and “20 staff.” Whether these are per-site
+  or group totals, the number of sites, and physical bottle counts remain open.
+- Terroir is the authoritative physical wine inventory system. Recommend keeping
+  orders, checks, payments, and financial sales records authoritative in the POS.
+  The service/depletion contract remains open. For Q8 the owner said the operation
+  will “probably mainly” use Toast: record Toast as the provisional primary POS
+  integration target, not an exclusive vendor commitment. Actual pilot use, API
+  access, integration permissions, and available data remain unverified.
+- Preserve three experiences: rapid restaurant service and management; an image-led
+  collector experience; and later enthusiast discovery and purchasing assistance.
+- Explore role-aware business UI and extensive AI assistance. The role permission
+  matrix, automation thresholds, and generative layout behavior remain proposals.
+- Q5: the owner accepts B for the first release: cached lookup plus offline pours,
+  opened bottles, waste, and counts, synchronized afterward. C is the intended
+  outcome as quickly as possible: extend offline operation to receiving, transfers,
+  and management changes. Treat C as the next priority offline milestone, not a
+  discarded idea or an approved delivery date. Exact management actions, supported
+  devices, outage duration, and conflict/authorization rules remain to be specified.
+
+Offline entries must show pending, synchronized, or needs-review status and the age
+of cached stock. Disconnected devices cannot guarantee globally current availability
+or exclusive allocation of the last bottle. Preserve conflicting physical reports
+for reconciliation without silently overwriting or dropping them. The build contract
+must define secure local persistence, device-loss/revocation handling, and recovery.
+
+Multi-location support is part of the target. Central purchasing, shared warehouses,
+inter-site transfers, group reports, and staff access across sites need a bounded
+pilot definition before they become committed release requirements. Personal
+collector support follows the restaurant pilot; its release date remains unset.
+
 ### Decision PDR-001: shared workspace foundation
 
 **Status:** Accepted by the owner on 2026-09-20.
@@ -41,6 +86,9 @@ design decision. The required behavior is:
 - users join workspaces through memberships and capabilities;
 - both workspace types can own collections, inventory, notes, prices, locations, and
   evidence;
+- restaurant group and site scopes must be explicit; physical location alone does
+  not grant group-wide access. The organization/workspace/site relationship and
+  cross-site role model remain a schema design decision;
 - restaurant workspaces can additionally enable teams, menus, pours, stocktakes,
   receiving, reconciliation, suppliers, and POS-adjacent integrations;
 - existing restaurant IDs, RLS policies, URLs, and critical journeys remain valid
@@ -151,6 +199,8 @@ IDs until they enter the approved source ledger.
 - Invite, revoke, expire, and audit access.
 - Assign roles and narrower capabilities.
 - Preserve existing restaurant owner, manager, and staff behavior.
+- Support the multi-location restaurant target with explicit group/site access;
+  settle cross-site membership and administration through the pilot role matrix.
 - Export or delete workspace data under an explicit retention policy.
 
 ### CAP-02: producer and wine identity
@@ -211,6 +261,9 @@ IDs until they enter the approved source ledger.
 - Preserve correction links rather than deleting the original event.
 - Distinguish unavailable, reserved, pending delivery, in transit, external custody,
   consumed, disposed, and missing states.
+- Keep sealed quantity in units by format and open quantity in mL with exact
+  conversions. Distinguish measured volume from estimates based on standard pours.
+  A bottle-equivalent display must name its conversion basis.
 
 ### CAP-07: locations, containers, and custody
 
@@ -317,9 +370,24 @@ IDs until they enter the approved source ledger.
 - Track open bottles, pours, closeouts, waste, and service adjustments.
 - Reconcile open-bottle volumes independently from sealed-stock counts.
 - Support staff wayfinding and service pull lists.
-- Model transfers between restaurant sites only after multi-venue requirements are
-  approved.
-- Treat POS and supplier integrations as external adapters, not sources of truth.
+- Define site-specific availability and group oversight; scope inter-site transfers,
+  shared storage, purchasing, pars, credits/returns, and shift handoff with the pilot.
+- Where transfers are required, represent dispatch, in transit, receipt, and
+  discrepancies without duplicating stock at both sites.
+- Treat POS and supplier integrations as versioned adapters. Terroir owns physical
+  inventory; the POS owns its financial/order facts and suppliers own their documents.
+- Specify depletion authority per site and service channel. A manual pour and a POS
+  sale of that same glass must produce one physical depletion, with a link between
+  the two observations. Message idempotency alone does not establish that link.
+- Distinguish void before service, void after service, comp, refund, return, and
+  waste. A financial reversal does not automatically restore consumed wine.
+- Preserve occurrence time, receipt time, source revision, effective mapping, and
+  correction links; define stocktake cutoffs and concurrent-service handling.
+- Coordinate stock allocation across channels: opening a 750 mL bottle and serving
+  four 150 mL pours leaves 150 mL open before waste. A linked POS bottle line cannot
+  remove the same sealed unit again. Unmatched records enter reconciliation.
+- Define physical service independently from payment/check status; comped service
+  still consumes wine. Return unopened stock only through a physical return event.
 
 ### CAP-15: restaurant lists and menus
 
@@ -344,6 +412,10 @@ IDs until they enter the approved source ledger.
 - Support cases and long-lived storage without requiring restaurant service concepts.
 - Allow approved household, assistant, advisor, or guest access through capabilities.
 - Provide collection exports that retain stable IDs and provenance.
+- Make imagery, collection browsing, producer/vintage discovery, ratings, notes,
+  price context, and drinking suggestions central to the collector experience.
+  Show image scope and source uncertainty without claiming representative images
+  are exact evidence of the owned bottle.
 
 ### CAP-17: imagery and evidence
 
@@ -377,6 +449,8 @@ IDs until they enter the approved source ledger.
 - Treat service-role paths as privileged and capability-scoped.
 - Keep raw images, invoices, costs, provider credentials, and unredacted queries out
   of general logs and replay tools.
+- Define access, retention, and permitted use of member-attributed pour and variance
+  metrics; do not infer employee misconduct from an unexplained discrepancy.
 - Provide backup, restore, migration, retention, deletion, and export procedures.
 - Apply schema migrations with paired downs, snapshots, generated types, containment
   tests, and exact-SHA release evidence.
@@ -393,6 +467,48 @@ IDs until they enter the approved source ledger.
   measured feasibility and a stable placement model.
 - Never infer inventory count from a room or shelf image unless a later approved
   contract defines evidence strength and human confirmation.
+
+### CAP-21: AI decisions, assistance, and evaluation
+
+- Explore TypeSafe for candidate alignment, extraction verification, intent routing,
+  search ranking, descriptor classification, and evidence checks. These are workload
+  hypotheses until tested on representative examples.
+- Use perception services for images/audio and generative models for explanation;
+  retain deterministic quantity arithmetic, permissions, eligibility, and writes.
+- Reuse existing decision/audit mechanisms where possible. For consequential
+  production actions retain operation, actor, subject, evidence references, model,
+  question/policy versions, typed result, confidence, review, and correction history.
+- Evaluate false acceptance, coverage, review time, end-to-end latency, cost, and
+  fallback behavior against the current workflow and a simpler baseline.
+- Separate calibration/tuning data from held-out evaluation. Sample automatically
+  accepted cases as well as corrected cases; record source/tenant restrictions.
+- Match automatic action and human review to consequence and uncertainty. Do not
+  block routine service on universal approval prompts or a model's availability.
+- Keep model-based prompt/citation checks supplementary to code-enforced boundaries.
+  Text about a suspected wine fault is not physical confirmation of that fault.
+- Keep provider-specific integrations replaceable. Pin evaluated model versions and
+  re-evaluate upgrades; provider speed, price, and confidence claims are not proof
+  of Terroir performance.
+
+### CAP-22: differentiated and role-aware experiences
+
+- Provide restaurant presets for actual authorized roles, including beverage
+  manager, sommelier, and server, with cost visibility and write rights set explicitly.
+- Optimize service for rapid location lookup, availability, pours, interruption
+  recovery, low light, and shared/concurrent staff work.
+- Preserve stable primary controls and navigation. Evaluate generated summaries,
+  suggestions, and user-approved dashboard composition as separate experiments.
+- Keep the collector's visual discovery emphasis distinct from operational density.
+- Enforce capabilities server-side independently of displayed or generated controls.
+
+### CAP-23: enthusiast discovery and purchasing (later horizon)
+
+- Preserve occasion, meal, gift, taste, budget, learning, rating, and wishlist ideas.
+- Keep discovery usable when merchant integration is absent, stating that current
+  local stock or best price is unknown.
+- Make verified merchant price, availability, shipping, format, vintage, observation
+  time, rights, and commercial disclosures prerequisites for those specific claims.
+- Retain the boundary between purchasing assistance and actual transaction execution.
 
 ## 6. Proposed domain and data model
 
@@ -484,9 +600,13 @@ method version must remain available.
 
 ## 7. Current schema gap map
 
+This inherited structural assessment is a starting point for baseline reconciliation,
+not a fresh production or runtime audit. Verify each affected row against current
+code, migrations, and executable evidence before using it in an implementation ticket.
+
 | Current area | What is useful now | Gap against this document | Direction |
 |---|---|---|---|
-| `restaurants`, `memberships` | Proven RLS-backed restaurant tenancy | Personal workspaces and non-restaurant roles are unresolved | Generalize through a staged compatibility migration; do not rename blindly |
+| `restaurants`, `memberships` | Existing RLS-backed restaurant tenancy | Personal workspaces and non-restaurant roles are unresolved | Generalize through a staged compatibility migration; do not rename blindly |
 | `canonical_wines` | Global producer plus cuvee identity | Producer is text, not an entity; no global vintage edition | Introduce producer and edition contracts without breaking current IDs |
 | `wine_variants` | Vintage and size identity with tenant containment | Variant is restaurant-scoped; proposed global edition does not exist | Separate global edition/format identity from private workspace assertions |
 | `wines` | Mature operational row used across the app | Mixes identity, enrichment, cached ratings, pricing, availability, and tenant state | Keep as a compatibility projection while new domains take authority incrementally |
@@ -498,9 +618,9 @@ method version must remain available.
 | rating fields on `wines` | Simple current display | Mixes inferred, external, and cached values; lacks event history | Use user-review, external-event, and aggregate separation |
 | retail fields on `wines` | Current min/median/max cache | No price history, type, currency, method, or observation lineage | Add price observations; retain current fields as projections if useful |
 | `pricing_recommendations` | Restaurant action suggestions | One current row per wine, no recommendation history | Treat as recomputable output with saved decisions where needed |
-| invoice and import tables | Strong intake and review foundation | Purchase, lot, evidence, and inventory application are not one canonical lifecycle | Define one acquisition/intake state machine before expanding providers |
-| pours and reconciliation | Strong restaurant operations | Not applicable to personal workspaces; sealed-stock count remains absent | Gate by capabilities and add separate stocktake domain |
-| wine lists | Mature restaurant publishing | No effective history for published price/availability | Add publication snapshots only if operational or legal needs require them |
+| invoice and import tables | Existing intake and review structures | Purchase, lot, evidence, and inventory application are not one canonical lifecycle | Define one acquisition/intake state machine before expanding providers |
+| pours and reconciliation | Existing restaurant workflows | Not applicable to personal workspaces; sealed-stock count remains absent | Gate by capabilities and add separate stocktake domain |
+| wine lists | Existing restaurant publishing | No effective history for published price/availability | Add publication snapshots only if operational or legal needs require them |
 
 ## 8. Data invariants
 
@@ -528,6 +648,12 @@ The detailed schema may change. These invariants may not.
    require the proper authority, and leave the required audit record.
 15. Retryable writes use durable idempotency keys at the boundary where duplication
    would create a second fact or inventory change.
+16. One physical service occurrence has one depletion outcome, even when staff and
+   POS each report it. Shared stock allocation prevents double use of the last unit.
+17. Sealed count and open volume never sum without a named, dimensionally valid
+   conversion. Opening moves stock between states; pouring consumes open volume.
+18. Physical service is independent of payment state. A comp or post-service refund
+   does not undo consumption; restoring stock requires a physical correction/return.
 
 ## 9. Requirement status model
 
@@ -552,6 +678,13 @@ Do not use `active` as a synonym for shipped.
 PDR-001 is settled. The decisions below change schema grain, permissions, or product
 scope and should be answered before database tickets freeze.
 
+Freeze only the decisions needed by the restaurant pilot and shared identity/access
+boundaries. Collector-only portions of PDR-004/005/006/007/009 remain open for
+collector discovery. Defaults are recommendations, not owner answers. Multi-location
+scope (PDR-011) replaces the old defer recommendation. PDR-013 now has an accepted
+release sequence (B first, C as soon as practical); its detailed acceptance and
+failure policies remain open. The audit records the full supersession history.
+
 | ID | Decision | Recommended default | Why it matters |
 |---|---|---|---|
 | PDR-002 | Can one workspace contain multiple named collections? | Yes, but one default collection in the first migration | Supports home plus professional storage without multiplying tenants |
@@ -563,57 +696,178 @@ scope and should be answered before database tickets freeze.
 | PDR-008 | Which case states and count authorities are allowed? | Expected, confirmed contents, sealed, opened, partial, damaged | Defines inventory events and evidence strength |
 | PDR-009 | Who may receive a share, and what may they do? | Named users first; expiring view-only links later | Defines access-grant schema and abuse cases |
 | PDR-010 | Which external custody provider is first? | None until a lawful API or export contract is selected | Prevents provider-specific schema and credential risk |
-| PDR-011 | Is multi-venue restaurant support in the next horizon? | Defer until a real operator supplies requirements | Avoids premature organization hierarchy |
+| PDR-011 | What multi-location group/site behavior must the restaurant pilot support? | Multi-location target confirmed; clarify site count, shared inventory, transfers, oversight, and access | Sets tenant/site boundaries without assuming every group workflow is launch scope |
 | PDR-012 | Is marketplace or sale execution part of Terroir? | No; retain acquisition and value data without transaction execution | Avoids compliance and tax scope entering the core model |
-| PDR-013 | What offline writes are required? | Stocktake capture only after conflict behavior is specified | Offline inventory mutation has high reconciliation risk |
+| PDR-013 | What offline reads/writes are required? | Owner accepted B on September 23: cached lookup and offline service/count capture first; C (receiving, transfers, management) is the priority follow-on | Detailed conflict, stocktake cutoff, revoked access, duplicate-device, outage duration, and device-loss behavior still require specification |
 | PDR-014 | What does “why I bought this” mean? | User-authored acquisition note linked to the lot | Avoids confusing invoice context with personal rationale |
+
+### Remaining interview: proposed answers to Q6–Q15
+
+Status: all recommendations below accepted on September 23 by “Agree with all,”
+with Toast identified as the likely primary POS. The owner also authorized autonomous
+implementation, testing, iteration, agent delegation, and mobile optimization.
+Recommendation language below preserves the wording approved. Agreement approves
+product choices, not unknown operational facts or implied access. Production-release
+gates and explicit roadmap deferrals remain as approved in Q15. Engineers may resolve
+reversible implementation choices without waiting for the absent owner.
+
+6. **Group and locations.** Recommend a group workspace with separately controlled
+   sites, scoped group oversight, consolidated stock views, and tracked transfers.
+   Rehearse at one site, then prove the cross-site cycle at two before claiming
+   multi-site readiness. Defer central purchasing and warehouse automation. Actual
+   site count, whether 70/35/20 are per-site, storage arrangements, and legal stock
+   owners remain unknown; different legal owners need a distinct transfer policy.
+7. **Primary problem and success.** Propose trusted availability and reduced
+   inventory administration as the primary outcome. Provisional pilot targets:
+   90% of trained-staff lookup tasks within 10 seconds, 90% of standard-pour logging
+   tasks within 3 seconds once the wine is selected, and 50% less staff time for
+   the same count/reconciliation scope. Measure baseline and a four-week pilot at
+   the same venues; the beverage manager and owner judge success. Offline timing
+   measures durable local capture, not server synchronization. No lost acknowledged
+   entries, duplicate depletion, or unauthorized access in the required test suite.
+   These are proposed targets, not measured results; changes require explicit review.
+8. **POS and depletion.** Recommend keeping orders/payments in the existing POS
+   and physical inventory in Terroir. Use staff-recorded physical events as the
+   initial depletion authority; POS/imported sales corroborate and flag discrepancies,
+   never subtract a second time. Do not make an unverified integration a controlled
+   pilot prerequisite. Owner update: Toast is the provisional primary vendor, not
+   an exclusive commitment. API access, actual pilot configuration, and present
+   staff workflow remain unknown. The later blanket approval accepts the proposed
+   staff-recorded depletion policy without establishing live Toast access.
+9. **Roles and staff data.** Recommend owner/group admin, beverage manager/sommelier,
+   shift manager, service staff, and receiving/counting capabilities. Grant site
+   access explicitly. Owners and authorized beverage managers see costs/margins;
+   service staff see availability, locations, guest prices, and service actions.
+   Receiving staff can capture deliveries/counts; managers approve discrepancies.
+   Routine service needs no manager approval. Log actor history for accountability;
+   keep staff-attributed variance private and exclude automated performance rankings.
+   Actual roles, delegates, and retention periods still need validation.
+10. **Physical tracking.** Recommend quantities by wine/vintage/format and acquisition
+    lot, individually tracked open bottles with remaining mL, and optional individual
+    sealed-bottle tags for rare/high-value stock. Venue-defined pour sizes, tasting
+    portions, flights, waste, and explicit bottle/table holds share one stock model.
+    Show estimated open volume as estimated. Do not require every bottle to be tagged.
+11. **Receiving and counts.** Recommend invoice photo/PDF/CSV capture with review
+    of uncertain identities, quantities, costs, and vintage before posting; record
+    shortages, damage, returns, and supplier credits separately. Start with daily
+    open-bottle checks and weekly full counts, then tune frequency using pilot effort
+    and variance. Beverage managers own unresolved discrepancies. Actual suppliers,
+    source files, and existing count practices remain unknown.
+12. **Devices and service UX.** Recommend phone-first service, shared-tablet support,
+    and desktop management; rapid staff identification without shared identities.
+    Use readable low-light screens, large stable controls, interruption recovery,
+    scan-assisted lookup, and a manual fallback. Voice is optional, never required
+    in a noisy venue. Devices and shared-device authentication need field validation.
+13. **AI authority.** Recommend early assistance for import checks, wine matching,
+    search, pairings, concise staff explanations, and anomaly detection. Evaluate
+    TypeSafe for bounded judgments/ranking against rules and current alternatives;
+    use separate perception/generative services where needed. Permit validated,
+    authorized low-risk assistance automatically; require confirmation for uncertain
+    identity, count adjustments, purchasing, pricing, or access changes. Normal
+    authorized pours do not need an AI review. Keep role controls stable; generated
+    suggestions/composition must not rearrange service controls mid-task. Ground
+    factual wine advice in sources, show uncertainty, isolate tenant data, and keep
+    core service usable without AI. Model quality, latency, spend caps, provider data
+    permissions, and exceptional-action review thresholds remain explicit gates.
+14. **Collector scope.** Recommend the next customer release after the restaurant
+    pilot: image-led browsing, exact location, producer/vintage information, provenance,
+    purchase prices, sourced value observations, note/rating history, drink-window
+    guidance, pairings, and discovery within the owned collection. Support multiple
+    cellars and delegated access. Preserve 3D exploration, merchant integrations,
+    and later enthusiast purchasing in the roadmap without making them restaurant
+    launch requirements. Collector scale/custody examples and data/image rights remain
+    to be verified; unknown valuations or missing exact images stay explicit.
+15. **Launch and autonomous-run boundaries.** Recommend an invite-only restaurant
+    pilot in one selected country and operating currency; no alcohol checkout/sales
+    execution in the first release. Use readiness gates rather than an invented date:
+    verified critical journeys, tenant/site isolation, offline recovery, migration and
+    backup/restore rehearsal, monitoring, and independent adversarial review. Require
+    a genuinely isolated test environment before claiming staging proof. Prepare
+    implementation/testing autonomously after the build contract is approved; retain
+    a separate owner gate for production data/migrations, merge-to-main deployment,
+    paid services beyond existing approvals, and live release. Country/currency,
+    pilot access, budget caps, and deadline remain unknown; initial commercial success
+    is continued pilot use and validated willingness to pay, not assumed revenue.
 
 ## 11. Delivery sequence
 
 ### Phase 0: approve the contract
 
-1. Review this document and record PDR-002 through PDR-014.
-2. Mark each capability as required now, later, deferred, or rejected.
-3. Convert the approved subset into observable acceptance criteria.
-4. Amend `app_spec.txt` through the source-ledger process and regenerate the feature
-   ledger. Do not hand-edit `docs/feature-ledger.json`.
+1. Finish the owner interview, preserving the maximum of 15 numbered questions.
+   Q1–Q5 have answers and Q6–Q15 recommendations are approved, including Q7's proposed
+   pilot metrics. Q8 names Toast as the likely primary vendor. Missing operational
+   facts remain unknown; pilot measurements are not established by approval.
+2. Record PDR-002 through PDR-014 and the additional POS, service, role, pilot,
+   and AI decisions identified in the September 22 audit. Distinguish accepted
+   owner decisions, proposed defaults, and unanswered questions.
+3. Mark each capability as required now, later, experiment, deferred, or rejected;
+   map it to current code/schema/evidence without treating presence as runtime proof.
+4. Define the receive/place/find/serve/count/reconcile journey, group/site boundary,
+   one-depletion rule, offline behavior, and measurable pilot success criteria.
+5. Amend `app_spec.txt` through the source-ledger process for approved requirements
+   and regenerate the feature ledger. Do not hand-edit `docs/feature-ledger.json`.
 
 ### Phase 1: schema and migration design
 
 1. Produce an entity and event model with stable record grain.
 2. Map every current table and reader to keep, adapt, project, migrate, or retire.
 3. Design the workspace compatibility path and RLS matrix.
+   Map group, stock/legal owner, workspace, site, collection, and membership onto
+   existing restaurant IDs before selecting a migration. Test site-limited access,
+   group manager grants, and linked cross-site transfers; do not silently widen RLS.
 4. Design producer, wine product, edition, format, lot, inventory-event, location,
    note, rating, and price-observation boundaries.
 5. Define migration ordering, dual-read or compatibility views, rollback, and data
    quality reports.
 6. Review the plan independently before writing migrations.
 
-### Phase 2: shared foundation
+### Phase 2: minimum shared foundation for the restaurant pilot
 
-1. Land workspace compatibility without changing restaurant behavior.
-2. Land global identity additions and resolution reports.
-3. Land acquisition lots and inventory events behind existing workflows.
-4. Land note, rating, price, and provenance contracts in separately reviewable slices.
+1. Land only the workspace/site compatibility needed by the agreed pilot without
+   changing existing restaurant behavior.
+2. Reuse global identity structures; add only demonstrated gaps and resolution reports.
+3. Adapt existing acquisition and inventory operations to the agreed event contract;
+   avoid a wholesale rewrite when compatible extensions satisfy the pilot.
+4. Add note, cost, and provenance contracts required by the restaurant pilot in
+   separately reviewable slices; defer unrelated valuation/collector expansion.
 5. Keep current application projections until each reader has moved and passed its
    regression suite.
 
-### Phase 3: personal collection vertical slice
+### Phase 3: restaurant pilot and inventory cycle
 
-Deliver one complete path: personal workspace creation, one-bottle intake, confirmed
+Deliver receive, place, find, serve, count, and reconcile with the agreed site
+permissions and group workflows. Keep sealed-stock counts and open-bottle volume
+reconciliation distinct. Prove no double depletion from staff/POS records, retries,
+and order revisions. Verify the offline and transfer cases that the pilot requires.
+Measure staff task performance against its current baseline. A one-site rehearsal
+does not establish multi-site readiness.
+
+Before building, choose the metric unit, site scope, time period, baseline, target,
+judge, and stop/descope conditions. Offline writes must pass replay after partial
+failure, stocktake-cutoff, revoked-access, and concurrent-device cases. Q5 establishes
+B as first-release behavior and C as the priority offline extension; specify the
+remaining failure/authorization policies and C's acceptance gates before building it.
+
+AI fixture experiments may run during discovery. Introduce successful helpers in
+shadow mode before enabling their authorized actions. A new table family is not
+a prerequisite to evaluation. Production decisions need the agreed audit/review
+contract, a held-out evaluation, fallback behavior, and an operational owner.
+
+### Phase 4: personal collection vertical slice
+
+Deliver personal workspace creation, intake, confirmed or explicitly unresolved
 identity, acquisition lot, quantity, location or unplaced state, private evidence,
-note, cost, and collection view. Prove that existing restaurant journeys did not
-change.
-
-### Phase 4: restaurant inventory cycle
-
-Deliver receiving, bin-scoped stocktake, discrepancy review, conflict-safe apply, and
-audit evidence. Keep open-bottle reconciliation as a separate workflow.
+notes, ratings, cost, and image-led collection browsing. Add collector-specific
+custody, provenance, value, and drinking guidance according to its release scope.
+Prove that existing restaurant journeys did not change.
 
 ### Phase 5: deeper intelligence and spatial work
 
 Add price history, valuations, sourced ratings, drink guidance, Atlas, assisted grids,
 voice, and 3D only after the shared entities and evidence contracts are stable.
+Basic versions required by an approved earlier release can ship in that slice;
+this phase covers deeper expansion. Enthusiast discovery follows the priority
+markets; merchant-dependent promises require verified access and rights.
 
 ## 12. Verification requirements for future implementation
 
@@ -631,6 +885,24 @@ Every schema-affecting slice must include:
 - exact changed-row and unresolved-row reports for backfills;
 - independent review before merge;
 - exact-SHA staging and release evidence before production promotion.
+
+### Restaurant acceptance scenarios for approved implementation tickets
+
+1. One 750 mL bottle opened and four 150 mL pours leave 150 mL open before waste;
+   linked POS reporting never removes the same sealed bottle again.
+2. A six-unit dispatch and five-unit receipt leave one explicitly unresolved unit
+   under an accountable owner/custodian; unrelated site staff cannot access it.
+3. Replaying a permitted offline write after partial failure yields one domain
+   outcome, and a stocktake cutoff preserves later service activity.
+4. A wrong suggested producer match leaves the import unresolved after rejection;
+   a confirmed correction and reversal retain source evidence and history.
+5. Comp, split, reopen, and refund updates preserve served wine consumption,
+   including out-of-order delivery of those updates.
+
+These scenarios operationalize the approved inventory/recovery requirements; they
+are not passing test results. Q5 approves the B-to-C offline direction. The execution
+contract records reversible engineering policies and required tests. Direction
+approval does not prove either tier works.
 
 ## 13. Source reconciliation
 
@@ -660,3 +932,25 @@ This draft is ready for owner review when:
 - open decisions are explicit enough to answer without reading the entire archive;
 - no code, migration, provider, deployment, or production change is implied by approval
   of the document alone.
+
+## 15. Change and decision history
+
+- 2026-09-20: original consolidated draft, CAP-01 through CAP-20; existing PDR-001
+  approval retained from the earlier document.
+- 2026-09-22: recorded restaurant-first sequence, multi-location target, and Terroir
+  inventory authority from owner answers. Added CAP-21/22/23 for AI, role-aware
+  experiences, and the later enthusiast vision. Corrected POS authority and
+  cross-source depletion rules. Collector-only schema choices remain open.
+- 2026-09-22: Opus 5 challenged the proposed plan. The linked audit records findings,
+  accepted/rejected recommendations, source limitations, and acceptance scenarios.
+  The interview is incomplete; this revision is not a final approved build contract.
+- 2026-09-23: owner accepted offline B for the first release and C as the intended
+  outcome as quickly as possible. Added recommended answers to Q6–Q15 for batch
+  approval; none of those recommendations or missing facts is silently accepted.
+- 2026-09-23: owner identified Toast as the likely primary POS (Q8 partial answer).
+  Recorded a provisional Toast-first target without assuming API access, exclusive
+  vendor use, a depletion policy, or approval of the remaining recommendations.
+- 2026-09-23: owner approved all Q6–Q15 recommendations and explicitly requested
+  /goal implementation through production readiness, mobile optimization, arbitrary
+  agent delegation, and JEV verification. Prior unapproved status is superseded;
+  unknown facts, empirical pilot results, and the approved release gates remain.
