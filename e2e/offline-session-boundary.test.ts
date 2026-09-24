@@ -7,6 +7,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Route,
   type TestInfo,
 } from "@playwright/test";
 import {
@@ -54,6 +55,14 @@ const VIEWPORTS = [
 ] as const;
 
 type ForwardedSignOut = { forwardedSetCookieCount: number; responseSetCookieCount: number; status: number };
+type ProtectedSignalObservation = {
+  location: string | null;
+  method: string;
+  requestHeaders: Record<string, string>;
+  responseSetCookieCount: number;
+  status: number;
+  url: string;
+};
 
 const driverContract = {
   name: OFFLINE_DATABASE_NAME,
@@ -338,23 +347,61 @@ test.describe("offline session boundary", () => {
     ];
 
     for (const headers of requestCases) {
-      const [response] = await Promise.all([
-        page.waitForResponse((candidate) => (
-          new URL(candidate.url()).pathname === "/cellar" && candidate.status() === 307
-        )),
-        page.evaluate(async (signalHeaders) => {
-          await fetch("/cellar", {
-            credentials: "same-origin",
-            headers: signalHeaders,
-            redirect: "manual",
-          });
-        }, headers),
-      ]);
-      const actualHeaders = await response.request().allHeaders();
-      for (const [name, value] of Object.entries(headers)) {
-        expect(actualHeaders[name.toLowerCase()]).toBe(value);
+      const observation = deferred<ProtectedSignalObservation>();
+      const handler = async (route: Route) => {
+        try {
+          const request = route.request();
+          const response = await route.fetch({ maxRedirects: 0 });
+          const allRequestHeaders = await request.allHeaders();
+          const observed: ProtectedSignalObservation = {
+            location: response.headers().location ?? null,
+            method: request.method(),
+            requestHeaders: Object.fromEntries(Object.keys(headers).map((name) => [
+              name.toLowerCase(),
+              allRequestHeaders[name.toLowerCase()] ?? "",
+            ])),
+            responseSetCookieCount: response.headersArray().filter(
+              ({ name }) => name.toLowerCase() === "set-cookie",
+            ).length,
+            status: response.status(),
+            url: request.url(),
+          };
+          try {
+            await route.fulfill({ response });
+          } finally {
+            await response.dispose();
+          }
+          observation.resolve(observed);
+        } catch (error) {
+          observation.reject(error);
+          await route.abort("failed").catch(() => undefined);
+        }
+      };
+      await page.route("**/cellar", handler);
+      try {
+        const [observed] = await Promise.all([
+          observation.promise,
+          page.evaluate(async (signalHeaders) => {
+            await fetch("/cellar", {
+              credentials: "same-origin",
+              headers: signalHeaders,
+              redirect: "manual",
+            });
+          }, headers),
+        ]);
+        expect(observed.method).toBe("GET");
+        expect(new URL(observed.url).pathname).toBe("/cellar");
+        for (const [name, value] of Object.entries(headers)) {
+          expect(observed.requestHeaders[name.toLowerCase()]).toBe(value);
+        }
+        expect(observed.status).toBe(307);
+        expect(observed.location).toBe("/login?next=%2Fcellar");
+        expect(observed.responseSetCookieCount).toBe(0);
+        expect(await authCookieSnapshot(page.context())).toEqual(authBefore);
+        await expectRootMarker(page.context(), HARD_DEVICE_LOCK);
+      } finally {
+        await page.unroute("**/cellar", handler);
       }
-      expect(await response.headerValues("set-cookie")).toEqual([]);
     }
 
     expect(await authCookieSnapshot(page.context())).toEqual(authBefore);
@@ -473,7 +520,8 @@ test.describe("offline session boundary", () => {
     });
     await openSignedInCellar(page);
     await seedOfflineFixture(page);
-    const actorAStoreBefore = await expectUnlockedFixture(page, { projections: 1 });
+    await expectUnlockedFixture(page, { projections: 1 });
+    const actorAStoreBefore = await readOfflineFixture(page);
     await installCookieWriteFailure(page);
     await installIndexedDbOpenFailures(page, "all");
     await page.route("**/auth/signout", (route) => route.abort("failed"));

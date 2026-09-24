@@ -48,9 +48,14 @@ test.describe("positive offline eligibility", () => {
   test.beforeEach(({ baseURL }) => expect(baseURL).toBe(APP_ORIGIN));
 
   test("fresh transition provisions an absent partition before deleting the exact marker", async ({ page }) => {
-    const payload = await loginAndReadPayload(page);
+    const loginPayload = await loginAndReadPayload(page);
     const generation = await generationCookie(page.context());
-    await page.goto("/cellar");
+    const payload = await gotoCellarAndReadProvisioningPayload(page);
+    expect(payload.context.contextId).not.toBe(loginPayload.context.contextId);
+    expect(payload.context).toMatchObject({
+      userId: loginPayload.context.userId,
+      restaurantId: loginPayload.context.restaurantId,
+    });
     await waitForAcknowledgement(page);
 
     const stored = await readOfflineState(page);
@@ -92,10 +97,21 @@ test.describe("positive offline eligibility", () => {
   test("a reload before successful marker acknowledgement remains unavailable", async ({ page }) => {
     await refuseMarkerDeletion(page);
     await loginAndReadPayload(page);
+    await page.goto("/api/health");
+    expect(await readOfflineState(page)).toEqual({
+      state: "not_initialized",
+      stores: [],
+      userContexts: [],
+      fences: [],
+      projections: [],
+    });
+    expect(await offlineDatabaseExists(page)).toBe(false);
     await page.goto("/cellar");
     await expectRootMarker(page.context(), REPROVISION_REQUIRED);
-    await expect.poll(async () => (await readOfflineState(page)).fences[0]?.state)
-      .toBe("eligible");
+    await expect.poll(async () => {
+      const stored = await readOfflineState(page);
+      return { state: stored.state, stores: stored.stores, fence: stored.fences[0]?.state };
+    }).toEqual({ state: "ready", stores: ["contexts", "projections"], fence: "eligible" });
     await page.reload();
     await expectRootMarker(page.context(), REPROVISION_REQUIRED);
   });
@@ -217,22 +233,47 @@ test.describe("positive offline eligibility", () => {
     await loginAndReadPayload(page);
     await page.goto("/cellar");
     await expectRootMarker(page.context(), REPROVISION_REQUIRED);
-    await expect.poll(async () => (await readOfflineState(page)).fences[0]?.state)
-      .toBe("denied");
+    await expect.poll(async () => {
+      const stored = await readOfflineState(page);
+      return { state: stored.state, stores: stored.stores, fence: stored.fences[0]?.state };
+    }).toEqual({ state: "ready", stores: ["contexts", "projections"], fence: "denied" });
   });
 
   test("legacy and unrelated locked rows never become eligible", async ({ page }) => {
-    const payload = await loginAndReadPayload(page);
+    const loginPayload = await loginAndReadPayload(page);
+    const generation = await generationCookie(page.context());
     await page.goto("/api/health");
-    await seedLegacyAndLockedRows(page, payload);
-    await page.goto("/cellar");
+    await seedLegacyAndLockedRows(page, loginPayload);
+    const payload = await gotoCellarAndReadProvisioningPayload(page);
+    expect(payload.context.contextId).not.toBe(loginPayload.context.contextId);
+    expect(payload.context).toMatchObject({
+      userId: loginPayload.context.userId,
+      restaurantId: loginPayload.context.restaurantId,
+    });
     await waitForAcknowledgement(page);
     const stored = await readOfflineState(page);
     expect(stored.userContexts.filter((row) => row.lockedAt === null)).toEqual([
-      expect.objectContaining({ contextId: payload.context.contextId }),
+      expect.objectContaining({
+        contextId: payload.context.contextId,
+        userId: payload.context.userId,
+        restaurantId: payload.context.restaurantId,
+        authorizationGeneration: generation,
+      }),
     ]);
     expect(stored.userContexts.filter((row) => row.userId !== payload.context.userId))
       .toEqual(expect.arrayContaining([expect.objectContaining({ lockedAt: expect.any(String) })]));
+    expect(stored.projections).toEqual([
+      expect.objectContaining({ contextId: payload.context.contextId }),
+    ]);
+    expect(stored.fences).toEqual([
+      expect.objectContaining({
+        state: "eligible",
+        authorizationGeneration: generation,
+        eligibleUserId: payload.context.userId,
+        eligibleRestaurantId: payload.context.restaurantId,
+        eligibleContextId: payload.context.contextId,
+      }),
+    ]);
   });
 
   test("a delayed older tab loses to the newer response through the fence revision", async ({ browser, baseURL }) => {
@@ -315,6 +356,16 @@ async function loginAndReadPayload(page: Page): Promise<OfflineContextResponse> 
   expect(response.ok(), await response.text()).toBeTruthy();
   return response.json() as Promise<OfflineContextResponse>;
 }
+async function gotoCellarAndReadProvisioningPayload(page: Page): Promise<OfflineContextResponse> {
+  const responsePromise = page.waitForResponse((response) => (
+    new URL(response.url()).pathname === "/api/offline-context"
+      && response.request().method() === "GET"
+  ));
+  await page.goto("/cellar");
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  return response.json() as Promise<OfflineContextResponse>;
+}
 async function waitForAcknowledgement(page: Page) {
   await expect(page.getByLabel("Settings")).toBeVisible();
   await expect.poll(() => rootMarker(page.context())).toBeNull();
@@ -336,27 +387,105 @@ async function generationCookie(context: BrowserContext) {
 }
 
 async function readOfflineState(page: Page) {
-  return page.evaluate(async ({ name, version }) => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+  return page.evaluate(async ({ name, version, stores }) => {
+    const notInitialized = () => ({
+      state: "not_initialized" as const,
+      stores: [] as string[],
+      userContexts: [] as Record<string, unknown>[],
+      fences: [] as Record<string, unknown>[],
+      projections: [] as Record<string, unknown>[],
+    });
+    const existing = (await indexedDB.databases()).find((database) => database.name === name);
+    if (!existing) return notInitialized();
+    if (existing.version !== version) {
+      throw new Error(`Unexpected ${name} version ${existing.version}; expected ${version}.`);
+    }
+
+    const database = await new Promise<IDBDatabase | null>((resolve, reject) => {
       const request = indexedDB.open(name, version);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      let upgradeDatabase: IDBDatabase | null = null;
+      let upgradeOldVersion: number | null = null;
+      request.onupgradeneeded = (event) => {
+        upgradeDatabase = request.result;
+        upgradeOldVersion = event.oldVersion;
+        const transaction = request.transaction;
+        if (!transaction) {
+          upgradeDatabase.close();
+          reject(new Error(`Observation of ${name} entered an upgrade without a transaction.`));
+          return;
+        }
+        try {
+          transaction.abort();
+          upgradeDatabase.close();
+        } catch (error) {
+          upgradeDatabase.close();
+          reject(error);
+        }
+      };
+      request.onsuccess = () => {
+        if (upgradeOldVersion !== null) {
+          request.result.close();
+          reject(new Error(`Observation of ${name} unexpectedly committed an upgrade.`));
+          return;
+        }
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        upgradeDatabase?.close();
+        if (upgradeOldVersion === 0 && request.error?.name === "AbortError") {
+          resolve(null);
+          return;
+        }
+        if (upgradeOldVersion !== null) {
+          reject(new Error(
+            `Observation of ${name} refused an unexpected upgrade from version ${upgradeOldVersion}.`,
+            { cause: request.error },
+          ));
+          return;
+        }
+        reject(request.error ?? new Error(`Failed to observe ${name}.`));
+      };
+      request.onblocked = () => reject(new Error(`Observation of ${name} was blocked.`));
     });
-    const transaction = database.transaction(["contexts", "projections"], "readonly");
-    const all = (store: string) => new Promise<Record<string, unknown>[]>((resolve, reject) => {
-      const request = transaction.objectStore(store).getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const contexts = await all("contexts");
-    const projections = await all("projections");
-    database.close();
-    return {
-      userContexts: contexts.filter((row) => row.recordType !== "device_access_fence"),
-      fences: contexts.filter((row) => row.recordType === "device_access_fence"),
-      projections,
-    };
-  }, { name: OFFLINE_DATABASE_NAME, version: OFFLINE_DATABASE_VERSION });
+    if (!database) return notInitialized();
+    const actualStores = [...database.objectStoreNames].sort();
+    const expectedStores = [...stores].sort();
+    if (JSON.stringify(actualStores) !== JSON.stringify(expectedStores)) {
+      database.close();
+      throw new Error(
+        `Unexpected ${name} stores ${JSON.stringify(actualStores)}; expected ${JSON.stringify(expectedStores)}.`,
+      );
+    }
+    try {
+      const transaction = database.transaction(stores, "readonly");
+      const all = (store: string) => new Promise<Record<string, unknown>[]>((resolve, reject) => {
+        const request = transaction.objectStore(store).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const contexts = await all("contexts");
+      const projections = await all("projections");
+      return {
+        state: "ready" as const,
+        stores: actualStores,
+        userContexts: contexts.filter((row) => row.recordType !== "device_access_fence"),
+        fences: contexts.filter((row) => row.recordType === "device_access_fence"),
+        projections,
+      };
+    } finally {
+      database.close();
+    }
+  }, {
+    name: OFFLINE_DATABASE_NAME,
+    version: OFFLINE_DATABASE_VERSION,
+    stores: ["contexts", "projections"],
+  });
+}
+
+async function offlineDatabaseExists(page: Page) {
+  return page.evaluate(async (name) => (
+    (await indexedDB.databases()).some((database) => database.name === name)
+  ), OFFLINE_DATABASE_NAME);
 }
 
 async function lockUnlockedContexts(page: Page) {
