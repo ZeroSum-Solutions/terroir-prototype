@@ -11,7 +11,10 @@ an atomic inventory timestamp. This evidence covers the endpoint only; deploymen
 the full offline workflow are unverified. Completion status remains in the generated
 feature ledger and product conformance report.
 
-TER-CF-291 through TER-CF-293 store work exists only as concurrent, unverified WIP.
+The native store policy and driver for TER-CF-291 through TER-CF-293 have 34 passing
+deterministic tests and independent acceptance of that bounded implementation.
+They are not yet connected to application flows. Real-browser persistence and
+session integration remain unverified; these requirements are not complete.
 TER-CF-294 through TER-CF-296 public-shell, session-boundary, and cached-search work
 is incomplete. This lookup slice adds no mutation capture, queue, replay, recovery
 report, count, transfer, receiving flow, provider call, schema migration, dependency,
@@ -209,7 +212,7 @@ required dependencies, not silently deferred features.
 | 0. Source/contract promotion | `docs/plans/2026-09-23-terroir-offline-operation-contract.md` and `docs/plans/2026-09-23-terroir-production-execution.md` | Adopt this exact lookup-only scope first. Mark every new requirement **UNIMPLEMENTED** and preserve C03/C05/Q10/C04 dependencies; make no shipped/runtime claim. |
 | 1. Pure contract | `src/domains/offline/contract.ts`, `contract.test.ts` | Exact v1 schema; forbidden fields cannot serialize; no role/capability/operation types. |
 | 2. Authorized projection | `src/app/api/offline-context/route.ts` and test; a dedicated server query/mapper module | Actor/site derived from current auth; spoofed IDs ignored; revocation denied; lease <=12h; response `no-store`; every authorized placement preserved. |
-| 3. Native store | Planned IndexedDB store module and test under existing `src/domains/offline/` | IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
+| 3. Native store | [Store policy](../../src/domains/offline/database.ts), [IndexedDB driver](../../src/domains/offline/indexeddb.ts), and focused tests under `src/domains/offline/` | Local deterministic tests and independent review pass; real-browser proof remains required. IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
 | 4. Session boundary | Planned offline-aware sign-out component under existing `src/app/(app)/`; [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); `src/app/auth/signout/route.ts`; `src/app/auth/callback/route.ts`; `src/app/api/dev-login/route.ts`; `src/lib/supabase/proxy.ts`; existing focused tests | No locked-login loop; active restaurant cleared; success-only unlock cookie; both local persistence failure branches render honestly. |
 | 5. Public shell | Planned offline route and client page under existing `src/app/`; planned offline provider under existing `src/app/(app)/`; [application layout](../../src/app/%28app%29/layout.tsx); `src/lib/context/restaurant.tsx`; planned service worker under existing `public/` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
 | 6. Browser proof | focused Playwright spec | All proofs below pass before any implemented ledger assertion may be promoted to proved; lookup-only scope and C03/C05/Q10/C04 dependency states remain explicit. |
