@@ -90,7 +90,7 @@ test.describe("discard command mobile recovery", () => {
   test("replays one committed discard without duplicating its spill", async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 320, height: 844 });
     await login(page);
 
     const openResponse = await page.request.post("/api/open-bottles", {
@@ -136,21 +136,34 @@ test.describe("discard command mobile recovery", () => {
     await page.evaluate(() => localStorage.setItem("terroir-theme", "light"));
     await page.reload();
     const fixtureRow = page.getByRole("listitem").filter({ hasText: producer });
+    const identity = fixtureRow.locator(".font-serif.text-body-lg").first();
     await expect(fixtureRow).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     const close = fixtureRow.getByRole("button", { name: "Close bottle" });
     await expectTouchTarget(close, "close bottle");
     await close.click();
-    const cancel = fixtureRow.getByRole("button", { name: "Cancel close" });
+    const cancelAt320 = fixtureRow.getByRole("button", { name: "Cancel close" });
+    const confirmAt320 = fixtureRow.getByRole("button", { name: /^Confirm discard / });
+    await expectTouchTarget(cancelAt320, "320px cancel discard");
+    await expectTouchTarget(confirmAt320, "320px confirm discard");
+    await expectNoHorizontalOverflow(page);
+    const identityAt320 = await identity.boundingBox();
+    const actionsAt320 = await confirmAt320.locator("..").boundingBox();
+    expect(identityAt320, "320px wine identity has no bounding box").not.toBeNull();
+    expect(actionsAt320, "320px confirm actions have no bounding box").not.toBeNull();
+    await attachScreenshot(page, testInfo, "320px-discard-confirm");
+    await cancelAt320.click();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(page);
+    await close.click();
     const confirm = fixtureRow.getByRole("button", { name: /^Confirm discard / });
-    await expectTouchTarget(cancel, "cancel discard");
     await expectTouchTarget(confirm, "confirm discard");
     await confirm.click();
 
     const retry = fixtureRow.getByRole("button", { name: "Retry prior action" });
     const warning = fixtureRow.getByRole("alert");
-    const identity = fixtureRow.locator(".font-serif.text-body-lg").first();
     await expect(retry).toBeVisible();
     await expect(warning).toHaveText(
       "Discard not confirmed. This may already be recorded. Retry the prior action to check; do not discard again.",
@@ -219,6 +232,14 @@ test.describe("discard command mobile recovery", () => {
       warningGeometry.lineCount,
       `discard warning collapses into ${warningGeometry.lineCount} lines at 390px`,
     ).toBeLessThanOrEqual(6);
+    expect(
+      identityAt320!.width,
+      `wine identity collapses to ${identityAt320!.width}px beside 320px confirm actions`,
+    ).toBeGreaterThanOrEqual(120);
+    expect(
+      actionsAt320!.y,
+      "320px wine identity overlaps the confirmation actions",
+    ).toBeGreaterThanOrEqual(identityAt320!.y + identityAt320!.height - 1);
   });
 
   async function discardSnapshot(operationId: string) {
@@ -301,11 +322,13 @@ async function login(page: Page) {
 
 async function expectTouchTarget(control: Locator, label: string) {
   const box = await control.boundingBox();
+  const viewportWidth = await control.evaluate(() => window.innerWidth);
   expect(box, `${label} has no bounding box`).not.toBeNull();
   expect(box!.width, `${label} is narrower than 44px`).toBeGreaterThanOrEqual(44);
   expect(box!.height, `${label} is shorter than 44px`).toBeGreaterThanOrEqual(44);
   expect(box!.x, `${label} clips left`).toBeGreaterThanOrEqual(-1);
-  expect(box!.x + box!.width, `${label} clips right`).toBeLessThanOrEqual(391);
+  expect(box!.x + box!.width, `${label} clips right`)
+    .toBeLessThanOrEqual(viewportWidth + 1);
 }
 
 async function expectWrappedInsideViewport(control: Locator, label: string) {

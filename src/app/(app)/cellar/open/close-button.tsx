@@ -121,7 +121,11 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
 
   return (
     <>
-      <div className="flex items-center gap-xs">
+      <div
+        className={confirming
+          ? "col-span-full flex w-full items-center justify-end gap-xs"
+          : "flex items-center gap-xs"}
+      >
         {confirming && (
           <button
             type="button"
