@@ -20,18 +20,29 @@ type Toast = {
 type OpenPayload = {
   wineId: string;
   preservationMethod: PreservationMethod;
+  contractVersion: 1 | 2;
 };
 
-type PourPayload = OpenPayload & { ml: number };
+type PourPayload = {
+  wineId: string;
+  ml: number;
+  contractVersion: 1 | 2;
+  openBottleId: string | null;
+  preservationMethod: PreservationMethod;
+};
 
 export function useInventoryCommands(input: {
   row: CellarWineRow | null;
+  contractVersion: 1 | 2;
+  selectedBottleId: string | null;
   preservationMethod: PreservationMethod;
   setBusy: Dispatch<SetStateAction<boolean>>;
   setErrorMsg: Dispatch<SetStateAction<string | null>>;
   setLastPour: Dispatch<SetStateAction<{ ml: number } | null>>;
   toast: Toast;
   refresh: () => void;
+  onBottleOpened: (bottleId: string) => void;
+  onBottleStale: (message: string) => void;
 }) {
   const { busy: openBottleBusy, run: runOpen } = useAsyncAction();
   const {
@@ -48,12 +59,16 @@ export function useInventoryCommands(input: {
   } = useIdempotentCommand<PourPayload>();
   const {
     row,
+    contractVersion,
+    selectedBottleId,
     preservationMethod,
     setBusy,
     setErrorMsg,
     setLastPour,
     toast,
     refresh,
+    onBottleOpened,
+    onBottleStale,
   } = input;
 
   const runOpenCommand = useCallback((attempt: CommandAttempt<OpenPayload>) => {
@@ -83,6 +98,8 @@ export function useInventoryCommands(input: {
             );
           }
           if (!definitive) throw new Error("Invalid open-bottle response.");
+          const openedBottleId = readOpenBottleId(payload);
+          if (!openedBottleId) throw new Error("Invalid open-bottle response.");
           successful = true;
           toast.success(
             isReplayedCommandResponse(response)
@@ -90,6 +107,9 @@ export function useInventoryCommands(input: {
               : "Bottle opened",
           );
           refresh();
+          if (attempt.payload.contractVersion === 2) {
+            onBottleOpened(openedBottleId);
+          }
         } finally {
           finishOpen(attempt.fingerprint, definitive, successful);
         }
@@ -110,7 +130,7 @@ export function useInventoryCommands(input: {
         },
       },
     );
-  }, [finishOpen, refresh, runOpen, setErrorMsg, toast]);
+  }, [finishOpen, onBottleOpened, refresh, runOpen, setErrorMsg, toast]);
 
   const doOpenBottle = useCallback(() => {
     if (!row) return Promise.resolve();
@@ -118,13 +138,18 @@ export function useInventoryCommands(input: {
       setErrorMsg("Retry the prior open-bottle action before starting another one.");
       return Promise.resolve();
     }
-    const payload = { wineId: row.wine_id, preservationMethod };
-    const fingerprint = JSON.stringify(["open", payload.wineId, payload.preservationMethod]);
+    const payload = { wineId: row.wine_id, preservationMethod, contractVersion };
+    const fingerprint = JSON.stringify([
+      "open",
+      payload.contractVersion,
+      payload.wineId,
+      payload.preservationMethod,
+    ]);
     const operationId = beginOpen(fingerprint, payload);
     return operationId
       ? runOpenCommand({ fingerprint, operationId, payload, wasUncertain: false })
       : Promise.resolve();
-  }, [beginOpen, pendingOpen, preservationMethod, row, runOpenCommand, setErrorMsg]);
+  }, [beginOpen, contractVersion, pendingOpen, preservationMethod, row, runOpenCommand, setErrorMsg]);
 
   const retryPriorOpen = useCallback(() => {
     const attempt = retryOpen();
@@ -146,9 +171,14 @@ export function useInventoryCommands(input: {
         headers: commandHeaders(attempt.operationId),
         body: JSON.stringify({
           wine_id: attempt.payload.wineId,
+          ...(attempt.payload.contractVersion === 2
+            ? { open_bottle_id: attempt.payload.openBottleId }
+            : {}),
           ml: attempt.payload.ml,
           kind: "pour",
-          preservation_method: attempt.payload.preservationMethod,
+          ...(attempt.payload.contractVersion === 1
+            ? { preservation_method: attempt.payload.preservationMethod }
+            : {}),
         }),
       });
       const payload = await readPayload(response);
@@ -158,6 +188,15 @@ export function useInventoryCommands(input: {
         isOpenBottleSuccess,
       );
       if (!response.ok) {
+        const errorCode = readErrorCode(payload);
+        if (
+          attempt.payload.contractVersion === 2 &&
+          (errorCode === "open_bottle_not_found" ||
+            errorCode === "already_closed" ||
+            errorCode === "open_bottle_changed")
+        ) {
+          onBottleStale("The selected bottle is no longer available. Choose an open bottle.");
+        }
         throw new Error(
           readError(payload) ?? `Request failed (${response.status}).`,
         );
@@ -167,7 +206,9 @@ export function useInventoryCommands(input: {
       toast.success(
         isReplayedCommandResponse(response) ? "Already recorded" : "Glass poured",
       );
-      setLastPour({ ml: attempt.payload.ml });
+      setLastPour(attempt.payload.contractVersion === 1
+        ? { ml: attempt.payload.ml }
+        : null);
       refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Pour failed.";
@@ -185,18 +226,28 @@ export function useInventoryCommands(input: {
       finishPour(attempt.fingerprint, definitive, successful);
       setBusy(false);
     }
-  }, [finishPour, refresh, setBusy, setErrorMsg, setLastPour, toast]);
+  }, [finishPour, onBottleStale, refresh, setBusy, setErrorMsg, setLastPour, toast]);
 
   const doPour = useCallback((ml: number) => {
-    if (!row || !row.glass_pour_ml) return Promise.resolve();
+    if (!row || !row.glass_pour_ml || (contractVersion === 2 && !selectedBottleId)) {
+      return Promise.resolve();
+    }
     if (pendingPour?.state === "unresolved") {
       setErrorMsg("Retry the prior pour before recording another one.");
       return Promise.resolve();
     }
-    const payload = { wineId: row.wine_id, ml, preservationMethod };
+    const payload = {
+      wineId: row.wine_id,
+      ml,
+      preservationMethod,
+      contractVersion,
+      openBottleId: contractVersion === 2 ? selectedBottleId : null,
+    };
     const fingerprint = JSON.stringify([
       "pour",
+      payload.contractVersion,
       payload.wineId,
+      payload.openBottleId,
       payload.ml,
       payload.preservationMethod,
     ]);
@@ -204,7 +255,7 @@ export function useInventoryCommands(input: {
     return operationId
       ? runPourCommand({ fingerprint, operationId, payload, wasUncertain: false })
       : Promise.resolve();
-  }, [beginPour, pendingPour, preservationMethod, row, runPourCommand, setErrorMsg]);
+  }, [beginPour, contractVersion, pendingPour, preservationMethod, row, runPourCommand, selectedBottleId, setErrorMsg]);
 
   const retryPriorPour = useCallback(() => {
     const attempt = retryPour();
@@ -249,4 +300,18 @@ function readError(payload: unknown) {
   return typeof errorPayload?.error === "string"
     ? errorPayload.error
     : errorPayload?.error?.message;
+}
+
+function readErrorCode(payload: unknown) {
+  const errorPayload = payload as { error?: { code?: unknown } } | null;
+  return typeof errorPayload?.error?.code === "string"
+    ? errorPayload.error.code
+    : null;
+}
+
+function readOpenBottleId(payload: unknown) {
+  const result = payload as { open_bottle?: { id?: unknown } } | null;
+  return typeof result?.open_bottle?.id === "string"
+    ? result.open_bottle.id
+    : null;
 }

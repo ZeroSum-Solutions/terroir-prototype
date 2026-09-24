@@ -30,6 +30,10 @@ import { useHeroImageActions } from "./use-hero-image-actions";
 import { useEightysixToggle } from "./use-eightysix-toggle";
 import { useInventoryCommands } from "./use-inventory-commands";
 import { wineDisplayName } from "@/lib/wine-display-name";
+import {
+  PhysicalBottleSelector,
+  resolvePhysicalBottleSelection,
+} from "./physical-bottle-selector";
 
 export function WineDetailDrawer({
   row,
@@ -40,6 +44,12 @@ export function WineDetailDrawer({
   isOwner,
   onClose,
   duplicateRows,
+  inventoryContractVersion = 1,
+  selectedBottleId = null,
+  onSelectBottle = () => undefined,
+  onBottleOpened = onSelectBottle,
+  bottleSelectionMessage = null,
+  onBottleStale = () => undefined,
 }: {
   row: CellarWineRow | null;
   canManage: boolean;
@@ -51,6 +61,12 @@ export function WineDetailDrawer({
   // OPP-1 (EV-1.2) — same-lineage/vintage/format twins of `row`, offered
   // for merge below. Provided by the shell from the page's suspect scan.
   duplicateRows?: CellarWineRow[];
+  inventoryContractVersion?: 1 | 2;
+  selectedBottleId?: string | null;
+  onSelectBottle?: (bottleId: string) => void;
+  onBottleOpened?: (bottleId: string) => void;
+  bottleSelectionMessage?: string | null;
+  onBottleStale?: (message: string) => void;
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -122,14 +138,33 @@ export function WineDetailDrawer({
 
   const [preservationMethod, setPreservationMethod] =
     useState<PreservationMethod>(row?.preservation_method ?? "none");
+  const bottleSelection = resolvePhysicalBottleSelection({
+    contractVersion: inventoryContractVersion,
+    bottles: row?.activeBottles,
+    activeBottleCount: row?.activeBottleCount,
+    activeOpenMl: row?.activeOpenMl,
+    requestedBottleId: selectedBottleId,
+  });
+  const effectiveBottleId = inventoryContractVersion === 2
+    ? bottleSelection.selectedBottleId
+    : row?.open_bottle_id ?? null;
+  const selectedPhysicalBottle = row?.activeBottles?.find(
+    (bottle) => bottle.id === effectiveBottleId,
+  ) ?? null;
+  const physicalStateInvalid = inventoryContractVersion === 2 &&
+    bottleSelection.status === "invalid";
   const { doOpenBottle, doPour, retryPriorOpen, retryPriorPour, openBottleBusy, openNeedsReview, pourNeedsReview } = useInventoryCommands({
     row,
+    contractVersion: inventoryContractVersion,
+    selectedBottleId: effectiveBottleId,
     preservationMethod,
     setBusy,
     setErrorMsg,
     setLastPour,
     toast,
     refresh,
+    onBottleOpened,
+    onBottleStale,
   });
 
   // BND-119: undo the most recent pour.
@@ -173,7 +208,7 @@ export function WineDetailDrawer({
           producer: row.producer,
           vintage: row.vintage as number,
           glass_pour_ml: row.glass_pour_ml,
-          open_remaining_ml: row.open_remaining_ml as number,
+          open_remaining_ml: (selectedPhysicalBottle?.remainingMl ?? row.open_remaining_ml) as number,
           opened_at: row.opened_at as string,
           pour_size_mode: row.pour_size_mode ?? "fixed",
           sealed_count: row.sealed_count,
@@ -185,22 +220,33 @@ export function WineDetailDrawer({
   const totalMl =
     row.size_ml === null
       ? null
-      : (row.open_remaining_ml ?? 0) + row.sealed_count * row.size_ml;
+      : row.activeOpenMl + row.sealed_count * row.size_ml;
   const glassesLeft =
     row.glass_pour_ml && totalMl !== null
       ? Math.floor(totalMl / row.glass_pour_ml)
       : null;
-  const ozLeft =
-    row.open_remaining_ml !== null
-      ? (row.open_remaining_ml / ML_PER_OZ).toFixed(1)
-      : null;
+  const ozLeft = row.activeBottleCount > 0
+    ? (row.activeOpenMl / ML_PER_OZ).toFixed(1)
+    : null;
 
-  const canPour = Boolean(
+  const hasPourConfig = Boolean(
     row.glass_pour_ml &&
     row.glass_pour_ml > 0 &&
     !row.is_eightysixed,
   );
-  const outOfStock = Boolean(canPour && totalMl !== null && totalMl < row.glass_pour_ml!);
+  const canPour = hasPourConfig && !physicalStateInvalid && (
+    inventoryContractVersion === 1 || selectedPhysicalBottle !== null
+  );
+  const requiresBottleSelection = inventoryContractVersion === 2 &&
+    !physicalStateInvalid &&
+    row.activeBottleCount > 1 &&
+    !selectedPhysicalBottle;
+  const availablePourMl = inventoryContractVersion === 2
+    ? selectedPhysicalBottle?.remainingMl ?? 0
+    : totalMl;
+  const outOfStock = Boolean(
+    canPour && availablePourMl !== null && availablePourMl < row.glass_pour_ml!,
+  );
 
   return (
     <>
@@ -294,6 +340,13 @@ export function WineDetailDrawer({
                     ` · pour size ${(row.glass_pour_ml / ML_PER_OZ).toFixed(1)} oz`}
                 </p>
               )}
+              {inventoryContractVersion === 2 && !physicalStateInvalid && (
+                <PhysicalBottleSelector
+                  bottles={row.activeBottles}
+                  selectedBottleId={selectedPhysicalBottle?.id ?? null}
+                  onSelect={onSelectBottle}
+                />
+              )}
               {row.bin_placements.map((placement) => (
                 <p
                   key={placement.binId}
@@ -359,16 +412,19 @@ export function WineDetailDrawer({
               <DecantTimeSection row={row} />
             )}
 
-            {errorMsg && eightysix.pendingDirection === null && (
+            {(physicalStateInvalid || bottleSelectionMessage || errorMsg) &&
+              eightysix.pendingDirection === null && (
               <div
                 role="alert"
                 className="mt-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
               >
-                {errorMsg}
+                {physicalStateInvalid
+                  ? "Bottle data could not be verified. Refresh and try again."
+                  : bottleSelectionMessage ?? errorMsg}
               </div>
             )}
 
-            {row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null && (
+            {inventoryContractVersion === 1 && row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null && (
               <PartialBottleCloseout
                 bottle={{
                   id: row.open_bottle_id,
@@ -506,10 +562,13 @@ export function WineDetailDrawer({
               Undo) pinned at the foot so they never sit below the fold
               (Kimi audit 2026-08-26). Reference sections scroll; actions
               don't. */}
-          {(canPour || row.sealed_count > 0 || openNeedsReview || pourNeedsReview) && (
+          {!physicalStateInvalid &&
+            (canPour || requiresBottleSelection || row.sealed_count > 0 || openNeedsReview || pourNeedsReview) && (
             <PourActionBar
               row={row}
+              contractVersion={inventoryContractVersion}
               canPour={canPour}
+              requiresBottleSelection={requiresBottleSelection}
               outOfStock={outOfStock}
               pickerItem={pickerItem}
               busy={busy}
@@ -575,6 +634,6 @@ export function WineDetailDrawer({
   );
 }
 
-export function drawerStateKey(row: CellarWineRow | null) {
-  return row ? `${row.wine_id}:${row.opened_at ?? "sealed"}` : "none";
+export function drawerStateKey(row: CellarWineRow | null, version: 1 | 2 = 1) {
+  return !row ? "none" : version === 2 ? row.wine_id : `${row.wine_id}:${row.opened_at ?? "sealed"}`;
 }

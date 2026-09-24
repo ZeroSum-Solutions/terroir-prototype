@@ -33,3 +33,18 @@ export type WineListSectionEmbed<TItem> = {
  */
 export type OpenBottleRow =
   Database["public"]["Functions"]["list_open_bottle_items"]["Returns"][number];
+
+/** Allowlisted exact-bottle state exposed to service UI. */
+export type PhysicalBottleSummary = {
+  id: string;
+  wineId: string;
+  remainingMl: number;
+  nominalCapacityMl: number | null;
+  openedAt: string;
+  preservationMethod: "coravin" | "argon" | "vacuum" | "none";
+  sourceProvenance: "known" | "legacy_unknown";
+  sourceBinLocation: string | null;
+  identityContract: 1 | 2;
+  identityOrigin: "legacy_slot" | "migrated_active" | "native";
+  stateVersion: number;
+};

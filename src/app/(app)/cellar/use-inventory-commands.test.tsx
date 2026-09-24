@@ -15,17 +15,33 @@ const setErrorMsg = vi.fn();
 const setLastPour = vi.fn();
 const refresh = vi.fn();
 const toast = { success: vi.fn(), error: vi.fn() };
+const onBottleOpened = vi.fn();
+const onBottleStale = vi.fn();
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
+const BOTTLE_A = "66666666-6666-4666-8666-666666666666";
+const BOTTLE_B = "77777777-7777-4777-8777-777777777777";
 
-function Harness({ row }: { row: CellarWineRow }) {
+function Harness({
+  row,
+  contractVersion = 1,
+  selectedBottleId = null,
+}: {
+  row: CellarWineRow;
+  contractVersion?: 1 | 2;
+  selectedBottleId?: string | null;
+}) {
   const commands = useInventoryCommands({
     row,
+    contractVersion,
+    selectedBottleId,
     preservationMethod: "coravin",
     setBusy,
     setErrorMsg,
     setLastPour,
     refresh,
     toast,
+    onBottleOpened,
+    onBottleStale,
   });
   useEffect(() => {
     holder.current = commands;
@@ -51,6 +67,64 @@ afterEach(async () => {
 });
 
 describe("useInventoryCommands retry state", () => {
+  it("freezes the exact contract-2 bottle across an uncertain retry", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Bad gateway", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        open_bottle: {
+          id: BOTTLE_A,
+          wine_id: WINE_ID,
+          opened_at: "2026-09-23T12:00:00.000Z",
+          remaining_ml: 350,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const physicalRow = baseRow({
+      wine_id: WINE_ID,
+      glass_pour_ml: 150,
+      activeBottleCount: 2,
+      activeOpenMl: 900,
+      activeBottles: [],
+    });
+    await act(async () => root.render(
+      <Harness row={physicalRow} contractVersion={2} selectedBottleId={BOTTLE_A} />,
+    ));
+    await act(async () => api().doPour(90));
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(api().pourNeedsReview).toBe(true);
+    await act(async () => root.render(
+      <Harness row={physicalRow} contractVersion={2} selectedBottleId={BOTTLE_B} />,
+    ));
+    await act(async () => api().retryPriorPour());
+
+    for (const call of fetchMock.mock.calls) {
+      expect(JSON.parse(String(call[1]?.body))).toEqual({
+        wine_id: WINE_ID,
+        open_bottle_id: BOTTLE_A,
+        ml: 90,
+        kind: "pour",
+      });
+    }
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Idempotency-Key"));
+  });
+
+  it("selects only the exact bottle returned by a valid contract-2 open", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      open_bottle: {
+        id: BOTTLE_B,
+        wine_id: WINE_ID,
+        opened_at: "2026-09-23T12:00:00.000Z",
+        remaining_ml: 750,
+      },
+    }), { status: 201, headers: { "content-type": "application/json" } })));
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID })} contractVersion={2} />,
+    ));
+    await act(async () => api().doOpenBottle());
+    expect(onBottleOpened).toHaveBeenCalledExactlyOnceWith(BOTTLE_B);
+  });
+
   it("retries the stored custom pour through 403 and catalog changes", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("Bad gateway", { status: 503 }))

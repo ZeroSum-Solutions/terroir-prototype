@@ -85,4 +85,12 @@ describe("bottlesOnHand", () => {
     expect(bottlesOnHand({ sealed_count: 3, open_remaining_ml: 0 })).toBe(3);
     expect(bottlesOnHand({ sealed_count: 0, open_remaining_ml: null })).toBe(0);
   });
+
+  it("counts every active physical bottle when the exact count is present", () => {
+    expect(bottlesOnHand({
+      sealed_count: 3,
+      open_remaining_ml: 200,
+      activeBottleCount: 2,
+    })).toBe(5);
+  });
 });

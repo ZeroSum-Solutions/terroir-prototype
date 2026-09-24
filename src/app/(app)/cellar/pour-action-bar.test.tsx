@@ -24,6 +24,50 @@ function button(text: string) {
 }
 
 describe("PourActionBar", () => {
+  it("keeps Open another bottle enabled in physical mode", async () => {
+    const doOpenBottle = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 3, activeBottleCount: 1 })}
+        contractVersion={2}
+        canPour
+        outOfStock={false}
+        pickerItem={null}
+        busy={false}
+        openBottleBusy={false}
+        lastPour={null}
+        doOpenBottle={doOpenBottle}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+    expect(button("Open another bottle")?.disabled).toBe(false);
+    await act(async () => button("Open another bottle")!.click());
+    expect(doOpenBottle).toHaveBeenCalledOnce();
+  });
+
+  it("shows a disabled selection requirement instead of choosing a sibling", async () => {
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 0, glass_pour_ml: 150, activeBottleCount: 2 })}
+        contractVersion={2}
+        canPour={false}
+        requiresBottleSelection
+        outOfStock={false}
+        pickerItem={null}
+        busy={false}
+        openBottleBusy={false}
+        lastPour={null}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+    expect(button("Select a bottle")?.disabled).toBe(true);
+  });
+
   it("renders only Open bottle when the wine cannot be poured", async () => {
     const doOpenBottle = vi.fn();
     await act(async () => {

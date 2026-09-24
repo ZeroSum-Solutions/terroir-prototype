@@ -43,6 +43,7 @@ export type CellarUrlState = CellarFacets & {
   sort: CellarSort | null;
   view: CellarView;
   wine: string | null;
+  bottle: string | null;
 };
 
 type SearchParamsReader = { get(name: string): string | null };
@@ -57,6 +58,7 @@ const healthSchema = z.enum(HEALTH_SEGMENTS);
 const sortSchema = z.enum(CELLAR_SORTS);
 const viewSchema = z.enum(CELLAR_VIEWS);
 const wineSchema = z.string().uuid();
+const bottleSchema = z.string().uuid();
 
 export function parseCellarUrlState(params: SearchParamsReader): CellarUrlState {
   return {
@@ -75,6 +77,7 @@ export function parseCellarUrlState(params: SearchParamsReader): CellarUrlState 
     sort: parseValue(sortSchema, params.get("sort")),
     view: parseValue(viewSchema, params.get("view")) ?? "list",
     wine: parseValue(wineSchema, params.get("wine")),
+    bottle: parseValue(bottleSchema, params.get("bottle")),
   };
 }
 
@@ -98,6 +101,7 @@ export function serializeCellarUrlState(state: CellarUrlState): URLSearchParams 
   // as short as it was.
   setText(params, "view", state.view === "list" ? null : state.view);
   setText(params, "wine", state.wine);
+  setText(params, "bottle", state.bottle);
   return params;
 }
 

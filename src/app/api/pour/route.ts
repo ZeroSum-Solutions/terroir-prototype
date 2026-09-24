@@ -16,6 +16,7 @@ export const runtime = "nodejs";
 
 const BodySchema = z.strictObject({
   wine_id: z.string().uuid(),
+  open_bottle_id: z.string().uuid().optional(),
   ml: z.number().int().positive().max(2000),
   kind: z.enum(["pour", "spill"]).default("pour"),
   note: z.string().trim().max(500).optional(),
@@ -44,6 +45,7 @@ async function postPour(request: NextRequest) {
       operationId,
       restaurantId: auth.restaurantId,
       wineId: parsed.data.wine_id,
+      openBottleId: parsed.data.open_bottle_id,
       ml: parsed.data.ml,
       kind: parsed.data.kind,
       note: parsed.data.note,

@@ -5,8 +5,9 @@ import { ToastProvider } from "@/lib/toast";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
 import type { CellarWineRow } from "./types";
 
+const navigation = vi.hoisted(() => ({ search: "" }));
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navigation.search),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -51,6 +52,21 @@ const openRow: CellarWineRow = {
   preservation_method: "none",
   opened_by: null,
   theoretical_remaining_ml: null,
+  activeBottleCount: 1,
+  activeOpenMl: 300,
+  activeBottles: [{
+    id: "open-bottle-1",
+    wineId: "wine-1",
+    remainingMl: 300,
+    nominalCapacityMl: null,
+    openedAt: "2026-08-20T12:00:00.000Z",
+    preservationMethod: "none",
+    sourceProvenance: "legacy_unknown",
+    sourceBinLocation: null,
+    identityContract: 1,
+    identityOrigin: "legacy_slot",
+    stateVersion: 0,
+  }],
   closeout_reason_codes: [],
   stock_adjustment_reason_codes: [],
   drink_window_start: null,
@@ -95,6 +111,9 @@ const secondRow: CellarWineRow = {
   open_remaining_ml: null,
   opened_at: null,
   open_bottle_id: null,
+  activeBottleCount: 0,
+  activeOpenMl: 0,
+  activeBottles: [],
   sealed_count: 12,
 };
 const reconcileRow: OpenBottleRow = {
@@ -115,6 +134,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  navigation.search = "";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -126,6 +146,41 @@ afterEach(() => {
 });
 
 describe("CellarShell open bottles route", () => {
+  it("reaches the invalid bottle alert when activeBottles is absent", () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    navigation.search = `wine=${wineId}`;
+    act(() => root.render(
+      <ToastProvider>
+        <CellarShell
+          rows={[{
+            ...openRow,
+            wine_id: wineId,
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottles: undefined as never,
+          }]}
+          reconcileItems={[]}
+          cellarConfig={null}
+          gridData={{}}
+          restaurantName="Test Restaurant"
+          restaurantId="restaurant-1"
+          userId="user-1"
+          autoEightysixEnabled={false}
+          autoEightysixThresholdMl={148}
+          eightysixStrategy="hide"
+          defaultTargetPourCostPct={null}
+          defaultTargetMarkupRatio={null}
+          // eslint-disable-next-line jsx-a11y/aria-role -- CellarShell's RBAC prop, not a DOM role.
+          role="staff"
+          inventoryContractVersion={2}
+        />
+      </ToastProvider>,
+    ));
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+  });
+
   it("keeps the open bottles route reachable without reconciliation items", () => {
     act(() => {
       root.render(
@@ -152,6 +207,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="owner"
+            inventoryContractVersion={1}
             cellarSections={[{ id: "section-1", name: "Main cellar" }]}
           />
         </ToastProvider>,
@@ -278,6 +334,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="staff"
+            inventoryContractVersion={1}
           />
         </ToastProvider>,
       );
@@ -321,6 +378,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="staff"
+            inventoryContractVersion={1}
             cellarSections={[{ id: "section-1", name: "Main cellar" }]}
           />
         </ToastProvider>,

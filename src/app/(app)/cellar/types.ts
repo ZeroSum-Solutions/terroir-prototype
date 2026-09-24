@@ -3,6 +3,7 @@ import {
 } from "@/lib/wine-intelligence/corpus-image";
 import type { XWinesImageKind } from "@/lib/wine-intelligence/xwines-profile";
 import type { CellarHealthSegment } from "@/lib/cellar-health/classify";
+import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 
 /**
  * CellarWineRow — unified row shape that absorbs the per-wine data from
@@ -81,6 +82,11 @@ export type CellarWineRow = {
   preservation_method: "coravin" | "argon" | "vacuum" | "none";
   opened_by: string | null;
   theoretical_remaining_ml: number | null;
+  // Phase B exact-bottle read model. Required in production; contract 2
+  // validates count and sum against this same array before enabling actions.
+  activeBottleCount: number;
+  activeOpenMl: number;
+  activeBottles: PhysicalBottleSummary[];
   closeout_reason_codes: Array<{
     id: string;
     label: string;

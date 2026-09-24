@@ -76,12 +76,36 @@ function mappedMessage(message: string): NextResponse {
         "The open bottle changed. Refresh and try again.",
       );
     case "open_bottle_already_closed":
+    case "open_bottle_closed":
       return Errors.conflict("already_closed", "Bottle is already closed.");
     case "inventory_operation_actor_conflict":
     case "inventory_operation_payload_conflict":
+    case "physical_operation_actor_conflict":
+    case "physical_operation_payload_conflict":
       return Errors.conflict(
         "idempotency_conflict",
         "This Idempotency-Key was already used for a different inventory command.",
+      );
+    case "insufficient_bottle_volume":
+      return Errors.conflict(
+        "insufficient_bottle_volume",
+        "The selected bottle does not have enough remaining volume.",
+      );
+    case "physical_dependency_not_found":
+    case "physical_dependency_stale":
+      return Errors.conflict(
+        "open_bottle_changed",
+        "The selected bottle changed. Refresh and try again.",
+      );
+    case "physical_inventory_contract_inactive":
+      return Errors.conflict(
+        "inventory_contract_inactive",
+        "Physical bottle commands are not active.",
+      );
+    case "legacy_inventory_command_retired":
+      return Errors.conflict(
+        "legacy_inventory_command_retired",
+        "Refresh and select the exact open bottle before recording this action.",
       );
     case "wine_size_unknown":
       return Errors.unprocessable("wine_size_unknown", "Wine bottle size is unknown.");
@@ -106,8 +130,9 @@ function mappedMessage(message: string): NextResponse {
         "Reason code must be an active spoilage or adjustment reason.",
       );
     case "invalid_inventory_command":
+    case "invalid_physical_command":
       return Errors.unprocessable(
-        "invalid_inventory_command",
+        message,
         "The inventory command is invalid.",
       );
     default:

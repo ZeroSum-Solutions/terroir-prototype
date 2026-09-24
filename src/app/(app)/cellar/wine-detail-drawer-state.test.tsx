@@ -33,6 +33,74 @@ describe("WineDetailDrawer bottle state", () => {
     refresh.mockClear();
   });
 
+  it("fails closed when contract-2 exact bottle state is missing", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <ToastProvider>
+        <WineDetailDrawer
+          row={row({
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottleCount: 1,
+            activeOpenMl: 500,
+            activeBottles: undefined as never,
+          })}
+          inventoryContractVersion={2}
+          selectedBottleId={null}
+          onSelectBottle={() => undefined}
+          canManage
+          onClose={() => undefined}
+        />
+      </ToastProvider>,
+    ));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+    expect(button(container, "Open another bottle")).toBeUndefined();
+    expect([...container.querySelectorAll("button")].some((item) =>
+      item.textContent?.startsWith("Pour "),
+    )).toBe(false);
+    await act(async () => root.unmount());
+  });
+
+  it("shows exact contract-2 bottles while legacy closeout stays unavailable", async () => {
+    const onSelectBottle = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <ToastProvider>
+        <WineDetailDrawer
+          row={row({
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottleCount: 2,
+            activeOpenMl: 900,
+            activeBottles: [
+              physicalBottle("66666666-6666-4666-8666-666666666666", 600),
+              physicalBottle("77777777-7777-4777-8777-777777777777", 300),
+            ],
+          })}
+          inventoryContractVersion={2}
+          selectedBottleId={null}
+          onSelectBottle={onSelectBottle}
+          canManage
+          onClose={() => undefined}
+        />
+      </ToastProvider>,
+    ));
+    expect(container.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    expect(button(container, "Select a bottle")?.disabled).toBe(true);
+    expect(button(container, "Close bottle")).toBeUndefined();
+    await act(async () => {
+      container.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1].click();
+    });
+    expect(onSelectBottle).toHaveBeenCalledExactlyOnceWith(
+      "77777777-7777-4777-8777-777777777777",
+    );
+    await act(async () => root.unmount());
+  });
+
   it("resets preservation and close-out values when switching drawer wines", async () => {
     const requests: Array<Record<string, unknown>> = [];
     vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
@@ -169,6 +237,58 @@ describe("WineDetailDrawer bottle state", () => {
     const replacement = row({ wine_id: "wine-1", opened_at: "2026-08-19T10:00:00.000Z" });
 
     expect(drawerStateKey(first)).not.toBe(drawerStateKey(replacement));
+  });
+
+  it("keeps an unresolved physical pour frozen when a sibling opens", async () => {
+    const bottleA = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const bottleB = physicalBottle("77777777-7777-4777-8777-777777777777", 750);
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({
+        open_bottle: {
+          id: bottleA.id,
+          wine_id: "wine-1",
+          opened_at: bottleA.openedAt,
+          remaining_ml: 450,
+        },
+      }, 200));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const initial = row({
+      activeBottleCount: 1,
+      activeOpenMl: 600,
+      activeBottles: [bottleA],
+      opened_at: bottleA.openedAt,
+      glass_pour_ml: 150,
+    });
+
+    await renderPhysicalDrawer(root, initial, bottleA.id);
+    await click(button(container, "Pour 5.1 oz"));
+    const withSibling = row({
+      activeBottleCount: 2,
+      activeOpenMl: 1350,
+      activeBottles: [bottleA, bottleB],
+      opened_at: null,
+      glass_pour_ml: 150,
+    });
+    await renderPhysicalDrawer(root, withSibling, bottleB.id);
+
+    expect(button(container, "Retry prior pour")).toBeDefined();
+    await click(button(container, "Retry prior pour"));
+    const first = fetchMock.mock.calls[0];
+    const retry = fetchMock.mock.calls[1];
+    expect(JSON.parse(String(first[1]?.body))).toEqual({
+      wine_id: "wine-1",
+      open_bottle_id: bottleA.id,
+      ml: 150,
+      kind: "pour",
+    });
+    expect(retry[1]?.body).toBe(first[1]?.body);
+    expect(new Headers(retry[1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(first[1]?.headers).get("Idempotency-Key"));
+    await act(async () => root.unmount());
   });
 
   it("hides immediately when Close is tapped while its URL owner catches up", async () => {
@@ -417,6 +537,25 @@ async function renderDrawer(root: ReturnType<typeof createRoot>, value: CellarWi
   });
 }
 
+async function renderPhysicalDrawer(
+  root: ReturnType<typeof createRoot>,
+  value: CellarWineRow,
+  selectedBottleId: string,
+) {
+  await act(async () => root.render(
+    <ToastProvider>
+      <WineDetailDrawer
+        key={drawerStateKey(value, 2)}
+        row={value}
+        inventoryContractVersion={2}
+        selectedBottleId={selectedBottleId}
+        canManage
+        onClose={() => undefined}
+      />
+    </ToastProvider>,
+  ));
+}
+
 async function change(element: HTMLInputElement | HTMLSelectElement, value: string) {
   await act(async () => {
     element.value = value;
@@ -477,6 +616,22 @@ function jsonResponse(body: unknown, status: number) {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function physicalBottle(id: string, remainingMl: number) {
+  return {
+    id,
+    wineId: "wine-1",
+    remainingMl,
+    nominalCapacityMl: 750,
+    openedAt: "2026-09-23T12:00:00.000Z",
+    preservationMethod: "coravin" as const,
+    sourceProvenance: "known" as const,
+    sourceBinLocation: "A-1",
+    identityContract: 2 as const,
+    identityOrigin: "native" as const,
+    stateVersion: 1,
+  };
 }
 
 function select(label: string) {

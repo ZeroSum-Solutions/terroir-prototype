@@ -16,29 +16,50 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 const { POST } = await import("./route");
 
 const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
+const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
 
 function makeSupabase(options: {
   replayed?: boolean;
   error?: { code?: string; message?: string } | null;
+  contractVersion?: unknown;
 } = {}) {
-  const rpc = vi.fn().mockResolvedValue({
-    data: options.error
-      ? null
-      : {
+  const rpc = vi.fn((name: string) => {
+    if (name === "current_inventory_contract_version") {
+      return Promise.resolve({
+        data: "contractVersion" in options ? options.contractVersion : 1,
+        error: null,
+      });
+    }
+    return Promise.resolve({
+      data: options.error
+        ? null
+        : {
           operation_id: OPERATION_ID,
           command: "pour",
           pour_event_ids: ["77777777-7777-4777-8777-777777777777"],
           replayed: options.replayed ?? false,
           open_bottle: {
             id: "66666666-6666-4666-8666-666666666666",
+            ...(name === "execute_physical_bottle_command" ? {
+              restaurant_id: RESTAURANT_ID,
+              nominal_capacity_ml: 750,
+              closed_at: null,
+              source_inventory_item_id: "88888888-8888-4888-8888-888888888888",
+              source_provenance: "known",
+              identity_contract: 2,
+              identity_origin: "native",
+              state_version: 1,
+            } : {}),
             wine_id: WINE_ID,
             remaining_ml: 600,
             opened_at: "2026-09-23T12:00:00.000Z",
             preservation_method: "argon",
           },
+          ...(name === "execute_physical_bottle_command" ? { closeout: null } : {}),
         },
-    error: options.error ?? null,
+      error: options.error ?? null,
+    });
   });
   return { rpc };
 }
@@ -46,7 +67,7 @@ function makeSupabase(options: {
 function allow(supabase: ReturnType<typeof makeSupabase>) {
   mockRequireMembership.mockResolvedValue({
     supabase,
-    restaurantId: "restaurant-a",
+    restaurantId: RESTAURANT_ID,
     user: { id: "user-a" },
     role: "staff",
   });
@@ -115,10 +136,51 @@ describe("POST /api/pour", () => {
     );
     expect(mockRevalidateAutoEightysixedWines).toHaveBeenCalledWith({
       supabase,
-      restaurantId: "restaurant-a",
+      restaurantId: RESTAURANT_ID,
       touchedWineIds: [WINE_ID],
       sinceTs: expect.any(String),
     });
+  });
+
+  it("uses the exact selector in contract 2 and omits legacy preservation", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    allow(supabase);
+    const response = await POST(request({
+      wine_id: WINE_ID,
+      open_bottle_id: "66666666-6666-4666-8666-666666666666",
+      ml: 150,
+      kind: "pour",
+      note: "glass",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.objectContaining({
+        p_open_bottle_id: "66666666-6666-4666-8666-666666666666",
+        p_preservation_method: undefined,
+      }),
+    );
+  });
+
+  it("rejects a contract-2 pour without an exact selector", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    allow(supabase);
+    const response = await POST(request({ wine_id: WINE_ID, ml: 150, kind: "pour" }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("legacy_inventory_command_retired");
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("does not fall back to the legacy writer when contract version is unknown", async () => {
+    const supabase = makeSupabase({ contractVersion: null });
+    allow(supabase);
+    const response = await POST(request());
+    expect(response.status).toBe(500);
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
   it("rejects volumes above the preserved 2,000 ml maximum", async () => {

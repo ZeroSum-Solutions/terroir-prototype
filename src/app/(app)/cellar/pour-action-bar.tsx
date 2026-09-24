@@ -14,7 +14,9 @@ import type { CellarWineRow } from "./types";
  */
 export function PourActionBar({
   row,
+  contractVersion = 1,
   canPour,
+  requiresBottleSelection = false,
   outOfStock,
   pickerItem,
   busy,
@@ -30,7 +32,9 @@ export function PourActionBar({
   onOpenPicker,
 }: {
   row: CellarWineRow;
+  contractVersion?: 1 | 2;
   canPour: boolean;
+  requiresBottleSelection?: boolean;
   outOfStock: boolean;
   pickerItem: unknown;
   busy: boolean;
@@ -45,7 +49,10 @@ export function PourActionBar({
   doUndo: () => void;
   onOpenPicker: () => void;
 }) {
-  const hasActiveBottle = Boolean(row.open_bottle_id);
+  const physicalMode = contractVersion === 2;
+  const hasActiveBottle = physicalMode
+    ? row.activeBottleCount > 0
+    : Boolean(row.open_bottle_id);
 
   return (
     <div
@@ -53,7 +60,7 @@ export function PourActionBar({
       style={{ paddingBottom: "calc(var(--safe-bottom) + var(--spacing-sm))" }}
     >
       {/* BND-119: Undo last pour */}
-      {lastPour && canPour && (
+      {lastPour && canPour && !physicalMode && (
         <button
           type="button"
           disabled={busy}
@@ -79,7 +86,7 @@ export function PourActionBar({
         ) : row.sealed_count > 0 && (
           <button
             type="button"
-            disabled={openBottleBusy || hasActiveBottle}
+            disabled={openBottleBusy || (!physicalMode && hasActiveBottle)}
             onClick={doOpenBottle}
             className={cn(
               "flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill text-[14px] font-medium transition-colors disabled:opacity-60",
@@ -89,7 +96,9 @@ export function PourActionBar({
             )}
           >
             <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {hasActiveBottle
+            {physicalMode && hasActiveBottle
+              ? "Open another bottle"
+              : hasActiveBottle
               ? "Bottle already open"
               : openBottleBusy
                 ? "Opening..."
@@ -104,6 +113,14 @@ export function PourActionBar({
             className="h-[52px] flex-1 rounded-pill bg-primary text-body font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
           >
             Retry prior pour
+          </button>
+        ) : requiresBottleSelection ? (
+          <button
+            type="button"
+            disabled
+            className="h-[52px] flex-1 rounded-pill bg-primary text-body font-medium text-seal-ink opacity-60"
+          >
+            Select a bottle
           </button>
         ) : canPour && (
           <>
