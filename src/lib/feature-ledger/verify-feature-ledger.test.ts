@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
@@ -35,6 +36,17 @@ const SPEC = `<project_specification>
 
 const PLAN = "### TER-010: Complete authentication";
 const TEST_COMPLETION_RULES = [[1, 3, "TER-010", "identity"]];
+const C14_SOURCE_TEXTS = [
+  "System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+  "System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+  "System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+];
+const C14_ANCHOR_SOURCE_HASH =
+  "83dd041b3837e6485e328f6da56cdbf52d185d1be71fca189c73fb908fd09cb0";
+const C14_ANCHOR_LEDGER_HASH =
+  "95cb41da20570a2cbeace625aea6740e4fd9a9039431e4f3f883fcf9ab35df8e";
+const hashJson = (value: unknown) =>
+  createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const createTestLedger = () => createInitialLedger(SPEC, 3);
 const verifyTestLedger = (
   ledger: ReturnType<typeof createInitialLedger>,
@@ -128,6 +140,8 @@ describe("metadataForRequirement", () => {
     [315, "TER-041", "physical-bottle-inventory"],
     [316, "TER-049", "csv-identity-review"],
     [317, "TER-049", "csv-identity-review"],
+    [318, "TER-050", "pilot-measurement"],
+    [320, "TER-050", "pilot-measurement"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -135,8 +149,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 317", () => {
-    expect(() => metadataForRequirement(318)).toThrow(
+  it("rejects requirements outside the authoritative 320", () => {
+    expect(() => metadataForRequirement(321)).toThrow(
       "no completion metadata",
     );
   });
@@ -356,10 +370,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 317 as the default approved source count", () => {
+  it("keeps 320 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 317");
+    ).toContain("source feature count must remain 320");
   });
 
   it.each([
@@ -582,8 +596,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 317 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(317);
+  it("accounts for all 320 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(320);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -698,7 +712,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the approved C09 CSV identity-review contract without claiming implementation", () => {
-    expect(ledger.items.slice(315).map((item: { id: string }) => item.id)).toEqual([
+    expect(ledger.items.slice(315, 317).map((item: { id: string }) => item.id)).toEqual([
       "TER-CF-316",
       "TER-CF-317",
     ]);
@@ -718,6 +732,33 @@ describe("checked-in feature ledger", () => {
     });
     expect(ledger.items[315].sourceText).toContain("including an empty set");
     expect(ledger.items[316].sourceText).toContain("optional display-only");
+  });
+
+  it("appends the approved C14 measurement contract without claiming implementation", () => {
+    expect(ledger.items.slice(317).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-318",
+      "TER-CF-319",
+      "TER-CF-320",
+    ]);
+    for (const [index, sourceText] of C14_SOURCE_TEXTS.entries()) {
+      expect(ledger.items[317 + index]).toMatchObject({
+        domain: "pilot_measurement_capability",
+        actor: "System",
+        sourceText,
+        status: "active",
+        completionSpec: "TER-050",
+        evidenceOwner: "pilot-measurement",
+      });
+    }
+    expect(plan).toContain("### TER-050: Deliver pilot measurement capability");
+    expect(plan).toContain("do not require real four-week pilot observations");
+  });
+
+  it("preserves the complete first 317 source and ledger objects from 006330bb", () => {
+    expect(hashJson(parseCoreFeatures(source).slice(0, 317))).toBe(
+      C14_ANCHOR_SOURCE_HASH,
+    );
+    expect(hashJson(ledger.items.slice(0, 317))).toBe(C14_ANCHOR_LEDGER_HASH);
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -757,6 +798,7 @@ describe("checked-in feature ledger", () => {
       "TER-047": 9,
       "TER-048": 7,
       "TER-049": 2,
+      "TER-050": 3,
     });
   });
 

@@ -6,7 +6,7 @@
   </overview>
 
   <feature_budget>
-    Implement all 317 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, then four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, seven C03 offline-lookup foundation additions, and eighteen C06 physical-bottle additions on 2026-09-23, followed by two C09 CSV identity-review additions on 2026-09-24 under approved Q10, Q11, Q13, and CAP-21, superseding the previous maximum of 200. Treat each source assertion as one feature; do not split one assertion into sub-features or add features beyond the enumerated contract. This approved count overrides any complexity-tier table.
+    Implement all 320 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, then four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, seven C03 offline-lookup foundation additions, and eighteen C06 physical-bottle additions on 2026-09-23, followed by two C09 CSV identity-review additions and three C14 pilot-measurement capability additions on 2026-09-24 under approved Q7, Q10, Q11, Q13, CAP-21, and the accepted C14 measurement contract, superseding the previous maximum of 200. Treat each source assertion as one feature; do not split one assertion into sub-features or add features beyond the enumerated contract. This approved count overrides any complexity-tier table.
   </feature_budget>
 
   <initializer_guidance>
@@ -454,6 +454,12 @@
       - User can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate
       - System may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable
     </csv_identity_review>
+
+    <pilot_measurement_capability>
+      - System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds
+      - System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result
+      - System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private
+    </pilot_measurement_capability>
 
   </core_features>
 

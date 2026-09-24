@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 317,
+  "featureCount": 320,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
     "expandedOn": "2026-09-24",
-    "approvedActiveCount": 317
+    "approvedActiveCount": 320
   },
   "items": [
     {
@@ -4131,6 +4131,45 @@
       "status": "active",
       "completionSpec": "TER-049",
       "evidenceOwner": "csv-identity-review"
+    },
+    {
+      "id": "TER-CF-318",
+      "domain": "pilot_measurement_capability",
+      "sourceOrder": 318,
+      "sourceText": "System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+      "actor": "System",
+      "action": "captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+      "observableOutcome": "System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+      "negativeCase": "Assertion is not observed: System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+      "status": "active",
+      "completionSpec": "TER-050",
+      "evidenceOwner": "pilot-measurement"
+    },
+    {
+      "id": "TER-CF-319",
+      "domain": "pilot_measurement_capability",
+      "sourceOrder": 319,
+      "sourceText": "System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+      "actor": "System",
+      "action": "computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+      "observableOutcome": "System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+      "negativeCase": "Assertion is not observed: System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+      "status": "active",
+      "completionSpec": "TER-050",
+      "evidenceOwner": "pilot-measurement"
+    },
+    {
+      "id": "TER-CF-320",
+      "domain": "pilot_measurement_capability",
+      "sourceOrder": 320,
+      "sourceText": "System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+      "actor": "System",
+      "action": "exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+      "observableOutcome": "System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+      "negativeCase": "Assertion is not observed: System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+      "status": "active",
+      "completionSpec": "TER-050",
+      "evidenceOwner": "pilot-measurement"
     }
   ]
 }

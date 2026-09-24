@@ -105,7 +105,7 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
-| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 317 assertions |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 320 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
@@ -113,7 +113,7 @@ recorded. The required critical subset fails on any skip.
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
-current machine-read source for 317 requirement identities, but the generated
+current machine-read source for 320 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the whole workflow is complete. C04 has a
 locally implemented shadow database foundation plus a bounded server-private
@@ -129,6 +129,11 @@ offline shell, positive eligibility, and the whole C03 workflow remain incomplet
 has 18 accepted physical-bottle source assertions
 (`TER-CF-298` through `TER-CF-315`) and canonical transition plans, but no
 physical-bottle runtime or schema implementation; source promotion does not complete C06.
+The three C14 pilot-measurement assertions (`TER-CF-318` through `TER-CF-320`) are
+active, but no measurement capture/export runtime exists and source promotion does not
+complete C14. The pure eight-path calculation/export leaf cannot complete it alone.
+Working authorized capture/export may complete the software criterion without real
+four-week pilot observations; those observations gate only Q7 outcome claims.
 The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast
 modules alone do not complete those workflows. Non-core `app_spec.txt`
 prose can retain historical or drifted claims (including a dead env var name).

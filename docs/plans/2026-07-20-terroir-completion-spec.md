@@ -177,7 +177,8 @@ The exact prerequisite graph is:
 | TER-043 | TER-004, TER-014, TER-015 |
 | TER-044 | TER-025 through TER-043 as applicable |
 | TER-045 | All implementation specs whose behavior it documents |
-| TER-046 | TER-002 through TER-045 |
+| TER-046 | TER-002 through TER-045, TER-047 through TER-050 |
+| TER-050 | TER-004, TER-010, TER-012, TER-014, TER-020, TER-024, TER-041, TER-044, TER-048 |
 
 Phases are ordered by risk, not visual appeal:
 
@@ -765,7 +766,7 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 
 **Acceptance:** All required checks pass on the promoted SHA; no active requirement lacks evidence; production auth, public list, health, queue, and key read paths pass; rollback target is recorded; during the 24-hour observation window, HTTP 5xx stays below 1%, synthetic auth and public-list success stay at or above 99%, background-job success stays at or above 95% with queue age below 5 minutes, public-list p95 response time stays below 2 seconds, and no unresolved severity-1 or severity-2 event is opened. Low-volume metrics must be supported by the scheduled synthetic canaries.
 **Verification:** Release manifest with commit, artifact, migrations, checks, staging report, production canary, and rollback reference.
-**Dependencies:** `TER-002` through `TER-045`, `TER-047`, `TER-048`, and `TER-049`.
+**Dependencies:** `TER-002` through `TER-045` and `TER-047` through `TER-050`.
 **Approval:** Production schema changes, deployment, data writes, and rollback require explicit approval at the release boundary.
 
 ### TER-047: Deliver bounded POS corroboration Slice A
@@ -798,6 +799,14 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 **Acceptance:** Source promotion preserves the exact first 315 assertion identities and text and appends only `TER-CF-316` and `TER-CF-317` as active requirements. The pure adapter/domain leaf passes exact request, response, minimization, deadline, schema, model, usage, oversize, and fail-closed tests with fake transport, but neither promotion nor those tests mark TER-049 complete. Completion later requires the authenticated caller and operator surface, current candidate and tenant isolation, bounded provider evaluation, provider-failure fallback, privacy approval for any private export, and aggregate-spend enforcement. The dormant adapter now has independently verified synthetic coverage for a 64 KiB delivered-response limit before decoding/JSON materialization, bounded empty-chunk handling, cooperative deadline checks, and body consumption or best-effort cancellation on early returns. These checks do not prove live provider behavior, synchronous socket closure, or an upstream transport memory bound. The 145-test checkpoint at `de9927f7` adds `src/adapters/llm/typesafe-jev-response.ts` beside the adapter and preserves caller activation, privacy, evaluation, and spend gates.
 **Verification:** Official feature-ledger generation and old-315 regression; pure fake-transport adapter/domain tests; later authenticated route, UI, stale-view, locked/skipped-row, tenant/source-isolation, pre-materialization response-byte-bound, and early-return body-consumption/cancellation tests; separately authorized bounded provider evaluation with frozen inputs and raw latency/usage/cost evidence. No live/provider/quality/runtime result may be inferred from source promotion or synthetic tests.
 **Dependencies:** `TER-004`, `TER-010`, `TER-014`, `TER-020`, `TER-023`, `TER-026`, `TER-040`, `TER-044`.
+
+### TER-050: Deliver pilot measurement capability
+
+**Outcome:** Authorized staff can capture provenance-bound lookup, standard-pour, and count-labor evidence and export one deterministic privacy-safe baseline/pilot CSV under the fixed Q7 definitions.
+
+**Acceptance:** Source promotion preserves the complete first 317 source and ledger objects and appends only `TER-CF-318` through `TER-CF-320` as active requirements; promotion does not prove capture, authorization, export, or runtime behavior. TER-050 and the C14 software criterion complete only after server-derived authorization and provenance, versioned phase/window and clock validation, durable capture, the authorized export surface, and end-to-end evidence are implemented and verified. They do not require real four-week pilot observations. A real Q7 success claim separately requires real same-venue baseline evidence, a closed pilot window spanning at least 2,419,200,000,000 microseconds, and every other qualification in the accepted measurement contract. Synthetic fixtures and provisional exports may prove software behavior but cannot claim a real Q7 result. The pure eight-path calculation/export leaf cannot complete TER-050 or C14 by itself.
+**Verification:** Official feature-ledger generation; exact first-317 source and complete-ledger conservation against `006330bb3037bb2ce52f1575ebf105316cfd06ba`; pure arithmetic, denominator/failure, deterministic ordering, privacy projection, and synthetic/real-gate tests; later authorization, capture, persistence, export, and end-to-end integration evidence. Source promotion alone supplies none of that runtime proof.
+**Dependencies:** `TER-004`, `TER-010`, `TER-012`, `TER-014`, `TER-020`, `TER-024`, `TER-041`, `TER-044`, `TER-048`.
 
 ## 7. Autonomous execution contract
 
