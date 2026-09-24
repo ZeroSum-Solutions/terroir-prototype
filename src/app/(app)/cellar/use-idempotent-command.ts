@@ -72,6 +72,16 @@ export function isReplayedCommandResponse(response: Response): boolean {
   return response.headers.get("Idempotency-Replayed") === "true";
 }
 
+export function unknownCommandOutcomeMessage(
+  action: string,
+  repeatAction: string,
+  latestError?: string,
+): string {
+  const message = `${action} not confirmed. This may already be recorded. ` +
+    `Retry the prior action to check; do not ${repeatAction} again.`;
+  return latestError ? `${message} Latest response: ${latestError}` : message;
+}
+
 export function useIdempotentCommand<TPayload>() {
   const pendingRef = useRef<PendingCommand<TPayload> | null>(null);
   const [pending, setPending] = useState<PendingCommandView<TPayload> | null>(null);

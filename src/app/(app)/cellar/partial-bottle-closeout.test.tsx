@@ -159,12 +159,16 @@ describe("PartialBottleCloseout", () => {
         item.textContent ?? "",
       ))!;
     await act(async () => close().click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Close-out not confirmed. This may already be recorded. Retry the prior action to check; do not close it again.",
+    );
     await act(async () => close().click());
 
     const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
     const retry = new Headers(fetchMock.mock.calls[1][1]?.headers);
     expect(retry.get("Idempotency-Key")).toBe(first.get("Idempotency-Key"));
     expect(mockToastSuccess).toHaveBeenCalledWith("Already recorded");
+    expect(container.textContent).not.toContain("Close-out not confirmed");
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
   });
@@ -202,7 +206,7 @@ describe("PartialBottleCloseout", () => {
       ))!;
     await act(async () => close().click());
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      "Couldn't confirm the bottle was closed",
+      "Close-out not confirmed. This may already be recorded. Retry the prior action to check; do not close it again.",
     );
     expect(close().textContent).toBe("Retry prior action");
     expect(container.querySelector<HTMLInputElement>(

@@ -75,6 +75,10 @@ describe("useInventoryCommands retry state", () => {
 
     await act(async () => api().doPour(90));
     expect(api().pourNeedsReview).toBe(true);
+    expect(setErrorMsg).toHaveBeenLastCalledWith(
+      "Pour not confirmed. This may already be recorded. Retry the prior action to check; do not pour again.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
 
     await act(async () => api().doPour(250));
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -84,6 +88,10 @@ describe("useInventoryCommands retry state", () => {
 
     await act(async () => api().retryPriorPour());
     expect(api().pourNeedsReview).toBe(true);
+    expect(setErrorMsg).toHaveBeenLastCalledWith(
+      "Pour not confirmed. This may already be recorded. Retry the prior action to check; do not pour again. Latest response: Membership changed.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
 
     await act(async () => root.render(
       <Harness row={baseRow({
@@ -107,12 +115,17 @@ describe("useInventoryCommands retry state", () => {
       preservation_method: "coravin",
     });
     expect(toast.success).toHaveBeenCalledWith("Already recorded");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(setErrorMsg).toHaveBeenLastCalledWith(null);
     expect(api().pourNeedsReview).toBe(false);
   });
 
   it("retries an unresolved open with its original payload after row changes", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("Unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: "forbidden", message: "Membership changed." },
+      }), { status: 403, headers: { "content-type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         open_bottle: {
           id: "66666666-6666-4666-8666-666666666666",
@@ -131,6 +144,17 @@ describe("useInventoryCommands retry state", () => {
 
     await act(async () => api().doOpenBottle());
     expect(api().openNeedsReview).toBe(true);
+    expect(setErrorMsg).toHaveBeenLastCalledWith(
+      "Open not confirmed. This may already be recorded. Retry the prior action to check; do not open again.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+
+    await act(async () => api().retryPriorOpen());
+    expect(api().openNeedsReview).toBe(true);
+    expect(setErrorMsg).toHaveBeenLastCalledWith(
+      "Open not confirmed. This may already be recorded. Retry the prior action to check; do not open again. Latest response: Membership changed.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
 
     await act(async () => root.render(
       <Harness row={baseRow({
@@ -141,16 +165,42 @@ describe("useInventoryCommands retry state", () => {
     ));
     await act(async () => api().retryPriorOpen());
 
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toEqual({
       wine_id: WINE_ID,
       preservation_method: "coravin",
     });
-    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get(
+    expect(new Headers(fetchMock.mock.calls[2][1]?.headers).get(
       "Idempotency-Key",
     )).toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get(
       "Idempotency-Key",
     ));
     expect(toast.success).toHaveBeenCalledWith("Already recorded");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(setErrorMsg).toHaveBeenLastCalledWith(null);
+  });
+
+  it("preserves specific definitive server errors without creating retry state", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "already_closed", message: "Bottle is already closed." },
+    }), { status: 409, headers: { "content-type": "application/json" } })));
+
+    await act(async () => api().doPour(90));
+
+    expect(setErrorMsg).toHaveBeenLastCalledWith("Bottle is already closed.");
+    expect(toast.error).toHaveBeenCalledWith("Pour failed");
+    expect(api().pourNeedsReview).toBe(false);
+  });
+
+  it("preserves a definitive open refusal without calling it uncertain", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "active_bottle", message: "A bottle is already open." },
+    }), { status: 409, headers: { "content-type": "application/json" } })));
+
+    await act(async () => api().doOpenBottle());
+
+    expect(setErrorMsg).toHaveBeenLastCalledWith("A bottle is already open.");
+    expect(toast.error).toHaveBeenCalledWith("Open bottle failed");
+    expect(api().openNeedsReview).toBe(false);
   });
 });
 

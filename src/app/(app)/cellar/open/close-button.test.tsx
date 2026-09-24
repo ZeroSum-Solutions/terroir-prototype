@@ -77,7 +77,7 @@ describe("CloseBottleButton failure reporting", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("tells the operator when the request never reaches the server", async () => {
+  it("retains a truthful unknown-outcome explanation when the response is lost", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network down")));
 
     const container = await mount();
@@ -85,8 +85,9 @@ describe("CloseBottleButton failure reporting", () => {
     await click(container, "Confirm discard 4.2 oz");
 
     expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
-      "Network down",
+      "Discard not confirmed. This may already be recorded. Retry the prior action to check; do not discard again.",
     );
+    expect(document.body.textContent).not.toContain("Network down");
     expect(refresh).not.toHaveBeenCalled();
   });
 
@@ -146,6 +147,9 @@ describe("CloseBottleButton failure reporting", () => {
     const container = await mount();
     await click(container, "Close bottle");
     await click(container, "Confirm discard 4.2 oz");
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
+      "Discard not confirmed",
+    );
     await click(container, "Retry prior action");
 
     const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
@@ -155,6 +159,28 @@ describe("CloseBottleButton failure reporting", () => {
     expect(document.body.querySelector('[role="status"]')?.textContent).toContain(
       "Already recorded",
     );
+    expect(document.body.textContent).not.toContain("Discard not confirmed");
+    expect(document.body.textContent).not.toContain("Couldn't close");
+  });
+
+  it("keeps an earlier unknown outcome visible after a retry is refused", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Bad gateway", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { message: "Membership changed." },
+      }), { status: 403, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const container = await mount();
+    await click(container, "Close bottle");
+    await click(container, "Confirm discard 4.2 oz");
+    await click(container, "Retry prior action");
+
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
+      "Discard not confirmed. This may already be recorded. Retry the prior action to check; do not discard again. Latest response: Membership changed.",
+    );
+    expect(container.textContent).toContain("Retry prior action");
   });
 
   it("reuses the UUID after a wrong-typed 200 response", async () => {
@@ -185,7 +211,7 @@ describe("CloseBottleButton failure reporting", () => {
     await click(container, "Close bottle");
     await click(container, "Confirm discard 4.2 oz");
     expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
-      "Couldn't confirm the bottle was closed",
+      "Discard not confirmed. This may already be recorded. Retry the prior action to check; do not discard again.",
     );
     await click(container, "Retry prior action");
 

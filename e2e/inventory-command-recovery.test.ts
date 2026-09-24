@@ -195,7 +195,11 @@ test.describe("inventory command recovery", () => {
 
     const retry = drawer.getByRole("button", { name: "Retry prior pour" });
     await expect(retry).toBeVisible();
-    await expect(drawer.getByRole("alert")).toBeVisible();
+    await expect(drawer.getByRole("alert")).toContainText(
+      "Pour not confirmed. This may already be recorded. Retry the prior action to check; do not pour again.",
+    );
+    await expect(page.getByText("Failed to fetch", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Pour failed", { exact: true })).toHaveCount(0);
     await expectTouchTarget(retry, "retry prior pour");
     await attachScreenshot(page, testInfo, "390px-pour-unknown-outcome");
 
@@ -224,6 +228,8 @@ test.describe("inventory command recovery", () => {
     await retry.click();
     await expect(page.getByRole("status").filter({ hasText: "Already recorded" }))
       .toBeVisible();
+    await expect(page.getByText("Pour not confirmed", { exact: false })).toHaveCount(0);
+    await expect(page.getByText("Pour failed", { exact: true })).toHaveCount(0);
     await expectTouchTarget(
       drawer.getByRole("button", { name: /^Pour / }),
       "replayed pour action",

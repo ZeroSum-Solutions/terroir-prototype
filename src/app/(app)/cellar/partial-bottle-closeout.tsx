@@ -7,6 +7,7 @@ import {
   isCloseoutSuccess,
   isDefinitiveCommandResponse,
   isReplayedCommandResponse,
+  unknownCommandOutcomeMessage,
   useIdempotentCommand,
 } from "./use-idempotent-command";
 
@@ -83,7 +84,8 @@ function useCloseout(bottle: Bottle, onComplete?: () => void) {
       writtenOffMl,
       reason || null,
     ]);
-    const retryCommand = pending?.state === "unresolved" ? retry() : null;
+    const hadUncertainOutcome = pending?.state === "unresolved";
+    const retryCommand = hadUncertainOutcome ? retry() : null;
     const operationId = retryCommand?.operationId ?? begin(fingerprint, nextPayload);
     const command = retryCommand?.payload ?? nextPayload;
     const commandFingerprint = retryCommand?.fingerprint ?? fingerprint;
@@ -112,7 +114,16 @@ function useCloseout(bottle: Bottle, onComplete?: () => void) {
       if (replayed) toast.success("Already recorded");
       onComplete?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Close-out failed.");
+      const message = cause instanceof Error ? cause.message : "Close-out failed.";
+      setError(
+        !definitive || hadUncertainOutcome
+          ? unknownCommandOutcomeMessage(
+            "Close-out",
+            "close it",
+            definitive ? message : undefined,
+          )
+          : message,
+      );
     } finally {
       finish(commandFingerprint, definitive, successful);
       setBusy(false);

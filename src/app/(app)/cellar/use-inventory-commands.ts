@@ -8,6 +8,7 @@ import {
   isOpenBottleSuccess,
   isDefinitiveCommandResponse,
   isReplayedCommandResponse,
+  unknownCommandOutcomeMessage,
   useIdempotentCommand,
 } from "./use-idempotent-command";
 
@@ -57,10 +58,10 @@ export function useInventoryCommands(input: {
 
   const runOpenCommand = useCallback((attempt: CommandAttempt<OpenPayload>) => {
     setErrorMsg(null);
+    let definitive = false;
+    let successful = false;
     return runOpen(
       async () => {
-        let definitive = false;
-        let successful = false;
         try {
           const response = await fetch("/api/open-bottles", {
             method: "POST",
@@ -96,8 +97,16 @@ export function useInventoryCommands(input: {
       {
         fallbackMessage: "Failed to open bottle.",
         onError: (message) => {
-          toast.error("Open bottle failed");
-          setErrorMsg(message);
+          if (!definitive || attempt.wasUncertain) {
+            setErrorMsg(unknownCommandOutcomeMessage(
+              "Open",
+              "open",
+              definitive ? message : undefined,
+            ));
+          } else {
+            toast.error("Open bottle failed");
+            setErrorMsg(message);
+          }
         },
       },
     );
@@ -113,13 +122,15 @@ export function useInventoryCommands(input: {
     const fingerprint = JSON.stringify(["open", payload.wineId, payload.preservationMethod]);
     const operationId = beginOpen(fingerprint, payload);
     return operationId
-      ? runOpenCommand({ fingerprint, operationId, payload })
+      ? runOpenCommand({ fingerprint, operationId, payload, wasUncertain: false })
       : Promise.resolve();
   }, [beginOpen, pendingOpen, preservationMethod, row, runOpenCommand, setErrorMsg]);
 
   const retryPriorOpen = useCallback(() => {
     const attempt = retryOpen();
-    return attempt ? runOpenCommand(attempt) : Promise.resolve();
+    return attempt
+      ? runOpenCommand({ ...attempt, wasUncertain: true })
+      : Promise.resolve();
   }, [retryOpen, runOpenCommand]);
 
   const runPourCommand = useCallback(async (attempt: CommandAttempt<PourPayload>) => {
@@ -159,8 +170,17 @@ export function useInventoryCommands(input: {
       setLastPour({ ml: attempt.payload.ml });
       refresh();
     } catch (error) {
-      toast.error("Pour failed");
-      setErrorMsg(error instanceof Error ? error.message : "Pour failed.");
+      const message = error instanceof Error ? error.message : "Pour failed.";
+      if (!definitive || attempt.wasUncertain) {
+        setErrorMsg(unknownCommandOutcomeMessage(
+          "Pour",
+          "pour",
+          definitive ? message : undefined,
+        ));
+      } else {
+        toast.error("Pour failed");
+        setErrorMsg(message);
+      }
     } finally {
       finishPour(attempt.fingerprint, definitive, successful);
       setBusy(false);
@@ -182,13 +202,15 @@ export function useInventoryCommands(input: {
     ]);
     const operationId = beginPour(fingerprint, payload);
     return operationId
-      ? runPourCommand({ fingerprint, operationId, payload })
+      ? runPourCommand({ fingerprint, operationId, payload, wasUncertain: false })
       : Promise.resolve();
   }, [beginPour, pendingPour, preservationMethod, row, runPourCommand, setErrorMsg]);
 
   const retryPriorPour = useCallback(() => {
     const attempt = retryPour();
-    return attempt ? runPourCommand(attempt) : Promise.resolve();
+    return attempt
+      ? runPourCommand({ ...attempt, wasUncertain: true })
+      : Promise.resolve();
   }, [retryPour, runPourCommand]);
 
   return {
@@ -206,6 +228,7 @@ type CommandAttempt<TPayload> = {
   operationId: string;
   fingerprint: string;
   payload: TPayload;
+  wasUncertain: boolean;
 };
 
 function commandHeaders(operationId: string) {

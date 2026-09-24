@@ -9,6 +9,7 @@ import {
   isClosedBottleSuccess,
   isDefinitiveCommandResponse,
   isReplayedCommandResponse,
+  unknownCommandOutcomeMessage,
   useIdempotentCommand,
 } from "../use-idempotent-command";
 
@@ -27,11 +28,12 @@ interface Props {
  *
  * SD-06: a refused close used to be console.error'd and the confirm state
  * reset — the bottle stayed open, the page did not move, and nothing said
- * why. The failure now reaches the operator through the same toast every
- * other cellar mutation uses (see cellar-list.tsx).
+ * why. Definitive refusals now use the mutation toast; uncertain outcomes stay
+ * inline so a later successful replay cannot leave contradictory feedback.
  */
 export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
   const [confirming, setConfirming] = useState(false);
+  const [uncertaintyMessage, setUncertaintyMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -51,6 +53,7 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
 
     const nextPayload = { bottleId, openedAt };
     const fingerprint = JSON.stringify(["legacy-close", bottleId, openedAt]);
+    const hadUncertainOutcome = retrying;
     const retryCommand = retrying ? retry() : null;
     const operationId = retryCommand?.operationId ?? begin(fingerprint, nextPayload);
     const command = retryCommand?.payload ?? nextPayload;
@@ -58,6 +61,7 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
     if (!operationId) return;
 
     startTransition(async () => {
+      setUncertaintyMessage(null);
       let definitive = false;
       let successful = false;
       try {
@@ -80,20 +84,28 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
           if (isReplayedCommandResponse(res)) toast.success("Already recorded");
           router.refresh();
         } else {
-          toast.error(
-            res.ok
-              ? "Couldn't confirm the bottle was closed. Retry the close."
-              : readApiError(
-                body,
-                `Couldn't close the bottle (${res.status}).`,
-              ).message,
-          );
+          const message = res.ok
+            ? "Couldn't confirm the bottle was closed. Retry the close."
+            : readApiError(
+              body,
+              `Couldn't close the bottle (${res.status}).`,
+            ).message;
+          if (!definitive || hadUncertainOutcome) {
+            setUncertaintyMessage(unknownCommandOutcomeMessage(
+              "Discard",
+              "discard",
+              definitive ? message : undefined,
+            ));
+          } else {
+            toast.error(message);
+          }
           setConfirming(false);
         }
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Couldn't close the bottle.",
-        );
+      } catch {
+        setUncertaintyMessage(unknownCommandOutcomeMessage(
+          "Discard",
+          "discard",
+        ));
         setConfirming(false);
       } finally {
         finish(commandFingerprint, definitive, successful);
@@ -108,7 +120,13 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-xs">
+    <>
+      {uncertaintyMessage && (
+        <p role="alert" className="max-w-[36ch] text-right text-caption text-risk-ink">
+          {uncertaintyMessage}
+        </p>
+      )}
+      <div className="flex items-center gap-xs">
       {confirming && (
         <button
           type="button"
@@ -147,6 +165,7 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
               ? "Retry prior action"
               : "Close"}
       </button>
-    </div>
+      </div>
+    </>
   );
 }
