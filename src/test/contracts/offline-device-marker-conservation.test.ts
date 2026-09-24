@@ -119,17 +119,20 @@ describe("offline device marker conservation", () => {
 
     expect(literalOwners).toEqual(["src/domains/offline/device-lock.ts"]);
     expect(importers).toEqual([
+      "src/app/(app)/offline-context-provider.tsx",
       "src/app/(app)/offline-session-boundary.tsx",
       "src/app/api/dev-login/route.ts",
       "src/app/auth/callback/route.ts",
       "src/app/auth/confirm/route.ts",
       "src/app/auth/signout/route.ts",
       "src/app/login/actions.ts",
+      "src/domains/offline/eligibility.ts",
+      "src/lib/api/active-restaurant.ts",
       "src/lib/supabase/proxy.ts",
     ]);
   });
 
-  it("has no marker-specific delete or expiry primitive", () => {
+  it("allows only the reviewed post-commit marker-clear primitive", () => {
     const violations: string[] = [];
     for (const [file, source] of contents) {
       for (const alias of importedMarkerAliases(file, source)) {
@@ -148,8 +151,17 @@ describe("offline device marker conservation", () => {
     const markerSource = contents.get(
       path.join(sourceRoot, "domains/offline/device-lock.ts"),
     )!;
-    expect(markerSource).not.toMatch(/export\s+(?:async\s+)?function\s+\w*(delete|clear|expire)/i);
+    const exportedDestructiveNames = [...markerSource.matchAll(
+      /export\s+(?:async\s+)?function\s+(\w*(?:delete|clear|expire)\w*)/gi,
+    )].map((match) => match[1]);
+    expect(exportedDestructiveNames).toEqual(["clearReprovisionMarkerAfterCommit"]);
     expect(violations).toEqual([]);
+
+    const clearCallers = sources
+      .filter((file) => relative(file) !== "src/domains/offline/device-lock.ts")
+      .filter((file) => contents.get(file)?.includes("clearReprovisionMarkerAfterCommit("))
+      .map(relative);
+    expect(clearCallers).toEqual(["src/app/(app)/offline-context-provider.tsx"]);
   });
 
   it("allows only the two reviewed direct marker writes", () => {
@@ -227,6 +239,7 @@ describe("offline device marker conservation", () => {
       "src/app/auth/callback/route.ts",
       "src/app/auth/confirm/route.ts",
       "src/app/login/actions.ts",
+      "src/lib/api/active-restaurant.ts",
     ]);
     expect(clientWriters).toEqual([
       "src/app/(app)/offline-session-boundary.tsx",

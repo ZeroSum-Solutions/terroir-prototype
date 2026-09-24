@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAuthContext: vi.fn(),
+  offlineContextProviderProps: vi.fn(),
   restaurantProviderProps: vi.fn(),
   redirect: vi.fn(),
 }));
@@ -33,6 +34,16 @@ vi.mock("./offline-session-boundary", () => ({
   OfflineSessionBoundary: ({ children }: { children: React.ReactNode }) => (
     <div data-offline-session-boundary="true">{children}</div>
   ),
+}));
+vi.mock("./offline-context-provider", () => ({
+  OfflineContextProvider: (props: {
+    children: React.ReactNode;
+    userId: string;
+    restaurantId: string;
+  }) => {
+    mocks.offlineContextProviderProps(props);
+    return <div data-offline-context-provider="true">{props.children}</div>;
+  },
 }));
 vi.mock("./settings-dropdown", () => ({
   SettingsDropdown: () => <button data-settings="true">Settings</button>,
@@ -81,6 +92,15 @@ describe("AppLayout header", () => {
     expect(root.querySelector('[data-desktop-nav="true"]')).not.toBeNull();
     expect(root.querySelector('[data-mobile-nav="true"]')).not.toBeNull();
     expect(root.querySelector('[data-offline-session-boundary="true"]')).not.toBeNull();
+    const positiveProvider = root.querySelector('[data-offline-context-provider="true"]');
+    expect(positiveProvider).not.toBeNull();
+    expect(positiveProvider?.parentElement?.dataset.offlineSessionBoundary).toBe("true");
+    expect(mocks.offlineContextProviderProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "10000000-0000-4000-8000-000000000001",
+        restaurantId: "restaurant-1",
+      }),
+    );
     expect(root.querySelector("header")?.parentElement?.className).toContain(
       "overflow-x-hidden",
     );
@@ -137,7 +157,10 @@ async function renderLayout(
     restaurantName,
     userRole,
     shadowAccess,
-    user: { email: "manager@example.com" },
+    user: {
+      id: "10000000-0000-4000-8000-000000000001",
+      email: "manager@example.com",
+    },
   });
 
   const element = await AppLayout({ children: <p>Dashboard</p> });

@@ -62,7 +62,11 @@ describe("OfflineSessionBoundary", () => {
   it("unmounts the private tree before starting network and storage work", async () => {
     const events: string[] = [];
     const server = deferred<Response>();
-    const database = deferred<{ locked: boolean; projectionsDeleted: boolean }>();
+    const database = deferred<{
+      locked: boolean;
+      denialFenceCommitted: boolean;
+      projectionsDeleted: boolean;
+    }>();
     const dependencies = createDependencies({
       requestSignOut: vi.fn(() => {
         events.push("request");
@@ -81,7 +85,7 @@ describe("OfflineSessionBoundary", () => {
     expect(container.textContent).not.toContain("Private wine inventory");
     expect(events).toEqual(["request", "database"]);
     server.resolve(response(503));
-    database.resolve({ locked: false, projectionsDeleted: false });
+    database.resolve({ locked: false, denialFenceCommitted: false, projectionsDeleted: false });
     await flush();
   });
 
@@ -107,6 +111,7 @@ describe("OfflineSessionBoundary", () => {
       name: "local lock only",
       serverStatus: 503,
       locked: true,
+      denialFenceCommitted: false,
       cookie: false,
       message: "Locked on this device. Server sign-out is not confirmed.",
     },
@@ -114,6 +119,7 @@ describe("OfflineSessionBoundary", () => {
       name: "neither side confirmed",
       serverStatus: 503,
       locked: false,
+      denialFenceCommitted: false,
       cookie: false,
       message:
         "This device lock could not be saved. Server sign-out is not confirmed.",
@@ -122,15 +128,25 @@ describe("OfflineSessionBoundary", () => {
       name: "server only",
       serverStatus: 204,
       locked: false,
+      denialFenceCommitted: false,
       cookie: false,
       message:
         "Online sign-out completed, but this device lock was not verified. Do not hand this device to another person until retry or recovery succeeds.",
+    },
+    {
+      name: "zero-context denial fence",
+      serverStatus: 503,
+      locked: false,
+      denialFenceCommitted: true,
+      cookie: false,
+      message: "Locked on this device. Server sign-out is not confirmed.",
     },
   ])("renders truthful unresolved copy for $name", async (scenario) => {
     const dependencies = createDependencies({
       requestSignOut: vi.fn(async () => response(scenario.serverStatus)),
       lockDevice: vi.fn(async () => ({
         locked: scenario.locked,
+        denialFenceCommitted: scenario.denialFenceCommitted,
         projectionsDeleted: true,
       })),
       writeHardMarker: vi.fn(() => scenario.cookie),
@@ -172,6 +188,9 @@ describe("OfflineSessionBoundary", () => {
 
     expect(dependencies.requestSignOut).toHaveBeenCalledTimes(1);
     expect(dependencies.lockDevice).toHaveBeenCalledTimes(1);
+    expect(dependencies.lockDevice).toHaveBeenCalledWith(
+      "10000000-0000-4000-8000-000000000010",
+    );
     server.resolve(response(503));
     await flush();
   });
@@ -276,9 +295,14 @@ describe("OfflineSessionBoundary", () => {
   ): OfflineSessionBoundaryDependencies {
     return {
       requestSignOut: vi.fn(async () => response(503)),
-      lockDevice: vi.fn(async () => ({ locked: false, projectionsDeleted: true })),
+      lockDevice: vi.fn(async () => ({
+        locked: false,
+        denialFenceCommitted: false,
+        projectionsDeleted: true,
+      })),
       writeHardMarker: vi.fn(() => false),
       readMarker: vi.fn(() => null),
+      readGeneration: vi.fn(() => "10000000-0000-4000-8000-000000000010"),
       navigate: vi.fn(),
       clock: {
         setTimeout(callback, delay) {

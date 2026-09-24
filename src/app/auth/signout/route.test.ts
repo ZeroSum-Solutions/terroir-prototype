@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import {
+  AUTHORIZATION_GENERATION_COOKIE_NAME,
   DEVICE_LOCK_COOKIE_NAME,
   HARD_DEVICE_LOCK,
 } from "@/domains/offline/device-lock";
@@ -78,6 +79,8 @@ describe("POST /auth/signout", () => {
     expect(response.cookies.get(DEVICE_LOCK_COOKIE_NAME)?.value).toBe(
       HARD_DEVICE_LOCK,
     );
+    expect(response.cookies.get(AUTHORIZATION_GENERATION_COOKIE_NAME)?.value)
+      .toMatch(/^[0-9a-f-]{36}$/i);
     expectSafetyHeaders(response);
   });
 

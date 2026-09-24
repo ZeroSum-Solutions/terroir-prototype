@@ -5,6 +5,7 @@ const TOKEN_HASH =
   "fcc10d33162838e7b9e468c681194474d040cd9844c9e8c69f11e0e1aa0d8010";
 const FUTURE_EXPIRY = "2026-07-23T12:05:00.000Z";
 const mockVerifyOtp = vi.fn();
+const mockCookieGet = vi.fn();
 const mockCookieSet = vi.fn();
 const mockCreateClient = vi.fn(async () => ({
   auth: { verifyOtp: mockVerifyOtp },
@@ -15,7 +16,10 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: () => mockCreateClient(),
 }));
 vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({ set: mockCookieSet })),
+  cookies: vi.fn(async () => ({
+    get: (name: string) => mockCookieGet(name),
+    set: (...args: unknown[]) => mockCookieSet(...args),
+  })),
 }));
 
 vi.mock("@sentry/nextjs", () => ({
@@ -23,6 +27,7 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 const { GET } = await import("./route");
+let scheduledCookies = new Map<string, string>();
 
 function makeRequest(token = "temporary-secret"): NextRequest {
   return makeRequestWithQuery(`token=${encodeURIComponent(token)}`);
@@ -91,6 +96,14 @@ describe("GET /api/dev-login", () => {
     vi.setSystemTime(new Date("2026-07-23T12:00:00.000Z"));
     configureBaseEnvironment("production");
     vi.clearAllMocks();
+    scheduledCookies = new Map();
+    mockCookieGet.mockImplementation((name: string) => {
+      const value = scheduledCookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    });
+    mockCookieSet.mockImplementation((name: string, value: string) => {
+      scheduledCookies.set(name, value);
+    });
   });
 
   afterEach(() => {
@@ -183,6 +196,55 @@ describe("GET /api/dev-login", () => {
       "reprovision_required",
       expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
     );
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "terroir_authorization_generation",
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+    expect(mockCookieSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("completes dev login under hard denial when generation rotation is unavailable", async () => {
+    configureDevelopmentBypass();
+    mockSuccessfulSupabaseLogin();
+    vi.stubGlobal("crypto", {});
+    scheduledCookies.set(
+      "terroir_authorization_generation",
+      "10000000-0000-4000-8000-000000000010",
+    );
+
+    const response = await GET(makeRequestWithQuery());
+
+    expect(response.status).toBe(303);
+    expect(scheduledCookies.get("terroir_authorization_generation"))
+      .toBe("10000000-0000-4000-8000-000000000010");
+    expect(scheduledCookies.get("terroir_device_locked")).toBe("1");
+    expect(mockCookieSet).not.toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.anything(),
+    );
+  });
+
+  it("maps hard-denial scheduling failure to the existing temporary-login failure", async () => {
+    configureDevelopmentBypass();
+    mockSuccessfulSupabaseLogin();
+    vi.stubGlobal("crypto", {});
+    mockCookieSet.mockImplementation((name: string, value: string) => {
+      if (name === "terroir_device_locked") throw new Error("private detail");
+      scheduledCookies.set(name, value);
+    });
+
+    const response = await GET(makeRequestWithQuery());
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "bad_gateway",
+        message: "Temporary login unavailable.",
+      },
+    });
+    expect(scheduledCookies.has("terroir_device_locked")).toBe(false);
   });
 
   it("redacts a secret-bearing provider non-2xx response", async () => {

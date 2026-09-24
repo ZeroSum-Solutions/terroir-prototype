@@ -8,9 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { lockAllContexts } from "@/domains/offline/database";
+import {
+  lockAllContexts,
+  type OfflineLockResult,
+} from "@/domains/offline/database";
 import {
   HARD_DEVICE_LOCK,
+  readAuthorizationGeneration,
   readDeviceLockMarker,
   writeClientDeviceLock,
 } from "@/domains/offline/device-lock";
@@ -37,9 +41,10 @@ type BoundaryClock = {
 
 export type OfflineSessionBoundaryDependencies = {
   requestSignOut: (signal: AbortSignal) => Promise<Response>;
-  lockDevice: () => Promise<{ locked: boolean; projectionsDeleted: boolean }>;
+  lockDevice: (authorizationGeneration: string | null) => Promise<OfflineLockResult>;
   writeHardMarker: () => boolean;
   readMarker: () => string | null;
+  readGeneration: () => string | null;
   navigate: (path: string) => void;
   clock: BoundaryClock;
 };
@@ -61,14 +66,17 @@ const defaultDependencies: OfflineSessionBoundaryDependencies = {
       headers: { [INTERNAL_SIGNOUT_HEADER]: INTERNAL_SIGNOUT_VALUE },
     });
   },
-  lockDevice() {
-    return lockAllContexts("sign_out", () => undefined);
+  lockDevice(authorizationGeneration) {
+    return lockAllContexts("sign_out", authorizationGeneration, () => undefined);
   },
   writeHardMarker() {
     return writeClientDeviceLock(HARD_DEVICE_LOCK);
   },
   readMarker() {
     return readDeviceLockMarker();
+  },
+  readGeneration() {
+    return readAuthorizationGeneration();
   },
   navigate(path) {
     window.location.assign(path);
@@ -107,6 +115,12 @@ function settleServerRequest(
 }
 
 async function runSignOut(dependencies: OfflineSessionBoundaryDependencies) {
+  let authorizationGeneration: string | null = null;
+  try {
+    authorizationGeneration = dependencies.readGeneration();
+  } catch {
+    authorizationGeneration = null;
+  }
   const controller = new AbortController();
   let request: Promise<Response>;
   try {
@@ -128,8 +142,12 @@ async function runSignOut(dependencies: OfflineSessionBoundaryDependencies) {
     }
   });
   const databaseResult = Promise.resolve()
-    .then(() => dependencies.lockDevice())
-    .catch(() => ({ locked: false, projectionsDeleted: false }));
+    .then(() => dependencies.lockDevice(authorizationGeneration))
+    .catch(() => ({
+      locked: false,
+      denialFenceCommitted: false,
+      projectionsDeleted: false,
+    }));
 
   const [serverSignOut, clientCookieVerified, database] = await Promise.all([
     serverResult,
@@ -143,7 +161,8 @@ async function runSignOut(dependencies: OfflineSessionBoundaryDependencies) {
     responseCookieVerified = false;
   }
   const durableLock =
-    database.locked || clientCookieVerified || responseCookieVerified;
+    database.denialFenceCommitted || database.locked ||
+    clientCookieVerified || responseCookieVerified;
 
   if (serverSignOut && durableLock) return { navigate: true as const };
   if (!serverSignOut && durableLock) {

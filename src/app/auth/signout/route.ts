@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  AUTHORIZATION_GENERATION_COOKIE_NAME,
+  authorizationGenerationCookieOptions,
+  createAuthorizationGeneration,
   DEVICE_LOCK_COOKIE_NAME,
   deviceLockCookieOptions,
   HARD_DEVICE_LOCK,
@@ -64,6 +67,14 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 0,
     });
+  }
+  const generation = createAuthorizationGeneration();
+  if (generation) {
+    response.cookies.set(
+      AUTHORIZATION_GENERATION_COOKIE_NAME,
+      generation,
+      authorizationGenerationCookieOptions(),
+    );
   }
   response.cookies.set(
     DEVICE_LOCK_COOKIE_NAME,

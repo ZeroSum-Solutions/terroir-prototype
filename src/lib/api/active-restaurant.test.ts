@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // next/headers cookies() stub — we only care about parseActiveRestaurantCookie
 // and signActiveRestaurantCookie here. Keep it simple.
 const mockCookieGet = vi.fn();
 const mockCookieSet = vi.fn();
 const mockCookieDelete = vi.fn();
+let scheduledCookies = new Map<string, string>();
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({
     get: (name: string) => mockCookieGet(name),
@@ -88,7 +89,17 @@ describe("readActiveRestaurantFromCookie", () => {
 describe("setActiveRestaurant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scheduledCookies = new Map();
+    mockCookieGet.mockImplementation((name: string) => {
+      const value = scheduledCookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    });
+    mockCookieSet.mockImplementation((name: string, value: string) => {
+      scheduledCookies.set(name, value);
+    });
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   function mockSupabase(row: { restaurant_id: string } | null, error?: unknown) {
     return {
@@ -129,16 +140,58 @@ describe("setActiveRestaurant", () => {
     expect(mockCookieSet).not.toHaveBeenCalled();
   });
 
-  it("writes a signed cookie when membership check passes", async () => {
+  it("writes the signed site, a fresh generation, and reprovision marker when membership passes", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = mockSupabase({ restaurant_id: "r1" }) as any;
     const result = await setActiveRestaurant(supabase, "u1", "r1");
     expect(result.ok).toBe(true);
-    expect(mockCookieSet).toHaveBeenCalledTimes(1);
+    expect(mockCookieSet).toHaveBeenCalledTimes(3);
     const [name, value, opts] = mockCookieSet.mock.calls[0];
     expect(name).toBe("active_restaurant_id");
     expect(value).toMatch(/^r1\./);
     expect(opts).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/" });
+    expect(mockCookieSet.mock.calls[1][0]).toBe("terroir_authorization_generation");
+    expect(mockCookieSet.mock.calls[1][1]).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(mockCookieSet.mock.calls[2].slice(0, 2)).toEqual([
+      "terroir_device_locked",
+      "reprovision_required",
+    ]);
+  });
+
+  it("accepts the site but schedules hard denial when generation rotation is unavailable", async () => {
+    vi.stubGlobal("crypto", {});
+    scheduledCookies.set(
+      "terroir_authorization_generation",
+      "10000000-0000-4000-8000-000000000010",
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = mockSupabase({ restaurant_id: "r1" }) as any;
+
+    await expect(setActiveRestaurant(supabase, "u1", "r1"))
+      .resolves.toEqual({ ok: true });
+
+    expect(scheduledCookies.get("terroir_authorization_generation"))
+      .toBe("10000000-0000-4000-8000-000000000010");
+    expect(scheduledCookies.get("terroir_device_locked")).toBe("1");
+    expect(mockCookieSet.mock.calls.map(([name, value]) => [name, value]))
+      .toEqual([
+        ["active_restaurant_id", expect.stringMatching(/^r1\./)],
+        ["terroir_device_locked", "1"],
+      ]);
+  });
+
+  it("rejects the accepted-site transition when hard denial cannot be scheduled", async () => {
+    vi.stubGlobal("crypto", {});
+    mockCookieSet.mockImplementation((name: string, value: string) => {
+      if (name === "terroir_device_locked") throw new Error("private detail");
+      scheduledCookies.set(name, value);
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = mockSupabase({ restaurant_id: "r1" }) as any;
+
+    await expect(setActiveRestaurant(supabase, "u1", "r1"))
+      .rejects.toThrow("Unable to schedule device denial.");
+    expect(scheduledCookies.has("terroir_device_locked")).toBe(false);
   });
 });
 

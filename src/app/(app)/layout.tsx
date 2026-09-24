@@ -11,6 +11,7 @@ import { Fab } from "./fab";
 import { ToastWrapper } from "./toast-wrapper";
 import { OnboardingModal } from "./onboarding-modal";
 import { OfflineSessionBoundary } from "./offline-session-boundary";
+import { OfflineContextProvider } from "./offline-context-provider";
 
 export default async function AppLayout({
   children,
@@ -25,6 +26,7 @@ export default async function AppLayout({
 
   return (
     <OfflineSessionBoundary>
+    <OfflineContextProvider userId={user.id} restaurantId={restaurantId}>
     <RestaurantProvider restaurantId={restaurantId} restaurantName={restaurantName} userRole={userRole}>
       <ToastWrapper>
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-canvas">
@@ -163,6 +165,7 @@ export default async function AppLayout({
     </div>
     </ToastWrapper>
     </RestaurantProvider>
+    </OfflineContextProvider>
     </OfflineSessionBoundary>
   );
 }

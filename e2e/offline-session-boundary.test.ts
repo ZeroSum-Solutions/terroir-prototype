@@ -268,9 +268,13 @@ test.describe("offline session boundary", () => {
       await page.route("**/auth/signout", (route) => route.abort("failed"));
       await beginSignOut(page);
       await expect(page.getByText(
-        "This device lock could not be saved. Server sign-out is not confirmed.",
+        "Locked on this device. Server sign-out is not confirmed.",
       )).toBeVisible();
-      await expectStoredFixture(page, { contexts: 0, projections: 0 });
+      await expectStoredFixture(page, {
+        userContexts: 0,
+        fences: 1,
+        projections: 0,
+      });
     });
 
     await withPage(browser, baseURL, async (page) => {
@@ -393,6 +397,7 @@ test.describe("offline session boundary", () => {
   test("dev login and password login write transition state while failed auth preserves hard denial", async ({
     page,
   }) => {
+    await page.route("**/api/offline-context", (route) => route.abort("failed"));
     await devLogin(page);
     await expectRootMarker(page.context(), REPROVISION_REQUIRED);
 
@@ -419,6 +424,7 @@ test.describe("offline session boundary", () => {
   });
 
   test("session-returning signup changes hard denial to transition state", async ({ page }) => {
+    await page.route("**/api/offline-context", (route) => route.abort("failed"));
     const email = `c03-signup-${runId}@terroir.test`;
     uiSignupEmails.add(email);
     await setRootMarker(page.context(), HARD_DEVICE_LOCK);
@@ -437,6 +443,7 @@ test.describe("offline session boundary", () => {
     page,
   }) => {
     test.setTimeout(120_000);
+    await page.route("**/api/offline-context", (route) => route.abort("failed"));
     const email = `c03-recovery-${runId}@terroir.test`;
     await identities.createUser(localAdminClient(), {
       email,
@@ -653,6 +660,7 @@ async function devLogin(page: Page) {
 }
 
 async function openSignedInCellar(page: Page) {
+  await page.route("**/api/offline-context", (route) => route.abort("failed"));
   await devLogin(page);
   await page.goto("/cellar");
   await expect(page.getByLabel("Settings")).toBeVisible();
@@ -973,24 +981,48 @@ async function readOfflineFixture(page: Page) {
 
 async function expectStoredFixture(
   page: Page,
-  expected: { contexts: number; projections: number },
+  expected: { userContexts: number; fences: number; projections: number },
 ) {
   const stored = await readOfflineFixture(page);
-  expect(stored.contexts).toHaveLength(expected.contexts);
+  const fences = stored.contexts.filter(
+    (row) => (row as { recordType?: string }).recordType === "device_access_fence",
+  );
+  const userContexts = stored.contexts.filter(
+    (row) => (row as { recordType?: string }).recordType !== "device_access_fence",
+  );
+  expect(userContexts).toHaveLength(expected.userContexts);
+  expect(fences).toHaveLength(expected.fences);
   expect(stored.projections).toHaveLength(expected.projections);
-  return stored;
+  return { ...stored, fences, userContexts };
 }
 
 async function expectLockedFixture(page: Page, expected: { projections: number }) {
-  const stored = await expectStoredFixture(page, { contexts: 1, projections: expected.projections });
-  expect(stored.contexts).toEqual([
+  const stored = await expectStoredFixture(page, {
+    userContexts: 1,
+    fences: 1,
+    projections: expected.projections,
+  });
+  expect(stored.userContexts).toEqual([
     expect.objectContaining({ lockedAt: expect.any(String), lockReason: "sign_out" }),
+  ]);
+  expect(stored.fences).toEqual([
+    expect.objectContaining({
+      state: "denied",
+      eligibleUserId: null,
+      eligibleRestaurantId: null,
+      eligibleContextId: null,
+      reason: "sign_out",
+    }),
   ]);
 }
 
 async function expectUnlockedFixture(page: Page, expected: { projections: number }) {
-  const stored = await expectStoredFixture(page, { contexts: 1, projections: expected.projections });
-  expect(stored.contexts).toEqual([
+  const stored = await expectStoredFixture(page, {
+    userContexts: 1,
+    fences: 0,
+    projections: expected.projections,
+  });
+  expect(stored.userContexts).toEqual([
     expect.objectContaining({ lockedAt: null, lockReason: null }),
   ]);
   return stored;
