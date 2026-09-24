@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMembership } from "@/lib/api/auth";
+import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { assembleQueue } from "@/lib/reconcile-ledger/queue-sources";
 import type { Database } from "@/types/database";
 
@@ -40,6 +42,15 @@ export async function GET(_request: NextRequest) {
   return withApiHandler(async () => {
     const auth = await requireMembership();
     if (auth instanceof NextResponse) return auth;
+    const access = await resolveSitePricingAccess(
+      auth.supabase,
+      auth.restaurantId,
+    );
+    if (!access.canReadCost) {
+      return Errors.forbidden(
+        "Cost access is required to view the reconciliation queue.",
+      );
+    }
     const sources = await querySources(auth.supabase, auth.restaurantId);
     const queue = assembleQueue(sources.inventory, sources.scans, sources.wines);
     return NextResponse.json({

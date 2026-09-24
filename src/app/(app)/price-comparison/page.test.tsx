@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAuthContext: vi.fn(),
+  resolveSitePricingAccess: vi.fn(),
   router: { push: vi.fn(), refresh: vi.fn() },
 }));
 
@@ -11,6 +12,10 @@ vi.mock("@/lib/auth-context", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => mocks.router,
+}));
+vi.mock("@/lib/api/site-capability", () => ({
+  resolveSitePricingAccess: (...args: unknown[]) =>
+    mocks.resolveSitePricingAccess(...args),
 }));
 
 const { default: PriceComparisonPage } = await import("./page");
@@ -38,13 +43,15 @@ function makeSupabase(results: Record<string, QueryResult>) {
 }
 
 function authenticate(results: Record<string, QueryResult>) {
+  const supabase = makeSupabase(results);
   mocks.getAuthContext.mockResolvedValue({
     user: { id: "user-1" },
     userRole: "owner",
     restaurantId: "restaurant-1",
     restaurantName: "House",
-    supabase: makeSupabase(results),
+    supabase,
   });
+  return supabase;
 }
 
 function renderPage(node: React.ReactNode) {
@@ -77,7 +84,55 @@ const inventoryItem = {
 };
 
 describe("PriceComparisonPage", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.resolveSitePricingAccess.mockResolvedValue({
+      canReadCost: true,
+      canReadMargin: false,
+      canManagePricing: false,
+    });
+  });
+
+  it("renders an unavailable state without protected reads when cost authority cannot be verified", async () => {
+    const supabase = authenticate({
+      inventory_items: { data: [inventoryItem], error: null },
+      wines: {
+        data: [{ id: "wine-1", retail_median: 42 }],
+        error: null,
+      },
+    });
+    mocks.resolveSitePricingAccess.mockResolvedValue({
+      canReadCost: false,
+      canReadMargin: true,
+      canManagePricing: true,
+    });
+
+    const container = renderPage(
+      await PriceComparisonPage({ searchParams: Promise.resolve({}) }),
+    );
+    const unavailable = container.querySelector(
+      '[aria-label="Price comparison is unavailable"]',
+    );
+
+    expect(mocks.resolveSitePricingAccess).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-1",
+    );
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(unavailable?.textContent).toContain(
+      "Cost access could not be verified for this site.",
+    );
+    const backLink = unavailable?.querySelector<HTMLAnchorElement>(
+      'a[href="/cellar"]',
+    );
+    expect(backLink && getAccessibleName(backLink)).toBe("Back to cellar");
+    expect(backLink?.className).toContain("h-11");
+    expect(container.textContent).not.toContain("House Producer");
+    expect(container.textContent).not.toContain("Reliable Distribution");
+    expect(
+      container.querySelector('[aria-label="Scan invoices to compare prices"]'),
+    ).toBeNull();
+  });
 
   it("throws an inventory_items query failure instead of presenting no pricing data", async () => {
     const error = new Error("forced query failure");

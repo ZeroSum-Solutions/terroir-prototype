@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth-context";
 import { DollarSign, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { RouteDataEmpty } from "@/components/route-data-state";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { PriceComparisonMasthead } from "./price-comparison-masthead";
 import { SortControls } from "./sort-controls";
 import {
@@ -44,6 +45,28 @@ export default async function PriceComparisonPage({
     : 25;
   const auth = (await getAuthContext())!; // AppLayout redirects when null
   const { supabase, restaurantId: rid, restaurantName } = auth;
+  const access = await resolveSitePricingAccess(supabase, rid);
+
+  if (!access.canReadCost) {
+    return (
+      <section>
+        <PriceComparisonMasthead tenant={restaurantName} />
+        <RouteDataEmpty
+          icon={<DollarSign className="h-6 w-6" strokeWidth={1.5} />}
+          title="Price comparison is unavailable"
+          description="Cost access could not be verified for this site."
+          action={
+            <Link
+              href="/cellar"
+              className="inline-flex h-11 items-center rounded-pill bg-primary px-md text-control font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+            >
+              Back to cellar
+            </Link>
+          }
+        />
+      </section>
+    );
+  }
 
   // Fetch inventory items with wine retail data + invoice scan details
   const { data: items, error: itemsError } = await supabase

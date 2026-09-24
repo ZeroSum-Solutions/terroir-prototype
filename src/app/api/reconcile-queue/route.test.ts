@@ -16,9 +16,14 @@ import {
 
 const mockRequireMembership = vi.fn();
 const mockRequireRole = vi.fn();
+const mockResolveSitePricingAccess = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
   requireRole: (...args: unknown[]) => mockRequireRole(...args),
+}));
+vi.mock("@/lib/api/site-capability", () => ({
+  resolveSitePricingAccess: (...args: unknown[]) =>
+    mockResolveSitePricingAccess(...args),
 }));
 
 const { GET } = await import("./route");
@@ -59,7 +64,14 @@ const actions = [
 ] as const;
 
 describe("reconcile queue routes", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveSitePricingAccess.mockResolvedValue({
+      canReadCost: true,
+      canReadMargin: false,
+      canManagePricing: false,
+    });
+  });
 
   it("GET uses the membership gate and performs no query when denied", async () => {
     const supabase = makeSupabase({});
@@ -71,7 +83,35 @@ describe("reconcile queue routes", () => {
 
     expect(response.status).toBe(401);
     expect(mockRequireMembership).toHaveBeenCalledOnce();
+    expect(mockResolveSitePricingAccess).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("GET denies a manager without exact-site cost.read before protected source queries", async () => {
+    const supabase = makeSupabase(subjectSeed());
+    allow(supabase);
+    mockResolveSitePricingAccess.mockResolvedValue({
+      canReadCost: false,
+      canReadMargin: true,
+      canManagePricing: true,
+    });
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: {
+        code: "forbidden",
+        message: "Cost access is required to view the reconciliation queue.",
+      },
+    });
+    expect(mockResolveSitePricingAccess).toHaveBeenCalledWith(
+      supabase,
+      RESTAURANT_ID,
+    );
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).not.toContain("unit_cost");
   });
 
   it("GET consumes scan inventory once and partitions duplicate, ambiguous, then unplaced stock", async () => {
@@ -124,6 +164,10 @@ describe("reconcile queue routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(mockResolveSitePricingAccess).toHaveBeenCalledWith(
+      supabase,
+      RESTAURANT_ID,
+    );
     expect(body.issues.map((issue: { kind: string }) => issue.kind).sort()).toEqual([
       "ambiguous_lineage",
       "duplicate_suspect",

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
+import { Errors } from "@/lib/api/errors";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 
 export const runtime = "nodejs";
 
@@ -8,6 +10,12 @@ export async function GET() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
+  const access = await resolveSitePricingAccess(supabase, restaurantId);
+  if (!access.canReadCost) {
+    return Errors.forbidden(
+      "Cost access is required to compare distributor prices.",
+    );
+  }
 
   // Fetch inventory items with wine + invoice scan details
   const { data: items, error } = await supabase
