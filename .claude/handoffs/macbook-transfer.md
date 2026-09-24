@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: 0ba6c37ba70431e5d1e2f542ab7bf77afdaaaf85
+last-code-commit: bccd227791ec612b4728b23e70edd7e349bb3c3d
 
 ## Active Task
 
@@ -75,6 +75,15 @@ passed 5/5, with TypeScript and scoped gates passing; Opus accepted the bounded
 source. Evidence is in `demo-list-cost-20260924/`. No live database or browser
 pass is implied by these unit checks.
 
+Checkpoint `bccd2277` protects reconciliation-queue and supplier price-comparison
+reads with exact-site `cost.read` before querying protected data. The price page
+shows an unavailable state when access cannot be verified, not an empty or zero
+result. Independent focused tests passed 36/36 with zero selected skips; full
+Node20 TypeScript and scoped lint/file-size checks passed. Opus accepted the bounded
+source. Actual 390px browser DOM showed the expected unavailable message without
+cost values or horizontal overflow; screenshot capture still failed. Evidence:
+`demo-cost-endpoints-20260924/` and `demo-browser-recheck-20260924/` on the mini.
+
 These checkpoints are NOT a complete authorization rollout. Without 0154 and explicit
 grants, cost/target displays and suggestions fail closed for owners and managers too;
 manual menu-price entry remains available by source inspection. Raw authenticated
@@ -112,10 +121,12 @@ For the active mini goal, finish database and remaining-screen cost protection b
 team safety, then prove find/open/pour and receive/count/reconcile in the browser.
 The latest isolated schema restore passed after exact source-derived owner-role setup,
 but whole owner/ACL comparison found two missing GraphQL schema permission sets.
-That run stopped before applying 0153/0154. The reviewed finite repair then stopped
-at a process-identity assertion before any SQL mutation. Its helper must account for
-the captured trailing byte and explicitly cast one catalog field before a fresh
-reviewed invocation. Read-only settlement confirmed the donor and target unchanged.
+That run stopped before applying 0153/0154. The first reviewed finite repair stopped
+at a process-identity assertion before mutation. A separately reviewed correction
+passed that check, then stopped because transaction command tags accompanied its
+two expected admission rows. Neither run changed the database. Fresh read-only
+settlement confirmed the donor and isolated target unchanged. The next preparation
+audits output parsing throughout the helper before any further reviewed invocation.
 Do not run another blind restore or change the retained active database.
 
 On the mini, the guarded development wrapper responds with `--webpack` after the
