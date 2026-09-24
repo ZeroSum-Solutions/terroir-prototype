@@ -19,11 +19,16 @@ const { CellarShell } = await import("./cellar-shell");
 
 type Resp = { data: unknown[] | null; error: unknown };
 
-function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
+function makeSupabase(opts: {
+  wines: unknown[];
+  inventoryItems: unknown[];
+  capabilities?: Partial<Record<"cost.read" | "margin.read" | "pricing.manage", boolean>>;
+}) {
   const ranges: Record<string, Array<[number, number]>> = {
     wines: [],
     inventory_items: [],
   };
+  const selects: Record<string, string[]> = {};
   const paginated: Record<string, unknown[]> = {
     wines: opts.wines,
     inventory_items: opts.inventoryItems,
@@ -39,7 +44,11 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
 
   function chain(table: string) {
     const self: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "order", "is", "limit", "in", "gte", "neq", "not"]) {
+    self.select = (fields: string) => {
+      (selects[table] ??= []).push(fields);
+      return self;
+    };
+    for (const method of ["eq", "order", "is", "limit", "in", "gte", "neq", "not"]) {
       self[method] = () => self;
     }
     self.range = async (from: number, to: number) => {
@@ -54,8 +63,8 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
             auto_eightysix_from_inventory: false,
             eightysix_ml_threshold: 148,
             eightysix_strategy: "hide",
-            default_target_pour_cost_pct: null,
-            default_target_markup_ratio: null,
+            default_target_pour_cost_pct: 24,
+            default_target_markup_ratio: 3.1,
           },
           error: null,
         };
@@ -70,8 +79,20 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
 
   return {
     ranges,
+    selects,
     from: (table: string) => chain(table),
-    rpc: () => Promise.resolve({ data: [], error: null }),
+    rpc: (name: string, args?: { p_capability_key?: string }) => {
+      if (name === "effective_site_capability") {
+        const key = args?.p_capability_key as "cost.read" | "margin.read" | "pricing.manage";
+        return {
+          abortSignal: () => Promise.resolve({
+            data: opts.capabilities?.[key] ?? false,
+            error: null,
+          }),
+        };
+      }
+      return Promise.resolve({ data: [], error: null });
+    },
   };
 }
 
@@ -104,8 +125,8 @@ function makeWine(i: number) {
     retail_median: null,
     retail_retailer_count: null,
     retail_refreshed_at: null,
-    pricing_target_pour_cost_pct: null,
-    pricing_target_markup_ratio: null,
+    pricing_target_pour_cost_pct: 23,
+    pricing_target_markup_ratio: 3,
     pricing_dismissed_until: null,
     tasting_notes: null,
     hero_image_url: null,
@@ -152,5 +173,41 @@ describe("CellarPage cellar-scale read pagination", () => {
       [0, 999],
       [1000, 1999],
     ]);
+    expect(supabase.selects.inventory_items[0]).not.toContain("unit_cost");
+    expect(element.props.rows[0]).not.toHaveProperty("current_unit_cost");
+    expect(element.props.rows[0].pricing_target_pour_cost_pct).toBeNull();
+    expect(element.props.rows[0].pricing_target_markup_ratio).toBeNull();
+    expect(element.props.defaultTargetPourCostPct).toBeNull();
+    expect(element.props.defaultTargetMarkupRatio).toBeNull();
+    expect(element.props.canReadCost).toBe(false);
+    expect(element.props.canReadMargin).toBe(false);
+    expect(element.props.canManagePricing).toBe(false);
+  });
+
+  it("selects and serializes cost only for an exact cost.read grant", async () => {
+    const supabase = makeSupabase({
+      wines: [makeWine(0)],
+      inventoryItems: [makeInventoryItem(0)],
+      capabilities: { "cost.read": true, "margin.read": true, "pricing.manage": true },
+    });
+    mocks.getAuthContext.mockResolvedValue({
+      supabase,
+      restaurantId: "restaurant-1",
+      restaurantName: "House",
+      userRole: "staff",
+      user: { id: "user-1" },
+    });
+
+    const element = await CellarPage();
+
+    expect(supabase.selects.inventory_items[0]).toContain("unit_cost");
+    expect(element.props.rows[0].current_unit_cost).toBe(10);
+    expect(element.props.rows[0].pricing_target_pour_cost_pct).toBe(23);
+    expect(element.props.rows[0].pricing_target_markup_ratio).toBe(3);
+    expect(element.props.defaultTargetPourCostPct).toBe(24);
+    expect(element.props.defaultTargetMarkupRatio).toBe(3.1);
+    expect(element.props.canReadCost).toBe(true);
+    expect(element.props.canReadMargin).toBe(true);
+    expect(element.props.canManagePricing).toBe(true);
   });
 });

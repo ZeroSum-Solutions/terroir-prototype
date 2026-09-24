@@ -23,10 +23,17 @@ import { PricingTargetOverride } from "./pricing-target-override";
 export function PricingSection({
   row,
   canManage,
+  canReadCost = false,
+  canReadMargin = false,
+  canManagePricing = false,
 }: {
   row: CellarWineRow;
   canManage: boolean;
+  canReadCost?: boolean;
+  canReadMargin?: boolean;
+  canManagePricing?: boolean;
 }) {
+  const canReadDerivedMargin = canReadCost && canReadMargin;
   const targetMarkup = resolveMarkupTarget(
     row.pricing_target_markup_ratio,
     row.restaurant_default_target_markup_ratio,
@@ -35,15 +42,23 @@ export function PricingSection({
     row.pricing_target_pour_cost_pct,
     row.restaurant_default_target_pour_cost_pct,
   );
-  const markupRatio = getMarkupRatio(row.current_bottle_price, row.retail_median);
-  const pourCostPct = getPourCostPct(
-    row.current_unit_cost,
-    row.size_ml,
-    row.glass_pour_ml,
-    row.current_glass_price,
-  );
-  const glassStatus = getGlassStatus(pourCostPct, targetPourCost);
-  const bottleStatus = getBottleStatus(markupRatio, targetMarkup);
+  const markupRatio = canReadDerivedMargin
+    ? getMarkupRatio(row.current_bottle_price, row.retail_median)
+    : null;
+  const pourCostPct = canReadDerivedMargin
+    ? getPourCostPct(
+        row.current_unit_cost,
+        row.size_ml,
+        row.glass_pour_ml,
+        row.current_glass_price,
+      )
+    : null;
+  const glassStatus = canReadDerivedMargin
+    ? getGlassStatus(pourCostPct, targetPourCost)
+    : "unknown";
+  const bottleStatus = canReadDerivedMargin
+    ? getBottleStatus(markupRatio, targetMarkup)
+    : "unknown";
 
   // No list prices → no card. A full-weight card holding only a staleness
   // disclaimer spent prime hierarchy on dead content (Kimi audit).
@@ -78,18 +93,22 @@ export function PricingSection({
                   / {(row.glass_pour_ml / ML_PER_OZ).toFixed(1)} oz glass
                 </span>
               </p>
-              {glassStatus !== "on_target" && glassStatus !== "unknown" && (
+              {canReadDerivedMargin &&
+                glassStatus !== "on_target" &&
+                glassStatus !== "unknown" && (
                 <p className="text-[12px] text-grey">
                   {formatPricingStatusLabel(glassStatus)}
                 </p>
               )}
             </div>
-            <PriceBand
-              bottleList={row.current_bottle_price}
-              retailReference={row.retail_median}
-              targetMarkup={targetMarkup}
-              size="mini"
-            />
+            {canReadDerivedMargin && (
+              <PriceBand
+                bottleList={row.current_bottle_price}
+                retailReference={row.retail_median}
+                targetMarkup={targetMarkup}
+                size="mini"
+              />
+            )}
           </div>
         )}
 
@@ -101,18 +120,22 @@ export function PricingSection({
                 ${row.current_bottle_price.toFixed(2)}{" "}
                 <span className="font-normal text-grey">/ bottle</span>
               </p>
-              {bottleStatus !== "on_target" && bottleStatus !== "unknown" && (
+              {canReadDerivedMargin &&
+                bottleStatus !== "on_target" &&
+                bottleStatus !== "unknown" && (
                 <p className="text-[12px] text-grey">
                   {formatPricingStatusLabel(bottleStatus)}
                 </p>
               )}
             </div>
-            <PriceBand
-              bottleList={row.current_bottle_price}
-              retailReference={row.retail_median}
-              targetMarkup={targetMarkup}
-              size="mini"
-            />
+            {canReadDerivedMargin && (
+              <PriceBand
+                bottleList={row.current_bottle_price}
+                retailReference={row.retail_median}
+                targetMarkup={targetMarkup}
+                size="mini"
+              />
+            )}
           </div>
         )}
 
@@ -123,7 +146,7 @@ export function PricingSection({
         )}
       </div>
 
-      {canManage && row.current_bottle_price != null && (
+      {canManage && canManagePricing && canReadMargin && row.current_bottle_price != null && (
         <div className="mt-md">
           <PricingTargetOverride
             wineId={row.wine_id}

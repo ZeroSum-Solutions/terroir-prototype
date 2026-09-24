@@ -34,12 +34,18 @@ import { wineDisplayName } from "@/lib/wine-display-name";
 export function WineDetailDrawer({
   row,
   canManage,
+  canReadCost = false,
+  canReadMargin = false,
+  canManagePricing = false,
   isOwner,
   onClose,
   duplicateRows,
 }: {
   row: CellarWineRow | null;
   canManage: boolean;
+  canReadCost?: boolean;
+  canReadMargin?: boolean;
+  canManagePricing?: boolean;
   isOwner?: boolean;
   onClose: () => void;
   // OPP-1 (EV-1.2) — same-lineage/vintage/format twins of `row`, offered
@@ -334,7 +340,13 @@ export function WineDetailDrawer({
             )}
 
             {row.retail_median != null && (
-              <PricingSection row={row} canManage={canManage} />
+              <PricingSection
+                row={row}
+                canManage={canManage}
+                canReadCost={canReadCost}
+                canReadMargin={canReadMargin}
+                canManagePricing={canManagePricing}
+              />
             )}
 
             {row.drink_window_end != null && (

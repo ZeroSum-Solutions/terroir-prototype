@@ -8,7 +8,8 @@ import { normalizeSections, type CellarSection } from "./sections";
 import { wineRowImages, type CellarWineRow } from "./types";
 import { theoreticalRemaining } from "@/lib/partial-bottles/math";
 import { isCellarHealthSegment } from "@/lib/cellar-health/classify";
-
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { fetchCellarInventoryRows } from "./inventory-data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,12 @@ async function fetchAll<T>(
 export default async function CellarPage() {
   const auth = (await getAuthContext())!; // AppLayout redirects when null
   const { supabase, restaurantId, restaurantName, userRole, user } = auth;
+  const pricingAccess = await resolveSitePricingAccess(supabase, restaurantId);
+  const inventoryRowsPromise = fetchCellarInventoryRows(
+    supabase,
+    restaurantId,
+    pricingAccess.canReadCost,
+  );
 
   const [
     wineRows,
@@ -85,15 +92,7 @@ export default async function CellarPage() {
         .order("id", { ascending: true })
         .range(from, to),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("inventory_items")
-        .select("wine_id, bin_id, bin_location, quantity, unit_cost, added_at, section")
-        .eq("restaurant_id", restaurantId)
-        .order("added_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    inventoryRowsPromise,
     supabase
       .from("bins")
       .select("id, code, zone, capacity, retired_at")
@@ -228,7 +227,7 @@ export default async function CellarPage() {
     prev.sealed += item.quantity ?? 0;
     if (!prev.bin && item.bin_location) prev.bin = item.bin_location;
     if (!prev.section && item.section) prev.section = item.section;
-    if (prev.latestCost == null && item.unit_cost != null) {
+    if (pricingAccess.canReadCost && prev.latestCost == null && item.unit_cost != null) {
       prev.latestCost = item.unit_cost;
     }
     inventoryByWine.set(item.wine_id, prev);
@@ -385,18 +384,16 @@ export default async function CellarPage() {
       retail_median: w.retail_median,
       retail_retailer_count: w.retail_retailer_count,
       retail_refreshed_at: w.retail_refreshed_at,
-      pricing_target_pour_cost_pct: w.pricing_target_pour_cost_pct,
-      pricing_target_markup_ratio: w.pricing_target_markup_ratio,
+      pricing_target_pour_cost_pct: pricingAccess.canReadMargin ? w.pricing_target_pour_cost_pct : null,
+      pricing_target_markup_ratio: pricingAccess.canReadMargin ? w.pricing_target_markup_ratio : null,
       pricing_dismissed_until: w.pricing_dismissed_until,
       current_bottle_price: price?.bottle ?? null,
       current_glass_price: price?.glass ?? null,
       current_list_name: price?.listName ?? null,
       current_other_list_count: price?.otherListCount ?? 0,
-      current_unit_cost: inv.latestCost,
-      restaurant_default_target_pour_cost_pct:
-        restaurantRow?.default_target_pour_cost_pct ?? null,
-      restaurant_default_target_markup_ratio:
-        restaurantRow?.default_target_markup_ratio ?? null,
+      ...(pricingAccess.canReadCost ? { current_unit_cost: inv.latestCost } : {}),
+      restaurant_default_target_pour_cost_pct: pricingAccess.canReadMargin ? restaurantRow?.default_target_pour_cost_pct ?? null : null,
+      restaurant_default_target_markup_ratio: pricingAccess.canReadMargin ? restaurantRow?.default_target_markup_ratio ?? null : null,
     };
   });
 
@@ -467,8 +464,11 @@ export default async function CellarPage() {
       autoEightysixEnabled={restaurantRow?.auto_eightysix_from_inventory ?? false}
       autoEightysixThresholdMl={restaurantRow?.eightysix_ml_threshold ?? 148}
       eightysixStrategy={eightysixStrategy}
-      defaultTargetPourCostPct={restaurantRow?.default_target_pour_cost_pct ?? null}
-      defaultTargetMarkupRatio={restaurantRow?.default_target_markup_ratio ?? null}
+      defaultTargetPourCostPct={pricingAccess.canReadMargin ? restaurantRow?.default_target_pour_cost_pct ?? null : null}
+      defaultTargetMarkupRatio={pricingAccess.canReadMargin ? restaurantRow?.default_target_markup_ratio ?? null : null}
+      canReadCost={pricingAccess.canReadCost}
+      canReadMargin={pricingAccess.canReadMargin}
+      canManagePricing={pricingAccess.canManagePricing}
       role={userRole}
     />
   );

@@ -29,6 +29,7 @@ export function AutoEightysixModal({
   eightysixStrategy,
   defaultTargetPourCostPct,
   defaultTargetMarkupRatio,
+  canManagePricingTargets = false,
   onClose,
 }: {
   open: boolean;
@@ -38,6 +39,7 @@ export function AutoEightysixModal({
   eightysixStrategy: "hide" | "mark";
   defaultTargetPourCostPct: number | null;
   defaultTargetMarkupRatio: number | null;
+  canManagePricingTargets?: boolean;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -90,11 +92,13 @@ export function AutoEightysixModal({
           className="flex flex-col gap-md overflow-y-auto overscroll-contain px-md py-md md:gap-lg md:px-lg md:py-lg"
           style={{ paddingBottom: "calc(var(--safe-bottom) + var(--spacing-lg))" }}
         >
-          <PricingTargetsPanel
-            restaurantId={restaurantId}
-            pourCostPct={defaultTargetPourCostPct}
-            markupRatio={defaultTargetMarkupRatio}
-          />
+          {canManagePricingTargets && (
+            <PricingTargetsPanel
+              restaurantId={restaurantId}
+              pourCostPct={defaultTargetPourCostPct}
+              markupRatio={defaultTargetMarkupRatio}
+            />
+          )}
           <AutoEightysixPanel
             restaurantId={restaurantId}
             enabled={enabled}

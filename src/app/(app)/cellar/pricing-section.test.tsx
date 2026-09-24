@@ -37,19 +37,76 @@ describe("PricingSection", () => {
     expect(html).toContain("/ bottle");
   });
 
-  it("shows the pricing target override only when canManage and a bottle price exist", () => {
-    const managed = renderToStaticMarkup(
+  it("does not render cost-derived margin cues without both cost.read and margin.read", () => {
+    const row = baseRow({
+      retail_median: 40,
+      current_bottle_price: 65,
+      current_glass_price: 10,
+      glass_pour_ml: 150,
+      current_unit_cost: 100,
+    });
+    const withoutCost = renderToStaticMarkup(
       <PricingSection
-        row={baseRow({ retail_median: 40, current_bottle_price: 65 })}
+        row={row}
         canManage={true}
+        canReadCost={false}
+        canReadMargin={true}
       />,
     );
-    const unmanaged = renderToStaticMarkup(
+    const withoutMargin = renderToStaticMarkup(
       <PricingSection
-        row={baseRow({ retail_median: 40, current_bottle_price: 65 })}
-        canManage={false}
+        row={row}
+        canManage={true}
+        canReadCost={true}
+        canReadMargin={false}
       />,
     );
-    expect(managed.length).toBeGreaterThan(unmanaged.length);
+    const withBoth = renderToStaticMarkup(
+      <PricingSection
+        row={row}
+        canManage={false}
+        canReadCost={true}
+        canReadMargin={true}
+      />,
+    );
+
+    expect(withoutCost).not.toContain("Outlier");
+    expect(withoutCost).not.toContain("aria-label=\"Pricing position\"");
+    expect(withoutCost).not.toContain("linear-gradient");
+    expect(withoutMargin).not.toContain("Outlier");
+    expect(withoutMargin).not.toContain("aria-label=\"Pricing position\"");
+    expect(withoutMargin).not.toContain("linear-gradient");
+    expect(withBoth).toContain("Outlier");
+    expect(withBoth).toContain("linear-gradient");
+  });
+
+  it("requires legacy mutation eligibility plus margin.read and pricing.manage during cutover", () => {
+    const row = baseRow({ retail_median: 40, current_bottle_price: 65 });
+    const legacyManagerOnly = renderToStaticMarkup(
+      <PricingSection row={row} canManage={true} canManagePricing={false} />,
+    );
+    const delegatedStaff = renderToStaticMarkup(
+      <PricingSection
+        row={row}
+        canManage={false}
+        canReadMargin={true}
+        canManagePricing={true}
+      />,
+    );
+    const managerWithoutMarginRead = renderToStaticMarkup(
+      <PricingSection row={row} canManage={true} canManagePricing={true} />,
+    );
+    const authorizedManager = renderToStaticMarkup(
+      <PricingSection
+        row={row}
+        canManage={true}
+        canReadMargin={true}
+        canManagePricing={true}
+      />,
+    );
+
+    expect(delegatedStaff).toBe(legacyManagerOnly);
+    expect(managerWithoutMarginRead).toBe(legacyManagerOnly);
+    expect(authorizedManager.length).toBeGreaterThan(legacyManagerOnly.length);
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import {
   isGlassPricePlausible,
   resolveMarkupTarget,
@@ -30,8 +31,8 @@ const DEFAULT_GLASS_POUR_ML = 148; // 5 oz
  * when retail_median is unavailable — UI shows "Pricing data
  * unavailable" and the user fills in manually.
  *
- * Auth: any restaurant member can read (this endpoint doesn't burn
- * Wine-Searcher quota — it reads cached data only).
+ * Auth: current exact-site cost.read and margin.read grants. Cached data still
+ * contains private cost-derived suggestions; membership alone cannot grant it.
  */
 export async function GET(
   req: Request,
@@ -44,6 +45,11 @@ export async function GET(
   const { id } = await ctx.params;
   if (!id) {
     return Errors.badRequest("wine id required");
+  }
+
+  const access = await resolveSitePricingAccess(supabase, restaurantId);
+  if (!access.canReadCost || !access.canReadMargin) {
+    return Errors.forbidden("Pricing suggestions require cost and margin access.");
   }
 
   const url = new URL(req.url);

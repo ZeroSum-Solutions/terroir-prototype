@@ -135,7 +135,7 @@ export type CellarWineRow = {
   // lists" when > 0 so the sommelier knows pricing may differ elsewhere.
   current_other_list_count: number;
   // Most-recent invoice cost — drives pour-cost % calculation.
-  current_unit_cost: number | null;
+  current_unit_cost?: number | null;
   // Restaurant-level defaults (passed through from the page so the
   // drawer's helpers can resolve effective targets without another fetch).
   restaurant_default_target_pour_cost_pct: number | null;

@@ -37,6 +37,8 @@ export function CellarShell({
   eightysixStrategy,
   defaultTargetPourCostPct,
   defaultTargetMarkupRatio,
+  canReadCost = false, canReadMargin = false,
+  canManagePricing = false,
   role,
   cellarSections,
 }: {
@@ -51,6 +53,7 @@ export function CellarShell({
   eightysixStrategy: "hide" | "mark";
   defaultTargetPourCostPct: number | null;
   defaultTargetMarkupRatio: number | null;
+  canReadCost?: boolean; canReadMargin?: boolean; canManagePricing?: boolean;
   role: "owner" | "manager" | "staff";
   // BND-063/064 — cellar sections for grouping and DnD
   cellarSections?: CellarSection[];
@@ -429,6 +432,9 @@ export function CellarShell({
         key={drawerStateKey(selected)}
         row={selected}
         canManage={canManage}
+        canReadCost={canReadCost}
+        canReadMargin={canReadMargin}
+        canManagePricing={canManagePricing}
         isOwner={isOwner}
         onClose={() => replaceUrlState({ wine: null })}
         duplicateRows={
@@ -451,6 +457,7 @@ export function CellarShell({
           restaurantId={restaurantId}
           defaultTargetPourCostPct={defaultTargetPourCostPct}
           defaultTargetMarkupRatio={defaultTargetMarkupRatio}
+          canManagePricingTargets={canReadMargin && canManagePricing}
           enabled={autoEightysixEnabled}
           thresholdMl={autoEightysixThresholdMl}
           eightysixStrategy={eightysixStrategy}
