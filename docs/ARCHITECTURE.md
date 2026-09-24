@@ -9,9 +9,10 @@ business workflows. Adapter modules own external/provider mechanics.
 - `src/domains/scanning`: invoice OCR/LLM extraction orchestration.
 - `src/domains/wine-lists`: wine-list PDF generation workflow.
 - `src/domains/pours`: versioned bottle command orchestration. Contract version 1
-  uses `execute_inventory_command` and `undo_last_pour`; the committed version 2
-  Open/Pour application path uses `execute_physical_bottle_command` and exact
-  physical-bottle identities. Version 2 is not active yet.
+  uses `execute_inventory_command` and the wine-scoped `undo_last_pour`. Contract
+  version 2 routes Open, Pour, close/discard, and receipt-bound Undo through
+  `execute_physical_bottle_command` with exact event, bottle, and wine identities.
+  Version 2 is not active yet.
 - `src/domains/cellar`: reconcile transaction orchestration around
   `reconcile_open_bottles_batch`.
 - `src/domains/offline`: the versioned private projection contract, IndexedDB
@@ -102,11 +103,28 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   integration. Its corrected V2 author and native independent checkpoints pass
   100/100 focused tests, Opus accepted the bounded source, and immutable-range security
   review passed. Runtime proof remains outstanding.
+- Saved and pushed commit `9f3a1b25` adds the contract-version-2 Undo application checkpoint.
+  A physical pour or discard receipt binds Undo to the original event, exact bottle,
+  and wine. The server rejects missing or mismatched physical identities and returns
+  a distinct Undo event receipt. Client retries retain the same operation UUID and
+  immutable payload after an uncertain result. Mistaken-discard correction requires
+  affirmative confirmation that the same bottle remains present; while that correction
+  is pending or unresolved, the competing discard-confirmation and review exits stay
+  disabled. Native and bounded source review accepted the frozen source with 190/190
+  focused tests. Its exact `1c37b7ab..9f3a1b25` range passed the immutable security
+  certificate across 20 changed paths and 22 reviewed blobs. No SQL or browser result
+  is claimed.
 - The uncommitted effective-reader packet redirects five application readers to
   `effective_service_pour_events`, which excludes version 2 reversals and reversed
-  originals while retaining legacy history. Positive service-role runtime proof is
-  blocked because the view does not yet grant `SELECT` to `service_role`. A separate
-  migration 0155 is planned but is not implemented.
+  originals while retaining legacy history. Positive service-role runtime proof
+  remains blocked because the retained stack does not grant the view to `service_role`.
+  Migration 0155 source is implemented but uncommitted. Its V2 live admission stopped
+  before mutation when the retained database exposed the historical authenticated
+  five-privilege ACL shape. V3 review then found that an unwrapped invocation could
+  mutate the ACL before detecting the missing outer transaction. V4 adds pre-mutation
+  outer-transaction guards. Native and Opus review accepted the bounded V4 source and
+  runtime plan. The finite independent C runtime matrix is released, but it has no
+  result yet; V4 has not run against a live database.
 
 - The legacy end-of-shift `POST /api/reconcile` path calls
   `reconcile_open_bottles_batch` through `src/domains/cellar/reconcile-service.ts`;
@@ -135,9 +153,19 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   lifecycle's full remainder, closes it without opening a replacement, and creates no
   `bottle_closeouts` row. This is not an external backward-compatibility guarantee;
   callers of the deprecated endpoint must send the current header and body.
-- `POST /api/pour/undo` still uses `undo_last_pour`. When a command crossed multiple
-  physical lifecycles or a replacement lifecycle has opened, the RPC refuses the
-  unsafe partial reversal and the route returns `409 undo_not_reversible`.
+- Under contract version 1, `POST /api/pour/undo` still uses `undo_last_pour`. When a
+  command crossed multiple physical lifecycles or a replacement lifecycle has opened,
+  the RPC refuses the unsafe partial reversal and the route returns
+  `409 undo_not_reversible`.
+- Under contract version 2, the same route requires an idempotency UUID plus the wine,
+  expected bottle, and original pour-or-discard event UUID. It routes through
+  `execute_physical_bottle_command`, which scopes and locks the referenced event and
+  bottle before writing a distinct reversal event. A retry after an uncertain response
+  reuses the same UUID and payload. The route fails closed on unknown contract state,
+  malformed receipt identity, expired windows, prior reversal, or unsafe review cases.
+  These source contracts do not prove migration behavior, RLS, concurrency, or browser
+  recovery. In particular, a zero-volume discard cannot satisfy migration 0153's
+  positive-delta Undo lookup and still needs SQL/runtime follow-up.
 - `record_pour` and `close_open_bottle` remain during expand-contract deployment, but
   migrated first-party inventory routes no longer call them. Authenticated direct
   `bottle_closeouts` insertion also remains a receipt-bypass until the separately

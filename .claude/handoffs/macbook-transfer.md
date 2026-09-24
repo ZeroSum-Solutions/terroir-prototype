@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: e9a49e5da6562a2a49cbd6226ecf21f1b84c2868
+last-code-commit: 9f3a1b2511519b5b409ecd25d5a9d5370f00146a
 
 ## Active Task
 
@@ -56,12 +56,15 @@ at pause; T02–T14 remain incomplete.
 | Saved and pushed | `44d046d5` exact-bottle Open/Pour application slice | 141/141 focused checks plus native, Opus, and immutable-range security review passed. This is a partial Phase B checkpoint; physical contract version 2 remains disabled. |
 | Saved and pushed | `d35a9dae` live-test conservation and `3532f13e` local app origin | 41/41 combined focused checks plus native gates, Opus review, and exact-range security review passed. These are launch and conservation safeguards, not a runtime application proof. |
 | Saved and pushed | `29b06e78` 0154 authority source checkpoint, 22 paths | Isolated V6 apply, fresh settlement, and immutable-range security review passed. The retained full local stack remains at schema 0152 and physical contract version 1; all nine measured raw-cost exposures remain open. |
-| Frozen on mini, uncommitted | Effective service-event readers, 10 paths | Source checks passed. Positive live service-role proof is blocked because `effective_service_pour_events` lacks a `service_role` `SELECT` grant. Migration 0155 is planned but not implemented. |
+| Frozen on mini, uncommitted | Effective service-event readers, 10 paths | Source checks passed. Positive live service-role proof remains blocked because the retained stack does not grant `service_role` access to `effective_service_pour_events`. |
+| Frozen on mini, uncommitted | Migration 0155 V4 source, 7-path packet | 0155 is implemented source, not merely planned. V2 live admission stopped before mutation on the retained database's historical authenticated five-privilege ACL shape. V3 review found an unwrapped outer-transaction hazard; V4 adds guards before both ACL mutations. Native and Opus accepted the bounded V4 source and runtime plan. The independent C matrix is released, but no live apply, down, reader proof, or readiness result exists yet. |
 | Saved and pushed | `e9a49e5d` measured closeout integration, 20-path V2 checkpoint | The corrected author and native independent sets pass 100/100, Opus accepted the bounded source, and immutable-range security review passed. Runtime proof remains pending. |
+| Saved and pushed | `9f3a1b25` receipt-bound physical Undo, exact 20-path checkpoint | The frozen 22-file review packet included two unchanged architecture tests; the commit changes 20 paths. Native and bounded source review accepted it, and the affected gate passed 190/190 with zero selected skips. The exact `1c37b7ab..9f3a1b25` immutable certificate passed with no prescribed Gitleaks or validator findings. No SQL, browser, reconciliation, or Phase B completion is claimed. |
 
 `docs/feature-ledger.json` remains the only completion authority. The uncommitted
-effective-reader packet cannot be reconstructed from the pushed branch, and none of
-these checkpoints completes C04, D1, C06, or Phase B.
+effective-reader and 0155 packets cannot be reconstructed from the pushed branch.
+The Undo commit is present on the remote, but the uncommitted packets remain mini-only.
+None of these checkpoints completes C04, D1, C06, or Phase B.
 
 ## Evidence
 
@@ -156,14 +159,28 @@ blockers instead of inventing a fresh-stack procedure.
 For the active mini goal, preserve the frozen effective-reader packet and closeout
 commit.
 Migration 0154 is committed, but do not start migration 0155 until its separate grant
-change is reviewed. Do not alter the retained local database, retry spent historical
-runs, or treat the isolated V6 result as permission for a hosted apply.
+change is reviewed. Its V4 source now exists, but no live apply/down or positive reader
+proof has run. Two earlier D0 starts failed: the first lost its diagnostics, so its
+cause remains unknown; the second identified the SQLSTATE 25P01 outer-transaction
+failure at the 0152 lock. The later adapter run launched its CLI successfully against
+a disposable target at 123 migrations through 0151, restored the staged files, then
+stopped before SQL 0152 when it found nine actual containers against seven planned.
+The target remains retained; no application or seed step ran, and the retained full
+stack did not change. Native and Opus accepted the bounded 0155 V4 source and runtime
+plan. Root released the finite independent C matrix at 23:46 UTC, but no runtime
+outcome exists yet. Do not retry spent historical runs or treat the isolated V6
+result as permission for a hosted apply.
 
 Exact-bottle Open/Pour application work is saved in `44d046d5`. The corrected closeout
 V2 leaf is saved and pushed at `e9a49e5d`; its 100/100 focused author and native
 independent checks passed, Opus accepted the bounded source, and immutable-range
 security review passed. The exact commit is saved and pushed; runtime proof remains
-outstanding. Do not enable contract version 2 until
+outstanding. Receipt-bound Undo is saved and pushed at `9f3a1b25`; 190/190 focused
+checks and bounded native and Opus source review passed, as did the exact immutable
+range security certificate. It binds physical Undo to exact event, bottle, and wine
+receipt identity, keeps the same operation UUID and payload for uncertain retries, and
+blocks competing mistaken-discard exits while a correction remains unresolved. No SQL
+or browser proof ran. Do not enable contract version 2 until
 all required readers, writers, Undo, reconciliation, analytics, provenance, and the
 canonical pre-cutover gates pass.
 
