@@ -128,7 +128,7 @@ export default async function OpenBottlesPage() {
                     className="block px-lg py-md transition-colors hover:bg-wash focus-ring"
                   >
                     <div className="md:hidden">
-                      <div className="flex items-start justify-between gap-sm">
+                      <div className="grid grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-sm">
                         <OpenThumb wine={wine} />
                         <div className="min-w-0 font-serif text-body-lg font-normal leading-snug text-ink">
                           {wine?.producer ?? "Unknown"}{" "}

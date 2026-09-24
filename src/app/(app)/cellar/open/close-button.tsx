@@ -121,51 +121,54 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
 
   return (
     <>
+      <div className="flex items-center gap-xs">
+        {confirming && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="min-h-11 min-w-11 rounded-pill px-xs text-caption font-medium uppercase tracking-[0.13em] text-grey transition-colors hover:text-ink"
+            aria-label="Cancel close"
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleClose();
+          }}
+          disabled={isPending}
+          className={
+            confirming
+              ? "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-risk-ink/40 bg-risk-wash px-sm text-caption font-medium uppercase tracking-[0.13em] text-risk-ink transition-colors hover:bg-risk-wash/70"
+              : "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-sm text-caption font-medium uppercase tracking-[0.13em] text-ink transition-colors hover:text-risk-ink"
+          }
+          aria-label={confirming
+            ? `Confirm discard ${remainingOz.toFixed(1)} oz`
+            : retrying
+              ? "Retry prior action"
+              : "Close bottle"}
+        >
+          <XCircle className="h-3.5 w-3.5" strokeWidth={2} />
+          {confirming
+            ? `Discard ${remainingOz.toFixed(1)} oz?`
+            : isPending
+              ? "Closing..."
+              : retrying
+                ? "Retry prior action"
+                : "Close"}
+        </button>
+      </div>
       {uncertaintyMessage && (
-        <p role="alert" className="max-w-[36ch] text-right text-caption text-risk-ink">
+        <p
+          role="alert"
+          className="col-span-full w-full text-left text-body-sm text-risk-ink md:text-right"
+        >
           {uncertaintyMessage}
         </p>
       )}
-      <div className="flex items-center gap-xs">
-      {confirming && (
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="min-h-11 min-w-11 rounded-pill px-xs text-caption font-medium uppercase tracking-[0.13em] text-grey transition-colors hover:text-ink"
-          aria-label="Cancel close"
-        >
-          Cancel
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleClose();
-        }}
-        disabled={isPending}
-        className={
-          confirming
-            ? "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-risk-ink/40 bg-risk-wash px-sm text-caption font-medium uppercase tracking-[0.13em] text-risk-ink transition-colors hover:bg-risk-wash/70"
-            : "inline-flex min-h-11 min-w-11 items-center gap-xs rounded-pill border border-rule-strong bg-transparent px-sm text-caption font-medium uppercase tracking-[0.13em] text-ink transition-colors hover:text-risk-ink"
-        }
-        aria-label={confirming
-          ? `Confirm discard ${remainingOz.toFixed(1)} oz`
-          : retrying
-            ? "Retry prior action"
-            : "Close bottle"}
-      >
-        <XCircle className="h-3.5 w-3.5" strokeWidth={2} />
-        {confirming
-          ? `Discard ${remainingOz.toFixed(1)} oz?`
-          : isPending
-            ? "Closing..."
-            : retrying
-              ? "Retry prior action"
-              : "Close"}
-      </button>
-      </div>
     </>
   );
 }
