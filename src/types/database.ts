@@ -1240,12 +1240,76 @@ export type Database = {
           },
         ]
       }
+      membership_capability_grants: {
+        Row: {
+          capability_key: string
+          expires_at: string | null
+          grant_reason: string
+          granted_at: string
+          granted_by_user_id: string
+          id: string
+          membership_id: string
+          restaurant_id: string
+          revoke_cause: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          site_lifecycle_generation: string
+          source: string
+          subject_user_id: string
+          workspace_id: string
+          workspace_lifecycle_generation: string
+          workspace_membership_id: string
+        }
+        Insert: {
+          capability_key: string
+          expires_at?: string | null
+          grant_reason: string
+          granted_at?: string
+          granted_by_user_id: string
+          id?: string
+          membership_id: string
+          restaurant_id: string
+          revoke_cause?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          site_lifecycle_generation: string
+          source?: string
+          subject_user_id: string
+          workspace_id: string
+          workspace_lifecycle_generation: string
+          workspace_membership_id: string
+        }
+        Update: {
+          capability_key?: string
+          expires_at?: string | null
+          grant_reason?: string
+          granted_at?: string
+          granted_by_user_id?: string
+          id?: string
+          membership_id?: string
+          restaurant_id?: string
+          revoke_cause?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          site_lifecycle_generation?: string
+          source?: string
+          subject_user_id?: string
+          workspace_id?: string
+          workspace_lifecycle_generation?: string
+          workspace_membership_id?: string
+        }
+        Relationships: []
+      }
       memberships: {
         Row: {
           created_at: string
           expires_at: string | null
           granted_by: string | null
           id: string
+          lifecycle_generation: string
           restaurant_id: string
           revoked_at: string | null
           role: Database["public"]["Enums"]["membership_role"]
@@ -1258,6 +1322,7 @@ export type Database = {
           expires_at?: string | null
           granted_by?: string | null
           id?: string
+          lifecycle_generation?: string
           restaurant_id: string
           revoked_at?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
@@ -1270,6 +1335,7 @@ export type Database = {
           expires_at?: string | null
           granted_by?: string | null
           id?: string
+          lifecycle_generation?: string
           restaurant_id?: string
           revoked_at?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
@@ -2496,6 +2562,7 @@ export type Database = {
           expires_at: string | null
           governance_role: string | null
           id: string
+          lifecycle_generation: string
           revoked_at: string | null
           status: string
           user_id: string
@@ -2507,6 +2574,7 @@ export type Database = {
           expires_at?: string | null
           governance_role?: string | null
           id?: string
+          lifecycle_generation?: string
           revoked_at?: string | null
           status?: string
           user_id: string
@@ -2518,6 +2586,7 @@ export type Database = {
           expires_at?: string | null
           governance_role?: string | null
           id?: string
+          lifecycle_generation?: string
           revoked_at?: string | null
           status?: string
           user_id?: string
@@ -2884,6 +2953,14 @@ export type Database = {
         Args: { p_days?: number; p_wine_id: string }
         Returns: string
       }
+      effective_site_capability: {
+        Args: { p_capability_key: string; p_restaurant_id: string }
+        Returns: boolean
+      }
+      effective_site_ids: {
+        Args: { p_capability_key: string }
+        Returns: string[]
+      }
       enqueue_invoice_extract_job: {
         Args: { p_restaurant_id: string; p_scan_id: string }
         Returns: {
@@ -3096,6 +3173,18 @@ export type Database = {
         Args: { p_source_wine_id: string; p_target_wine_id: string }
         Returns: Json
       }
+      read_pricing_recommendations: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          class: string
+          computed_at: string
+          evidence: Json
+          rationale: string
+          timing: string
+          wine_id: string
+          wines: Json
+        }[]
+      }
       reclaim_stuck_invoice_extract_jobs: {
         Args: { p_stuck_after_seconds: number }
         Returns: {
@@ -3193,6 +3282,15 @@ export type Database = {
         Args: { p_ordered_ids: string[] }
         Returns: undefined
       }
+      replace_member_site_capabilities: {
+        Args: {
+          p_capability_keys: string[]
+          p_expires_at: string
+          p_grant_reason: string
+          p_membership_id: string
+        }
+        Returns: string[]
+      }
       resolve_wine_variants_bulk: {
         Args: { p_restaurant_id: string; p_variants: Json }
         Returns: {
@@ -3203,6 +3301,15 @@ export type Database = {
           variant_created: boolean
           wine_variant_id: string
         }[]
+      }
+      retire_membership_capability_grants: {
+        Args: {
+          p_membership_ids: string[]
+          p_revoke_cause: string
+          p_revoke_reason: string
+          p_revoked_by_user_id: string
+        }
+        Returns: number
       }
       revert_import_batch: { Args: { p_batch_id: string }; Returns: number }
       revert_import_session: { Args: { p_session_id: string }; Returns: Json }
