@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: 74af64f28e82bc05b8a3456d422485e8d0550a1c
+last-code-commit: b0a3ecfec0b08e2d1f84aeb4ccc680323f20709b
 
 ## Active Task
 
@@ -59,10 +59,20 @@ The exact code-commit range passed a redacted secret scan. Four network-reset
 diagnostics remain in an unchanged drawer-state test; this is not a clean full-suite
 or browser verdict. Mini-only evidence: goal proof `demo-staff-cost-20260924/`.
 
-This checkpoint is NOT a complete authorization rollout. Without 0154 and explicit
+The next checkpoint `d0372759` applies the same explicit cost-and-margin grants to
+wine-detail queries and below-cost badges. Independent focused tests passed 33/33;
+the changed live-database test remains unexecuted. Checkpoint `b0a3ecfe` fixes the
+offline-context request type and an inert test-fixture false positive; its independent
+44/44 tests and full no-incremental TypeScript check passed. Opus accepted both
+bounded checkpoints. These counts are selected tests, not full-release coverage.
+Mini-only evidence: `demo-detail-cost-20260924/` and
+`demo-verification-blockers-20260924/` under the goal proof directory.
+
+These checkpoints are NOT a complete authorization rollout. Without 0154 and explicit
 grants, cost/target displays and suggestions fail closed for owners and managers too;
 manual menu-price entry remains available by source inspection. Raw authenticated
-database access and full-detail cost badges remain open. Do not expose this branch
+database access, several other screens and historical JSON cost copies remain open.
+Do not expose this branch
 to real staff/data or deploy it alone as completed privacy protection. No C04 or demo
 milestone was completed. Active local schema remains 0152; neither 0153 nor 0154
 was applied during this checkpoint. A synthetic local authenticated HTTP request
@@ -91,12 +101,17 @@ On the MacBook, read this handoff and AGENTS.md, verify the checked-out branch,
 then prepare an isolated local test setup from the local-stack runbook. Report
 setup blockers before running tests. Do not resume suspended C13 database work.
 
-For the active mini goal, finish database/full-detail cost protection before claiming
+For the active mini goal, finish database and remaining-screen cost protection before claiming
 team safety, then prove find/open/pour and receive/count/reconcile in the browser.
-Two new disposable-schema restores failed (cron database setting, then two missing
-owner roles); both were stopped without applying app migrations. Reuse their exact
-diagnosis and existing C13 role evidence for a materially different Sol/xhigh plan,
-not another blind restore. Do not repair or reset the retained active database.
+The latest isolated schema restore passed after exact source-derived owner-role setup,
+but whole owner/ACL comparison found two missing GraphQL schema permission sets.
+That run stopped before applying 0153/0154. A finite repair is under independent
+review; do not run another blind restore or change the retained active database.
+
+On the mini, the guarded development wrapper responds with `--webpack` after the
+default bundler entered a memory/restart loop. The synthetic local login and mobile
+cellar content loaded, but browser screenshots timed out and a native capture was
+blank. This is not a visual-QA pass or a completed service demo.
 
 ## Suggested Skills
 
