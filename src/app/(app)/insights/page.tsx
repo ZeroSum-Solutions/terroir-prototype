@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import * as Sentry from "@sentry/nextjs";
 import { getAuthContext } from "@/lib/auth-context";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { BarChart3, ScanLine, History, Activity, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { fetchDrinkWindowAlerts } from "@/lib/drink-window/alerts";
@@ -17,24 +19,12 @@ import { SnoozedAlertsCard, type SnoozedRow } from "./snoozed-alerts-card";
 import PourAnalyticsSection from "./pour-analytics-section";
 import { Sparkline } from "@/components/charts/sparkline";
 import { ThroughputBarChart } from "@/components/charts/throughput-bar-chart";
-import {
-  fetchPastDrinkWindow,
-  type PastDrinkWindowRow,
-} from "@/domains/cellar/past-drink-window";
-import { fetchSnoozedAlerts } from "@/domains/cellar/snoozed-alerts";
+import { fetchPastDrinkWindow, type PastDrinkWindowRow } from "@/domains/cellar/past-drink-window";
+import { fetchDrinkWindowSnoozedAlerts, fetchSnoozedAlerts } from "@/domains/cellar/snoozed-alerts";
 import DateRangeSelector from "./date-range-selector";
-import {
-  dateRangeLabel,
-  dateRangeSince,
-  dateRangeUntil,
-  normalizeInsightsRange,
-} from "./date-range";
+import { dateRangeLabel, dateRangeSince, dateRangeUntil, normalizeInsightsRange } from "./date-range";
 import { InsightScope } from "./insight-scope";
-import {
-  TodayStrip,
-  selectTodayExceptions,
-  type TodayException,
-} from "./insights-drilldown";
+import { TodayStrip, selectTodayExceptions, type TodayException } from "./insights-drilldown";
 import { InsightsMasthead } from "./insights-masthead";
 import { StatTileGrid } from "./insights-stat-tiles";
 import { metricHref } from "./metric-href";
@@ -48,7 +38,7 @@ import {
   summarizeDistributorMetrics,
 } from "./distributor-metrics";
 import { wineTitle } from "@/lib/wine-display-name";
-import { fetchInsightsHealth, fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
+import { fetchInsightsHealth, fetchInsightsInventory, fetchInsightsScans, fetchInsightsStock } from "@/lib/insights/snapshot-data";
 
 type NullableDateRange = { range?: string; from?: string; to?: string };
 type SearchParams = Promise<NullableDateRange>;
@@ -119,54 +109,88 @@ export default async function DashboardPage({
   const rangeSince = dateRangeSince(range, from);
   const rangeUntil = dateRangeUntil(range, to);
   const selectedRangeLabel = dateRangeLabel(range, from, to);
+  const access = await resolveSitePricingAccess(supabase, rid);
+  const canReadPricing = access.canReadCost && access.canReadMargin;
 
-  const [
-    drinkWindowAlerts,
-    pricingAlerts,
-    snoozedRows,
-    yieldGroups,
-    pricingRecommendations,
-  ] = await Promise.all([
+  const [drinkWindowAlerts, pricingAlerts, snoozedResult, yieldGroups, pricingRecommendations] = await Promise.all([
     fetchDrinkWindowAlerts(supabase, rid),
-    fetchPricingAlerts(supabase, rid).catch(function () { return []; }),
-    fetchSnoozedAlerts(supabase, rid).catch(function () { return [] as SnoozedRow[]; }),
+    canReadPricing
+      ? fetchPricingAlerts(supabase, rid).catch(function (error) {
+          Sentry.captureException(error, {
+            tags: { surface: "insights-page", phase: "pricing-fetch" },
+            extra: { restaurantId: rid, source: "alerts" },
+          });
+          return null;
+        })
+      : Promise.resolve(null),
+    access.canReadMargin
+      ? fetchSnoozedAlerts(supabase, rid)
+          .then((rows) => ({ rows, strategyAvailable: true }))
+          .catch(function (error) {
+            Sentry.captureException(error, {
+              tags: { surface: "insights-page", phase: "pricing-snooze-fetch" },
+              extra: { restaurantId: rid },
+            });
+            return fetchDrinkWindowSnoozedAlerts(supabase, rid).then((rows) => ({
+              rows,
+              strategyAvailable: false,
+            }));
+          })
+      : fetchDrinkWindowSnoozedAlerts(supabase, rid).then((rows) => ({
+          rows,
+          strategyAvailable: false,
+        })),
     fetchYieldGroups(supabase, rid, rangeSince, rangeUntil),
-    // Fail soft: a pricing read/shape error must not take down Insights.
-    fetchPricingRecommendations(supabase, rid).catch(function (error) {
-      console.error("pricing recommendations unavailable:", error);
-      return null;
-    }),
+    canReadPricing
+      ? fetchPricingRecommendations(supabase, rid).catch(function (error) {
+          Sentry.captureException(error, {
+            tags: { surface: "insights-page", phase: "pricing-fetch" },
+            extra: { restaurantId: rid, source: "recommendations" },
+          });
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
+  const snoozedRows: SnoozedRow[] = snoozedResult.rows;
   const canManage = userRole === "owner" || userRole === "manager";
 
-  // ── Build scan query, conditionally filtering by date range ─────────
-  let scanQuery = supabase
-    .from("invoice_scans")
-    .select(
-      "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
-    )
-    .eq("restaurant_id", rid)
-    .order("created_at", { ascending: false }).order("id");
-
-  if (rangeSince) {
-    scanQuery = scanQuery.gte("created_at", rangeSince.toISOString());
+  let scans: Awaited<ReturnType<typeof fetchInsightsScans>> = [];
+  let costItems: Awaited<ReturnType<typeof fetchInsightsInventory>> | null = null;
+  let stockItems: Awaited<ReturnType<typeof fetchInsightsStock>> = [];
+  let cellarHealthRows: Awaited<ReturnType<typeof fetchInsightsHealth>> = [];
+  if (access.canReadCost) {
+    try {
+      [scans, costItems, cellarHealthRows] = await Promise.all([
+        fetchInsightsScans(supabase, rid, {
+          includeCost: true, since: rangeSince, until: rangeUntil,
+        }),
+        fetchInsightsInventory(supabase, rid),
+        fetchInsightsHealth(supabase, rid),
+      ]);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { surface: "insights-page", phase: "cost-fetch" },
+        extra: { restaurantId: rid },
+      });
+    }
   }
-  if (rangeUntil) {
-    scanQuery = scanQuery.lte("created_at", rangeUntil.toISOString());
+  const costDataAvailable = costItems !== null;
+  if (!costDataAvailable) {
+    [scans, stockItems] = await Promise.all([
+      fetchInsightsScans(supabase, rid, {
+        includeCost: false, since: rangeSince, until: rangeUntil,
+      }),
+      fetchInsightsStock(supabase, rid),
+    ]);
+    cellarHealthRows = [];
   }
 
   const [
-    scans,
-    inventoryItems,
-    cellarHealthRows,
     { count: rawEightysixedCount },
     { count: rawDrinkNowCount },
     initPastDrinkWindow,
   ] =
     await Promise.all([
-      readInsightsPages((from, to) => scanQuery.range(from, to)),
-      fetchInsightsInventory(supabase, rid),
-      fetchInsightsHealth(supabase, rid),
       // Server-side counts: a .select() read is capped at the PostgREST row
       // limit, which silently truncates on large cellars.
       supabase
@@ -188,19 +212,19 @@ export default async function DashboardPage({
     ]);
 
   const allScans = scans ?? [];
-  const items = inventoryItems ?? [];
-  const cellarHealthSummary = summarizeCellarHealth(cellarHealthRows ?? [], items);
-  const cellarHealthUnscored = summarizeUnscoredStock(cellarHealthRows ?? [], items);
+  const items = costItems ?? stockItems;
+  const cellarHealthSummary = summarizeCellarHealth(cellarHealthRows, costItems ?? []);
+  const cellarHealthUnscored = summarizeUnscoredStock(cellarHealthRows, costItems ?? []);
   const pastDrinkWindowWines: PastDrinkWindowRow[] = initPastDrinkWindow;
 
-  const inventoryValue = items.reduce(function (s, i) { return s + i.quantity * i.unit_cost; }, 0);
+  const inventoryValue = costItems?.reduce(function (s, i) { return s + i.quantity * i.unit_cost; }, 0) ?? null;
   const totalBottles = items.reduce(function (s, i) { return s + i.quantity; }, 0);
   const eightysixedCount = rawEightysixedCount ?? 0;
   const drinkNowCount = rawDrinkNowCount ?? 0;
   const todayExceptions = buildTodayExceptions(
     drinkWindowAlerts,
     pastDrinkWindowWines,
-    pricingAlerts,
+    pricingAlerts ?? [],
   );
   const visibleDrinkWindowAlerts = drinkWindowAlerts.slice(0, 6);
   const visiblePastDrinkWindowWines = pastDrinkWindowWines.slice(0, 12);
@@ -225,7 +249,7 @@ export default async function DashboardPage({
 
   // Varietal breakdown (current inventory — not time-filtered)
   const varietalMap = new Map<string, number>();
-  for (const item of items) {
+  for (const item of costItems ?? []) {
     const varietal =
       (item.wines as { varietal: string | null } | null)?.varietal ?? "Other";
     varietalMap.set(varietal, (varietalMap.get(varietal) ?? 0) + item.quantity * item.unit_cost);
@@ -246,6 +270,11 @@ export default async function DashboardPage({
     0,
   );
   const distributors = distributorMetrics.slice(0, 5);
+  const pricingDataAvailable =
+    canReadPricing &&
+    snoozedResult.strategyAvailable &&
+    pricingAlerts !== null &&
+    pricingRecommendations !== null;
 
   // Recent activity
   const recentScans = allScans.slice(0, 5);
@@ -283,10 +312,8 @@ export default async function DashboardPage({
   if (allScans.length === 0 && items.length === 0 && yieldGroups.length === 0) {
     return (
       <section>
-        <InsightsMasthead
-          tenant={restaurantName}
-          rangeLabel={selectedRangeLabel}
-        />
+        <InsightsMasthead tenant={restaurantName} rangeLabel={selectedRangeLabel} costCsvAvailable={costDataAvailable} />
+        {!costDataAvailable && <CostUnavailableNotice />}
         <ReconcileQueueMetric />
         <div className="glass flex flex-col items-center justify-center rounded-card px-lg py-3xl text-center">
           <span className="mb-md grid h-12 w-12 place-items-center rounded-full bg-accent/15 text-accent">
@@ -312,18 +339,10 @@ export default async function DashboardPage({
 
   return (
     <section>
-      {/* Masthead (DESIGN.md — Components, Masthead): the copper dawn glow,
-          an eyebrow carrying the tenant and the range in force, the room's
-          name in the serif, and the CSV export as a ghost pill — a
-          back-office export must never spend the screen's one primary fill
-          (Kimi audit 2026-08-26). */}
-      <InsightsMasthead
-        tenant={restaurantName}
-        rangeLabel={selectedRangeLabel}
-      />
+      <InsightsMasthead tenant={restaurantName} rangeLabel={selectedRangeLabel} costCsvAvailable={costDataAvailable} />
 
-      {/* One glass strip divided by hairlines, not four tiles with four
-          edges. */}
+      {!costDataAvailable && <CostUnavailableNotice />}
+
       <div className="mb-xl md:mb-3xl">
         <div className="mb-sm">
           <InsightScope metric="inventory" kind="snapshot" />
@@ -338,12 +357,11 @@ export default async function DashboardPage({
         />
       </div>
 
-      {/* The range control is its own glass segmented pill now, so it needs
-          no band behind it. */}
       <div className="mb-lg md:mb-xl">
         <DateRangeSelector />
         <p className="mt-sm text-ledger text-grey">
-          Selected range applies to invoice scans, distributor metrics, and partial-bottle yield. Inventory value, bottle counts, availability, and varietal spend are current.
+          Selected range applies to invoice scans and partial-bottle yield. Bottle counts and availability are current.
+          {costDataAvailable && " Distributor metrics use the selected range; inventory value and varietal spend are current."}
         </p>
       </div>
 
@@ -483,15 +501,17 @@ export default async function DashboardPage({
         groups={yieldGroups}
         rangeLabel={selectedRangeLabel}
       />
-      <CellarHealthPanel
-        summary={cellarHealthSummary}
-        unscored={cellarHealthUnscored}
-        canRecompute={canManage}
-      />
-      {pricingRecommendations !== null && (
+      {costDataAvailable && (
+        <CellarHealthPanel
+          summary={cellarHealthSummary}
+          unscored={cellarHealthUnscored}
+          canRecompute={canManage}
+        />
+      )}
+      {pricingDataAvailable && pricingRecommendations !== null && (
         <PricingPlaysSection
           recommendations={pricingRecommendations}
-          canRecompute={canManage}
+          canRecompute={access.canManagePricing}
           recomputeBlockedReason={
             (cellarHealthRows ?? []).length === 0
               ? "Needs cellar health data — recompute cellar health first."
@@ -500,8 +520,10 @@ export default async function DashboardPage({
         />
       )}
 
+      {!pricingDataAvailable && <PricingUnavailableNotice />}
+
       {/* Pricing review */}
-      {pricingAlerts.length > 0 && (
+      {pricingDataAvailable && pricingAlerts !== null && pricingAlerts.length > 0 && (
         <section className="mb-xl md:mb-3xl" aria-labelledby="pricing-review-heading">
           <div className="mb-md flex flex-wrap items-baseline justify-between gap-sm">
             <h2
@@ -514,7 +536,7 @@ export default async function DashboardPage({
               {pricingAlerts.length} alert{pricingAlerts.length === 1 ? "" : "s"}
             </span>
           </div>
-          <PricingReviewCard alerts={pricingAlerts} canManage={canManage} />
+          <PricingReviewCard alerts={pricingAlerts} canManage={access.canManagePricing} />
         </section>
       )}
 
@@ -534,7 +556,7 @@ export default async function DashboardPage({
       </div>
 
       <h2 className="mb-md text-caption font-medium uppercase text-grey">
-        Scan &amp; spend
+        {costDataAvailable ? "Scan & spend" : "Scan activity"}
       </h2>
       <div className="grid gap-md md:grid-cols-2">
         {/* Scan activity sparkline */}
@@ -651,7 +673,7 @@ export default async function DashboardPage({
         </div>
 
         {/* Spend by varietal */}
-        <div className="glass rounded-card p-lg">
+        {costDataAvailable && <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
               <h3 className="text-caption font-medium uppercase text-grey">
@@ -712,10 +734,10 @@ export default async function DashboardPage({
               )}
             </>
           )}
-        </div>
+        </div>}
 
         {/* Top distributors */}
-        <div className="glass rounded-card p-lg">
+        {costDataAvailable && <div className="glass rounded-card p-lg">
           <div className="mb-md flex items-center justify-between">
             <div>
               <h3 className="text-caption font-medium uppercase text-grey">
@@ -775,7 +797,7 @@ export default async function DashboardPage({
               </tbody>
             </table>
           )}
-        </div>
+        </div>}
 
         {/* Recent activity */}
         <div className="glass rounded-card p-lg md:col-span-2">
@@ -820,15 +842,18 @@ export default async function DashboardPage({
                   qty?: number;
                   unitCost?: number;
                 }>;
-                const scanTotal = lineItems.reduce(
-                  function (sum, it) { return sum + (it.qty ?? 0) * (it.unitCost ?? 0); },
-                  0,
-                );
+                const scanTotal = costDataAvailable
+                  ? lineItems.reduce(
+                      function (sum, it) { return sum + (it.qty ?? 0) * (it.unitCost ?? 0); },
+                      0,
+                    )
+                  : null;
+                const scanLabel = `View scan from ${scan.distributor_name}, ${scan.item_count} wines`;
                 return (
                   <Link
                     key={scan.id}
                     href={`/scan/${scan.id}`}
-                    aria-label={`View scan from ${scan.distributor_name}, ${scan.item_count} wines, ${formatMoney(scanTotal)}, ${relative}`}
+                    aria-label={`${scanLabel}${scanTotal === null ? "" : `, ${formatMoney(scanTotal)}`}, ${relative}`}
                     className={`flex items-center gap-md rounded-sm py-sm transition-colors hover:bg-surface-raised focus-ring ${i > 0 ? "border-t border-rule" : ""}`}
                   >
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
@@ -840,7 +865,7 @@ export default async function DashboardPage({
                       </div>
                       <div className="mt-2xs text-body-sm text-grey">
                         {scan.distributor_name} · {scan.item_count} wines
-                        {scanTotal > 0 && (
+                        {scanTotal !== null && scanTotal > 0 && (
                           <>
                             {" · "}
                             <span className="tabular">
@@ -872,6 +897,18 @@ export default async function DashboardPage({
       </div>
     </section>
   );
+}
+
+function CostUnavailableNotice() {
+  return <div role="status" className="glass mb-lg rounded-card px-md py-sm text-body-sm text-grey">
+    <span className="font-medium text-ink">Cost analytics could not be loaded for this site.</span>{" "}Bottle counts, scan activity, and service insights remain available.
+  </div>;
+}
+
+function PricingUnavailableNotice() {
+  return <div role="status" className="glass mb-xl rounded-card px-md py-sm text-body-sm text-grey">
+    <span className="font-medium text-ink">Pricing insights could not be loaded for this site.</span>{" "}Service and inventory activity remain available.
+  </div>;
 }
 
 function buildTodayExceptions(

@@ -3,7 +3,12 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
-import { fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import {
+  fetchInsightsInventory,
+  fetchInsightsStock,
+  readInsightsPages,
+} from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,23 +22,32 @@ async function getInsights() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
+  const access = await resolveSitePricingAccess(supabase, restaurantId);
 
   try {
-    // Fetch scans and inventory in parallel
-    const [
-      scans,
-      inventoryItems,
-    ] = await Promise.all([
-      readInsightsPages((from, to) => supabase
+    const scansPromise = readInsightsPages((from, to) => supabase
         .from("invoice_scans")
         .select("id, distributor_name, item_count, accuracy_score, created_at")
         .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: false }).order("id").range(from, to)),
-      fetchInsightsInventory(supabase, restaurantId),
+        .order("created_at", { ascending: false }).order("id").range(from, to));
+    const costItemsPromise = access.canReadCost
+      ? fetchInsightsInventory(supabase, restaurantId).catch((err) => {
+        Sentry.captureException(err, {
+          tags: { surface: "insights", phase: "cost-fetch" },
+          extra: { restaurantId },
+        });
+        return null;
+      })
+      : Promise.resolve(null);
+    const [scans, costItems] = await Promise.all([
+      scansPromise,
+      costItemsPromise,
     ]);
+    const inventoryItems = costItems ?? await fetchInsightsStock(supabase, restaurantId);
 
     const allScans = scans ?? [];
     const items = inventoryItems ?? [];
+    const costDataAvailable = costItems !== null;
 
     // This-month filter
     const startOfMonth = new Date();
@@ -44,10 +58,10 @@ async function getInsights() {
     );
 
     // Core metrics
-    const inventoryValue = items.reduce(
+    const inventoryValue = costItems?.reduce(
       (s, i) => s + i.quantity * i.unit_cost,
       0,
-    );
+    ) ?? null;
     const totalBottles = items.reduce((s, i) => s + i.quantity, 0);
     const scanCount = monthScans.length;
 
@@ -60,7 +74,7 @@ async function getInsights() {
 
     // Varietal breakdown
     const varietalMap = new Map<string, number>();
-    for (const item of items) {
+    for (const item of costItems ?? []) {
       const varietal =
         (item.wines as { varietal: string | null } | null)?.varietal ??
         "Other";
@@ -69,10 +83,10 @@ async function getInsights() {
         (varietalMap.get(varietal) ?? 0) + item.quantity * item.unit_cost,
       );
     }
-    const varietalBreakdown = [...varietalMap.entries()]
+    const varietalBreakdown = costDataAvailable ? [...varietalMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
-      .map(([name, value]) => ({ name, value }));
+      .map(([name, value]) => ({ name, value })) : null;
 
     // Recent scans
     const recentScans = allScans.slice(0, 5).map((s) => ({
@@ -84,6 +98,7 @@ async function getInsights() {
     }));
 
     return NextResponse.json({
+      costDataAvailable,
       inventoryValue,
       totalBottles,
       scanCount,

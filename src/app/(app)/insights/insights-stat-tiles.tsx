@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { metricHref, type MetricKey } from "./metric-href";
 
 export type StatTileMetrics = {
-  inventoryValue: number;
+  inventoryValue: number | null;
   totalBottles: number;
   eightysixedCount: number;
   drinkNowCount: number;
@@ -33,7 +33,10 @@ export function StatTileGrid({ metrics }: { metrics: StatTileMetrics }) {
     {
       key: "inventory-value",
       label: "Inventory value",
-      value: formatMoney(metrics.inventoryValue),
+      value:
+        metrics.inventoryValue === null
+          ? "Unavailable"
+          : formatMoney(metrics.inventoryValue),
     },
     {
       key: "bottles-in",

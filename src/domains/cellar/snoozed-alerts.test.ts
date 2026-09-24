@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { fetchSnoozedAlerts } from "./snoozed-alerts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  fetchDrinkWindowSnoozedAlerts,
+  fetchSnoozedAlerts,
+} from "./snoozed-alerts";
 
 const RESTAURANT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -13,17 +16,21 @@ type WineRow = {
 };
 
 function makeSupabase(wines: WineRow[] | undefined) {
+  const select = vi.fn();
+  const or = vi.fn(async () => ({ data: wines, error: null }));
+  const gt = vi.fn(async () => ({ data: wines, error: null }));
   const from = (table: string) => {
     if (table !== "wines") throw new Error(`unexpected table ${table}`);
     return {
-      select: () => ({
-        eq: () => ({
-          or: async () => ({ data: wines, error: null }),
-        }),
-      }),
+      select: (projection: string) => {
+        select(projection);
+        return {
+          eq: () => ({ or, gt }),
+        };
+      },
     };
   };
-  return { from } as never;
+  return { client: { from } as never, select, or, gt };
 }
 
 const FUTURE = new Date(Date.now() + 1000 * 60 * 60).toISOString();
@@ -32,7 +39,7 @@ const PAST = new Date(Date.now() - 1000 * 60 * 60).toISOString();
 describe("fetchSnoozedAlerts", () => {
   it("returns an empty array when the query yields no rows", async () => {
     const supabase = makeSupabase(undefined);
-    await expect(fetchSnoozedAlerts(supabase, RESTAURANT_ID)).resolves.toEqual([]);
+    await expect(fetchSnoozedAlerts(supabase.client, RESTAURANT_ID)).resolves.toEqual([]);
   });
 
   it("filters out rows whose snooze has already expired (defense against .or() semantics)", async () => {
@@ -46,7 +53,7 @@ describe("fetchSnoozedAlerts", () => {
         pricing_dismissed_until: null,
       },
     ]);
-    await expect(fetchSnoozedAlerts(supabase, RESTAURANT_ID)).resolves.toEqual([]);
+    await expect(fetchSnoozedAlerts(supabase.client, RESTAURANT_ID)).resolves.toEqual([]);
   });
 
   it("reports which kind(s) of snooze are active per wine", async () => {
@@ -69,7 +76,7 @@ describe("fetchSnoozedAlerts", () => {
       },
     ]);
 
-    const rows = await fetchSnoozedAlerts(supabase, RESTAURANT_ID);
+    const rows = await fetchSnoozedAlerts(supabase.client, RESTAURANT_ID);
 
     expect(rows).toEqual(
       expect.arrayContaining([
@@ -109,7 +116,7 @@ describe("fetchSnoozedAlerts", () => {
       },
     ]);
 
-    const rows = await fetchSnoozedAlerts(supabase, RESTAURANT_ID);
+    const rows = await fetchSnoozedAlerts(supabase.client, RESTAURANT_ID);
     expect(rows.map((r) => r.wine_id)).toEqual(["w2", "w1"]);
   });
 
@@ -139,7 +146,7 @@ describe("fetchSnoozedAlerts", () => {
       },
     ]);
 
-    const rows = await fetchSnoozedAlerts(supabase, RESTAURANT_ID);
+    const rows = await fetchSnoozedAlerts(supabase.client, RESTAURANT_ID);
     expect(rows.map((r) => r.wine_id)).toEqual(["pricing-sooner", "drink-window-later"]);
   });
 
@@ -164,7 +171,44 @@ describe("fetchSnoozedAlerts", () => {
       },
     ]);
 
-    const rows = await fetchSnoozedAlerts(supabase, RESTAURANT_ID);
+    const rows = await fetchSnoozedAlerts(supabase.client, RESTAURANT_ID);
     expect(rows.map((r) => r.wine_id)).toEqual(["alpha", "zeta"]);
+  });
+
+  it("projects and filters only drink-window snoozes for staff without margin access", async () => {
+    const supabase = makeSupabase([
+      {
+        id: "drink-window",
+        name: "Wine A",
+        producer: "Producer A",
+        vintage: 2010,
+        alert_snoozed_until: FUTURE,
+        pricing_dismissed_until: "2999-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    const rows = await fetchDrinkWindowSnoozedAlerts(
+      supabase.client,
+      RESTAURANT_ID,
+    );
+
+    expect(supabase.select).toHaveBeenCalledWith(
+      "id, name, producer, vintage, alert_snoozed_until",
+    );
+    expect(supabase.gt).toHaveBeenCalledWith(
+      "alert_snoozed_until",
+      expect.any(String),
+    );
+    expect(supabase.or).not.toHaveBeenCalled();
+    expect(rows).toEqual([
+      {
+        wine_id: "drink-window",
+        name: "Wine A",
+        producer: "Producer A",
+        vintage: 2010,
+        drinkWindowSnoozedUntil: FUTURE,
+        pricingDismissedUntil: null,
+      },
+    ]);
   });
 });

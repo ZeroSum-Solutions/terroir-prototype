@@ -1,17 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { fetchInsightsHealth, fetchInsightsInventory } from "./snapshot-data";
+import {
+  fetchInsightsHealth,
+  fetchInsightsInventory,
+  fetchInsightsScans,
+  fetchInsightsStock,
+} from "./snapshot-data";
 
 function fixture(rows: unknown[], failedPage?: number) {
   const range = vi.fn(async (from: number, to: number) => ({
     data: from === failedPage ? null : rows.slice(from, to + 1),
     error: from === failedPage ? { message: "Page unavailable" } : null,
   }));
-  const query = { select: vi.fn(), eq: vi.fn(), order: vi.fn(), range };
+  const query = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    order: vi.fn(),
+    gte: vi.fn(),
+    lte: vi.fn(),
+    range,
+  };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.order.mockReturnValue(query);
+  query.gte.mockReturnValue(query);
+  query.lte.mockReturnValue(query);
   const from = vi.fn(() => query);
   return { client: { from } as unknown as SupabaseClient<Database>, from, ...query };
 }
@@ -47,5 +61,47 @@ describe("Insights snapshot pagination", () => {
     const db = fixture(Array.from({ length: 1000 }, () => ({})));
     expect(await fetchInsightsHealth(db.client, "restaurant-a")).toHaveLength(1000);
     expect(db.range.mock.calls).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it("uses an explicit cost-free stock projection", async () => {
+    const db = fixture([{ quantity: 4, wine_id: "wine-a" }]);
+
+    await fetchInsightsStock(db.client, "restaurant-a");
+
+    expect(db.from).toHaveBeenCalledWith("inventory_items");
+    expect(db.select).toHaveBeenCalledWith("quantity, wine_id");
+    expect(db.eq).toHaveBeenCalledWith("restaurant_id", "restaurant-a");
+    expect(db.select.mock.calls.flat().join(" ")).not.toContain("unit_cost");
+  });
+
+  it("keeps invoice cost JSON out of safe scans and includes it only for cost reads", async () => {
+    const safe = fixture([]);
+    const cost = fixture([]);
+
+    await fetchInsightsScans(safe.client, "restaurant-a", {
+      includeCost: false,
+      since: new Date("2026-09-01T00:00:00.000Z"),
+      until: new Date("2026-09-30T23:59:59.999Z"),
+    });
+    await fetchInsightsScans(cost.client, "restaurant-a", {
+      includeCost: true,
+      since: null,
+      until: null,
+    });
+
+    expect(safe.select.mock.calls.flat().join(" ")).not.toContain(
+      "final_line_items",
+    );
+    expect(cost.select.mock.calls.flat().join(" ")).toContain(
+      "final_line_items",
+    );
+    expect(safe.gte).toHaveBeenCalledWith(
+      "created_at",
+      "2026-09-01T00:00:00.000Z",
+    );
+    expect(safe.lte).toHaveBeenCalledWith(
+      "created_at",
+      "2026-09-30T23:59:59.999Z",
+    );
   });
 });

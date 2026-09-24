@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
@@ -35,6 +36,10 @@ async function getInsightsCsv() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
+  const access = await resolveSitePricingAccess(supabase, restaurantId);
+  if (!access.canReadCost) {
+    return Errors.forbidden("Cost access is required to export insights.");
+  }
 
   try {
     // Fetch the same data as the insights page

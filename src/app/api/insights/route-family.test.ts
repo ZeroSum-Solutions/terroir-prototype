@@ -5,6 +5,7 @@ const mockRequireMembership = vi.fn();
 const mockCaptureException = vi.fn();
 const mockFetchDrinkWindowAlerts = vi.fn();
 const mockFetchPricingAlerts = vi.fn();
+const mockResolveSitePricingAccess = vi.fn();
 
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
@@ -18,6 +19,10 @@ vi.mock("@/lib/drink-window/alerts", () => ({
 }));
 vi.mock("@/lib/pricing/alerts", () => ({
   fetchPricingAlerts: (...args: unknown[]) => mockFetchPricingAlerts(...args),
+}));
+vi.mock("@/lib/api/site-capability", () => ({
+  resolveSitePricingAccess: (...args: unknown[]) =>
+    mockResolveSitePricingAccess(...args),
 }));
 
 const { GET: getInsights } = await import("./route");
@@ -40,7 +45,7 @@ type QueryCall = {
 };
 
 function makeSupabase(
-  results: Record<string, QueryResult | QueryResult[]> = {},
+  results: Record<string, QueryResult | QueryResult[] | Promise<QueryResult>> = {},
 ) {
   const calls: QueryCall[] = [];
   const queues = new Map(
@@ -118,6 +123,14 @@ const routes = [
   { name: "Toast CSV", invoke: getToastCsv },
 ] as const;
 
+beforeEach(() => {
+  mockResolveSitePricingAccess.mockResolvedValue({
+    canReadCost: true,
+    canReadMargin: false,
+    canManagePricing: false,
+  });
+});
+
 describe("insights and Toast route-family boundaries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -159,6 +172,119 @@ describe("insights and Toast route-family boundaries", () => {
 describe("GET /api/insights", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("preserves safe staff metrics without selecting or serializing cost when cost.read is unavailable", async () => {
+    const supabase = allow(makeSupabase({
+      invoice_scans: {
+        data: [{
+          id: "scan-safe",
+          distributor_name: "Safe Distributor",
+          item_count: 3,
+          accuracy_score: 0.8,
+          created_at: new Date().toISOString(),
+        }],
+        error: null,
+      },
+      inventory_items: {
+        data: [{ quantity: 7, wine_id: "wine-safe", unit_cost: 999 }],
+        error: null,
+      },
+    }));
+    mockResolveSitePricingAccess.mockResolvedValue({
+      canReadCost: false,
+      canReadMargin: true,
+      canManagePricing: true,
+    });
+
+    const response = await getInsights();
+    const text = await response.text();
+    const body = JSON.parse(text);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      costDataAvailable: false,
+      inventoryValue: null,
+      varietalBreakdown: null,
+      totalBottles: 7,
+      totalScans: 1,
+    });
+    expect(text).not.toContain("999");
+    expect(
+      supabase.calls.filter((call) => call.method === "select"),
+    ).toContainEqual({
+      table: "inventory_items",
+      method: "select",
+      args: ["quantity, wine_id"],
+    });
+    expect(
+      supabase.calls.filter((call) => call.method === "select")
+        .flatMap((call) => call.args)
+        .join(" "),
+    ).not.toContain("unit_cost");
+  });
+
+  it("falls back to safe stock when an authorized protected read fails", async () => {
+    const supabase = allow(makeSupabase({
+      inventory_items: [
+        { data: null, error: { message: "unit_cost 777 provider failure" } },
+        { data: [{ quantity: 5, wine_id: "wine-safe" }], error: null },
+      ],
+    }));
+
+    const response = await getInsights();
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(text)).toMatchObject({
+      costDataAvailable: false,
+      inventoryValue: null,
+      varietalBreakdown: null,
+      totalBottles: 5,
+    });
+    expect(text).not.toContain("777");
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "unit_cost 777 provider failure" }),
+      expect.objectContaining({ tags: { surface: "insights", phase: "cost-fetch" } }),
+    );
+    expect(
+      supabase.calls.filter(
+        (call) => call.table === "inventory_items" && call.method === "select",
+      ).map((call) => call.args[0]),
+    ).toEqual([
+      "quantity, unit_cost, wine_id, wines(varietal)",
+      "quantity, wine_id",
+    ]);
+  });
+
+  it("attaches the scan rejection handler while the cost read is still pending", async () => {
+    const scanError = new Error("super-secret scan failure");
+    let resolveCost!: (result: QueryResult) => void;
+    const costPending = new Promise<QueryResult>((resolve) => {
+      resolveCost = resolve;
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      if (reason === scanError) unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      allow(makeSupabase({
+        invoice_scans: { data: null, error: scanError },
+        inventory_items: costPending,
+      }));
+
+      const responsePromise = getInsights();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(unhandled).toEqual([]);
+      resolveCost({ data: [], error: null });
+      await expectNested500(await responsePromise, "Failed to load insights data.");
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+      resolveCost?.({ data: [], error: null });
+    }
+  });
+
   it("counts inventory beyond the database's first 1,000 rows", async () => {
     const supabase = allow(makeSupabase({
       inventory_items: [
@@ -172,29 +298,14 @@ describe("GET /api/insights", () => {
     expect(supabase.calls.filter(call => call.table === "inventory_items" && call.method === "range").map(call => call.args)).toEqual([[0, 999], [1000, 1999]]);
   });
 
-  it.each(["invoice_scans", "inventory_items"])(
-    "does not turn a %s query error into empty metrics",
-    async (failedTable) => {
-      const error = { message: "super-secret query failure" };
-      allow(
-        makeSupabase({
-          invoice_scans: {
-            data: [],
-            error: failedTable === "invoice_scans" ? error : null,
-          },
-          inventory_items: {
-            data: [],
-            error: failedTable === "inventory_items" ? error : null,
-          },
-        }),
-      );
+  it("does not turn a safe invoice_scans query error into empty metrics", async () => {
+    allow(makeSupabase({
+      invoice_scans: { data: [], error: { message: "super-secret query failure" } },
+      inventory_items: { data: [], error: null },
+    }));
 
-      await expectNested500(
-        await getInsights(),
-        "Failed to load insights data.",
-      );
-    },
-  );
+    await expectNested500(await getInsights(), "Failed to load insights data.");
+  });
 
   it("preserves staff access, tenant predicates, and response fields", async () => {
     const createdAt = new Date().toISOString();
@@ -230,6 +341,7 @@ describe("GET /api/insights", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      costDataAvailable: true,
       inventoryValue: 60,
       totalBottles: 2,
       scanCount: 1,
@@ -259,6 +371,31 @@ describe("GET /api/insights", () => {
 
 describe("GET /api/insights/csv", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("denies before every cost-bearing CSV query without cost.read", async () => {
+    const supabase = allow(makeSupabase({
+      invoice_scans: { data: [{ final_line_items: [{ unitCost: 999 }] }], error: null },
+      inventory_items: { data: [{ unit_cost: 999 }], error: null },
+    }));
+    mockResolveSitePricingAccess.mockResolvedValue({
+      canReadCost: false,
+      canReadMargin: true,
+      canManagePricing: true,
+    });
+
+    const response = await getInsightsCsv();
+    const text = await response.text();
+
+    expect(response.status).toBe(403);
+    expect(JSON.parse(text)).toEqual({
+      error: {
+        code: "forbidden",
+        message: "Cost access is required to export insights.",
+      },
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(text).not.toContain("999");
+  });
 
   it("exports all inventory and keeps thousands separators in one CSV cell", async () => {
     allow(makeSupabase({ inventory_items: [

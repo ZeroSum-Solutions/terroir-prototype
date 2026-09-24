@@ -2,6 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
 type Client = SupabaseClient<Database>;
+type InvoiceScan = Database["public"]["Tables"]["invoice_scans"]["Row"];
+type SafeScan = Pick<
+  InvoiceScan,
+  "id" | "distributor_name" | "item_count" | "accuracy_score" | "created_at"
+>;
+export type InsightsScan = SafeScan & Pick<InvoiceScan, "final_line_items">;
 const PAGE_SIZE = 1000;
 
 export async function readInsightsPages<T>(
@@ -27,6 +33,52 @@ export function fetchInsightsInventory(client: Client, restaurantId: string) {
     .eq("restaurant_id", restaurantId)
     .order("id")
     .range(from, to));
+}
+
+export function fetchInsightsStock(client: Client, restaurantId: string) {
+  return readInsightsPages((from, to) => client
+    .from("inventory_items")
+    .select("quantity, wine_id")
+    .eq("restaurant_id", restaurantId)
+    .order("id")
+    .range(from, to));
+}
+
+export async function fetchInsightsScans(
+  client: Client,
+  restaurantId: string,
+  options: {
+    includeCost: boolean;
+    since: Date | null;
+    until: Date | null;
+  },
+) {
+  if (options.includeCost) {
+    return readInsightsPages<InsightsScan>((from, to) => {
+      let query = client
+        .from("invoice_scans")
+        .select("id, distributor_name, item_count, accuracy_score, created_at, final_line_items")
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: false })
+        .order("id");
+      if (options.since) query = query.gte("created_at", options.since.toISOString());
+      if (options.until) query = query.lte("created_at", options.until.toISOString());
+      return query.range(from, to);
+    });
+  }
+
+  const rows = await readInsightsPages<SafeScan>((from, to) => {
+    let query = client
+      .from("invoice_scans")
+      .select("id, distributor_name, item_count, accuracy_score, created_at")
+      .eq("restaurant_id", restaurantId)
+      .order("created_at", { ascending: false })
+      .order("id");
+    if (options.since) query = query.gte("created_at", options.since.toISOString());
+    if (options.until) query = query.lte("created_at", options.until.toISOString());
+    return query.range(from, to);
+  });
+  return rows.map((row): InsightsScan => ({ ...row, final_line_items: null }));
 }
 
 export function fetchInsightsHealth(client: Client, restaurantId: string) {

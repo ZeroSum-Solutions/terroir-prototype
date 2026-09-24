@@ -15,7 +15,7 @@ export async function fetchSnoozedAlerts(
   restaurantId: string,
 ): Promise<SnoozedRow[]> {
   const nowIso = new Date().toISOString();
-  const { data: wines } = await supabase
+  const { data: wines, error } = await supabase
     .from("wines")
     .select(
       "id, name, producer, vintage, alert_snoozed_until, pricing_dismissed_until",
@@ -24,11 +24,41 @@ export async function fetchSnoozedAlerts(
     .or(
       `alert_snoozed_until.gt.${nowIso},pricing_dismissed_until.gt.${nowIso}`,
     );
+  if (error) throw error;
 
+  return toSnoozedRows(wines ?? [], true);
+}
+
+export async function fetchDrinkWindowSnoozedAlerts(
+  supabase: SupabaseClient<Database>,
+  restaurantId: string,
+): Promise<SnoozedRow[]> {
+  const nowIso = new Date().toISOString();
+  const { data: wines, error } = await supabase
+    .from("wines")
+    .select("id, name, producer, vintage, alert_snoozed_until")
+    .eq("restaurant_id", restaurantId)
+    .gt("alert_snoozed_until", nowIso);
+  if (error) throw error;
+
+  return toSnoozedRows(wines ?? [], false);
+}
+
+function toSnoozedRows(
+  wines: Array<{
+    id: string;
+    name: string;
+    producer: string;
+    vintage: number | null;
+    alert_snoozed_until: string | null;
+    pricing_dismissed_until?: string | null;
+  }>,
+  includePricing: boolean,
+): SnoozedRow[] {
   const rows: SnoozedRow[] = (wines ?? [])
     .map(function (w) {
       const dw = w.alert_snoozed_until;
-      const pr = w.pricing_dismissed_until;
+      const pr = includePricing ? w.pricing_dismissed_until ?? null : null;
       const dwActive = dw && new Date(dw).getTime() > Date.now();
       const prActive = pr && new Date(pr).getTime() > Date.now();
       if (!dwActive && !prActive) return null;
