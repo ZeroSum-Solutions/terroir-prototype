@@ -1,10 +1,10 @@
 # Conventions
 
-Every claim here was verified against the tree at `8c777d5` on 2026-08-29. Where a
-convention is aspirational rather than universal, it says so and gives the current
-number. Do not add a rule here you have not verified — a convention doc that lies is
-worse than no convention doc. This file replaces `.planning/codebase/CONVENTIONS.md`,
-which was deleted after four months of drift.
+Unless noted, claims below were verified against the tree at `8c777d5` on 2026-08-29.
+Where a convention is aspirational rather than universal, it says so and gives the
+current number. Do not add a rule here you have not verified — a convention doc that
+lies is worse than no convention doc. This file replaces a deleted planning-era
+predecessor that drifted for four months.
 
 ## TypeScript
 
@@ -94,10 +94,33 @@ which was deleted after four months of drift.
 
 ## Observability
 
+The source-backed policy in this section was verified against `49a77d3d` on
+2026-09-23.
+
 - **Sentry** wraps the Next.js build; server, edge, and client instrumented
   separately (`instrumentation.ts`, `instrumentation-client.ts`,
   `sentry.{server,edge}.config.ts`).
+- **First-party SDK exports are error-only and allowlisted.** Events may contain the
+  Sentry event ID, timestamp, platform, deploy environment, release, generic error
+  labels, and bounded stack frames with sanitized filename/line/column coordinates.
+  SDK and envelope metadata needed to route the event may also be added after the
+  privacy hook. Arbitrary application or domain error codes are not exported unless
+  a reviewed allowlist change adds them.
+- The privacy boundary removes request URLs, headers, cookies, query strings and
+  bodies; user data; tags and extras; arbitrary contexts; breadcrumbs; transaction
+  names; fingerprints; normalized request metadata; stack locals; raw exception,
+  log and source text; and attachments. Traces, logs, metrics, replay, sessions and
+  client reports stay disabled.
+- Monitoring uses the existing configured Sentry DSNs and adds no destination. This
+  policy covers events created by Terroir's first-party SDK configuration. It does
+  not authenticate traffic forged directly to a public DSN or sent through the
+  configured monitoring tunnel.
+- `src/lib/monitoring/error-privacy.ts` owns the allowlist. The installed-SDK envelope
+  contract lives in `src/test/contracts/sentry-envelope-privacy.test.ts`. Any wider
+  telemetry channel needs a separate reviewed data contract and regression proof.
 - Source maps upload on Railway deploy, gated on `SENTRY_AUTH_TOKEN` presence.
+- Provider-side retention and Sentry project permissions remain unverified release
+  gates; application tests cannot prove either setting.
 
 ## Naming
 
