@@ -125,38 +125,75 @@ or a redirect/login response.
 
 ### 4. Make lock, sign-out, proxy, and new sign-in one explicit state machine
 
-Replace the bare sign-out form with a small offline-aware client boundary. On user
-intent it immediately clears private React state and renders a generic locked view;
-then it starts a bounded IndexedDB `lockAllContexts` attempt, writes and reads back
-`terroir_device_locked=1`, and attempts the existing server sign-out whenever the
-network is available. Local storage failure must not prevent that network request.
+Preserve the native sign-out form and add an offline-aware client boundary around
+the entire private React tree. With JavaScript, sign-out intent first commits an
+unmount and a generic, data-free view. After that commit, start the server request
+before awaiting local storage; independently attempt bounded `lockAllContexts`
+and write/read back `terroir_device_locked=1`. A local failure must not suppress
+the request. Use a five-second request deadline and the existing IndexedDB
+deadlines. Unmounting is not erasure of browser memory, router caches, or storage.
 
-The readable lock cookie is an application display signal, not authentication. Use
-`Path=/`, `SameSite=Lax`, `Secure` in production, and deliberately no `HttpOnly` so
-offline code can set/check it. The server sign-out route also sets the lock cookie,
-calls `clearActiveRestaurant()` regardless of the local IndexedDB outcome, and then
-completes the Supabase sign-out. An offline result may say “locked on this device;
-server sign-out pending” only when at least one local lock marker was verified.
+The readable cookie is a display-denial signal, not authentication or API
+authorization. Use `Path=/`, `SameSite=Lax`, `Secure` in production, no `HttpOnly`,
+and a 400-day maximum age; browser retention is not guaranteed.
 
-In `updateSession`, evaluate the lock cookie before the existing authenticated-user
-`/login` redirect:
+| Device marker | Online private route | Offline cached display |
+| --- | --- | --- |
+| `1` | Deny except explicit auth/recovery paths | Deny before opening IndexedDB |
+| `reprovision_required` | Apply verified session and membership checks | Deny before opening IndexedDB |
+| Absent or unknown | Apply verified session and membership checks | Deny unless explicit positive current-context eligibility is proven |
 
-- `/offline` stays public.
-- `/login` renders and never redirects a locked request back to `/`.
-- a locked protected request returns one redirect to `/login`; it never emits private
-  HTML even if a Supabase user cookie is still present.
-- auth-cookie invalidation/deferred sign-out is attempted on reconnect, but failure
-  leaves the lock in place rather than opening a redirect loop.
+The sign-out route must establish same-origin evidence before any cookie, active
+restaurant, or provider side effect: accept `Sec-Fetch-Site: same-origin`, or an
+exact configured-origin `Origin` only when Fetch Metadata is absent. Reject other
+or missing evidence with a generic no-store 403 and no side effects. Native-form
+support therefore requires these headers; real Chromium is the browser proof, not
+a claim about every legacy or header-stripping client. After acceptance, attempt
+active-restaurant clearing and global Supabase sign-out independently and write the
+hard marker on every accepted response. Return 204 only for a confirmed internal
+client request, 303 for confirmed native navigation, and a generic 503 otherwise.
 
-Successful `/auth/callback` exchange and successful `/api/dev-login` verification
-clear the lock cookie in their outgoing response. Failed authentication does not.
-Clearing the cookie permits the new online session; it does not unlock old IndexedDB
-partitions. Only a fresh authorized `/api/offline-context` response may atomically
-unlock the exact new actor/site partition, with all others remaining locked.
+The proxy never writes, refreshes, deletes, or expires the device marker. Signout,
+callback, confirmation, and login POST reach their handlers before hard-marker
+logic; reset-password GET/POST retains normal recovery-session verification. A
+hard marker lets `/login` render without redirecting back to `/`; protected
+requests redirect once to login without private HTML. Only same-origin top-level
+documents may attempt deferred local-scope sign-out. RSC, prefetch, cross-site,
+`none`, and missing-evidence requests perform no cleanup. Await cleanup within
+1.5 seconds and apply accumulated auth-cookie writes before returning the chosen
+response; late results cannot reopen content or mutate a returned response.
+`/api/*` remains outside this proxy matcher and retains its own authorization.
+The later public `/offline` shell remains a separate required implementation.
+
+Every auth operation returning a non-null session writes `reprovision_required`:
+password login, callback exchange, recovery confirmation, dev login, and signup
+when it returns a session. No-session signup, request-only operations, and failed
+authentication preserve the marker. No auth handler opens or unlocks IndexedDB.
+No code in this session-boundary leaf deletes or expires the marker.
+
+A later provider/public-shell leaf must persist positive eligibility bound to the
+exact freshly authorized actor/site context atomically with its context and
+projection, lock every non-current partition, and observe the committed success
+before removing transition state. A fetched response, today's `stored` result,
+a sole unlocked row, or cookie absence is not that evidence. Older records without
+positive eligibility must fail closed. Its representation/versioning and the one
+permitted post-provision marker-deletion path require separate review.
+
+Track server sign-out, durable context locking, projection deletion, and verified
+cookie persistence separately. Zero contexts cannot count as a durable context
+lock, and deletion cannot promote a failed lock to success. Never remount private
+children after sign-out intent. Navigate the whole document to login only after
+server confirmation and at least one verified durable denial marker; otherwise
+show the appropriate data-free warning and retry control. If all persistent denial
+writes fail or their state is later lost, immediate unmounting and server revocation
+do not establish durable cross-reload or device-handoff safety.
 
 ### 5. Specify honest storage, lock, reload, and clock-failure behavior
 
-Every offline render first verifies: exactly one eligible context, matching
+Every offline render first rejects recognized denial markers, then requires
+explicit durable positive eligibility for exactly one matching context. Missing
+eligibility, including the current schema's lack of it, denies display. Also verify
+matching
 projection schema/version, `lockedAt === null`, a current time not earlier than
 `issuedAt` or `lastObservedWallClock`, and a current time before `expiresAt`. The read
 and monotonic-clock update occur in one transaction. Expiry, detected rollback,
@@ -181,7 +218,7 @@ Required failure matrix:
 | Persistent result | Current UI | Reload/reconnect truth |
 | --- | --- | --- |
 | IndexedDB lock succeeds | Private data removed | Offline reload remains locked even if the JS cookie failed; reconnect still finishes server sign-out. |
-| Cookie verifies, IndexedDB lock fails | Private data removed | `/offline` honors the cookie and proxy blocks private online render; projection deletion is only best effort. |
+| Cookie verifies, IndexedDB lock fails | Private data removed | The hard marker blocks private online render and cached display. A later verified login writes transition state, permitting only normal authorized online access; cached display stays denied until positive reprovision evidence. Projection deletion is only best effort. |
 | Both local writes fail while offline | Private data removed for this tab | Show “lock could not be saved; server sign-out pending.” Do not claim durable local sign-out or erase; retry server sign-out first on reconnect. |
 | IndexedDB open/read is denied | Data-free unavailable screen | Never fall back to cached React props, another partition, localStorage rows, or roles. |
 | Remote sign-out succeeds | Data-free/login screen | Server session revocation and active-restaurant-cookie clearing are real. If both local writes failed, the old IndexedDB partition's lock/deletion remains unverified; keep warning that the local lock is not durable and do not hand the device to another person until local recovery verifies the lock/deletion or a fresh authorized reprovision atomically supersedes the old context and locks every non-current partition. Never describe this as secure erase. |
@@ -213,7 +250,7 @@ required dependencies, not silently deferred features.
 | 1. Pure contract | `src/domains/offline/contract.ts`, `contract.test.ts` | Exact v1 schema; forbidden fields cannot serialize; no role/capability/operation types. |
 | 2. Authorized projection | `src/app/api/offline-context/route.ts` and test; a dedicated server query/mapper module | Actor/site derived from current auth; spoofed IDs ignored; revocation denied; lease <=12h; response `no-store`; every authorized placement preserved. |
 | 3. Native store | [Store policy](../../src/domains/offline/database.ts), [IndexedDB driver](../../src/domains/offline/indexeddb.ts), and focused tests under `src/domains/offline/` | Local deterministic tests and independent review pass; real-browser proof remains required. IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
-| 4. Session boundary | Planned offline-aware sign-out component under existing `src/app/(app)/`; [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); `src/app/auth/signout/route.ts`; `src/app/auth/callback/route.ts`; `src/app/api/dev-login/route.ts`; `src/lib/supabase/proxy.ts`; existing focused tests | No locked-login loop; active restaurant cleared; success-only unlock cookie; both local persistence failure branches render honestly. |
+| 4. Session boundary | Planned offline-aware sign-out component and current layout under `src/app/(app)/`; [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); signout, callback, and confirmation routes under `src/app/auth/`; `src/app/login/actions.ts`; `src/app/api/dev-login/route.ts`; `src/lib/supabase/proxy.ts`; planned marker and same-origin helpers under existing `src/domains/offline/` and `src/lib/auth/`; focused tests | No locked-login loop; active restaurant cleared; session-returning auth writes `reprovision_required`; no marker deletion in this leaf; both local persistence failure branches render honestly. |
 | 5. Public shell | Planned offline route and client page under existing `src/app/`; planned offline provider under existing `src/app/(app)/`; [application layout](../../src/app/%28app%29/layout.tsx); `src/lib/context/restaurant.tsx`; planned service worker under existing `public/` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
 | 6. Browser proof | focused Playwright spec | All proofs below pass before any implemented ledger assertion may be promoted to proved; lookup-only scope and C03/C05/Q10/C04 dependency states remain explicit. |
 
@@ -244,12 +281,18 @@ and sign-out boundary are the whole v1 implementation surface.
    `context.setOffline(true)` hard reloads to `/offline` at 320/390/768, shows the
    correct projection and `asOf`/stale label, remains keyboard/focus usable, and never
    claims real-time availability.
-5. **Session matrix:** actor A sign-out immediately blanks A; actor B/new site sees no
-   A rows; active-restaurant is cleared; lock cookie plus still-valid auth reaches
-   `/login` without a loop; successful callback/dev login clears the cookie; failed
-   login does not. Exercise IDB-lock success with cookie failure, cookie success with
-   IDB failure, and both local writes failing while offline, then verify the exact
-   messages and reconnect behavior above.
+5. **Session matrix:** actor A sign-out immediately unmounts A; actor B/new site sees
+   no A rows; active-restaurant is cleared; hard marker plus still-valid auth reaches
+   `/login` without a loop. Session-returning callback, confirm, password login,
+   dev login, and signup write transition state; no-session signup and failed auth
+   preserve it. Prove same-origin signout acceptance, cross-site/missing-evidence
+   refusal without side effects, recovery precedence, and no proxy marker writes.
+   With A's IDB lock/deletion failing, B login and reload before provisioning must
+   remain offline-denied. The later provider leaf must prove positive eligibility
+   and committed-provision-before-marker-deletion ordering. Exercise IDB-lock success
+   with cookie failure, cookie success with IDB failure, zero contexts, and both local
+   writes failing, then verify the truthful messages and reconnect behavior above.
+   Browser-seeded IndexedDB is fixture evidence, not product provisioning evidence.
 6. **Clock/expiry and cache truth:** before-`issuedAt`, backwards-from-last-read and
    at/after-`expiresAt` all produce the data-free screen and require online
    reprovision. Inspect IndexedDB and rendered controls to prove no cached role or
