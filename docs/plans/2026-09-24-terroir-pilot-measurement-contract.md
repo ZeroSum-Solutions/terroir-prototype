@@ -646,12 +646,13 @@ set, append only reviewed C14 assertions/completion ownership through official
 generators, and let the generator allocate IDs. This plan reserves no feature or
 migration identity and performs no source promotion.
 
-The first code leaf is limited to eight paths:
+The first code leaf is limited to nine paths:
 
 - `src/lib/csv/encode.ts`
 - `src/lib/csv/encode.test.ts`
 - `src/lib/scanner/csv.ts`
 - `src/lib/scanner/csv.test.ts`
+- `src/domains/pilot-measurement/types.ts`
 - `src/domains/pilot-measurement/calculate.ts`
 - `src/domains/pilot-measurement/calculate.test.ts`
 - `src/domains/pilot-measurement/export.ts`

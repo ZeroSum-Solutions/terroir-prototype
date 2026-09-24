@@ -131,7 +131,7 @@ has 18 accepted physical-bottle source assertions
 physical-bottle runtime or schema implementation; source promotion does not complete C06.
 The three C14 pilot-measurement assertions (`TER-CF-318` through `TER-CF-320`) are
 active, but no measurement capture/export runtime exists and source promotion does not
-complete C14. The pure eight-path calculation/export leaf cannot complete it alone.
+complete C14. The pure nine-path calculation/export leaf cannot complete it alone.
 Working authorized capture/export may complete the software criterion without real
 four-week pilot observations; those observations gate only Q7 outcome claims.
 The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast
