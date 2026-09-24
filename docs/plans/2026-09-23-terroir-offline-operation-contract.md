@@ -63,7 +63,11 @@ placement: binId, label, sealedQuantity
 Define the response and row types field-by-field in
 `src/domains/offline/contract.ts`; do not use `Pick<CellarWineRow, ...>`, spread a
 cellar row, serialize `CellarShell` props, or reuse its pricing-enriched query.
-The endpoint must select/map only the listed columns. In particular, unit cost,
+The endpoint must map only the listed columns into its response. Queries may also
+select their own primary-key `id` solely for stable, bounded keyset pagination;
+query-only IDs never enter the response unless the response allowlist names them.
+Every page retains the same site scope, and incomplete reads fail closed rather
+than silently truncating the projection. In particular, unit cost,
 bottle/glass price, list names/counts, target margins, notes, membership, settings,
 staff data, and arbitrary API/RSC content never enter the response.
 
