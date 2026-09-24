@@ -116,8 +116,12 @@ recorded. The required critical subset fails on any skip.
 current machine-read source for 315 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the whole workflow is complete. C04 has a
-locally implemented shadow database foundation, while cost enforcement and expanded
-roles remain incomplete. C03 has a locally implemented TER-CF-297 context-lookup leaf
+locally implemented shadow database foundation plus a bounded server-private
+observation attached after legacy active-membership selection. It does not authorize;
+legacy membership remains the sole authority while capability cutover, cost
+enforcement, and expanded roles remain incomplete. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#shadow-access-observation) for its
+server-only data boundary and per-resolution deadline. C03 has a locally implemented TER-CF-297 context-lookup leaf
 with bounded test evidence and an accepted bounded deterministic TER-CF-291 through
 TER-CF-293 private projection-store leaf. Browser integration and session coordination
 remain unverified, and TER-CF-294 through TER-CF-296 shell, session, and cached-search

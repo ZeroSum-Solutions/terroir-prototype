@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAuthContext: vi.fn(),
+  restaurantProviderProps: vi.fn(),
   redirect: vi.fn(),
 }));
 
@@ -13,9 +14,15 @@ vi.mock("next/navigation", () => ({
   redirect: (...args: unknown[]) => mocks.redirect(...args),
 }));
 vi.mock("@/lib/context/restaurant", () => ({
-  RestaurantProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-restaurant-provider="true">{children}</div>
-  ),
+  RestaurantProvider: (props: {
+    children: React.ReactNode;
+    restaurantId: string;
+    restaurantName: string;
+    userRole: string;
+  }) => {
+    mocks.restaurantProviderProps(props);
+    return <div data-restaurant-provider="true">{props.children}</div>;
+  },
 }));
 vi.mock("./toast-wrapper", () => ({
   ToastWrapper: ({ children }: { children: React.ReactNode }) => (
@@ -84,13 +91,46 @@ describe("AppLayout header", () => {
     expect(root.querySelector("header")?.textContent).toContain("Unnamed restaurant");
     expect(root.querySelector('[data-onboarding="true"]') !== null).toBe(role === "owner");
   });
+
+  it("keeps the server-only shadow observation out of markup and provider props", async () => {
+    const sentinel = "SHADOW_ACCESS_MUST_NOT_SERIALIZE";
+    const root = await renderLayout("Bar Norman", "manager", {
+      state: "resolved",
+      value: {
+        siteId: sentinel,
+        workspaceId: sentinel,
+        legacyRole: "manager",
+        roleKey: "beverage_manager",
+        capabilities: ["site.read"],
+        accessSource: "explicit_site_membership",
+      },
+    });
+
+    expect(root.innerHTML).not.toContain(sentinel);
+    expect(root.innerHTML).not.toContain("shadowAccess");
+    expect(mocks.restaurantProviderProps).toHaveBeenCalledTimes(1);
+    const providerProps = mocks.restaurantProviderProps.mock.calls[0]?.[0] as
+      Record<string, unknown>;
+    expect(Object.keys(providerProps).sort()).toEqual([
+      "children",
+      "restaurantId",
+      "restaurantName",
+      "userRole",
+    ]);
+    expect(providerProps).not.toHaveProperty("shadowAccess");
+  });
 });
 
-async function renderLayout(restaurantName: string | null, userRole = "manager") {
+async function renderLayout(
+  restaurantName: string | null,
+  userRole = "manager",
+  shadowAccess: unknown = { state: "denied" },
+) {
   mocks.getAuthContext.mockResolvedValue({
     restaurantId: "restaurant-1",
     restaurantName,
     userRole,
+    shadowAccess,
     user: { email: "manager@example.com" },
   });
 

@@ -92,16 +92,20 @@ Playwright runs with zero retries. The required CI journey subset also fails if
 any selected test skips, so a missing local fixture cannot pass as coverage.
 
 [`docs/feature-ledger.json`](docs/feature-ledger.json) is the sole authoritative
-completion and status ledger for all 297 currently enumerated core requirements. Run
+completion and status ledger for all 315 currently enumerated core requirements. Run
 `pnpm verify:feature-ledger` after changing the ledger or its source requirements;
 CI runs the same verification before the typecheck, lint, and test gates. Never
 hand-edit the ledger. An active ledger entry defines contract scope, not completed
-behavior; the eight C04 workspace/site shadow-access entries, nine C08
-fixture/manual POS-corroboration entries and seven C03 offline-lookup entries are
-not implemented. The pure Toast modules alone do not complete the C08 workflows.
+behavior. C04 has a bounded, server-private
+[workspace/site shadow observation](docs/ARCHITECTURE.md#shadow-access-observation),
+but legacy restaurant membership remains the sole authorization authority;
+capability cutover, cost enforcement, and expanded roles remain incomplete. C03 has bounded
+context-lookup and private projection-store leaves, but browser/session integration
+and the offline shell remain incomplete. The pure Toast modules do not complete the
+nine C08 fixture/manual POS-corroboration workflows.
 
 The `<core_features>` assertions in [`app_spec.txt`](app_spec.txt) are the current
-machine-read source for those 297 ledger identities. The generator combines them with
+machine-read source for those 315 ledger identities. The generator combines them with
 the completion metadata rules; the generated ledger, not `app_spec.txt`, determines
 completion status. Prose elsewhere in `app_spec.txt` can retain historical context or
 drifted claims. The session diary ([`claude-progress.txt`](claude-progress.txt)) is

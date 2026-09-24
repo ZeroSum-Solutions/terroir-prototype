@@ -8,6 +8,7 @@ const mockGetUser = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockOrderFinal = vi.fn();
+const mockObserveShadowSiteAccess = vi.fn();
 
 type MembershipsPayload = {
   data: Array<{ restaurant_id: string; role: string }> | null;
@@ -41,6 +42,15 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+vi.mock("@/lib/api/shadow-site-access", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./shadow-site-access")>();
+  return {
+    ...original,
+    observeShadowSiteAccess: (...args: unknown[]) =>
+      mockObserveShadowSiteAccess(...args),
+  };
+});
+
 // Import AFTER mocks
 const { requireAuth, requireMembership, requireOwner, requireRole } = await import(
   "./auth"
@@ -59,6 +69,34 @@ function withMemberships(memberships: Array<{ restaurant_id: string; role: strin
     };
   });
 }
+
+const observations = [
+  { label: "resolved", value: {
+    state: "resolved",
+    value: {
+      siteId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "33333333-3333-4333-8333-333333333333",
+      legacyRole: "owner",
+      roleKey: "site_owner",
+      capabilities: ["site.read", "inventory.service", "inventory.manage",
+        "receiving.capture", "receiving.cost_capture", "count.capture",
+        "discrepancy.approve", "cost.read", "margin.read", "pricing.manage",
+        "team.site.manage"],
+      accessSource: "explicit_site_membership",
+    },
+  } },
+  { label: "denied", value: { state: "denied" } },
+  { label: "timeout or rejection", value: {
+    state: "unavailable", reason: "provider_error",
+  } },
+  { label: "invalid", value: {
+    state: "unavailable", reason: "invalid_result",
+  } },
+] as const;
+
+beforeEach(() => {
+  mockObserveShadowSiteAccess.mockResolvedValue({ state: "denied" });
+});
 
 describe("requireAuth", () => {
   beforeEach(() => {
@@ -95,6 +133,7 @@ describe("requireMembership", () => {
     const result = await requireMembership();
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(403);
+    expect(mockObserveShadowSiteAccess).not.toHaveBeenCalled();
   });
 
   it("returns the sole membership when the user belongs to one restaurant", async () => {
@@ -156,6 +195,22 @@ describe("requireMembership", () => {
     const result = await requireMembership();
     expect((result as { restaurantId: string }).restaurantId).toBe("r-newest");
   });
+
+  it.each(observations)("relays the $label observation without changing membership", async ({ value }) => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockObserveShadowSiteAccess.mockResolvedValue(value);
+
+    const result = await requireMembership();
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(result).toMatchObject({
+      restaurantId: "r1",
+      role: "manager",
+      shadowAccess: value,
+    });
+    expect(mockObserveShadowSiteAccess).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("requireOwner", () => {
@@ -178,6 +233,17 @@ describe("requireOwner", () => {
     const result = await requireOwner();
     expect(result).not.toBeInstanceOf(NextResponse);
     expect((result as { role: string }).role).toBe("owner");
+  });
+
+  it.each(observations)("keeps owner authorization unchanged for $label", async ({ value }) => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    withMemberships([{ restaurant_id: "r1", role: "owner" }]);
+    mockObserveShadowSiteAccess.mockResolvedValue(value);
+
+    const result = await requireOwner();
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(result).toMatchObject({ role: "owner", shadowAccess: value });
   });
 });
 
@@ -217,5 +283,20 @@ describe("requireRole", () => {
     const result = await requireRole(["owner", "manager"]);
     expect(result).not.toBeInstanceOf(NextResponse);
     expect((result as { role: string }).role).toBe("owner");
+  });
+
+  it.each(observations)("keeps role authorization unchanged for $label", async ({ value }) => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockObserveShadowSiteAccess.mockResolvedValue(value);
+
+    const allowed = await requireRole(["owner", "manager"]);
+    expect(allowed).not.toBeInstanceOf(NextResponse);
+    expect(allowed).toMatchObject({ role: "manager", shadowAccess: value });
+
+    withMemberships([{ restaurant_id: "r1", role: "staff" }]);
+    const denied = await requireRole(["owner", "manager"]);
+    expect(denied).toBeInstanceOf(NextResponse);
+    expect((denied as NextResponse).status).toBe(403);
   });
 });

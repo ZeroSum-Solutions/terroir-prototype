@@ -16,6 +16,9 @@ business workflows. Adapter modules own external/provider mechanics.
 - `src/adapters/llm`: Anthropic invoice extraction boundary.
 - `src/adapters/pdf`: Puppeteer HTML-to-PDF boundary.
 - `src/lib/supabase`: Supabase runtime configuration and client creation.
+- `src/lib/api/shadow-site-access.ts`: server-private C04 workspace/site access
+  observation. It validates exact legacy-role capability sets behind one 750 ms
+  total deadline; it is not a client contract or authorization authority.
 - `src/lib/bins`, `src/lib/cellar-facets`, and `src/lib/cellar-health`:
   physical placement, URL-backed cellar views, and health classification.
 - `src/lib/reconcile-queue` and `src/lib/reconcile-ledger`: derived issue
@@ -38,6 +41,22 @@ Provider boundaries have two branding exceptions. Menu-theme proposals in
 Non-PNG palette extraction in `src/lib/branding/palette.ts` launches Puppeteer
 directly. Wine-list PDF generation still reaches Puppeteer through
 `src/adapters/pdf`.
+
+## Shadow access observation
+
+- After legacy membership selects the active restaurant,
+  `src/lib/api/resolve-active-membership.ts` calls
+  `shadow_effective_site_access` once through the same authenticated Supabase
+  client. Resolved, denied, malformed, provider-error, and timed-out observations
+  preserve the legacy restaurant, role, HTTP outcome, and RLS behavior. The
+  normalized observation stays inside the server auth helpers; it is not included
+  in route payloads, logs, telemetry, rendered markup, or client provider props.
+  Legacy membership remains authoritative until a separately reviewed cutover.
+- The observer can add at most 750 ms to each membership resolution. Existing auth
+  and legacy membership-query latency is outside that budget. Repeated API or
+  helper resolutions can each pay the observer budget. React's request-scoped
+  `getAuthContext` cache deduplicates only within one server render tree; it does
+  not deduplicate separate route or helper calls.
 
 ## Database Contracts
 

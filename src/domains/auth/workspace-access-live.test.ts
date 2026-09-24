@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { observeShadowSiteAccess } from "@/lib/api/shadow-site-access";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import type { Database } from "@/types/database";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -15,7 +18,7 @@ if (!hasLiveDb && process.env.CI) {
 
 type Actor = {
   id: string;
-  client: SupabaseClient;
+  client: SupabaseClient<Database>;
   restaurantId: string;
   workspaceId: string;
   workspaceMembershipId: string;
@@ -153,7 +156,7 @@ describe.skipIf(!hasLiveDb)(
       restaurantIds.add(membership.restaurant_id);
       workspaceIds.add(restaurant.workspace_id);
 
-      const authClient = createClient(supabaseUrl!, publishableKey!, {
+      const authClient = createClient<Database>(supabaseUrl!, publishableKey!, {
         auth: { persistSession: false },
       });
       const { data: session, error: signInError } = await authClient.auth.signInWithPassword({
@@ -161,7 +164,7 @@ describe.skipIf(!hasLiveDb)(
         password,
       });
       if (signInError || !session.session) throw signInError ?? new Error("sign-in failed");
-      const client = createClient(supabaseUrl!, publishableKey!, {
+      const client = createClient<Database>(supabaseUrl!, publishableKey!, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         global: { headers: { Authorization: `Bearer ${session.session.access_token}` } },
       });
@@ -408,6 +411,132 @@ describe.skipIf(!hasLiveDb)(
         p_capability_key: "invented.capability",
       });
       expect(unknown).toBe(false);
+    });
+
+    it("observes actor/site containment and lifecycle denial without changing legacy access", async () => {
+      const actorA = await createActor("adapter-a");
+      const actorB = await createActor("adapter-b");
+      const timings: Record<string, number> = {};
+
+      async function timedObservation(
+        label: string,
+        actor: Actor,
+        restaurantId: string,
+      ) {
+        const startedAt = performance.now();
+        const observation = await observeShadowSiteAccess(
+          actor.client,
+          restaurantId,
+          "owner",
+        );
+        timings[label] = Number((performance.now() - startedAt).toFixed(3));
+        return observation;
+      }
+
+      const ownA = await timedObservation("actor_a_own_site", actorA, actorA.restaurantId);
+      expect(ownA).toMatchObject({
+        state: "resolved",
+        value: {
+          siteId: actorA.restaurantId,
+          workspaceId: actorA.workspaceId,
+          legacyRole: "owner",
+          roleKey: "site_owner",
+          accessSource: "explicit_site_membership",
+        },
+      });
+
+      const foreignA = await timedObservation(
+        "actor_a_actor_b_site",
+        actorA,
+        actorB.restaurantId,
+      );
+      expect(foreignA).toEqual({ state: "denied" });
+
+      const ownB = await timedObservation("actor_b_own_site", actorB, actorB.restaurantId);
+      expect(ownB).toMatchObject({
+        state: "resolved",
+        value: {
+          siteId: actorB.restaurantId,
+          workspaceId: actorB.workspaceId,
+          legacyRole: "owner",
+          roleKey: "site_owner",
+          accessSource: "explicit_site_membership",
+        },
+      });
+
+      const revokedAt = new Date().toISOString();
+      const { error: revokeError } = await admin.from("memberships")
+        .update({ status: "revoked", revoked_at: revokedAt })
+        .eq("user_id", actorA.id)
+        .eq("restaurant_id", actorA.restaurantId);
+      if (revokeError) throw revokeError;
+
+      const revoked = await timedObservation(
+        "actor_a_revoked_site_membership",
+        actorA,
+        actorA.restaurantId,
+      );
+      const [{ data: revokedLegacy }, { data: revokedRestaurant }] = await Promise.all([
+        actorA.client.rpc("is_member", { r_id: actorA.restaurantId }),
+        actorA.client.from("restaurants").select("id")
+          .eq("id", actorA.restaurantId).single(),
+      ]);
+      expect(revoked).toEqual({ state: "denied" });
+      expect(revokedLegacy).toBe(true);
+      expect(revokedRestaurant?.id).toBe(actorA.restaurantId);
+
+      const { data: reactivatedMembership, error: reactivateError } = await admin.from("memberships")
+        .update({ status: "active", revoked_at: null })
+        .eq("user_id", actorA.id)
+        .eq("restaurant_id", actorA.restaurantId)
+        .select("user_id,restaurant_id,status,revoked_at")
+        .single();
+      if (reactivateError) throw reactivateError;
+      expect(reactivatedMembership).toEqual({
+        user_id: actorA.id,
+        restaurant_id: actorA.restaurantId,
+        status: "active",
+        revoked_at: null,
+      });
+
+      const reactivated = await timedObservation(
+        "actor_a_reactivated_site_membership",
+        actorA,
+        actorA.restaurantId,
+      );
+      expect(reactivated).toMatchObject({
+        state: "resolved",
+        value: {
+          siteId: actorA.restaurantId,
+          workspaceId: actorA.workspaceId,
+          legacyRole: "owner",
+          roleKey: "site_owner",
+          accessSource: "explicit_site_membership",
+        },
+      });
+
+      const { error: expireError } = await admin.from("workspace_memberships")
+        .update({ expires_at: "2000-01-01T00:00:00Z" })
+        .eq("id", actorA.workspaceMembershipId);
+      if (expireError) throw expireError;
+
+      const expired = await timedObservation(
+        "actor_a_expired_workspace_membership",
+        actorA,
+        actorA.restaurantId,
+      );
+      const [{ data: expiredLegacy }, { data: expiredRestaurant }] = await Promise.all([
+        actorA.client.rpc("is_member", { r_id: actorA.restaurantId }),
+        actorA.client.from("restaurants").select("id")
+          .eq("id", actorA.restaurantId).single(),
+      ]);
+      expect(expired).toEqual({ state: "denied" });
+      expect(expiredLegacy).toBe(true);
+      expect(expiredRestaurant?.id).toBe(actorA.restaurantId);
+      expect(Object.values(timings).every((elapsedMs) => (
+        elapsedMs >= 0 && elapsedMs < 750
+      ))).toBe(true);
+      process.stdout.write(`C04_SHADOW_ADAPTER_LOOPBACK_MS ${JSON.stringify(timings)}\n`);
     });
 
     it("denies revoked and expired rows in shadow while legacy access stays live", async () => {

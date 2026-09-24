@@ -11,13 +11,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { readActiveRestaurantFromCookie } from "@/lib/api/active-restaurant";
+import {
+  observeShadowSiteAccess,
+  type ShadowLegacyRole,
+  type ShadowSiteAccessObservation,
+} from "@/lib/api/shadow-site-access";
 
-export type MembershipRole = "owner" | "manager" | "staff";
+export type MembershipRole = ShadowLegacyRole;
 
 export type ResolvedMembership = {
   restaurantId: string;
   restaurantName: string;
   role: MembershipRole;
+  shadowAccess: ShadowSiteAccessObservation;
 };
 
 type Client = SupabaseClient<Database>;
@@ -57,10 +63,17 @@ export async function resolveActiveMembership(
   // an orphan membership row). Fall back to a placeholder.
   const restaurantName =
     (chosen.restaurants as { name: string } | null)?.name ?? "My Restaurant";
+  const role = (chosen.role ?? "staff") as MembershipRole;
+  const shadowAccess = await observeShadowSiteAccess(
+    supabase,
+    chosen.restaurant_id,
+    role,
+  );
 
   return {
     restaurantId: chosen.restaurant_id,
     restaurantName,
-    role: (chosen.role ?? "staff") as MembershipRole,
+    role,
+    shadowAccess,
   };
 }

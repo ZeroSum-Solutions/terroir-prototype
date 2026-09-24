@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { Errors } from "@/lib/api/errors";
 import { createClient } from "@/lib/supabase/server";
-import { resolveActiveMembership } from "@/lib/api/resolve-active-membership";
+import {
+  resolveActiveMembership,
+  type MembershipRole,
+} from "@/lib/api/resolve-active-membership";
+import type { ShadowSiteAccessObservation } from "@/lib/api/shadow-site-access";
 import type { Database } from "@/types/database";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-type MembershipRole = "owner" | "manager" | "staff";
 
 export type AuthResult = {
   supabase: SupabaseClient<Database>;
@@ -15,6 +17,7 @@ export type AuthResult = {
 export type MembershipResult = AuthResult & {
   restaurantId: string;
   role: MembershipRole;
+  shadowAccess: ShadowSiteAccessObservation;
 };
 
 /** Returns authenticated user + supabase client, or a 401 response. */
@@ -59,6 +62,7 @@ export async function requireMembership(): Promise<
     user,
     restaurantId: membership.restaurantId,
     role: membership.role,
+    shadowAccess: membership.shadowAccess,
   };
 }
 
