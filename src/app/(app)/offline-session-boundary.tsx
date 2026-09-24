@@ -222,7 +222,7 @@ export function OfflineSessionBoundary({
 
   if (state.phase !== "active") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-md px-lg text-center">
+      <main className="mx-auto flex min-h-screen w-full max-w-[32rem] flex-col items-center justify-center gap-md px-lg text-center">
         <h1 className="font-serif text-title text-ink">Signing out</h1>
         <p className="text-body text-grey" role="status">
           {state.phase === "pending"
