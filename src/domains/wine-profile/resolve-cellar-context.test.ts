@@ -5,10 +5,13 @@
 // PUBLISHED price only. A wrong derivation upstream makes computeBadges lie
 // with perfect fidelity.
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 import {
   composeBadges,
   deriveCellarFacts,
   isSellingFormat,
+  resolveCellarContext,
   type CellarFacts,
   type InventoryRow,
   type ListRow,
@@ -41,6 +44,54 @@ const derive = (input: Partial<Parameters<typeof deriveCellarFacts>[0]> = {}) =>
     sizeMl: 750,
     ...input,
   });
+
+function cellarClient() {
+  const selected: Record<string, string> = {};
+  const responses: Record<string, { data: unknown; error: null }> = {
+    inventory_items: {
+      data: [{
+        quantity: 2,
+        unit_cost: 100,
+        added_at: "2026-08-01T10:00:00.000Z",
+        bin_location: "A2",
+        section: null,
+        format: "750ml",
+      }],
+      error: null,
+    },
+    pour_events: { data: null, error: null },
+    wine_list_items: {
+      data: [{
+        bottle_price: 35,
+        hidden: false,
+        is_available: true,
+        wine_list_sections: {
+          wine_lists: { is_published: true, archived: false },
+        },
+      }],
+      error: null,
+    },
+    cellar_config: { data: { health_dead_stock_days: 90 }, error: null },
+  };
+  const client = {
+    from: (table: string) => {
+      const query = {
+        select: (columns: string) => {
+          selected[table] = columns;
+          return query;
+        },
+        eq: () => query,
+        order: () => query,
+        limit: () => query,
+        maybeSingle: () => Promise.resolve(responses[table]),
+        then: (resolve: (value: unknown) => unknown) =>
+          Promise.resolve(responses[table]).then(resolve),
+      };
+      return query;
+    },
+  } as unknown as SupabaseClient<Database>;
+  return { client, selected };
+}
 
 describe("selling format", () => {
   it("treats a lot with no recorded format as the selling format", () => {
@@ -86,6 +137,38 @@ describe("cost basis", () => {
   it("is null rather than zero when no lot carries a cost", () => {
     const facts = derive({ inventory: [lot({ unit_cost: 0 })] });
     expect(facts.weightedUnitCost).toBeNull();
+  });
+});
+
+describe("cost query authority", () => {
+  it("does not select or derive cost unless both read grants are explicit", async () => {
+    for (const access of [
+      undefined,
+      { canReadCost: false, canReadMargin: false },
+      { canReadCost: true, canReadMargin: false },
+      { canReadCost: false, canReadMargin: true },
+    ]) {
+      const { client, selected } = cellarClient();
+      const facts = await resolveCellarContext(client, "restaurant", "wine", 750, access);
+
+      expect(selected.inventory_items).not.toContain("unit_cost");
+      expect(facts.weightedUnitCost).toBeNull();
+      expect(facts.bottleCount).toBe(2);
+      expect(facts.locations).toEqual(["A2"]);
+      expect(facts.publishedBottlePrice).toBe(35);
+      expect(facts.listedAndOrderable).toBe(true);
+    }
+  });
+
+  it("selects and derives cost when both read grants are explicit", async () => {
+    const { client, selected } = cellarClient();
+    const facts = await resolveCellarContext(client, "restaurant", "wine", 750, {
+      canReadCost: true,
+      canReadMargin: true,
+    });
+
+    expect(selected.inventory_items).toContain("unit_cost");
+    expect(facts.weightedUnitCost).toBe(100);
   });
 });
 

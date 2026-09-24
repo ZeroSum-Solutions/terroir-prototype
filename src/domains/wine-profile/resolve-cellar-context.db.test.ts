@@ -15,6 +15,8 @@ import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
 import { resolveCellarContext } from "./resolve-cellar-context";
 
+const COST_AND_MARGIN_READ = { canReadCost: true, canReadMargin: true } as const;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -96,7 +98,7 @@ describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { ti
       sRows.find((s) => s.wine_list_id === lRows.find((l) => l.name === name)!.id)!.id;
 
     const { error: liErr } = await admin.from("wine_list_items").insert([
-      { restaurant_id: restaurantId, wine_id: wineId, section_id: sectionOf("Published"), bottle_price: 95, hidden: false, is_available: true },
+      { restaurant_id: restaurantId, wine_id: wineId, section_id: sectionOf("Published"), bottle_price: 35, hidden: false, is_available: true },
       // Cheaper, but on a list nobody can see. Must not become the price.
       { restaurant_id: restaurantId, wine_id: wineId, section_id: sectionOf("Draft"), bottle_price: 20, hidden: false, is_available: true },
     ] as never);
@@ -109,16 +111,30 @@ describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { ti
   });
 
   it("counts the selling format apart from magnums and weights cost across lots", async () => {
-    const facts = await resolveCellarContext(admin, restaurantId, wineId, 750);
+    const facts = await resolveCellarContext(
+      admin,
+      restaurantId,
+      wineId,
+      750,
+      COST_AND_MARGIN_READ,
+    );
     expect(facts.sellingFormatUnits).toBe(1);
     expect(facts.otherFormatUnits).toBe(4);
     expect(facts.weightedUnitCost).toBe(72);
     expect(facts.lastPutAwayAt).toBe("2026-06-01");
   });
 
+  it("retains stock, locations, and menu price without selecting cost", async () => {
+    const facts = await resolveCellarContext(admin, restaurantId, wineId, 750);
+    expect(facts.bottleCount).toBe(5);
+    expect(facts.publishedBottlePrice).toBe(35);
+    expect(facts.listedAndOrderable).toBe(true);
+    expect(facts.weightedUnitCost).toBeNull();
+  });
+
   it("reads the published price through the section and list join, ignoring the draft list", async () => {
     const facts = await resolveCellarContext(admin, restaurantId, wineId, 750);
-    expect(facts.publishedBottlePrice).toBe(95);
+    expect(facts.publishedBottlePrice).toBe(35);
     expect(facts.listedAndOrderable).toBe(true);
   });
 

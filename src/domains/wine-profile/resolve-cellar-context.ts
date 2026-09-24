@@ -23,7 +23,8 @@ import type { DrinkWindow } from "./resolve-reference-profile";
 
 export type InventoryRow = {
   quantity: number;
-  unit_cost: number;
+  /** Present only when the caller has both cost and margin read authority. */
+  unit_cost?: number | null;
   added_at: string;
   bin_location: string | null;
   section: string | null;
@@ -51,6 +52,11 @@ export type CellarFacts = {
   publishedBottlePrice: number | null;
   weightedUnitCost: number | null;
   listedAndOrderable: boolean;
+};
+
+export type CellarCostAccess = {
+  canReadCost: boolean;
+  canReadMargin: boolean;
 };
 
 /**
@@ -88,8 +94,9 @@ export function deriveCellarFacts({
     if (isSellingFormat(lot.format, sizeMl)) selling += lot.quantity;
     else other += lot.quantity;
     // Zero-quantity lots are history and a zero cost is "unknown", not free.
-    if (lot.quantity > 0 && lot.unit_cost > 0) {
-      costWeight += lot.quantity * lot.unit_cost;
+    const unitCost = lot.unit_cost ?? 0;
+    if (lot.quantity > 0 && unitCost > 0) {
+      costWeight += lot.quantity * unitCost;
       costUnits += lot.quantity;
     }
     if (latestPutAway === null || lot.added_at > latestPutAway) latestPutAway = lot.added_at;
@@ -165,13 +172,23 @@ export async function resolveCellarContext(
   restaurantId: string,
   wineId: string,
   sizeMl: number | null,
+  costAccess?: CellarCostAccess,
 ): Promise<CellarFacts> {
+  const canCompareMargin =
+    costAccess?.canReadCost === true && costAccess.canReadMargin === true;
+  const inventoryQuery = canCompareMargin
+    ? supabase
+        .from("inventory_items")
+        .select("quantity, unit_cost, added_at, bin_location, section, format")
+        .eq("wine_id", wineId)
+        .eq("restaurant_id", restaurantId)
+    : supabase
+        .from("inventory_items")
+        .select("quantity, added_at, bin_location, section, format")
+        .eq("wine_id", wineId)
+        .eq("restaurant_id", restaurantId);
   const [inventory, lastPour, lists, config] = await Promise.all([
-    supabase
-      .from("inventory_items")
-      .select("quantity, unit_cost, added_at, bin_location, section, format")
-      .eq("wine_id", wineId)
-      .eq("restaurant_id", restaurantId),
+    inventoryQuery,
     // 'pour' is the one depleting kind. spill is waste, reconcile is an
     // adjustment, new_bottle/finish_bottle are lifecycle — none of them is a
     // sale, and a badge cleared by a spill is the noise the audit named.
@@ -203,8 +220,20 @@ export async function resolveCellarContext(
   if (lists.error) throw lists.error;
   if (config.error) throw config.error;
 
+  const rawInventory = (inventory.data ?? []) as InventoryRow[];
+  const inventoryRows: InventoryRow[] = rawInventory.map((lot) => ({
+    quantity: lot.quantity,
+    added_at: lot.added_at,
+    bin_location: lot.bin_location,
+    section: lot.section,
+    format: lot.format,
+    ...(canCompareMargin
+      ? { unit_cost: lot.unit_cost }
+      : {}),
+  }));
+
   return deriveCellarFacts({
-    inventory: inventory.data ?? [],
+    inventory: inventoryRows,
     lastDepletionAt: lastPour.data?.occurred_at.slice(0, 10) ?? null,
     lists: lists.data ?? [],
     deadStockDays: config.data?.health_dead_stock_days ?? DEFAULT_HEALTH_THRESHOLDS.deadStockDays,

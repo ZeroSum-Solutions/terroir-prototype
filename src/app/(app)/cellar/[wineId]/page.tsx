@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getAuthContext } from "@/lib/auth-context";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import {
   fetchVintageRatings,
   type CorpusRead,
@@ -74,12 +75,23 @@ export default async function WineDetailPage({ params }: { params: Params }) {
     name: wine.name,
   });
 
-  // The three resolvers (spec §4.2) start together. House and cellar go the
-  // moment the wine row is known; the reference resolver's own queries start
-  // the moment the corpus match returns, which is the earliest they can.
-  const [house, cellar, reference, profile, lwin, vocabularyResult] = await Promise.all([
+  // House and reference start as soon as their inputs are known. Cellar waits
+  // only for exact-site capability evaluation so its inventory projection can
+  // omit cost unless both reads are explicitly granted.
+  const sitePricingAccessPromise = resolveSitePricingAccess(supabase, restaurantId);
+  const [
+    house,
+    cellar,
+    reference,
+    profile,
+    lwin,
+    vocabularyResult,
+    sitePricingAccess,
+  ] = await Promise.all([
     resolveHouseProfile(supabase, restaurantId, wineId),
-    resolveCellarContext(supabase, restaurantId, wineId, wine.size_ml),
+    sitePricingAccessPromise.then((access) =>
+      resolveCellarContext(supabase, restaurantId, wineId, wine.size_ml, access),
+    ),
     profilePromise.then((read) =>
       resolveReferenceProfile(
         supabase,
@@ -101,6 +113,7 @@ export default async function WineDetailPage({ params }: { params: Params }) {
     // alongside rather than adding a round trip to every wine detail page.
     fetchLwinReference(supabase, wine.lwin_id),
     supabase.from("descriptors").select("slug, label, family").order("sort"),
+    sitePricingAccessPromise,
   ]);
 
   const facts = resolveWineFacts({
@@ -117,6 +130,10 @@ export default async function WineDetailPage({ params }: { params: Params }) {
       : ({ status: "ok", value: [] } satisfies CorpusRead<VintageRating[]>);
 
   const today = new Date().toISOString().slice(0, 10);
+  const badgeFacts =
+    sitePricingAccess.canReadCost && sitePricingAccess.canReadMargin
+      ? cellar
+      : { ...cellar, weightedUnitCost: null };
 
   return (
     <WineDetailView
@@ -128,7 +145,7 @@ export default async function WineDetailPage({ params }: { params: Params }) {
       vintageRatings={vintageRatings}
       house={house}
       reference={reference}
-      badges={composeBadges(cellar, reference.window, today)}
+      badges={composeBadges(badgeFacts, reference.window, today)}
       currentYear={Number(today.slice(0, 4))}
       notesSlot={
         <NotesSection
