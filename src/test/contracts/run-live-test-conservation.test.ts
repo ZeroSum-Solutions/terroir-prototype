@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   IDENTITY_SNAPSHOT_SQL,
   TRACKED_IDENTITY_TABLES,
+  admitLocalStack,
+  assertConservationApiUrl,
+  captureLocalSnapshot,
   compareIdentitySnapshots,
   evaluateConservation,
   liveChildEnvironment,
@@ -15,6 +18,78 @@ type IdentitySnapshot = Record<string, string[]>;
 const emptySnapshot = (): IdentitySnapshot => Object.fromEntries(
   TRACKED_IDENTITY_TABLES.map((table) => [table, [] as string[]]),
 );
+
+const stackConfig = (projectId = "terroir-vw-local") => `
+project_id = "${projectId}"
+[api]
+port = 57321
+[db]
+port = 57322
+`;
+
+const commandResult = (stdout = "") => ({
+  error: undefined,
+  output: [null, stdout, ""] as [null, string, string],
+  pid: 1,
+  signal: null,
+  status: 0,
+  stderr: "",
+  stdout,
+});
+
+const containerInspect = ({
+  id,
+  name,
+  projectId,
+  internalPort,
+  hostPort,
+  hostIps = ["0.0.0.0"],
+}: {
+  id: string;
+  name: string;
+  projectId: string;
+  internalPort: number;
+  hostPort: number;
+  hostIps?: string[];
+}) => [
+  id,
+  `/${name}`,
+  "running",
+  projectId,
+  projectId,
+  JSON.stringify({
+    [`${internalPort}/tcp`]: hostIps.map((HostIp) => ({ HostIp, HostPort: String(hostPort) })),
+  }),
+].join("\t") + "\n";
+
+function localStackRunner(
+  projectId: string,
+  replacement = () => false,
+  portShift = 0,
+  hostIps = ["0.0.0.0"],
+) {
+  const databaseId = "a".repeat(64);
+  const replacementId = "b".repeat(64);
+  const apiId = "c".repeat(64);
+  return vi.fn((command: string, args: string[]) => {
+    if (command !== "docker") return commandResult();
+    const name = args.at(-1) ?? "";
+    if (args[0] === "inspect") {
+      const database = name === `supabase_db_${projectId}`;
+      return commandResult(containerInspect({
+        id: database && replacement()
+          ? replacementId
+          : database ? databaseId : apiId,
+        name,
+        projectId,
+        internalPort: database ? 5432 : 8000,
+        hostPort: (database ? 57322 : 57321) + portShift,
+        hostIps,
+      }));
+    }
+    return commandResult();
+  });
+}
 
 describe("live test identity conservation", () => {
   it("parses and sorts exact identities for all six tracked tables", () => {
@@ -207,5 +282,113 @@ describe("live test identity conservation", () => {
       "SUPABASE_SERVICE_ROLE_KEY",
     ]);
     expect(liveChildEnvironment({ ...complete, CI: "0" })).toMatchObject({ CI: "1" });
+  });
+
+  it("requires the conservation URL to use the admitted IPv4 loopback spelling", () => {
+    expect(() => assertConservationApiUrl(
+      "http://localhost:57321",
+      stackConfig(),
+    )).toThrow("http://127.0.0.1:57321");
+    expect(() => assertConservationApiUrl(
+      "http://127.0.0.1:57321",
+      stackConfig(),
+    )).not.toThrow();
+  });
+
+  it("derives an alternate stack and never invokes the retained project target", () => {
+    const runCommand = localStackRunner("alternate-local");
+    const target = admitLocalStack(stackConfig("alternate-local"), runCommand);
+
+    expect(captureLocalSnapshot(target, runCommand)).toEqual(emptySnapshot());
+    expect(JSON.stringify(runCommand.mock.calls)).not.toContain("terroir-vw-local");
+    expect(runCommand).toHaveBeenCalledWith(
+      "docker",
+      expect.arrayContaining(["exec", "a".repeat(64)]),
+      expect.any(Object),
+    );
+  });
+
+  it.each([
+    ["malformed config", "project_id = '../wrong'\n[api]\nport = 57321\n[db]\nport = 57322", vi.fn(), "invalid project_id"],
+    ["ambiguous project id", `project_id = "first-local"\n${stackConfig("second-local")}`, vi.fn(), "ambiguous or missing projectId"],
+    ["mismatched Docker labels", stackConfig(), localStackRunner("other-local"), "labels do not match"],
+    ["mismatched Docker ports", stackConfig(), localStackRunner("terroir-vw-local", () => false, 1), "port binding does not match"],
+  ])("refuses %s before a child can run", (_label, config, runCommand, failure) => {
+    const child = vi.fn();
+    const result = runConservationOrchestration({
+      captureSnapshot: () => captureLocalSnapshot(
+        admitLocalStack(config, runCommand),
+        runCommand,
+      ),
+      runChild: child,
+    });
+
+    expect(result).toMatchObject({
+      exitCode: 1,
+      childFailure: "not_run",
+      preCaptureFailure: expect.stringContaining(failure),
+    });
+    expect(child).not.toHaveBeenCalled();
+  });
+
+  it("supports the retained config while executing snapshots by immutable container id", () => {
+    const runCommand = localStackRunner("terroir-vw-local", () => false, 0, ["0.0.0.0", "::"]);
+    const target = admitLocalStack(stackConfig(), runCommand);
+
+    captureLocalSnapshot(target, runCommand);
+
+    const exec = runCommand.mock.calls.find(([, args]) => args[0] === "exec");
+    expect(exec?.[1]).toEqual(expect.arrayContaining([
+      "--env",
+      expect.stringContaining("default_transaction_read_only=on"),
+      "a".repeat(64),
+    ]));
+  });
+
+  it("supports an explicit IPv4 loopback-only stack binding", () => {
+    const runCommand = localStackRunner("terroir-vw-local", () => false, 0, ["127.0.0.1"]);
+    const target = admitLocalStack(stackConfig(), runCommand);
+
+    expect(captureLocalSnapshot(target, runCommand)).toEqual(emptySnapshot());
+  });
+
+  it("refuses a matching project and port bound only to a LAN address before child launch", () => {
+    const runCommand = localStackRunner("terroir-vw-local", () => false, 0, ["192.168.1.50"]);
+    const child = vi.fn();
+    const result = runConservationOrchestration({
+      captureSnapshot: () => captureLocalSnapshot(
+        admitLocalStack(stackConfig(), runCommand),
+        runCommand,
+      ),
+      runChild: child,
+    });
+
+    expect(result).toMatchObject({
+      exitCode: 1,
+      childFailure: "not_run",
+      preCaptureFailure: expect.stringContaining("IPv4 loopback"),
+    });
+    expect(child).not.toHaveBeenCalled();
+    expect(runCommand.mock.calls.some(([, args]) => args[0] === "exec")).toBe(false);
+  });
+
+  it("fails post-capture if the admitted database container is replaced", () => {
+    let replaced = false;
+    const runCommand = localStackRunner("terroir-vw-local", () => replaced);
+    const target = admitLocalStack(stackConfig(), runCommand);
+    const result = runConservationOrchestration({
+      captureSnapshot: () => captureLocalSnapshot(target, runCommand),
+      runChild: () => {
+        replaced = true;
+        return commandResult();
+      },
+    });
+
+    expect(result).toMatchObject({
+      childFailure: null,
+      exitCode: 1,
+      postCaptureFailure: expect.stringContaining("container changed"),
+    });
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === "exec")).toHaveLength(1);
   });
 });

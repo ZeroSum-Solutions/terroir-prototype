@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -188,12 +189,110 @@ function run(command, args, options = {}) {
   });
 }
 
-function captureLocalSnapshot() {
-  const result = run(
+export function parseLocalStackConfig(raw) {
+  const values = { projectId: [], apiPort: [], dbPort: [] };
+  let section = "";
+  for (const sourceLine of raw.split(/\r?\n/)) {
+    const line = sourceLine.replace(/\s+#.*$/, "").trim();
+    if (!line) continue;
+    const header = line.match(/^\[([a-z0-9_.-]+)]$/i);
+    if (header) {
+      section = header[1];
+      continue;
+    }
+    if (section === "" && /^project_id\b/.test(line)) {
+      const match = line.match(/^project_id\s*=\s*"([^"]+)"$/);
+      if (!match) throw new Error("invalid project_id in supabase/config.toml");
+      values.projectId.push(match[1]);
+    }
+    if ((section === "api" || section === "db") && /^port\b/.test(line)) {
+      const match = line.match(/^port\s*=\s*([0-9]+)$/);
+      if (!match) throw new Error(`invalid [${section}] port in supabase/config.toml`);
+      values[section === "api" ? "apiPort" : "dbPort"].push(Number(match[1]));
+    }
+  }
+  for (const [name, found] of Object.entries(values)) {
+    if (found.length !== 1) throw new Error(`ambiguous or missing ${name} in supabase/config.toml`);
+  }
+  const [projectId] = values.projectId;
+  const [apiPort] = values.apiPort;
+  const [dbPort] = values.dbPort;
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(projectId)) {
+    throw new Error("invalid project_id in supabase/config.toml");
+  }
+  if (![apiPort, dbPort].every((port) => Number.isInteger(port) && port > 0 && port <= 65535) || apiPort === dbPort) {
+    throw new Error("invalid or overlapping local Supabase ports");
+  }
+  return { projectId, apiPort, dbPort };
+}
+
+export function assertConservationApiUrl(apiUrl, configText) {
+  const { apiPort } = parseLocalStackConfig(configText);
+  const expected = `http://127.0.0.1:${apiPort}`;
+  if (apiUrl !== expected) {
+    throw new Error(`conservation target must be exactly ${expected}`);
+  }
+}
+
+const INSPECT_FORMAT = '{{.Id}}\t{{.Name}}\t{{.State.Status}}\t{{index .Config.Labels "com.supabase.cli.project"}}\t{{index .Config.Labels "com.docker.compose.project"}}\t{{json .NetworkSettings.Ports}}';
+
+function inspectStackContainer(name, projectId, internalPort, hostPort, runCommand) {
+  const result = runCommand("docker", ["inspect", "--format", INSPECT_FORMAT, name]);
+  if (result.error || result.status !== 0) {
+    throw new Error(`could not inspect ${name}`);
+  }
+  const rows = result.stdout.trim().split(/\r?\n/);
+  if (rows.length !== 1) throw new Error(`ambiguous Docker target for ${name}`);
+  const [id, actualName, status, supabaseProject, composeProject, rawPorts, ...extra] = rows[0].split("\t");
+  if (extra.length > 0 || !/^[0-9a-f]{64}$/.test(id) || actualName !== `/${name}` || status !== "running") {
+    throw new Error(`invalid or stopped Docker target for ${name}`);
+  }
+  if (supabaseProject !== projectId || composeProject !== projectId) {
+    throw new Error(`Docker container labels do not match project ${projectId}`);
+  }
+  let ports;
+  try {
+    ports = JSON.parse(rawPorts);
+  } catch {
+    throw new Error(`invalid Docker port metadata for ${name}`);
+  }
+  const bindings = ports[`${internalPort}/tcp`];
+  if (!Array.isArray(bindings) || bindings.length === 0 || bindings.some((binding) => binding?.HostPort !== String(hostPort))) {
+    throw new Error(`Docker port binding does not match config for ${name}`);
+  }
+  if (!bindings.some((binding) => ["127.0.0.1", "0.0.0.0"].includes(binding?.HostIp))) {
+    throw new Error(`Docker port binding does not cover IPv4 loopback for ${name}`);
+  }
+  return { id, name };
+}
+
+export function admitLocalStack(configText, runCommand = run) {
+  const config = parseLocalStackConfig(configText);
+  const databaseName = `supabase_db_${config.projectId}`;
+  const apiName = `supabase_kong_${config.projectId}`;
+  return {
+    ...config,
+    database: inspectStackContainer(databaseName, config.projectId, 5432, config.dbPort, runCommand),
+    api: inspectStackContainer(apiName, config.projectId, 8000, config.apiPort, runCommand),
+  };
+}
+
+function assertAdmittedLocalStack(target, runCommand) {
+  const database = inspectStackContainer(target.database.name, target.projectId, 5432, target.dbPort, runCommand);
+  const api = inspectStackContainer(target.api.name, target.projectId, 8000, target.apiPort, runCommand);
+  if (database.id !== target.database.id) throw new Error("database container changed after admission");
+  if (api.id !== target.api.id) throw new Error("API container changed after admission");
+}
+
+export function captureLocalSnapshot(target, runCommand = run) {
+  assertAdmittedLocalStack(target, runCommand);
+  const result = runCommand(
     "docker",
     [
       "exec",
-      "supabase_db_terroir-vw-local",
+      "--env",
+      "PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000",
+      target.database.id,
       "psql",
       "-X",
       "-v",
@@ -213,6 +312,7 @@ function captureLocalSnapshot() {
   if (result.status !== 0) {
     throw new Error(`identity snapshot failed: ${result.stderr.trim()}`);
   }
+  assertAdmittedLocalStack(target, runCommand);
   return parseIdentitySnapshot(result.stdout);
 }
 
@@ -240,6 +340,16 @@ function runCli() {
     return;
   }
 
+  let configText;
+  try {
+    configText = readFileSync("supabase/config.toml", "utf8");
+    assertConservationApiUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, configText);
+  } catch (error) {
+    console.error(`local target admission failed: ${errorMessage(error)}`);
+    process.exitCode = 2;
+    return;
+  }
+
   const guard = run("bash", ["scripts/local/assert-local-db.sh"]);
   if (guard.error) {
     console.error(`local guard spawn failed: ${guard.error.code ?? "unknown"}`);
@@ -253,8 +363,17 @@ function runCli() {
   }
   process.stdout.write(guard.stdout);
 
+  let target;
+  try {
+    target = admitLocalStack(configText);
+  } catch (error) {
+    console.error(`local stack admission failed: ${errorMessage(error)}`);
+    process.exitCode = 2;
+    return;
+  }
+
   const result = runConservationOrchestration({
-    captureSnapshot: captureLocalSnapshot,
+    captureSnapshot: () => captureLocalSnapshot(target),
     runChild: () => run(child[0], child.slice(1), {
       stdio: "inherit",
       env: liveChildEnvironment(process.env),
