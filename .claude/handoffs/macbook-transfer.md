@@ -6,8 +6,17 @@ last-code-commit: b7fba74973cd0215104313aecbaf162f1b14b974
 
 ## Active Task
 
-Transfer saved work through GitHub. The Mac mini goal remains paused. The owner
-may start a separate development session on the MacBook; do not restart the mini.
+Transfer saved work through GitHub. The owner has now authorized renewed work
+and a replacement goal is active. Coordinate MacBook work with this branch; do not
+start competing writers against the same files or local database.
+
+September 24 update: the owner now requests a restarted, demo-first production
+goal. Read the new opening directive in the September 23 execution contract before
+continuing. It prioritizes complete staff workflows and preserves all production
+criteria. After the initial refusal, the owner deleted the previous paused goal
+and the replacement goal was successfully created with status active. This new
+owner instruction supersedes the earlier no-development pause, but never authorizes
+unsafe database resets, hosted changes or a main merge.
 
 ## Goal
 
