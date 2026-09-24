@@ -13,13 +13,13 @@ export const ALLOWED_STATUSES = [
 
 export const SCHEMA_VERSION = 2;
 export const SOURCE_FILE = "app_spec.txt";
-export const APPROVED_FEATURE_COUNT = 315;
+export const APPROVED_FEATURE_COUNT = 317;
 export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
   approvedBy: "product_owner",
   approvedOn: "2026-07-23",
-  expandedOn: "2026-09-23",
+  expandedOn: "2026-09-24",
 };
 const REQUIRED_FIELDS = [
   "id",
@@ -83,6 +83,7 @@ export const COMPLETION_RULES = [
   [282, 290, "TER-047", "pos-integrations"],
   [291, 297, "TER-048", "offline-lookup"],
   [298, 315, "TER-041", "physical-bottle-inventory"],
+  [316, 317, "TER-049", "csv-identity-review"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,

@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 315,
+  "featureCount": 317,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
-    "expandedOn": "2026-09-23",
-    "approvedActiveCount": 315
+    "expandedOn": "2026-09-24",
+    "approvedActiveCount": 317
   },
   "items": [
     {
@@ -4105,6 +4105,32 @@
       "status": "active",
       "completionSpec": "TER-041",
       "evidenceOwner": "physical-bottle-inventory"
+    },
+    {
+      "id": "TER-CF-316",
+      "domain": "csv_identity_review",
+      "sourceOrder": 316,
+      "sourceText": "User can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate",
+      "actor": "User",
+      "action": "can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate",
+      "observableOutcome": "User can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate",
+      "negativeCase": "Assertion is not observed: User can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate",
+      "status": "active",
+      "completionSpec": "TER-049",
+      "evidenceOwner": "csv-identity-review"
+    },
+    {
+      "id": "TER-CF-317",
+      "domain": "csv_identity_review",
+      "sourceOrder": 317,
+      "sourceText": "System may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable",
+      "actor": "System",
+      "action": "may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable",
+      "observableOutcome": "System may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable",
+      "negativeCase": "Assertion is not observed: System may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable",
+      "status": "active",
+      "completionSpec": "TER-049",
+      "evidenceOwner": "csv-identity-review"
     }
   ]
 }

@@ -765,7 +765,7 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 
 **Acceptance:** All required checks pass on the promoted SHA; no active requirement lacks evidence; production auth, public list, health, queue, and key read paths pass; rollback target is recorded; during the 24-hour observation window, HTTP 5xx stays below 1%, synthetic auth and public-list success stay at or above 99%, background-job success stays at or above 95% with queue age below 5 minutes, public-list p95 response time stays below 2 seconds, and no unresolved severity-1 or severity-2 event is opened. Low-volume metrics must be supported by the scheduled synthetic canaries.
 **Verification:** Release manifest with commit, artifact, migrations, checks, staging report, production canary, and rollback reference.
-**Dependencies:** `TER-002` through `TER-045`, `TER-047` and `TER-048`.
+**Dependencies:** `TER-002` through `TER-045`, `TER-047`, `TER-048`, and `TER-049`.
 **Approval:** Production schema changes, deployment, data writes, and rollback require explicit approval at the release boundary.
 
 ### TER-047: Deliver bounded POS corroboration Slice A
@@ -783,6 +783,21 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 **Acceptance:** Current server authentication derives the actor/site in `GET /api/offline-context`; its strict allowlist contains neither costs nor roles and every response is `no-store`. Native IndexedDB v1 contains only replaceable contexts and projections. Atomic provisioning locks all other partitions. Invalid, ambiguous, expired or clock-rollback state and storage denial reveal no private rows. The worker caches only the credentialless public shell and exact same-build assets, and reports ready only after every entry succeeds. Sign-out blanks private UI immediately, prevents locked-login loops, clears active-site selection remotely, and reports local-lock failures truthfully; remote success does not imply failed local locks were repaired. New sign-in does not unlock an old partition without fresh provisioning.
 **Verification:** Field-exclusion and authorization tests; real-browser two-store, denial, quota, corruption and clock tests; cache/request inspection; actor/site switch and sign-out failure matrix; hard offline reload and lookup at 320, 390 and 768 pixels. All authorized placements must survive projection and search. This source promotion precedes implementation; all seven requirements remain unimplemented until those proofs pass.
 **Dependencies:** `TER-004`, `TER-010`, `TER-012`, `TER-020`, `TER-044`. The approved offline-operation contract governs implementation. C03 mutation capture remains required after C06 physical-bottle receipts and online count/receiving/placement authority; transfers additionally require C04/C05. TER-048 alone cannot close those criteria.
+
+### TER-049: Deliver bounded CSV identity review
+
+**Outcome:** The active deterministic CSV identity-review baseline remains authoritative, and an authenticated operator may explicitly request one optional display-only producer/cuvee advisory for a currently displayed apply-eligible candidate without changing deterministic matching, review, confirmation, or writes.
+
+**Scope:**
+
+- Preserve incremental apply-eligible candidate display with score and reject/undo, below-threshold non-linking, and confirm-time re-parse/re-match plus approval veto whenever the reviewed set is supplied, including an empty set.
+- Establish the direct-HTTP JEV adapter and producer/cuvee advisory contract first through injected fake transport, clock, and token tests only. This pure leaf adds no caller, route, UI, environment lookup, provider call, action authority, or persistent spend accounting.
+- A later authenticated caller must derive tenant authority server-side, use only normalized `PreviewRow.raw` producer/name text, rederive the global candidate, compare the expected candidate ID/display tuple, and return a server-computed view digest. A request-side digest is not authority, and locked or skipped rows cannot request advice.
+- Any bounded non-private provider evaluation requires a separately frozen model/question/policy, request/attempt/token/dollar ceiling, effective price basis, and sealed held-out protocol. Private tenant runtime additionally requires recorded privacy, retention/deletion, subprocessor, region, telemetry/ZDR, and payload approval. Aggregate spend requires proven provider credit caps or durable accounting; the existing process-local rate limiter is not such a counter.
+
+**Acceptance:** Source promotion preserves the exact first 315 assertion identities and text and appends only `TER-CF-316` and `TER-CF-317` as active requirements. The pure adapter/domain leaf passes exact request, response, minimization, deadline, schema, model, usage, oversize, and fail-closed tests with fake transport, but neither promotion nor those tests mark TER-049 complete. Completion later requires the authenticated caller and operator surface, current candidate and tenant isolation, bounded provider evaluation, provider-failure fallback, privacy approval for any private export, and aggregate-spend enforcement. Before caller activation, transport hardening also requires a response byte bound enforced before materialization and response-body consumption or cancellation on every early return; the dormant adapter does not yet prove either property.
+**Verification:** Official feature-ledger generation and old-315 regression; pure fake-transport adapter/domain tests; later authenticated route, UI, stale-view, locked/skipped-row, tenant/source-isolation, pre-materialization response-byte-bound, and early-return body-consumption/cancellation tests; separately authorized bounded provider evaluation with frozen inputs and raw latency/usage/cost evidence. No live/provider/quality/runtime result may be inferred from source promotion or synthetic tests.
+**Dependencies:** `TER-004`, `TER-010`, `TER-014`, `TER-020`, `TER-023`, `TER-026`, `TER-040`, `TER-044`.
 
 ## 7. Autonomous execution contract
 

@@ -126,6 +126,8 @@ describe("metadataForRequirement", () => {
     [297, "TER-048", "offline-lookup"],
     [298, "TER-041", "physical-bottle-inventory"],
     [315, "TER-041", "physical-bottle-inventory"],
+    [316, "TER-049", "csv-identity-review"],
+    [317, "TER-049", "csv-identity-review"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -133,8 +135,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 315", () => {
-    expect(() => metadataForRequirement(316)).toThrow(
+  it("rejects requirements outside the authoritative 317", () => {
+    expect(() => metadataForRequirement(318)).toThrow(
       "no completion metadata",
     );
   });
@@ -177,7 +179,7 @@ describe("createInitialLedger", () => {
         decision: "all_enumerated_features_active",
         approvedBy: "product_owner",
         approvedOn: "2026-07-23",
-        expandedOn: "2026-09-23",
+        expandedOn: "2026-09-24",
       },
       items: [
         {
@@ -354,10 +356,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 315 as the default approved source count", () => {
+  it("keeps 317 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 315");
+    ).toContain("source feature count must remain 317");
   });
 
   it.each([
@@ -580,8 +582,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 315 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(315);
+  it("accounts for all 317 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(317);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -683,7 +685,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the eighteen physical-bottle requirements as one reviewed interval", () => {
-    expect(ledger.items.slice(297).map((item: { id: string }) => item.id)).toEqual(
+    expect(ledger.items.slice(297, 315).map((item: { id: string }) => item.id)).toEqual(
       Array.from({ length: 18 }, (_, index) => `TER-CF-${298 + index}`),
     );
     expect(ledger.items[297]).toMatchObject({
@@ -693,6 +695,29 @@ describe("checked-in feature ledger", () => {
     });
     expect(ledger.items[300].sourceText).toContain("all-or-none batch");
     expect(ledger.items[314].actor).toBe("POST /api/reconcile");
+  });
+
+  it("appends the approved C09 CSV identity-review contract without claiming implementation", () => {
+    expect(ledger.items.slice(315).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-316",
+      "TER-CF-317",
+    ]);
+    expect(ledger.items[315]).toMatchObject({
+      domain: "csv_identity_review",
+      actor: "User",
+      status: "active",
+      completionSpec: "TER-049",
+      evidenceOwner: "csv-identity-review",
+    });
+    expect(ledger.items[316]).toMatchObject({
+      domain: "csv_identity_review",
+      actor: "System",
+      status: "active",
+      completionSpec: "TER-049",
+      evidenceOwner: "csv-identity-review",
+    });
+    expect(ledger.items[315].sourceText).toContain("including an empty set");
+    expect(ledger.items[316].sourceText).toContain("optional display-only");
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -731,6 +756,7 @@ describe("checked-in feature ledger", () => {
       "TER-044": 15,
       "TER-047": 9,
       "TER-048": 7,
+      "TER-049": 2,
     });
   });
 
