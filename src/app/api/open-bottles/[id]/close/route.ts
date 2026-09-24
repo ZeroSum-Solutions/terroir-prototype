@@ -15,13 +15,15 @@ import {
   withInventoryHeaders,
 } from "@/lib/api/inventory-command";
 import { parseJson, parseParams } from "@/lib/api/validation";
+import { getInventoryContractVersion } from "@/domains/pours/physical-bottle-command";
 
 export const runtime = "nodejs";
 
 const ParamsSchema = z.strictObject({ id: z.string().uuid() });
-const BodySchema = z.strictObject({
+const LegacyBodySchema = z.strictObject({
   expected_opened_at: z.string().datetime({ offset: true }),
 });
+const PhysicalBodySchema = z.strictObject({ wine_id: z.string().uuid() });
 
 export async function POST(
   request: NextRequest,
@@ -44,7 +46,19 @@ async function postCloseBottle(
   if (!parsedParams.ok) {
     return withInventoryHeaders(parsedParams.response, operationId);
   }
-  const parsedBody = await parseJson(request, BodySchema, { message: "Invalid body." });
+  let contractVersion: 1 | 2;
+  try {
+    contractVersion = await getInventoryContractVersion(auth.supabase);
+  } catch (error) {
+    const response = inventoryCommandErrorResponse(error, operationId);
+    if (response) return response;
+    throw error;
+  }
+  const parsedBody = await parseJson(
+    request,
+    contractVersion === 2 ? PhysicalBodySchema : LegacyBodySchema,
+    { message: "Invalid body." },
+  );
   if (!parsedBody.ok) return withInventoryHeaders(parsedBody.response, operationId);
 
   try {
@@ -53,7 +67,11 @@ async function postCloseBottle(
       operationId,
       restaurantId: auth.restaurantId,
       bottleId: parsedParams.data.id,
-      expectedOpenedAt: parsedBody.data.expected_opened_at,
+      wineId: "wine_id" in parsedBody.data ? parsedBody.data.wine_id : undefined,
+      contractVersion,
+      expectedOpenedAt: "expected_opened_at" in parsedBody.data
+        ? parsedBody.data.expected_opened_at
+        : undefined,
     });
     return inventoryResponse(
       { closed: outcome.closed },

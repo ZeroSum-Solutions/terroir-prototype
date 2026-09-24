@@ -15,12 +15,20 @@ import {
   withInventoryHeaders,
 } from "@/lib/api/inventory-command";
 import { parseJson } from "@/lib/api/validation";
+import { getInventoryContractVersion } from "@/domains/pours/physical-bottle-command";
 
 export const runtime = "nodejs";
 
-const BodySchema = z.strictObject({
+const LegacyBodySchema = z.strictObject({
   open_bottle_id: z.string().uuid(),
   expected_opened_at: z.string().datetime({ offset: true }),
+  actual_remaining_ml: z.number().int().nonnegative().max(2_147_483_647),
+  written_off_ml: z.number().int().nonnegative().max(2_147_483_647).default(0),
+  reason_code_id: z.string().uuid().optional(),
+});
+const PhysicalBodySchema = z.strictObject({
+  wine_id: z.string().uuid(),
+  open_bottle_id: z.string().uuid(),
   actual_remaining_ml: z.number().int().nonnegative().max(2_147_483_647),
   written_off_ml: z.number().int().nonnegative().max(2_147_483_647).default(0),
   reason_code_id: z.string().uuid().optional(),
@@ -37,7 +45,19 @@ async function postCloseout(request: NextRequest) {
   const operationId = requireInventoryOperationId(request);
   if (operationId instanceof NextResponse) return operationId;
 
-  const parsed = await parseJson(request, BodySchema, { message: "Invalid body." });
+  let contractVersion: 1 | 2;
+  try {
+    contractVersion = await getInventoryContractVersion(auth.supabase);
+  } catch (error) {
+    const response = inventoryCommandErrorResponse(error, operationId);
+    if (response) return response;
+    throw error;
+  }
+  const parsed = await parseJson(
+    request,
+    contractVersion === 2 ? PhysicalBodySchema : LegacyBodySchema,
+    { message: "Invalid body." },
+  );
   if (!parsed.ok) return withInventoryHeaders(parsed.response, operationId);
   const body = parsed.data;
 
@@ -58,7 +78,11 @@ async function postCloseout(request: NextRequest) {
       operationId,
       restaurantId: auth.restaurantId,
       bottleId: body.open_bottle_id,
-      expectedOpenedAt: body.expected_opened_at,
+      wineId: "wine_id" in body ? body.wine_id : undefined,
+      contractVersion,
+      expectedOpenedAt: "expected_opened_at" in body
+        ? body.expected_opened_at
+        : undefined,
       actualRemainingMl: body.actual_remaining_ml,
       writtenOffMl: body.written_off_ml,
       reasonCodeId: body.reason_code_id,

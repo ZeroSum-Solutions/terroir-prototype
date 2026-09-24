@@ -101,6 +101,34 @@ describe("WineDetailDrawer bottle state", () => {
     await act(async () => root.unmount());
   });
 
+  it("binds measured closeout to the selected physical bottle only", async () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      closeout: { id: "88888888-8888-4888-8888-888888888888", wine_id: wineId,
+        open_bottle_id: "77777777-7777-4777-8777-777777777777" },
+    }, 201));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const bottleA = { ...physicalBottle("66666666-6666-4666-8666-666666666666", 600), wineId };
+    const bottleB = { ...physicalBottle("77777777-7777-4777-8777-777777777777", 300), wineId };
+    await renderPhysicalDrawer(root, row({
+      wine_id: wineId, activeBottleCount: 2, activeOpenMl: 900, activeBottles: [bottleA, bottleB],
+    }), bottleB.id);
+    expect(input("actual_remaining_ml").value).toBe("300");
+    await click(button(container, "Close bottle"));
+    await act(async () => Promise.resolve());
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      wine_id: wineId,
+      open_bottle_id: bottleB.id,
+      actual_remaining_ml: 300,
+      written_off_ml: 0,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
+
   it("resets preservation and close-out values when switching drawer wines", async () => {
     const requests: Array<Record<string, unknown>> = [];
     vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {

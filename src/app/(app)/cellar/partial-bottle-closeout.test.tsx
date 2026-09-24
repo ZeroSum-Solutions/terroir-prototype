@@ -220,4 +220,41 @@ describe("PartialBottleCloseout", () => {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
   });
+
+  it("freezes the selected physical bottle, wine, values, reason, and UUID for retry", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(new Response(JSON.stringify(closeoutBody), {
+        status: 201, headers: { "content-type": "application/json" },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const bottle = (id: string, wineId: string, remaining: number) => ({
+      id, wineId, openedAt: "2026-09-23T12:00:00.000Z",
+      theoreticalRemainingMl: remaining, preservationMethod: "argon" as const,
+      openedBy: null, identityContract: 2 as const,
+    });
+    await act(async () => root.render(<PartialBottleCloseout
+      bottle={bottle("b1b2c3d4-e5f6-4789-8abc-def012345678", "55555555-5555-4555-8555-555555555555", 515)}
+      reasons={[]} />));
+    const action = () => [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((item) => ["Close bottle", "Retry prior action"].includes(item.textContent ?? ""))!;
+    await act(async () => action().click());
+    await act(async () => root.render(<PartialBottleCloseout
+      bottle={bottle("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "99999999-9999-4999-8999-999999999999", 300)}
+      reasons={[]} />));
+    await act(async () => action().click());
+    expect(fetchMock.mock.calls[1][1]?.body).toBe(fetchMock.mock.calls[0][1]?.body);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      wine_id: "55555555-5555-4555-8555-555555555555",
+      open_bottle_id: "b1b2c3d4-e5f6-4789-8abc-def012345678",
+      actual_remaining_ml: 515, written_off_ml: 0,
+    });
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Idempotency-Key"));
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  });
 });

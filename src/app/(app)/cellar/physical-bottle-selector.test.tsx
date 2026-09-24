@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
+import { formatPhysicalBottleId } from "@/domains/pours/physical-bottle-command";
 import {
   PhysicalBottleSelector,
   resolvePhysicalBottleSelection,
@@ -23,6 +24,12 @@ afterEach(() => {
 });
 
 describe("PhysicalBottleSelector", () => {
+  it("formats the full UUID into a collision-safe stable identifier", () => {
+    expect(formatPhysicalBottleId("66666666-6666-4666-8666-111111111111"))
+      .toBe("628RYTLL9GS2FTQ998GJMQRRL");
+    expect(formatPhysicalBottleId("66666666-6666-4666-8666-222222222222"))
+      .toBe("628RYTLL9GS2FTQ9FVX2EBKF6");
+  });
   it("fails closed when a contract-2 row has no exact array", () => {
     expect(resolvePhysicalBottleSelection({
       contractVersion: 2,

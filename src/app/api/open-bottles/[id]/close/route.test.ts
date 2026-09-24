@@ -18,12 +18,13 @@ const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
 const OPENED_AT = "2026-09-23T12:00:00.000Z";
 
 function makeSupabase(options: {
+  contractVersion?: 1 | 2;
   rpcError?: { code?: string; message?: string } | null;
   closedAt?: string | null;
   restaurantId?: string;
   replayed?: boolean;
 } = {}) {
-  const rpc = vi.fn().mockResolvedValue({
+  const commandResponse = {
     data: options.rpcError
       ? null
       : {
@@ -39,7 +40,12 @@ function makeSupabase(options: {
           },
         },
     error: options.rpcError ?? null,
-  });
+  };
+  const rpc = vi.fn((name: string) => Promise.resolve(
+    name === "current_inventory_contract_version"
+      ? { data: options.contractVersion ?? 1, error: null }
+      : commandResponse,
+  ));
   const from = vi.fn(() => ({
     select: () => {
       const chain = {
@@ -100,7 +106,7 @@ describe("POST /api/open-bottles/[id]/close", () => {
     allow(supabase);
     expect((await POST(request(undefined, null), context)).status).toBe(400);
     expect((await POST(request({}), context)).status).toBe(400);
-    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
   it("keeps the 200 closed envelope and forwards the lifecycle pair", async () => {
@@ -150,7 +156,7 @@ describe("POST /api/open-bottles/[id]/close", () => {
       id: "closeout-1",
     });
     expect(response.headers.get("Idempotency-Replayed")).toBe("true");
-    expect(supabase.rpc).toHaveBeenCalledOnce();
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
   });
 
   it("preserves the existing already_closed compatibility response", async () => {
@@ -167,4 +173,37 @@ describe("POST /api/open-bottles/[id]/close", () => {
     });
     expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
   });
+
+  it("uses wine-only physical discard without a mutable bottle pre-read", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    supabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "current_inventory_contract_version"
+        ? { data: 2, error: null }
+        : { data: physicalDiscardResult(), error: null },
+    ));
+    allow(supabase);
+    const response = await POST(request({ wine_id: WINE_ID }), context);
+    expect(response.status).toBe(200);
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
+      expect.objectContaining({ p_command: "discard", p_wine_id: WINE_ID,
+        p_open_bottle_id: BOTTLE_ID, p_actual_remaining_ml: undefined }));
+    expect((await POST(request({ wine_id: WINE_ID, expected_opened_at: OPENED_AT }), context)).status)
+      .toBe(400);
+  });
 });
+
+function physicalDiscardResult() {
+  return {
+    operation_id: OPERATION_ID, command: "discard", replayed: false,
+    pour_event_ids: ["77777777-7777-4777-8777-777777777777"], closeout: null,
+    open_bottle: {
+      id: BOTTLE_ID, restaurant_id: RESTAURANT_ID, wine_id: WINE_ID,
+      remaining_ml: 0, nominal_capacity_ml: 750, opened_at: OPENED_AT,
+      closed_at: "2026-09-23T13:00:00.000Z", preservation_method: "argon",
+      source_inventory_item_id: "88888888-8888-4888-8888-888888888888",
+      source_provenance: "known", identity_contract: 2,
+      identity_origin: "native", state_version: 2,
+    },
+  };
+}

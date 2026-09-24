@@ -220,6 +220,37 @@ describe("CloseBottleButton failure reporting", () => {
     expect(retry.get("Idempotency-Key")).toBe(first.get("Idempotency-Key"));
     expect(refresh).toHaveBeenCalledOnce();
   });
+
+  it("freezes the physical wine and bottle payload across an uncertain retry", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        closed: { id: "66666666-6666-4666-8666-666666666666",
+          wine_id: "55555555-5555-4555-8555-555555555555",
+          closed_at: "2026-09-23T13:00:00.000Z" },
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.push(root);
+    const render = (bottleId: string, wineId: string) => act(async () => root.render(
+      <ToastProvider><CloseBottleButton bottleId={bottleId} wineId={wineId}
+        identityContract={2} openedAt="2026-09-23T12:00:00.000Z" remainingOz={4.2} /></ToastProvider>,
+    ));
+    await render("66666666-6666-4666-8666-666666666666", "55555555-5555-4555-8555-555555555555");
+    await click(container, "Close bottle");
+    await click(container, "Confirm discard 4.2 oz");
+    await render("77777777-7777-4777-8777-777777777777", "88888888-8888-4888-8888-888888888888");
+    await click(container, "Retry prior action");
+    expect(fetchMock.mock.calls[1][0]).toContain("66666666-6666-4666-8666-666666666666");
+    expect(fetchMock.mock.calls[1][1]?.body).toBe(fetchMock.mock.calls[0][1]?.body);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      wine_id: "55555555-5555-4555-8555-555555555555",
+    });
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Idempotency-Key"));
+  });
 });
 
 async function mount(): Promise<HTMLElement> {

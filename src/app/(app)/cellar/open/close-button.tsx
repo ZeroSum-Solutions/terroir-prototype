@@ -15,6 +15,8 @@ import {
 
 interface Props {
   bottleId: string;
+  wineId?: string;
+  identityContract?: 1 | 2;
   openedAt: string;
   remainingOz: number;
 }
@@ -31,7 +33,9 @@ interface Props {
  * why. Definitive refusals now use the mutation toast; uncertain outcomes stay
  * inline so a later successful replay cannot leave contradictory feedback.
  */
-export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
+export function CloseBottleButton({
+  bottleId, wineId, identityContract = 1, openedAt, remainingOz,
+}: Props) {
   const [confirming, setConfirming] = useState(false);
   const [uncertaintyMessage, setUncertaintyMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -39,6 +43,8 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
   const toast = useToast();
   const { begin, retry, finish, pending } = useIdempotentCommand<{
     bottleId: string;
+    wineId?: string;
+    identityContract: 1 | 2;
     openedAt: string;
   }>();
   const retrying = pending?.state === "unresolved";
@@ -51,8 +57,12 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
       return;
     }
 
-    const nextPayload = { bottleId, openedAt };
-    const fingerprint = JSON.stringify(["legacy-close", bottleId, openedAt]);
+    const nextPayload = { bottleId, wineId, identityContract, openedAt };
+    const fingerprint = JSON.stringify([
+      identityContract === 2 ? "physical-discard" : "legacy-close",
+      bottleId,
+      identityContract === 2 ? wineId : openedAt,
+    ]);
     const hadUncertainOutcome = retrying;
     const retryCommand = retrying ? retry() : null;
     const operationId = retryCommand?.operationId ?? begin(fingerprint, nextPayload);
@@ -71,7 +81,9 @@ export function CloseBottleButton({ bottleId, openedAt, remainingOz }: Props) {
             "Content-Type": "application/json",
             "Idempotency-Key": operationId,
           },
-          body: JSON.stringify({ expected_opened_at: command.openedAt }),
+          body: JSON.stringify(command.identityContract === 2
+            ? { wine_id: command.wineId }
+            : { expected_opened_at: command.openedAt }),
         });
         const body = await res.json().catch(() => null);
         definitive = isDefinitiveCommandResponse(

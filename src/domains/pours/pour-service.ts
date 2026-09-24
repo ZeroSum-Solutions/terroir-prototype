@@ -203,7 +203,9 @@ export type CloseOpenBottleInput = {
   operationId: string;
   restaurantId: string;
   bottleId: string;
-  expectedOpenedAt: string;
+  wineId?: string;
+  contractVersion?: 1 | 2;
+  expectedOpenedAt?: string;
   actualRemainingMl: number;
   writtenOffMl?: number;
   reasonCodeId?: string;
@@ -216,11 +218,23 @@ export async function closeOpenBottle(input: CloseOpenBottleInput) {
     restaurantId,
     bottleId,
     expectedOpenedAt,
+    wineId,
+    contractVersion = 1,
     actualRemainingMl,
     writtenOffMl,
     reasonCodeId,
   } = input;
 
+  if (contractVersion === 2) {
+    if (!wineId) throw new InventoryCommandError("invalid_physical_command");
+    const result = await executePhysicalBottleCommand({
+      supabase, operationId, restaurantId, command: "close", wineId,
+      openBottleId: bottleId, actualRemainingMl, writtenOffMl, reasonCodeId,
+    });
+    revalidateClosePaths();
+    return { closeout: result.closeout!, replayed: result.replayed };
+  }
+  if (!expectedOpenedAt) throw new InventoryCommandError("invalid_inventory_command");
   const { data: bottle, error: fetchError } = await supabase
     .from("open_bottles")
     .select("id, wine_id, restaurant_id")
@@ -270,11 +284,24 @@ export type DiscardOpenBottleInput = {
   operationId: string;
   restaurantId: string;
   bottleId: string;
-  expectedOpenedAt: string;
+  wineId?: string;
+  contractVersion?: 1 | 2;
+  expectedOpenedAt?: string;
 };
 
 export async function discardOpenBottle(input: DiscardOpenBottleInput) {
-  const { supabase, operationId, restaurantId, bottleId, expectedOpenedAt } = input;
+  const { supabase, operationId, restaurantId, bottleId, expectedOpenedAt,
+    wineId, contractVersion = 1 } = input;
+  if (contractVersion === 2) {
+    if (!wineId) throw new InventoryCommandError("invalid_physical_command");
+    const result = await executePhysicalBottleCommand({
+      supabase, operationId, restaurantId, command: "discard", wineId,
+      openBottleId: bottleId,
+    });
+    revalidateClosePaths();
+    return { closed: result.openBottle, replayed: result.replayed };
+  }
+  if (!expectedOpenedAt) throw new InventoryCommandError("invalid_inventory_command");
   const { data: bottle, error: fetchError } = await supabase
     .from("open_bottles")
     .select("id, wine_id, restaurant_id")
@@ -302,4 +329,10 @@ export async function discardOpenBottle(input: DiscardOpenBottleInput) {
   revalidatePath("/cellar");
   revalidatePath("/insights");
   return { closed: result.openBottle, replayed: result.replayed };
+}
+
+function revalidateClosePaths() {
+  revalidatePath("/cellar/open");
+  revalidatePath("/cellar");
+  revalidatePath("/insights");
 }

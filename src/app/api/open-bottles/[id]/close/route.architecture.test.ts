@@ -14,6 +14,6 @@ describe("/api/open-bottles/[id]/close architecture boundary", () => {
     expect(routeSource).not.toContain("@sentry/nextjs");
     expect(routeSource).not.toContain("next/cache");
     expect(routeSource).not.toContain(".rpc(");
+    expect(routeSource).not.toContain('.from("open_bottles")');
   });
 });
-

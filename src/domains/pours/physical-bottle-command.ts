@@ -5,7 +5,7 @@ import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 import { InventoryCommandError } from "./inventory-command";
 
 export type InventoryContractVersion = 1 | 2;
-type PhysicalCommandName = "open" | "pour" | "spill";
+type PhysicalCommandName = "open" | "pour" | "spill" | "close" | "discard";
 
 const uuid = z.string().uuid();
 const preservation = z.enum(["coravin", "argon", "vacuum", "none"]);
@@ -32,7 +32,7 @@ const readerRowSchema = z.strictObject({
   }
 });
 
-const commandBottleSchema = z.strictObject({
+const commandBottleFields = {
   id: uuid,
   restaurant_id: uuid,
   wine_id: uuid,
@@ -46,7 +46,8 @@ const commandBottleSchema = z.strictObject({
   identity_contract: z.literal(2),
   identity_origin: z.enum(["migrated_active", "native"]),
   state_version: z.number().int().nonnegative(),
-}).superRefine((row, context) => {
+};
+const commandBottleSchema = z.strictObject(commandBottleFields).superRefine((row, context) => {
   if (
     row.identity_origin === "native" &&
     (row.source_inventory_item_id === null || row.source_provenance !== "known")
@@ -55,7 +56,23 @@ const commandBottleSchema = z.strictObject({
   }
 });
 
-const commandResultSchema = z.strictObject({
+const closeoutSchema = z.strictObject({
+  id: uuid,
+  restaurant_id: uuid,
+  wine_id: uuid,
+  open_bottle_id: uuid,
+  preservation_method: preservation,
+  opened_at: z.string().datetime({ offset: true }),
+  closed_at: z.string().datetime({ offset: true }),
+  theoretical_remaining_ml: z.number().int().nonnegative(),
+  actual_remaining_ml: z.number().int().nonnegative(),
+  variance_ml: z.number().int(),
+  written_off_ml: z.number().int().nonnegative(),
+  reason_code_id: uuid.nullable(),
+  event_contract: z.literal(2),
+});
+
+const activeCommandResultSchema = z.strictObject({
   operation_id: uuid,
   command: z.enum(["open", "pour", "spill"]),
   open_bottle: commandBottleSchema,
@@ -63,6 +80,33 @@ const commandResultSchema = z.strictObject({
   closeout: z.null(),
   replayed: z.boolean(),
 });
+const closeCommandResultSchema = z.strictObject({
+  operation_id: uuid,
+  command: z.literal("close"),
+  open_bottle: z.strictObject({ ...commandBottleFields,
+    remaining_ml: z.literal(0),
+    closed_at: z.string().datetime({ offset: true }),
+  }),
+  pour_event_ids: z.array(uuid).length(1),
+  closeout: closeoutSchema,
+  replayed: z.boolean(),
+});
+const discardCommandResultSchema = z.strictObject({
+  operation_id: uuid,
+  command: z.literal("discard"),
+  open_bottle: z.strictObject({ ...commandBottleFields,
+    remaining_ml: z.literal(0),
+    closed_at: z.string().datetime({ offset: true }),
+  }),
+  pour_event_ids: z.array(uuid).length(1),
+  closeout: z.null(),
+  replayed: z.boolean(),
+});
+const commandResultSchema = z.discriminatedUnion("command", [
+  activeCommandResultSchema,
+  closeCommandResultSchema,
+  discardCommandResultSchema,
+]);
 
 export async function getInventoryContractVersion(
   supabase: SupabaseClient<Database>,
@@ -72,6 +116,13 @@ export async function getInventoryContractVersion(
     throw new InventoryCommandError("inventory_contract_version_unknown");
   }
   return data;
+}
+
+export function formatPhysicalBottleId(id: string): string {
+  const hex = id.replaceAll("-", "").toLowerCase();
+  return /^[0-9a-f]{32}$/.test(hex)
+    ? BigInt(`0x${hex}`).toString(36).padStart(25, "0").toUpperCase()
+    : id;
 }
 
 export async function listActivePhysicalBottles(
@@ -126,6 +177,9 @@ export type ExecutePhysicalBottleCommandInput = {
   ml?: number;
   note?: string;
   preservationMethod?: string;
+  actualRemainingMl?: number;
+  writtenOffMl?: number;
+  reasonCodeId?: string;
 };
 
 export async function executePhysicalBottleCommand(
@@ -134,10 +188,14 @@ export async function executePhysicalBottleCommand(
   if (input.command !== "open" && !input.openBottleId) {
     throw new InventoryCommandError("legacy_inventory_command_retired");
   }
-  if (
-    (input.command === "open" && (input.openBottleId !== undefined || input.ml !== undefined)) ||
-    (input.command !== "open" && (input.ml === undefined || input.preservationMethod !== undefined))
-  ) {
+  const isPour = input.command === "pour" || input.command === "spill";
+  const isClose = input.command === "close";
+  const isDiscard = input.command === "discard";
+  if ((input.command === "open" && (input.openBottleId !== undefined || input.ml !== undefined)) ||
+    (isPour && (input.ml === undefined || input.preservationMethod !== undefined)) ||
+    (isClose && (input.ml !== undefined || input.actualRemainingMl === undefined)) ||
+    (isDiscard && (input.ml !== undefined || input.actualRemainingMl !== undefined ||
+      input.writtenOffMl !== undefined || input.reasonCodeId !== undefined))) {
     throw new InventoryCommandError("invalid_physical_command");
   }
 
@@ -151,9 +209,9 @@ export async function executePhysicalBottleCommand(
     p_ml: input.ml,
     p_note: input.note?.trim() || undefined,
     p_preservation_method: input.preservationMethod,
-    p_actual_remaining_ml: undefined,
-    p_written_off_ml: 0,
-    p_reason_code_id: undefined,
+    p_actual_remaining_ml: input.actualRemainingMl,
+    p_written_off_ml: input.writtenOffMl ?? 0,
+    p_reason_code_id: input.reasonCodeId,
     p_reversal_of_event_id: undefined,
     p_correction_reason: undefined,
     p_operator_confirms_same_bottle_present: false,
@@ -169,11 +227,22 @@ export async function executePhysicalBottleCommand(
   const result = parsed.success ? parsed.data : null;
   if (
     !result ||
+    (result.open_bottle.identity_origin === "native" &&
+      (result.open_bottle.source_inventory_item_id === null ||
+        result.open_bottle.source_provenance !== "known")) ||
     result.operation_id !== input.operationId ||
     result.command !== input.command ||
     result.open_bottle.restaurant_id !== input.restaurantId ||
     result.open_bottle.wine_id !== input.wineId ||
     (input.openBottleId !== undefined && result.open_bottle.id !== input.openBottleId)
+    || (result.command === "close" && (
+      result.closeout.restaurant_id !== input.restaurantId ||
+      result.closeout.wine_id !== input.wineId ||
+      result.closeout.open_bottle_id !== input.openBottleId ||
+      result.closeout.actual_remaining_ml !== input.actualRemainingMl ||
+      result.closeout.written_off_ml !== (input.writtenOffMl ?? 0) ||
+      result.closeout.reason_code_id !== (input.reasonCodeId ?? null)
+    ))
   ) {
     throw new InventoryCommandError("invalid_physical_command_result");
   }
@@ -183,6 +252,6 @@ export async function executePhysicalBottleCommand(
     pourEventIds: result.pour_event_ids,
     replayed: result.replayed,
     openBottle: result.open_bottle,
-    closeout: null,
+    closeout: result.closeout,
   };
 }

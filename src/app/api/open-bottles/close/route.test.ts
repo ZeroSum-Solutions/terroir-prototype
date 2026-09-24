@@ -19,6 +19,7 @@ const REASON_ID = "77777777-7777-4777-8777-777777777777";
 const OPENED_AT = "2026-09-23T12:00:00.000Z";
 
 function makeSupabase(options: {
+  contractVersion?: 1 | 2;
   replayed?: boolean;
   rpcError?: { code?: string; message?: string } | null;
   bottle?: null | {
@@ -38,7 +39,7 @@ function makeSupabase(options: {
         restaurant_id: RESTAURANT_ID,
       }
     : options.bottle;
-  const rpc = vi.fn().mockResolvedValue({
+  const commandResponse = {
     data: options.rpcError
       ? null
       : {
@@ -54,7 +55,12 @@ function makeSupabase(options: {
           },
         },
     error: options.rpcError ?? null,
-  });
+  };
+  const rpc = vi.fn((name: string) => Promise.resolve(
+    name === "current_inventory_contract_version"
+      ? { data: options.contractVersion ?? 1, error: null }
+      : commandResponse,
+  ));
   const from = vi.fn(() => ({
     select: () => {
       const chain = {
@@ -126,7 +132,7 @@ describe("POST /api/open-bottles/close", () => {
     expect((await missingKey.json()).error.code).toBe("invalid_idempotency_key");
     expect(wineOnly.status).toBe(400);
     expect(missingVersion.status).toBe(400);
-    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
   it("forwards the exact lifecycle and keeps the 201 closeout envelope", async () => {
@@ -166,7 +172,7 @@ describe("POST /api/open-bottles/close", () => {
     }));
     expect(response.status).toBe(422);
     expect((await response.json()).error.code).toBe("writeoff_reason_required");
-    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
   it.each([
@@ -190,6 +196,54 @@ describe("POST /api/open-bottles/close", () => {
     const response = await POST(request());
     expect(response.status).toBe(404);
     expect((await response.json()).error.code).toBe("open_bottle_not_found");
-    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
+  });
+
+  it("uses the strict physical body and performs no bottle authority pre-read", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    const physical = physicalCloseResult();
+    supabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "current_inventory_contract_version"
+        ? { data: 2, error: null }
+        : { data: physical, error: null },
+    ));
+    allow(supabase);
+    const response = await POST(request({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      actual_remaining_ml: 570, written_off_ml: 30,
+      reason_code_id: REASON_ID,
+    }));
+    expect(response.status).toBe(201);
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
+      expect.objectContaining({ p_command: "close", p_wine_id: WINE_ID,
+        p_open_bottle_id: BOTTLE_ID, p_actual_remaining_ml: 570 }));
+    expect((await POST(request({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, expected_opened_at: OPENED_AT,
+      actual_remaining_ml: 570, written_off_ml: 0,
+    }))).status).toBe(400);
   });
 });
+
+function physicalCloseResult() {
+  return {
+    operation_id: OPERATION_ID, command: "close", replayed: false,
+    pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+    open_bottle: {
+      id: BOTTLE_ID, restaurant_id: RESTAURANT_ID, wine_id: WINE_ID,
+      remaining_ml: 0, nominal_capacity_ml: 750, opened_at: OPENED_AT,
+      closed_at: "2026-09-23T13:00:00.000Z", preservation_method: "argon",
+      source_inventory_item_id: "99999999-9999-4999-8999-999999999999",
+      source_provenance: "known", identity_contract: 2,
+      identity_origin: "native", state_version: 2,
+    },
+    closeout: {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", restaurant_id: RESTAURANT_ID,
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, preservation_method: "argon",
+      opened_at: OPENED_AT, closed_at: "2026-09-23T13:00:00.000Z",
+      theoretical_remaining_ml: 600, actual_remaining_ml: 570,
+      variance_ml: -30, written_off_ml: 30, reason_code_id: REASON_ID,
+      event_contract: 2,
+    },
+  };
+}

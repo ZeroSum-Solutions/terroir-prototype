@@ -1,6 +1,7 @@
 "use client";
 
 import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
+import { formatPhysicalBottleId } from "@/domains/pours/physical-bottle-command";
 import { formatAbsolute, timeAgo } from "@/lib/time";
 import { ML_PER_OZ } from "@/lib/units";
 import { cn } from "@/lib/utils";
@@ -73,7 +74,7 @@ export function PhysicalBottleSelector({
           const selected = bottle.id === selectedBottleId;
           const remainingOz = (bottle.remainingMl / ML_PER_OZ).toFixed(1);
           const inputId = `physical-open-bottle-${bottle.id}`;
-          const displayId = compactBottleId(bottle.id);
+          const displayId = formatPhysicalBottleId(bottle.id);
           const openedAge = timeAgo(bottle.openedAt);
           const preservation = PRESERVATION_LABELS[bottle.preservationMethod];
           const capacity = bottle.nominalCapacityMl === null
@@ -118,11 +119,4 @@ export function PhysicalBottleSelector({
       </div>
     </fieldset>
   );
-}
-
-function compactBottleId(id: string) {
-  const hex = id.replaceAll("-", "").toLowerCase();
-  return /^[0-9a-f]{32}$/.test(hex)
-    ? BigInt(`0x${hex}`).toString(36).padStart(25, "0").toUpperCase()
-    : id;
 }

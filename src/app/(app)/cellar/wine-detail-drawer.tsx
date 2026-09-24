@@ -216,7 +216,6 @@ export function WineDetailDrawer({
           wine_list_item_id: row.wine_list_item_id,
         }
       : null;
-
   const totalMl =
     row.size_ml === null
       ? null
@@ -247,6 +246,15 @@ export function WineDetailDrawer({
   const outOfStock = Boolean(
     canPour && availablePourMl !== null && availablePourMl < row.glass_pour_ml!,
   );
+  const closeoutBottle = inventoryContractVersion === 2 && selectedPhysicalBottle
+    ? { id: selectedPhysicalBottle.id, wineId: selectedPhysicalBottle.wineId,
+        openedAt: selectedPhysicalBottle.openedAt, theoreticalRemainingMl: selectedPhysicalBottle.remainingMl,
+        preservationMethod: selectedPhysicalBottle.preservationMethod, openedBy: null, identityContract: 2 as const }
+    : inventoryContractVersion === 1 && row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null
+      ? { id: row.open_bottle_id, wineId: row.wine_id, openedAt: row.opened_at,
+          theoreticalRemainingMl: row.theoretical_remaining_ml,
+          preservationMethod: row.preservation_method, openedBy: row.opened_by }
+      : null;
 
   return (
     <>
@@ -424,21 +432,13 @@ export function WineDetailDrawer({
               </div>
             )}
 
-            {inventoryContractVersion === 1 && row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null && (
+            {closeoutBottle && (
               <PartialBottleCloseout
-                bottle={{
-                  id: row.open_bottle_id,
-                  wineId: row.wine_id,
-                  openedAt: row.opened_at,
-                  theoreticalRemainingMl: row.theoretical_remaining_ml,
-                  preservationMethod: row.preservation_method,
-                  openedBy: row.opened_by,
-                }}
+                bottle={closeoutBottle}
                 reasons={row.closeout_reason_codes}
-                onComplete={() => startTransition(() => router.refresh())}
+                onComplete={refresh}
               />
             )}
-
             {/* Quick actions */}
             <section aria-label="Actions" className="mt-md flex flex-col gap-sm">
               {(row.sealed_count > 0 || canPour) && (

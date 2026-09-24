@@ -8,45 +8,49 @@ import { ML_PER_OZ } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { CloseBottleButton } from "./close-button";
 import { wineDisplayName } from "@/lib/wine-display-name";
+import {
+  formatPhysicalBottleId,
+  getInventoryContractVersion,
+  listActivePhysicalBottles,
+} from "@/domains/pours/physical-bottle-command";
+import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Open Bottles" };
 
-type OBRow = {
+type WineDisplay = {
   id: string;
-  wine_id: string;
-  opened_at: string;
-  opened_by: string | null;
-  remaining_ml: number;
-  wines: {
-    id: string;
-    name: string;
-    producer: string;
-    vintage: number | null;
-    size_ml: number;
-    hero_image_url: string | null;
-    colour: string | null;
-  } | null;
+  name: string;
+  producer: string;
+  vintage: number | null;
+  hero_image_url: string | null;
+  colour: string | null;
 };
 
 export default async function OpenBottlesPage() {
   const auth = (await getAuthContext())!;
   const { supabase, restaurantId } = auth;
 
-  const { data: bottles, error: bottlesError } = await supabase
-    .from("open_bottles")
-    .select(
-      "id, wine_id, opened_at, opened_by, remaining_ml, wines!inner(id, name, producer, vintage, size_ml, hero_image_url, colour)",
-    )
+  const [inventoryContractVersion, bottles] = await Promise.all([
+    getInventoryContractVersion(supabase),
+    listActivePhysicalBottles(supabase, restaurantId),
+  ]);
+  const wineIds = [...new Set(bottles.map((bottle) => bottle.wineId))];
+  const wineQuery = supabase.from("wines")
+    .select("id, name, producer, vintage, hero_image_url, colour")
     .eq("restaurant_id", restaurantId)
-    .is("closed_at", null)
-    .order("opened_at", { ascending: false });
-
-  if (bottlesError) throw bottlesError;
-
-  const openBottles = (bottles ?? []) as unknown as OBRow[];
+    .in("id", wineIds);
+  const { data: wines, error: winesError } = wineIds.length > 0
+    ? await wineQuery
+    : { data: [], error: null };
+  if (winesError) throw winesError;
+  const winesById = new Map(
+    ((wines ?? []) as WineDisplay[]).map((wine) => [wine.id, wine]),
+  );
+  const openBottles = [...bottles].sort((a, b) =>
+    b.openedAt.localeCompare(a.openedAt));
   const renderedAtMs = new Date().getTime();
 
   return (
@@ -103,14 +107,12 @@ export default async function OpenBottlesPage() {
 
           <ul className="divide-y divide-rule">
             {openBottles.map((bottle) => {
-              const wine = bottle.wines;
-              const sizeMl = wine?.size_ml ?? 750;
-              const remainingOz = bottle.remaining_ml / ML_PER_OZ;
+              const wine = winesById.get(bottle.wineId) ?? null;
+              const sizeMl = bottle.nominalCapacityMl;
+              const remainingOz = bottle.remainingMl / ML_PER_OZ;
               const remainingPct =
-                sizeMl > 0
-                  ? Math.round((bottle.remaining_ml / sizeMl) * 100)
-                  : 0;
-              const openedDate = new Date(bottle.opened_at);
+                sizeMl === null ? null : Math.round((bottle.remainingMl / sizeMl) * 100);
+              const openedDate = new Date(bottle.openedAt);
               const daysOpen = Math.floor(
                 (renderedAtMs - openedDate.getTime()) / (1000 * 60 * 60 * 24),
               );
@@ -124,7 +126,7 @@ export default async function OpenBottlesPage() {
               return (
                 <li key={bottle.id}>
                   <Link
-                    href={`/cellar?wine=${bottle.wine_id}`}
+                    href={`/cellar?wine=${bottle.wineId}&bottle=${bottle.id}`}
                     className="block px-lg py-md transition-colors hover:bg-wash focus-ring"
                   >
                     <div className="md:hidden">
@@ -141,12 +143,14 @@ export default async function OpenBottlesPage() {
                         </div>
                         <CloseBottleButton
                           bottleId={bottle.id}
-                          openedAt={bottle.opened_at}
+                          wineId={bottle.wineId}
+                          identityContract={inventoryContractVersion}
+                          openedAt={bottle.openedAt}
                           remainingOz={remainingOz}
                         />
                       </div>
                       <div className="mt-xs flex flex-wrap items-center gap-sm text-ledger text-grey">
-                        <span>{formatBottleSize(sizeMl)}</span>
+                        <span>{sizeMl === null ? "Capacity unavailable" : formatBottleSize(sizeMl)}</span>
                         <span aria-hidden>·</span>
                         <span>
                           {openedLabel}{" "}
@@ -159,11 +163,12 @@ export default async function OpenBottlesPage() {
                         </span>
                       </div>
                       <div className="mt-sm flex items-center gap-sm">
-                        <PourMeter pct={remainingPct} className="flex-1" />
+                        {remainingPct !== null && <PourMeter pct={remainingPct} className="flex-1" />}
                         <span className="shrink-0 text-body-sm tabular text-ink">
                           {formatOz(remainingOz)}
                         </span>
                       </div>
+                      <BottleIdentity bottle={bottle} />
                     </div>
 
                     <div className="hidden md:grid md:grid-cols-[40px_1fr_120px_160px_120px_100px] gap-md items-center">
@@ -180,7 +185,7 @@ export default async function OpenBottlesPage() {
                         )}
                       </div>
                       <div className="text-body-sm tabular text-ink">
-                        {formatBottleSize(sizeMl)}
+                        {sizeMl === null ? "Capacity unavailable" : formatBottleSize(sizeMl)}
                       </div>
                       <div className="text-body-sm text-ink">
                         <span>{openedLabel}</span>
@@ -195,7 +200,7 @@ export default async function OpenBottlesPage() {
                       </div>
                       <div className="text-right">
                         <div className="flex items-center justify-end gap-sm">
-                          <PourMeter pct={remainingPct} className="w-16" />
+                          {remainingPct !== null && <PourMeter pct={remainingPct} className="w-16" />}
                           <span className="text-body-sm tabular text-ink">
                             {formatOz(remainingOz)}
                           </span>
@@ -204,10 +209,13 @@ export default async function OpenBottlesPage() {
                       <div className="text-right">
                         <CloseBottleButton
                           bottleId={bottle.id}
-                          openedAt={bottle.opened_at}
+                          wineId={bottle.wineId}
+                          identityContract={inventoryContractVersion}
+                          openedAt={bottle.openedAt}
                           remainingOz={remainingOz}
                         />
                       </div>
+                      <BottleIdentity bottle={bottle} />
                     </div>
                   </Link>
                 </li>
@@ -221,7 +229,7 @@ export default async function OpenBottlesPage() {
 }
 
 /** 2:3 portrait behind a glass hairline (DESIGN.md — Imagery). */
-function OpenThumb({ wine }: { wine: OBRow["wines"] }) {
+function OpenThumb({ wine }: { wine: WineDisplay | null }) {
   return (
     <WineThumb
       src={wine?.hero_image_url}
@@ -230,6 +238,16 @@ function OpenThumb({ wine }: { wine: OBRow["wines"] }) {
       colour={wine?.colour}
       size={40}
     />
+  );
+}
+
+function BottleIdentity({ bottle }: { bottle: PhysicalBottleSummary }) {
+  const source = bottle.sourceProvenance === "known" ? "Tracked source" : "Legacy source";
+  return (
+    <p className="mt-xs break-all font-mono text-ledger text-grey md:col-span-5 md:col-start-2 md:mt-0">
+      Bottle {formatPhysicalBottleId(bottle.id)} · {source}
+      {bottle.sourceBinLocation ? ` · ${bottle.sourceBinLocation}` : ""}
+    </p>
   );
 }
 

@@ -191,6 +191,35 @@ describe("physical bottle database adapters", () => {
       ml: 150,
     })).resolves.toMatchObject({ openBottle: { source_provenance: "legacy_unknown" } });
   });
+
+  it("sends measured close fields and requires an exact non-null closeout", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: physicalCommandResult("close"), error: null });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, command: "close", wineId: WINE_ID,
+      openBottleId: BOTTLE_ID, actualRemainingMl: 125, writtenOffMl: 25,
+      reasonCodeId: "99999999-9999-4999-8999-999999999999",
+    })).resolves.toMatchObject({ closeout: { open_bottle_id: BOTTLE_ID } });
+    expect(rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
+      expect.objectContaining({ p_command: "close", p_actual_remaining_ml: 125,
+        p_written_off_ml: 25 }));
+
+    rpc.mockResolvedValueOnce({ data: { ...physicalCommandResult("close"), closeout: null }, error: null });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, command: "close", wineId: WINE_ID,
+      openBottleId: BOTTLE_ID, actualRemainingMl: 125,
+    })).rejects.toMatchObject({ message: "invalid_physical_command_result" });
+  });
+
+  it("requires discard to return the exact closed bottle and no closeout", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: physicalCommandResult("discard"), error: null });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, command: "discard", wineId: WINE_ID,
+      openBottleId: BOTTLE_ID,
+    })).resolves.toMatchObject({ command: "discard", closeout: null });
+  });
 });
 
 function physicalReaderRow() {
@@ -211,18 +240,19 @@ function physicalReaderRow() {
   };
 }
 
-function physicalCommandResult() {
+function physicalCommandResult(command: "pour" | "close" | "discard" = "pour") {
+  const closed = command !== "pour";
   return {
     operation_id: OPERATION_ID,
-    command: "pour",
+    command,
     open_bottle: {
       id: BOTTLE_ID,
       restaurant_id: RESTAURANT_ID,
       wine_id: WINE_ID,
-      remaining_ml: 600,
+      remaining_ml: closed ? 0 : 600,
       nominal_capacity_ml: 750,
       opened_at: "2026-09-23T12:00:00.000Z",
-      closed_at: null,
+      closed_at: closed ? "2026-09-23T13:00:00.000Z" : null,
       preservation_method: "argon",
       source_inventory_item_id: "77777777-7777-4777-8777-777777777777",
       source_provenance: "known",
@@ -231,7 +261,21 @@ function physicalCommandResult() {
       state_version: 1,
     },
     pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
-    closeout: null,
+    closeout: command === "close" ? {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      restaurant_id: RESTAURANT_ID,
+      wine_id: WINE_ID,
+      open_bottle_id: BOTTLE_ID,
+      preservation_method: "argon",
+      opened_at: "2026-09-23T12:00:00.000Z",
+      closed_at: "2026-09-23T13:00:00.000Z",
+      theoretical_remaining_ml: 600,
+      actual_remaining_ml: 125,
+      variance_ml: -475,
+      written_off_ml: 25,
+      reason_code_id: "99999999-9999-4999-8999-999999999999",
+      event_contract: 2,
+    } : null,
     replayed: false,
   };
 }

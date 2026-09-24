@@ -463,6 +463,17 @@ describe("closeOpenBottle", () => {
     await expect(closeOpenBottle(closeInput(supabase))).rejects.toBe(fetchError);
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
+
+  it("uses receipt-first physical close without reading mutable bottle authority", async () => {
+    const supabase = makeRpcSupabase({ data: physicalClosedResult("close"), error: null }, 2);
+    await expect(closeOpenBottle({
+      supabase: supabase as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, contractVersion: 2, wineId: WINE_ID,
+      bottleId: BOTTLE_ID, actualRemainingMl: 125, writtenOffMl: 25,
+    })).resolves.toMatchObject({ closeout: { open_bottle_id: BOTTLE_ID } });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("current_inventory_contract_version");
+  });
 });
 
 describe("discardOpenBottle", () => {
@@ -501,7 +512,41 @@ describe("discardOpenBottle", () => {
     );
     expect(supabase.eq).toHaveBeenCalledWith("restaurant_id", RESTAURANT_ID);
   });
+
+  it("uses receipt-first physical discard without reading mutable bottle authority", async () => {
+    const supabase = makeRpcSupabase({ data: physicalClosedResult("discard"), error: null }, 2);
+    await expect(discardOpenBottle({
+      supabase: supabase as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, contractVersion: 2, wineId: WINE_ID,
+      bottleId: BOTTLE_ID,
+    })).resolves.toMatchObject({ closed: { id: BOTTLE_ID } });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith("current_inventory_contract_version");
+  });
 });
+
+function physicalClosedResult(command: "close" | "discard") {
+  return {
+    operation_id: OPERATION_ID, command, replayed: false,
+    pour_event_ids: ["77777777-7777-4777-8777-777777777777"],
+    open_bottle: {
+      id: BOTTLE_ID, restaurant_id: RESTAURANT_ID, wine_id: WINE_ID,
+      remaining_ml: 0, nominal_capacity_ml: 750, opened_at: OPENED_AT,
+      closed_at: "2026-09-23T13:00:00.000Z", preservation_method: "argon",
+      source_inventory_item_id: "88888888-8888-4888-8888-888888888888",
+      source_provenance: "known", identity_contract: 2,
+      identity_origin: "native", state_version: 2,
+    },
+    closeout: command === "close" ? {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", restaurant_id: RESTAURANT_ID,
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, preservation_method: "argon",
+      opened_at: OPENED_AT, closed_at: "2026-09-23T13:00:00.000Z",
+      theoretical_remaining_ml: 600, actual_remaining_ml: 125,
+      variance_ml: -475, written_off_ml: 25, reason_code_id: null,
+      event_contract: 2,
+    } : null,
+  };
+}
 
 function closeInput(supabase: ReturnType<typeof makeCloseSupabase>) {
   return {

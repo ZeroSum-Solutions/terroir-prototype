@@ -21,5 +21,8 @@ describe("inventory command route architecture", () => {
     expect(source).not.toContain("@/lib/supabase/service-role");
     expect(source).not.toContain('rpc("record_pour"');
     expect(source).not.toContain('rpc("close_open_bottle"');
+    if (relativePath.includes("/close/route.ts") || relativePath === "open-bottles/close/route.ts") {
+      expect(source).toContain("getInventoryContractVersion");
+    }
   });
 });

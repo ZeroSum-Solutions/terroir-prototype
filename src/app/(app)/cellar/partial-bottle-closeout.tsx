@@ -18,6 +18,7 @@ type Bottle = {
   theoreticalRemainingMl: number;
   preservationMethod: PreservationMethod;
   openedBy: string | null;
+  identityContract?: 1 | 2;
 };
 
 type Reason = { id: string; label: string; category: string };
@@ -78,8 +79,9 @@ function useCloseout(bottle: Bottle, onComplete?: () => void) {
     };
     const fingerprint = JSON.stringify([
       "close",
+      bottle.identityContract ?? 1,
       bottle.id,
-      bottle.openedAt,
+      bottle.identityContract === 2 ? bottle.wineId : bottle.openedAt,
       actualMl,
       writtenOffMl,
       reason || null,
@@ -160,7 +162,13 @@ async function postCloseout(
       "Content-Type": "application/json",
       "Idempotency-Key": operationId,
     },
-    body: JSON.stringify({
+    body: JSON.stringify(bottle.identityContract === 2 ? {
+      wine_id: bottle.wineId,
+      open_bottle_id: bottle.id,
+      actual_remaining_ml: actualRemainingMl,
+      written_off_ml: writtenOffMl,
+      reason_code_id: reasonCodeId || undefined,
+    } : {
       open_bottle_id: bottle.id,
       expected_opened_at: bottle.openedAt,
       actual_remaining_ml: actualRemainingMl,
