@@ -140,11 +140,13 @@ export async function undoLastPour(input: UndoLastPourInput) {
     if (error.message?.includes("undo_inventory_command_not_reversible")) {
       throw new PourNotReversibleError();
     }
-    console.error("undo_last_pour failed:", error);
-    Sentry.captureException(error, {
-      tags: { surface: "pour", phase: "undo_last_pour-rpc" },
-      extra: { wine_id: wineId },
-    });
+    try {
+      Sentry.captureException(new Error("Undo RPC failed"), {
+        tags: { surface: "pour", phase: "undo_last_pour-rpc" },
+      });
+    } catch {
+      // Monitoring must not replace the intended domain error.
+    }
     throw new PourRpcError("Undo failed.", { cause: error });
   }
 

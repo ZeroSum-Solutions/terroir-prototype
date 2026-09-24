@@ -160,6 +160,46 @@ describe("inventory command services", () => {
 describe("undoLastPour", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("does not export a raw database error or wine identity", async () => {
+    const databaseError = { code: "XX000", message: "private customer note" };
+    const supabase = makeRpcSupabase({ data: null, error: databaseError });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(undoLastPour({
+        supabase: supabase as never,
+        restaurantId: RESTAURANT_ID,
+        wineId: WINE_ID,
+      })).rejects.toMatchObject({ name: "PourRpcError", message: "Undo failed." });
+      expect(mockCaptureException).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ message: "Undo RPC failed" }),
+        { tags: { surface: "pour", phase: "undo_last_pour-rpc" } },
+      );
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("keeps the intended RPC error when monitoring throws", async () => {
+    const databaseError = { code: "XX000", message: "private database detail" };
+    const supabase = makeRpcSupabase({ data: null, error: databaseError });
+    mockCaptureException.mockImplementationOnce(() => {
+      throw new Error("monitor unavailable");
+    });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(undoLastPour({
+        supabase: supabase as never,
+        restaurantId: RESTAURANT_ID,
+        wineId: WINE_ID,
+      })).rejects.toMatchObject({
+        name: "PourRpcError", message: "Undo failed.", cause: databaseError,
+      });
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   it("keeps the bounded reversal path unchanged", async () => {
     const supabase = makeRpcSupabase({ data: { wine_id: WINE_ID }, error: null });
     await expect(undoLastPour({
