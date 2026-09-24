@@ -10,6 +10,7 @@ import { DesktopNavLinks, MobileNavLinks } from "./nav-links";
 import { Fab } from "./fab";
 import { ToastWrapper } from "./toast-wrapper";
 import { OnboardingModal } from "./onboarding-modal";
+import { OfflineSessionBoundary } from "./offline-session-boundary";
 
 export default async function AppLayout({
   children,
@@ -23,6 +24,7 @@ export default async function AppLayout({
   const onLocalStack = isLocalSupabaseTarget();
 
   return (
+    <OfflineSessionBoundary>
     <RestaurantProvider restaurantId={restaurantId} restaurantName={restaurantName} userRole={userRole}>
       <ToastWrapper>
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-canvas">
@@ -161,5 +163,6 @@ export default async function AppLayout({
     </div>
     </ToastWrapper>
     </RestaurantProvider>
+    </OfflineSessionBoundary>
   );
 }

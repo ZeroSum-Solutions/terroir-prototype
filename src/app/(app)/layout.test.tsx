@@ -29,6 +29,11 @@ vi.mock("./toast-wrapper", () => ({
     <div data-toast-wrapper="true">{children}</div>
   ),
 }));
+vi.mock("./offline-session-boundary", () => ({
+  OfflineSessionBoundary: ({ children }: { children: React.ReactNode }) => (
+    <div data-offline-session-boundary="true">{children}</div>
+  ),
+}));
 vi.mock("./settings-dropdown", () => ({
   SettingsDropdown: () => <button data-settings="true">Settings</button>,
 }));
@@ -75,6 +80,7 @@ describe("AppLayout header", () => {
     expect(root.querySelectorAll('[data-global-search="true"]')).toHaveLength(2);
     expect(root.querySelector('[data-desktop-nav="true"]')).not.toBeNull();
     expect(root.querySelector('[data-mobile-nav="true"]')).not.toBeNull();
+    expect(root.querySelector('[data-offline-session-boundary="true"]')).not.toBeNull();
     expect(root.querySelector("header")?.parentElement?.className).toContain(
       "overflow-x-hidden",
     );

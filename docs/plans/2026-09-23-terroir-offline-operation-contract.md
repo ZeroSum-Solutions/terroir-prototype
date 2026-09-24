@@ -13,13 +13,15 @@ feature ledger and product conformance report.
 
 The native store policy and driver for TER-CF-291 through TER-CF-293 have 34 passing
 deterministic tests and independent acceptance of that bounded implementation.
-They are not yet connected to application flows. Real-browser persistence and
-session integration remain unverified; these requirements are not complete.
-TER-CF-294 through TER-CF-296 public-shell, session-boundary, and cached-search work
-is incomplete. This lookup slice adds no mutation capture, queue, replay, recovery
-report, count, transfer, receiving flow, provider call, schema migration, dependency,
-or production activation. Active source requirements state scope; they do not prove
-that the behavior ships.
+They are not yet connected to application flows. The bounded local session-boundary
+leaf now unmounts private content before sign-out work, conservatively resolves raw
+duplicate marker cookies, and keeps uncertain outcomes data-free and retryable. Its
+focused unit and contract suite has 153 passing tests. Real-browser persistence and
+session proof remain unverified; the public shell, positive-eligibility provider, and
+cached search are not implemented. C03 remains incomplete. This foundation adds no
+mutation capture, queue, replay, recovery report, count, transfer, receiving flow,
+provider call, schema migration, dependency, or production activation. Active source
+requirements state scope; they do not prove that the behavior ships.
 
 Two accepted limits remain explicit:
 
@@ -250,7 +252,7 @@ required dependencies, not silently deferred features.
 | 1. Pure contract | `src/domains/offline/contract.ts`, `contract.test.ts` | Exact v1 schema; forbidden fields cannot serialize; no role/capability/operation types. |
 | 2. Authorized projection | `src/app/api/offline-context/route.ts` and test; a dedicated server query/mapper module | Actor/site derived from current auth; spoofed IDs ignored; revocation denied; lease <=12h; response `no-store`; every authorized placement preserved. |
 | 3. Native store | [Store policy](../../src/domains/offline/database.ts), [IndexedDB driver](../../src/domains/offline/indexeddb.ts), and focused tests under `src/domains/offline/` | Local deterministic tests and independent review pass; real-browser proof remains required. IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
-| 4. Session boundary | Planned offline-aware sign-out component and current layout under `src/app/(app)/`; [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); signout, callback, and confirmation routes under `src/app/auth/`; `src/app/login/actions.ts`; `src/app/api/dev-login/route.ts`; `src/lib/supabase/proxy.ts`; planned marker and same-origin helpers under existing `src/domains/offline/` and `src/lib/auth/`; focused tests | No locked-login loop; active restaurant cleared; session-returning auth writes `reprovision_required`; no marker deletion in this leaf; both local persistence failure branches render honestly. |
+| 4. Session boundary | [Offline session boundary](../../src/app/%28app%29/offline-session-boundary.tsx), [application layout](../../src/app/%28app%29/layout.tsx), and [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); signout, callback, and confirmation routes under `src/app/auth/`; `src/app/login/actions.ts`; `src/app/api/dev-login/route.ts`; [proxy](../../src/lib/supabase/proxy.ts); [device marker](../../src/domains/offline/device-lock.ts); [same-origin helper](../../src/lib/auth/same-origin-request.ts); focused tests | Bounded local source and 153 focused unit and contract tests cover no locked-login loop, active-restaurant clearing, session-returning auth transition state, marker conservation, both local persistence failure branches, stable in-flight attempts, and raw duplicate-cookie denial. Real-browser verification remains required. |
 | 5. Public shell | Planned offline route and client page under existing `src/app/`; planned offline provider under existing `src/app/(app)/`; [application layout](../../src/app/%28app%29/layout.tsx); `src/lib/context/restaurant.tsx`; planned service worker under existing `public/` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
 | 6. Browser proof | focused Playwright spec | All proofs below pass before any implemented ledger assertion may be promoted to proved; lookup-only scope and C03/C05/Q10/C04 dependency states remain explicit. |
 

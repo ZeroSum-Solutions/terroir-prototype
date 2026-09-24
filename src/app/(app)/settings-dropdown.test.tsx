@@ -1,7 +1,16 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { SettingsDropdown } from "./settings-dropdown";
+
+const mocks = vi.hoisted(() => ({
+  boundary: vi.fn(),
+  beginSignOut: vi.fn(),
+}));
+
+vi.mock("./offline-session-boundary", () => ({
+  useOfflineSessionBoundary: () => mocks.boundary(),
+}));
 
 const reactTestEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
@@ -24,6 +33,8 @@ describe("SettingsDropdown touch targets", () => {
       await act(async () => root.unmount());
     }
     document.body.innerHTML = "";
+    vi.clearAllMocks();
+    mocks.boundary.mockReturnValue(null);
   });
 
   it("keeps the mobile Settings trigger at least 44px square", async () => {
@@ -105,6 +116,48 @@ describe("SettingsDropdown touch targets", () => {
       );
     }
   });
+
+  it("preserves the native POST form without a JavaScript boundary", async () => {
+    const container = await mount(<SettingsDropdown />);
+    await openMenu(container);
+    const form = document.querySelector<HTMLFormElement>(
+      'form[action="/auth/signout"]',
+    )!;
+    const event = new Event("submit", { bubbles: true, cancelable: true });
+
+    form.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(form.method).toBe("post");
+  });
+
+  it("intercepts the form and begins one boundary sign-out when mounted", async () => {
+    mocks.boundary.mockReturnValue({
+      beginSignOut: mocks.beginSignOut,
+      signOutInProgress: false,
+    });
+    const container = await mount(<SettingsDropdown />);
+    await openMenu(container);
+    const form = document.querySelector<HTMLFormElement>(
+      'form[action="/auth/signout"]',
+    )!;
+    const event = new Event("submit", { bubbles: true, cancelable: true });
+
+    await act(async () => form.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(mocks.beginSignOut).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  async function openMenu(container: HTMLElement) {
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Settings"]',
+    )!;
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+  }
 
   async function mount(element: React.ReactElement) {
     const container = document.createElement("div");

@@ -99,10 +99,12 @@ hand-edit the ledger. An active ledger entry defines contract scope, not complet
 behavior. C04 has a bounded, server-private
 [workspace/site shadow observation](docs/ARCHITECTURE.md#shadow-access-observation),
 but legacy restaurant membership remains the sole authorization authority;
-capability cutover, cost enforcement, and expanded roles remain incomplete. C03 has bounded
-context-lookup and private projection-store leaves, but browser/session integration
-and the offline shell remain incomplete. The pure Toast modules do not complete the
-nine C08 fixture/manual POS-corroboration workflows.
+capability cutover, cost enforcement, and expanded roles remain incomplete. C03 has
+bounded context-lookup, private projection-store, and local session-boundary leaves.
+The session boundary has 153 passing focused unit and contract tests, but real-browser
+verification, the public offline shell, and the full offline workflow remain incomplete.
+The pure Toast modules do not complete the nine C08 fixture/manual POS-corroboration
+workflows.
 
 The `<core_features>` assertions in [`app_spec.txt`](app_spec.txt) are the current
 machine-read source for those 315 ledger identities. The generator combines them with

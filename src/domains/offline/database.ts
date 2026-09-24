@@ -222,9 +222,9 @@ async function lockContexts(reason: OfflineLockReason, options: OfflineDatabaseO
           lockReason: reason,
         }, clock)).ok) return { ok: false };
       }
-      return { ok: true, value: undefined };
+      return { ok: true, value: contexts.data.length > 0 };
     }));
-  return result.ok;
+  return result.ok && result.value === true;
 }
 async function deleteProjections(options: OfflineDatabaseOptions) {
   const result = await withDatabase(options, (database, clock) =>

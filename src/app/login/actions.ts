@@ -1,8 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import {
+  REPROVISION_REQUIRED,
+  setDeviceLockCookie,
+} from "@/domains/offline/device-lock";
 import { safeNext } from "@/lib/api/safe-redirect";
 import { consumeAuthAttempt } from "@/lib/auth/attempt-rate-limit";
 import { appUrl, authCallbackUrl, loginUrl } from "@/lib/auth/redirects";
@@ -74,13 +78,18 @@ export async function signInWithPassword(formData: FormData) {
 
   let credentialsRejected = false;
   let requestFailed = false;
+  let sessionCreated = false;
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     credentialsRejected = error !== null;
+    sessionCreated = error === null && data?.session != null;
+    if (sessionCreated) {
+      setDeviceLockCookie(await cookies(), REPROVISION_REQUIRED);
+    }
   } catch {
     requestFailed = true;
   }
@@ -111,12 +120,15 @@ export async function signUpWithPassword(formData: FormData) {
   let requestFailed = false;
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: authCallbackUrl(next) },
     });
     requestFailed = error !== null;
+    if (error === null && data?.session) {
+      setDeviceLockCookie(await cookies(), REPROVISION_REQUIRED);
+    }
   } catch {
     requestFailed = true;
   }

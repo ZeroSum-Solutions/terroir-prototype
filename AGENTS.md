@@ -121,11 +121,12 @@ observation attached after legacy active-membership selection. It does not autho
 legacy membership remains the sole authority while capability cutover, cost
 enforcement, and expanded roles remain incomplete. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#shadow-access-observation) for its
-server-only data boundary and per-resolution deadline. C03 has a locally implemented TER-CF-297 context-lookup leaf
-with bounded test evidence and an accepted bounded deterministic TER-CF-291 through
-TER-CF-293 private projection-store leaf. Browser integration and session coordination
-remain unverified, and TER-CF-294 through TER-CF-296 shell, session, and cached-search
-work is incomplete. C06 has 18 accepted physical-bottle source assertions
+server-only data boundary and per-resolution deadline. C03 has a locally implemented
+TER-CF-297 context-lookup leaf, an accepted bounded deterministic TER-CF-291 through
+TER-CF-293 private projection-store leaf, and a bounded local session-boundary leaf
+with 153 passing focused unit and contract tests. Real-browser verification, the public
+offline shell, positive eligibility, and the whole C03 workflow remain incomplete. C06
+has 18 accepted physical-bottle source assertions
 (`TER-CF-298` through `TER-CF-315`) and canonical transition plans, but no
 physical-bottle runtime or schema implementation; source promotion does not complete C06.
 The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast

@@ -8,13 +8,18 @@ class RedirectSignal extends Error {
 }
 
 const mocks = vi.hoisted(() => ({
+  cookieSet: vi.fn(),
+  cookies: vi.fn(),
   createClient: vi.fn(),
   headers: vi.fn(),
   redirect: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
-vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("next/headers", () => ({
+  cookies: mocks.cookies,
+  headers: mocks.headers,
+}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 const {
@@ -56,13 +61,20 @@ describe("login server actions", () => {
     mocks.headers.mockResolvedValue(
       new Headers({ "x-forwarded-for": "198.51.100.7" }),
     );
+    mocks.cookies.mockResolvedValue({ set: mocks.cookieSet });
     mocks.redirect.mockImplementation((url: string) => {
       throw new RedirectSignal(url);
     });
     mocks.createClient.mockResolvedValue({ auth });
     auth.signInWithOtp.mockResolvedValue({ error: null });
-    auth.signInWithPassword.mockResolvedValue({ error: null });
-    auth.signUp.mockResolvedValue({ error: null });
+    auth.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: "session" } },
+      error: null,
+    });
+    auth.signUp.mockResolvedValue({
+      data: { session: { access_token: "session" } },
+      error: null,
+    });
     auth.resetPasswordForEmail.mockResolvedValue({ error: null });
   });
 
@@ -106,6 +118,27 @@ describe("login server actions", () => {
       },
     });
     expect(url.searchParams.get("signup")).toBe("1");
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+  });
+
+  it("preserves marker state when signup returns no session", async () => {
+    auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+
+    await redirectedUrl(() =>
+      signUpWithPassword(
+        form({
+          email: "new@restaurant.test",
+          password: "secure-password",
+          confirm: "secure-password",
+        }),
+      ),
+    );
+
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 
   it("rejects mismatched signup passwords before calling Supabase", async () => {
@@ -138,10 +171,16 @@ describe("login server actions", () => {
       password: "secure-password",
     });
     expect(url.href).toBe("http://localhost:3000/cellar?section=reds");
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
   });
 
   it("maps rejected credentials to one generic response", async () => {
     auth.signInWithPassword.mockResolvedValue({
+      data: { session: null },
       error: { message: "Email not confirmed for person@restaurant.test" },
     });
 
@@ -153,6 +192,7 @@ describe("login server actions", () => {
 
     expect(url.searchParams.get("error")).toBe("invalid_credentials");
     expect(url.href).not.toContain("person%40restaurant.test");
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 
   it("always gives the same password-reset completion response", async () => {

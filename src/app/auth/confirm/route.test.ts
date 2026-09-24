@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
+  cookieSet: vi.fn(),
+  cookies: vi.fn(),
   createClient: vi.fn(),
   verifyOtp: vi.fn(),
 }));
 
+vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 
 const { GET } = await import("./route");
@@ -20,7 +23,11 @@ describe("GET /auth/confirm", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.terroir.example");
     mocks.createClient.mockResolvedValue({ auth: { verifyOtp: mocks.verifyOtp } });
-    mocks.verifyOtp.mockResolvedValue({ error: null });
+    mocks.cookies.mockResolvedValue({ set: mocks.cookieSet });
+    mocks.verifyOtp.mockResolvedValue({
+      data: { session: { access_token: "session" } },
+      error: null,
+    });
   });
 
   it("exchanges a recovery token and opens the reset page", async () => {
@@ -33,6 +40,11 @@ describe("GET /auth/confirm", () => {
     });
     expect(response.headers.get("location")).toBe(
       "https://staging.terroir.example/auth/reset-password",
+    );
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
     );
   });
 
@@ -54,5 +66,6 @@ describe("GET /auth/confirm", () => {
     expect(response.headers.get("location")).toBe(
       "https://staging.terroir.example/login?error=link",
     );
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 });

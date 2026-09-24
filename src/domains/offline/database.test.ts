@@ -315,6 +315,14 @@ describe("offline database", () => {
     expect(factory.rows("projections")).toEqual([]);
   });
 
+  it("does not claim a durable lock when no context row exists", async () => {
+    const factory = new MemoryIdbFactory();
+
+    expect(
+      await lockAllContexts("sign_out", () => undefined, options(factory)),
+    ).toEqual({ locked: false, projectionsDeleted: true });
+  });
+
   it("still attempts deletion and reports independent results after lock failure", async () => {
     const factory = new MemoryIdbFactory();
     await provisionOfflineContext(response(), options(factory));

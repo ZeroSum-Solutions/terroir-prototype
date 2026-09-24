@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { BookOpen, Archive, DollarSign, LogOut, Settings, Upload, Users } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { useOfflineSessionBoundary } from "./offline-session-boundary";
 
 export function SettingsDropdown() {
+  const sessionBoundary = useOfflineSessionBoundary();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
@@ -86,6 +88,16 @@ export function SettingsDropdown() {
       >
         <Settings className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
+      <noscript>
+        <form action="/auth/signout" method="post">
+          <button
+            type="submit"
+            className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink"
+          >
+            Sign out
+          </button>
+        </form>
+      </noscript>
 
       {open && typeof document !== "undefined" && createPortal(
         <>
@@ -165,10 +177,20 @@ export function SettingsDropdown() {
             <div className="mx-md my-xs border-t border-rule" role="separator" />
             <ThemeToggle />
             <div className="mx-md my-xs border-t border-rule" role="separator" />
-            <form action="/auth/signout" method="post">
+            <form
+              action="/auth/signout"
+              method="post"
+              onSubmit={(event) => {
+                if (!sessionBoundary) return;
+                event.preventDefault();
+                close();
+                sessionBoundary.beginSignOut();
+              }}
+            >
               <button
                 ref={(el) => { itemsRef.current[5] = el; }}
                 type="submit"
+                disabled={sessionBoundary?.signOutInProgress}
                 role="menuitem"
                 tabIndex={-1}
                 className="flex min-h-11 w-full items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"

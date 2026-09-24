@@ -5,6 +5,7 @@ const TOKEN_HASH =
   "fcc10d33162838e7b9e468c681194474d040cd9844c9e8c69f11e0e1aa0d8010";
 const FUTURE_EXPIRY = "2026-07-23T12:05:00.000Z";
 const mockVerifyOtp = vi.fn();
+const mockCookieSet = vi.fn();
 const mockCreateClient = vi.fn(async () => ({
   auth: { verifyOtp: mockVerifyOtp },
 }));
@@ -12,6 +13,9 @@ const mockCaptureMessage = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: () => mockCreateClient(),
+}));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ set: mockCookieSet })),
 }));
 
 vi.mock("@sentry/nextjs", () => ({
@@ -75,7 +79,10 @@ function mockSuccessfulSupabaseLogin() {
       Response.json({ hashed_token: "supabase-magic-link-proof" }),
     ),
   );
-  mockVerifyOtp.mockResolvedValue({ error: null });
+  mockVerifyOtp.mockResolvedValue({
+    data: { session: { access_token: "session" } },
+    error: null,
+  });
 }
 
 describe("GET /api/dev-login", () => {
@@ -171,6 +178,11 @@ describe("GET /api/dev-login", () => {
         }),
       }),
     );
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
   });
 
   it("redacts a secret-bearing provider non-2xx response", async () => {
@@ -258,6 +270,7 @@ describe("GET /api/dev-login", () => {
       name: "returned verification error",
       verify: () =>
         mockVerifyOtp.mockResolvedValue({
+          data: { session: null },
           error: { message: "secret verification detail" },
         }),
     },

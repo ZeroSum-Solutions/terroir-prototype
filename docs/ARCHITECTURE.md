@@ -12,6 +12,15 @@ business workflows. Adapter modules own external/provider mechanics.
   orchestration around `execute_inventory_command` and `undo_last_pour`.
 - `src/domains/cellar`: reconcile transaction orchestration around
   `reconcile_open_bottles_batch`.
+- `src/domains/offline`: the versioned private projection contract, IndexedDB
+  policy and driver, and deny-only device marker. The marker is not authentication
+  or positive offline eligibility.
+- The [offline session boundary](../src/app/%28app%29/offline-session-boundary.tsx),
+  `src/lib/auth/same-origin-request.ts`, and `src/lib/supabase/proxy.ts` form the
+  bounded local sign-out boundary. It unmounts
+  private React content before starting sign-out work, applies the strongest
+  recognized raw-cookie denial, and keeps provider cleanup bounded. Real-browser
+  verification and the public offline shell remain incomplete.
 - `src/domains/integrations/pos/toast`: internal, pure Toast observation
   normalization, strict manual/operator snapshot guards, and versioned canonical
   framing/digests for domains `0x01`, `0x02`, and `0x03`, backed by checked literal vectors.

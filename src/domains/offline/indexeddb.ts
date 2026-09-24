@@ -1,7 +1,7 @@
 export const OFFLINE_DATABASE_NAME = "terroir-offline";
 export const OFFLINE_DATABASE_VERSION = 1;
 export const OFFLINE_STORES = ["contexts", "projections"] as const;
-const STORE_KEY_PATHS = {
+export const STORE_KEY_PATHS = {
   contexts: ["userId", "restaurantId"],
   projections: ["userId", "restaurantId", "projectionKind"],
 } as const;
