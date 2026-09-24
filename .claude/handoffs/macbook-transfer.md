@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: bccd227791ec612b4728b23e70edd7e349bb3c3d
+last-code-commit: 698587e3813014f3b499051f73c783feef8e3690
 
 ## Active Task
 
@@ -84,6 +84,26 @@ source. Actual 390px browser DOM showed the expected unavailable message without
 cost values or horizontal overflow; screenshot capture still failed. Evidence:
 `demo-cost-endpoints-20260924/` and `demo-browser-recheck-20260924/` on the mini.
 
+Checkpoint `698587e3` keeps safe Insights quantities, scan activity and service
+metrics visible while gating procurement costs, pricing modules and CSV exports.
+Denied or failed cost reads show unavailable values, never fabricated zeroes.
+Sales revenue remains visible; this is not a blanket restriction on monetary values.
+Independent tests passed 56/56 with zero selected skips, plus Node20 TypeScript,
+scoped ESLint and the changed files' size limits. Opus accepted the corrected
+checkpoint after identifying a delayed promise-rejection handler; a regression
+test reproduced that failure before the fix. Concurrent uncommitted Cellar work
+temporarily failed the repository-wide size gate, so these results do not establish
+a green full checkout. Mini-only evidence: `demo-insights-cost-implementation-20260924/`.
+
+The alternate browser capture path now works with the already-installed Playwright
+Chromium. Real 390px screenshots show the cellar, unavailable price comparison and
+Insights page without horizontal overflow. Insights preserves bottle counts while
+showing unavailable cost value and CSV. These captures use the synthetic local owner,
+whose grants are denied because the active database lacks0154. They do not prove
+staff-role isolation or a completed inventory journey. The development indicator
+overlaps the first navigation item, and some metric headings truncate. Evidence:
+`demo-playwright-capture-20260924/`. Earlier screenshot failures remain historical.
+
 These checkpoints are NOT a complete authorization rollout. Without 0154 and explicit
 grants, cost/target displays and suggestions fail closed for owners and managers too;
 manual menu-price entry remains available by source inspection. Raw authenticated
@@ -97,9 +117,10 @@ proved the missing-authority 403, not live positive grants or database privacy.
 Historical checkpoints, not rerun for transfer: C03 browser checkpoint 27 pass,
 0 fail, 0 skip; Toast pure contracts 217 tests; JEV advisory modules 145 tests;
 pilot calculations 59 tests. These do not prove complete end-to-end workflows.
-Physical-bottle foundation b7fba749 passed disposable SQL and generated-artifact
+Physical-bottle foundation b7fba749 passed earlier disposable SQL and generated-artifact
 checks; API/auth checks and application integration remain incomplete. 0153 was
-not applied to the active local database. 0154 runtime SQL remains unexecuted.
+not applied to the active local database. A later run applied0153 on the isolated
+disposable target but stopped in0154 preflight before applying0154.
 The outgoing 44-commit range passed a redacted Gitleaks scan before transfer.
 
 ## Open Questions
@@ -117,22 +138,26 @@ On the MacBook, read this handoff and AGENTS.md, verify the checked-out branch,
 then prepare an isolated local test setup from the local-stack runbook. Report
 setup blockers before running tests. Do not resume suspended C13 database work.
 
-For the active mini goal, finish database and remaining-screen cost protection before claiming
-team safety, then prove find/open/pour and receive/count/reconcile in the browser.
-The latest isolated schema restore passed after exact source-derived owner-role setup,
-but whole owner/ACL comparison found two missing GraphQL schema permission sets.
-That run stopped before applying 0153/0154. The first reviewed finite repair stopped
-at a process-identity assertion before mutation. A separately reviewed correction
-passed that check, then stopped because transaction command tags accompanied its
-two expected admission rows. Neither run changed the database. Fresh read-only
-settlement confirmed the donor and isolated target unchanged. The next preparation
-audits output parsing throughout the helper before any further reviewed invocation.
-Do not run another blind restore or change the retained active database.
+For the active mini goal, finish database and remaining-screen cost protection before
+claiming team safety, then prove find/open/pour and receive/count/reconcile in the
+browser. The fourth reviewed runner repaired the disposable target's two GraphQL
+schema permission sets and applied0153. It stopped at0154 preflight because a
+combined SQL condition referenced the not-yet-created capability ledger. The0154
+apply and subsequent acceptance tests never ran. Measured settlement confirms the
+donor unchanged, target roles conserved, and exactly the expected0153 additions.
+The run is spent; do not retry it or reapply0153. Correct the preflight and review
+a continuation from that measured state. Preserve all failed packets and targets.
+No blind restore or change to the retained active database is authorized.
+
+Exact-bottle Open/Pour application work remains uncommitted on the mini and is not
+part of checkpoint698587e3. It is only part of the required physical-bottle transition.
+Do not enable contract version2 until all required readers, writers, Undo,
+reconciliation, analytics and provenance paths pass the canonical pre-cutover gate.
 
 On the mini, the guarded development wrapper responds with `--webpack` after the
-default bundler entered a memory/restart loop. The synthetic local login and mobile
-cellar content loaded, but browser screenshots timed out and a native capture was
-blank. This is not a visual-QA pass or a completed service demo.
+default bundler entered a memory/restart loop. The synthetic local login, mobile
+content and alternate Playwright captures work. No completed browser-to-database
+service demo or all-width visual-QA pass is claimed.
 
 ## Suggested Skills
 
