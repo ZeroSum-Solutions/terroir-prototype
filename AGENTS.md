@@ -116,7 +116,8 @@ recorded. The required critical subset fails on any skip.
 current machine-read source for 290 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the behavior is complete; the eight C04
-workspace/site shadow-access assertions remain unimplemented. Non-core `app_spec.txt`
+workspace/site shadow-access assertions and nine C08 fixture/manual POS-corroboration
+assertions remain unimplemented. Non-core `app_spec.txt`
 prose can retain historical or drifted claims (including a dead env var name).
 `claude-progress.txt` is a frozen historical record and does not determine current
 scope or status. Both remain at the **repo root**, not in `docs/_archive/`.
