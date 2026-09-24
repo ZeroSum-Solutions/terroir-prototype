@@ -13,7 +13,7 @@ export const ALLOWED_STATUSES = [
 
 export const SCHEMA_VERSION = 2;
 export const SOURCE_FILE = "app_spec.txt";
-export const APPROVED_FEATURE_COUNT = 281;
+export const APPROVED_FEATURE_COUNT = 290;
 export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
@@ -80,6 +80,7 @@ export const COMPLETION_RULES = [
   [270, 273, "TER-041", "pour-reconciliation"],
   [274, 278, "TER-012", "tenant-access"],
   [279, 281, "TER-014", "authorization"],
+  [282, 290, "TER-047", "pos-integrations"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,

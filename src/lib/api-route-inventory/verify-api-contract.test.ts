@@ -279,7 +279,7 @@ describe("reconciliation semantics", () => {
     expect(errors).toContain(
       "reconciliation summary must be derived from contract documents",
     );
-    expect(errors).toContain("all 281 feature-ledger requirements must remain active");
+    expect(errors).toContain("all 290 feature-ledger requirements must remain active");
     expect(errors).toContain("TER-020 plan leaf IDs must be unique, exact, and ordered");
   });
 
@@ -337,7 +337,7 @@ describe("checked-in API contract gate", () => {
       // GET /api/import/template, because mobile Safari will not download a
       // data: URL and navigated the tab to raw CSV instead — 114 + 1 = 115.
       discoveredOperationCount: 115,
-      plannedOperationCount: 15,
+      plannedOperationCount: 18,
       classificationCount: 115,
     });
     expect(paths.map((file) => readFileSync(resolve(file), "utf8"))).toEqual(

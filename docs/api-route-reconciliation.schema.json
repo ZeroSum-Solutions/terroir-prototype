@@ -46,8 +46,8 @@
     },
     "concreteRequirements": {
       "type": "array",
-      "minItems": 32,
-      "maxItems": 32,
+      "minItems": 35,
+      "maxItems": 35,
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/concreteRequirement"
@@ -92,7 +92,7 @@
     },
     "concreteRequirementId": {
       "type": "string",
-      "pattern": "^TER-CF-(18[0-9]|19[0-9]|20[0-9]|21[01])$"
+      "pattern": "^TER-CF-(18[0-9]|19[0-9]|20[0-9]|21[01]|28[89]|290)$"
     },
     "summary": {
       "type": "object",
@@ -108,10 +108,10 @@
       ],
       "properties": {
         "activeRequirementCount": {
-          "const": 281
+          "const": 290
         },
         "concreteRequirementCount": {
-          "const": 32
+          "const": 35
         },
         "exactDiscoveredCount": {
           "type": "integer",

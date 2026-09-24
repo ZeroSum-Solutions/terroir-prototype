@@ -92,14 +92,14 @@ Playwright runs with zero retries. The required CI journey subset also fails if
 any selected test skips, so a missing local fixture cannot pass as coverage.
 
 [`docs/feature-ledger.json`](docs/feature-ledger.json) is the sole authoritative
-completion and status ledger for all 281 currently enumerated core requirements. Run
+completion and status ledger for all 290 currently enumerated core requirements. Run
 `pnpm verify:feature-ledger` after changing the ledger or its source requirements;
 CI runs the same verification before the typecheck, lint, and test gates. Never
 hand-edit the ledger. An active ledger entry defines contract scope, not completed
 behavior; the eight C04 workspace/site shadow-access entries are not implemented.
 
 The `<core_features>` assertions in [`app_spec.txt`](app_spec.txt) are the current
-machine-read source for those 281 ledger identities. The generator combines them with
+machine-read source for those 290 ledger identities. The generator combines them with
 the completion metadata rules; the generated ledger, not `app_spec.txt`, determines
 completion status. Prose elsewhere in `app_spec.txt` can retain historical context or
 drifted claims. The session diary ([`claude-progress.txt`](claude-progress.txt)) is

@@ -120,6 +120,8 @@ describe("metadataForRequirement", () => {
     [273, "TER-041", "pour-reconciliation"],
     [274, "TER-012", "tenant-access"],
     [281, "TER-014", "authorization"],
+    [282, "TER-047", "pos-integrations"],
+    [290, "TER-047", "pos-integrations"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -127,8 +129,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 281", () => {
-    expect(() => metadataForRequirement(282)).toThrow(
+  it("rejects requirements outside the authoritative 290", () => {
+    expect(() => metadataForRequirement(291)).toThrow(
       "no completion metadata",
     );
   });
@@ -348,10 +350,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 281 as the default approved source count", () => {
+  it("keeps 290 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 281");
+    ).toContain("source feature count must remain 290");
   });
 
   it.each([
@@ -574,8 +576,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 281 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(281);
+  it("accounts for all 290 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(290);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -622,7 +624,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the approved C04 Slice 1 contract without claiming enforcement", () => {
-    expect(ledger.items.slice(273).map((item: { id: string }) => item.id)).toEqual(
+    expect(ledger.items.slice(273, 281).map((item: { id: string }) => item.id)).toEqual(
       Array.from({ length: 8 }, (_, index) => `TER-CF-${274 + index}`),
     );
     expect(ledger.items[278]).toMatchObject({
@@ -635,8 +637,24 @@ describe("checked-in feature ledger", () => {
     expect(ledger.items[279].sourceText).toContain(
       "shadow effective-site access denies revoked or expired site or workspace membership",
     );
-    expect(ledger.items.slice(273).map((item: { sourceText: string }) => item.sourceText).join("\n"))
+    expect(ledger.items.slice(273, 281).map((item: { sourceText: string }) => item.sourceText).join("\n"))
       .not.toContain("takes effect on the next request");
+  });
+
+  it("appends the approved C08 Slice A contract without claiming live activation", () => {
+    expect(ledger.items.slice(281).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 9 }, (_, index) => `TER-CF-${282 + index}`),
+    );
+    expect(ledger.items[281]).toMatchObject({
+      id: "TER-CF-282",
+      completionSpec: "TER-047",
+      evidenceOwner: "pos-integrations",
+    });
+    expect(ledger.items[282].sourceText).toContain(
+      "live activation and any public webhook route disabled",
+    );
+    expect(ledger.items.slice(281).map((item: { sourceText: string }) => item.sourceText).join("\n"))
+      .not.toContain("live-active connection");
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -673,6 +691,7 @@ describe("checked-in feature ledger", () => {
       "TER-042": 37,
       "TER-043": 3,
       "TER-044": 15,
+      "TER-047": 9,
     });
   });
 

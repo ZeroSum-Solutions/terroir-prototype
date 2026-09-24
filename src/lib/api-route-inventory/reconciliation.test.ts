@@ -114,21 +114,21 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 281 requirements active and maps TER-CF-180..211 once", () => {
-    expect(ledger.items).toHaveLength(281);
+  it("keeps all 290 requirements active and maps the original and C08 route assertions once", () => {
+    expect(ledger.items).toHaveLength(290);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {
       const order = Number(item.id.slice("TER-CF-".length));
-      return order >= 180 && order <= 211;
+      return (order >= 180 && order <= 211) || (order >= 288 && order <= 290);
     });
-    expect(concreteLedger).toHaveLength(32);
+    expect(concreteLedger).toHaveLength(35);
 
     const mapped = uniqueBy(
       reconciliation.concreteRequirements,
       (item) => item.requirementId,
     );
-    expect(mapped.size).toBe(32);
+    expect(mapped.size).toBe(35);
     for (const requirement of concreteLedger) {
       const mapping = mapped.get(requirement.id);
       expect(mapping, `${requirement.id} must be mapped`).toBeDefined();
@@ -138,6 +138,21 @@ describe("TER-020Ab active API requirement reconciliation", () => {
         operationIdFor(actor.method, actor.path),
       );
     }
+  });
+
+  it("keeps C08 Slice A routes planned and omits a provider webhook route", () => {
+    expect(
+      inventory.plannedOperations
+        .filter((item) => item.path.startsWith("/api/integrations/pos/toast/"))
+        .map((item) => [item.sourceRequirementIds, item.method, item.path]),
+    ).toEqual([
+      [["TER-CF-288"], "POST", "/api/integrations/pos/toast/imports"],
+      [["TER-CF-290"], "POST", "/api/integrations/pos/toast/observations/[id]/interpretations"],
+      [["TER-CF-289"], "GET", "/api/integrations/pos/toast/reconciliation"],
+    ]);
+    expect(
+      inventory.plannedOperations.some((item) => item.path.includes("webhook")),
+    ).toBe(false);
   });
 
   it("classifies every discovered and planned operation exactly once", () => {

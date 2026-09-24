@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 281,
+  "featureCount": 290,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
     "expandedOn": "2026-09-23",
-    "approvedActiveCount": 281
+    "approvedActiveCount": 290
   },
   "items": [
     {
@@ -3663,6 +3663,123 @@
       "status": "active",
       "completionSpec": "TER-014",
       "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-282",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 282,
+      "sourceText": "System treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts",
+      "actor": "System",
+      "action": "treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts",
+      "observableOutcome": "System treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts",
+      "negativeCase": "Assertion is not observed: System treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-283",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 283,
+      "sourceText": "System keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass",
+      "actor": "System",
+      "action": "keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass",
+      "observableOutcome": "System keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass",
+      "negativeCase": "Assertion is not observed: System keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-284",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 284,
+      "sourceText": "System verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist",
+      "actor": "System",
+      "action": "verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist",
+      "observableOutcome": "System verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist",
+      "negativeCase": "Assertion is not observed: System verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-285",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 285,
+      "sourceText": "System stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations",
+      "actor": "System",
+      "action": "stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations",
+      "observableOutcome": "System stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations",
+      "negativeCase": "Assertion is not observed: System stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-286",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 286,
+      "sourceText": "System abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions",
+      "actor": "System",
+      "action": "abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions",
+      "observableOutcome": "System abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions",
+      "negativeCase": "Assertion is not observed: System abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-287",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 287,
+      "sourceText": "Staff can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live",
+      "actor": "Staff",
+      "action": "can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live",
+      "observableOutcome": "Staff can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live",
+      "negativeCase": "Assertion is not observed: Staff can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-288",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 288,
+      "sourceText": "POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance",
+      "actor": "POST /api/integrations/pos/toast/imports",
+      "action": "accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance",
+      "observableOutcome": "POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance",
+      "negativeCase": "Assertion is not observed: POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-289",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 289,
+      "sourceText": "GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth",
+      "actor": "GET /api/integrations/pos/toast/reconciliation",
+      "action": "returns site-scoped observations, review states, and connector truth",
+      "observableOutcome": "GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth",
+      "negativeCase": "Assertion is not observed: GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-290",
+      "domain": "toast_pos_corroboration",
+      "sourceOrder": 290,
+      "sourceText": "POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory",
+      "actor": "POST /api/integrations/pos/toast/observations/[id]/interpretations",
+      "action": "creates an authorized linked interpretation without mutating the source receipt or physical inventory",
+      "observableOutcome": "POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory",
+      "negativeCase": "Assertion is not observed: POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory",
+      "status": "active",
+      "completionSpec": "TER-047",
+      "evidenceOwner": "pos-integrations"
     }
   ]
 }

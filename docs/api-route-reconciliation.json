@@ -5,10 +5,10 @@
   "featureLedger": "docs/feature-ledger.json",
   "completionPlan": "docs/plans/2026-07-20-terroir-completion-spec.md",
   "summary": {
-    "activeRequirementCount": 281,
-    "concreteRequirementCount": 32,
+    "activeRequirementCount": 290,
+    "concreteRequirementCount": 35,
     "exactDiscoveredCount": 17,
-    "plannedPromiseCount": 15,
+    "plannedPromiseCount": 18,
     "extensionDiscoveredCount": 98,
     "crossCuttingRequirementCount": 6,
     "ter020LeafCount": 8
@@ -301,6 +301,30 @@
       "method": "GET",
       "path": "/api/export",
       "operationId": "api:GET:/api/export",
+      "realization": "planned_exact_path",
+      "implementationLeaf": "TER-020E"
+    },
+    {
+      "requirementId": "TER-CF-288",
+      "method": "POST",
+      "path": "/api/integrations/pos/toast/imports",
+      "operationId": "api:POST:/api/integrations/pos/toast/imports",
+      "realization": "planned_exact_path",
+      "implementationLeaf": "TER-020E"
+    },
+    {
+      "requirementId": "TER-CF-289",
+      "method": "GET",
+      "path": "/api/integrations/pos/toast/reconciliation",
+      "operationId": "api:GET:/api/integrations/pos/toast/reconciliation",
+      "realization": "planned_exact_path",
+      "implementationLeaf": "TER-020E"
+    },
+    {
+      "requirementId": "TER-CF-290",
+      "method": "POST",
+      "path": "/api/integrations/pos/toast/observations/[id]/interpretations",
+      "operationId": "api:POST:/api/integrations/pos/toast/observations/{param}/interpretations",
       "realization": "planned_exact_path",
       "implementationLeaf": "TER-020E"
     }

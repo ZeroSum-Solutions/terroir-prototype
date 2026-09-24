@@ -6,7 +6,7 @@
   </overview>
 
   <feature_budget>
-    Implement all 281 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions on 2026-09-23, and eight C04 workspace/site shadow-access additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 290 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, and nine C08 fixture/manual POS-corroboration additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
   </feature_budget>
 
   <initializer_guidance>
@@ -406,6 +406,18 @@
       - System shadow effective-site access denies revoked or expired site or workspace membership
       - System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority
     </workspace_site_access_foundation>
+
+    <toast_pos_corroboration>
+      - System treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts
+      - System keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass
+      - System verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist
+      - System stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations
+      - System abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions
+      - Staff can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live
+      - POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance
+      - GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth
+      - POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory
+    </toast_pos_corroboration>
 
   </core_features>
 

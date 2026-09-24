@@ -37,8 +37,11 @@ function fixture() {
     [182, "POST /api/cellar"],
     [183, "PATCH /api/cellar/[id]"],
     [212, "All write endpoints"],
+    [288, "POST /api/integrations/pos/toast/imports"],
+    [289, "GET /api/integrations/pos/toast/reconciliation"],
+    [290, "POST /api/integrations/pos/toast/observations/[id]/interpretations"],
   ]);
-  const items = Array.from({ length: 281 }, (_, index) => {
+  const items = Array.from({ length: 290 }, (_, index) => {
     const sourceOrder = index + 1;
     const id = `TER-CF-${String(sourceOrder).padStart(3, "0")}`;
     const actor =
@@ -56,7 +59,7 @@ function fixture() {
   });
   write(root, "docs/feature-ledger.json", {
     schemaVersion: 2,
-    featureCount: 281,
+    featureCount: 290,
     items,
   });
   write(
@@ -190,17 +193,22 @@ describe("product contract conformance generator", () => {
     const root = fixture();
     expect(run(root, "--write").status).toBe(0);
     const generated = output(root);
-    expect(generated.scope.activeFeatureLedgerCount).toBe(281);
+    expect(generated.scope.activeFeatureLedgerCount).toBe(290);
     expect(generated.requirements.map((item: { requirementId: string }) => item.requirementId)).toEqual(
-      Array.from({ length: 38 }, (_, index) => `TER-CF-${180 + index}`),
+      [
+        ...Array.from({ length: 38 }, (_, index) => `TER-CF-${180 + index}`),
+        "TER-CF-288",
+        "TER-CF-289",
+        "TER-CF-290",
+      ],
     );
 
     const ledger = JSON.parse(readFileSync(join(root, "docs/feature-ledger.json"), "utf8"));
-    ledger.items[280].id = "TER-CF-999";
+    ledger.items[289].id = "TER-CF-999";
     write(root, "docs/feature-ledger.json", ledger);
     const result = run(root, "--write");
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-281");
+    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-290");
   });
 
   it("keeps cross-cutting claims weak with an explicit proof assessment", () => {

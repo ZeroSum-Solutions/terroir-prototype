@@ -17,6 +17,12 @@ const CROSS_CUTTING = [
   ["TER-CF-216", "all_operations", "TER-020C"], ["TER-CF-217", "all_operations", "TER-020D"],
 ].map(([requirementId, scope, ownerLeaf]) => ({ requirementId, scope, ownerLeaf }));
 const PLAN_LEAVES = ["TER-020Aa", "TER-020Ab", "TER-020Ac", "TER-020B", "TER-020C", "TER-020D", "TER-020E", "TER-020F"];
+const CONCRETE_REQUIREMENT_IDS = [
+  ...Array.from({ length: 32 }, (_, index) => `TER-CF-${180 + index}`),
+  "TER-CF-288",
+  "TER-CF-289",
+  "TER-CF-290",
+];
 const readJson = (root, file) => JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
 const ids = (items) => items.map((item) => item.operationId);
 const same = (left, right) => isDeepStrictEqual(left, right);
@@ -146,11 +152,10 @@ export function validateReconciliationSemantics({
     );
   }
   const ledgerById = new Map(ledger.items.map((item) => [item.id, item]));
-  if (ledger.items.length !== 281 || ledger.items.some((item) => item.status !== "active")) {
-    errors.push("all 281 feature-ledger requirements must remain active");
+  if (ledger.items.length !== 290 || ledger.items.some((item) => item.status !== "active")) {
+    errors.push("all 290 feature-ledger requirements must remain active");
   }
-  for (let order = 180; order <= 211; order += 1) {
-    const requirementId = `TER-CF-${order}`;
+  for (const requirementId of CONCRETE_REQUIREMENT_IDS) {
     const ledgerItem = ledgerById.get(requirementId);
     const mapping = concreteById.get(requirementId);
     const actor = ledgerItem && actorIdentity(ledgerItem);

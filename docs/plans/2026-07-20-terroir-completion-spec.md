@@ -765,8 +765,16 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 
 **Acceptance:** All required checks pass on the promoted SHA; no active requirement lacks evidence; production auth, public list, health, queue, and key read paths pass; rollback target is recorded; during the 24-hour observation window, HTTP 5xx stays below 1%, synthetic auth and public-list success stay at or above 99%, background-job success stays at or above 95% with queue age below 5 minutes, public-list p95 response time stays below 2 seconds, and no unresolved severity-1 or severity-2 event is opened. Low-volume metrics must be supported by the scheduled synthetic canaries.
 **Verification:** Release manifest with commit, artifact, migrations, checks, staging report, production canary, and rollback reference.
-**Dependencies:** `TER-002` through `TER-045`.
+**Dependencies:** `TER-002` through `TER-045` and `TER-047`.
 **Approval:** Production schema changes, deployment, data writes, and rollback require explicit approval at the release boundary.
+
+### TER-047: Deliver bounded POS corroboration Slice A
+
+**Outcome:** Staff can inspect durable fixture/manual POS observations and discrepancies without POS data mutating physical inventory or appearing as a live Toast connection.
+
+**Acceptance:** Authenticated fixture/manual imports retain explicit non-live provenance; accepted observations, duplicates, changed-body conflicts, out-of-order snapshots, incomplete mapping, and authorized linked interpretations preserve their reviewed evidence. Every exercised path leaves `pour_events`, `open_bottles`, `inventory_items`, `bottle_closeouts`, `stock_adjustments`, and `inventory_command_receipts` unchanged. Connection and coverage states remain truthful, and no public webhook route or Orders pull exists in Slice A.
+**Verification:** Adapter and persistence tests with signed local fixtures, cross-site containment, row-and-value comparisons for the six forbidden physical relations, API contract tests for the three authenticated Slice A routes, and operator UI tests for provenance, abstention, mismatch, coverage-gap, and connection-state presentation. Live C08 remains gated on the provider evidence in the approved Toast contract.
+**Dependencies:** `TER-004`, `TER-012`, `TER-014`, `TER-020`, `TER-023`, `TER-041`.
 
 ## 7. Autonomous execution contract
 

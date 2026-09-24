@@ -1289,6 +1289,30 @@
       ]
     },
     {
+      "operationId": "api:POST:/api/integrations/pos/toast/imports",
+      "method": "POST",
+      "path": "/api/integrations/pos/toast/imports",
+      "sourceRequirementIds": [
+        "TER-CF-288"
+      ]
+    },
+    {
+      "operationId": "api:POST:/api/integrations/pos/toast/observations/{param}/interpretations",
+      "method": "POST",
+      "path": "/api/integrations/pos/toast/observations/[id]/interpretations",
+      "sourceRequirementIds": [
+        "TER-CF-290"
+      ]
+    },
+    {
+      "operationId": "api:GET:/api/integrations/pos/toast/reconciliation",
+      "method": "GET",
+      "path": "/api/integrations/pos/toast/reconciliation",
+      "sourceRequirementIds": [
+        "TER-CF-289"
+      ]
+    },
+    {
       "operationId": "api:GET:/api/inventory",
       "method": "GET",
       "path": "/api/inventory",

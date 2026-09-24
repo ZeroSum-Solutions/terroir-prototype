@@ -3,9 +3,9 @@
   "generatorVersion": 2,
   "scope": {
     "firstRequirementId": "TER-CF-180",
-    "lastRequirementId": "TER-CF-217",
-    "requirementCount": 38,
-    "activeFeatureLedgerCount": 281
+    "lastRequirementId": "TER-CF-290",
+    "requirementCount": 41,
+    "activeFeatureLedgerCount": 290
   },
   "inputs": {
     "featureLedger": "docs/feature-ledger.json",
@@ -14,7 +14,7 @@
   "summary": {
     "proved": 0,
     "weak": 23,
-    "unimplemented": 15
+    "unimplemented": 18
   },
   "requirements": [
     {
@@ -569,6 +569,48 @@
         "scope": "All endpoints",
         "implementation": null,
         "proofAssessment": "No trusted executable proof covers this quantified scope."
+      }
+    },
+    {
+      "requirementId": "TER-CF-288",
+      "status": "unimplemented",
+      "reason": "current_route_not_discovered",
+      "operationId": "api:POST:/api/integrations/pos/toast/imports",
+      "evidence": {
+        "ledgerClaim": "POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance",
+        "expectedRoute": {
+          "method": "POST",
+          "path": "/api/integrations/pos/toast/imports"
+        },
+        "implementation": null
+      }
+    },
+    {
+      "requirementId": "TER-CF-289",
+      "status": "unimplemented",
+      "reason": "current_route_not_discovered",
+      "operationId": "api:GET:/api/integrations/pos/toast/reconciliation",
+      "evidence": {
+        "ledgerClaim": "GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth",
+        "expectedRoute": {
+          "method": "GET",
+          "path": "/api/integrations/pos/toast/reconciliation"
+        },
+        "implementation": null
+      }
+    },
+    {
+      "requirementId": "TER-CF-290",
+      "status": "unimplemented",
+      "reason": "current_route_not_discovered",
+      "operationId": "api:POST:/api/integrations/pos/toast/observations/{param}/interpretations",
+      "evidence": {
+        "ledgerClaim": "POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory",
+        "expectedRoute": {
+          "method": "POST",
+          "path": "/api/integrations/pos/toast/observations/[id]/interpretations"
+        },
+        "implementation": null
       }
     }
   ]
