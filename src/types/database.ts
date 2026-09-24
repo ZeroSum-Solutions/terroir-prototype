@@ -196,6 +196,7 @@ export type Database = {
           actual_remaining_ml: number
           closed_at: string
           closed_by: string | null
+          event_contract: number
           id: string
           open_bottle_id: string | null
           opened_at: string | null
@@ -211,6 +212,7 @@ export type Database = {
           actual_remaining_ml: number
           closed_at?: string
           closed_by?: string | null
+          event_contract?: number
           id?: string
           open_bottle_id?: string | null
           opened_at?: string | null
@@ -226,6 +228,7 @@ export type Database = {
           actual_remaining_ml?: number
           closed_at?: string
           closed_by?: string | null
+          event_contract?: number
           id?: string
           open_bottle_id?: string | null
           opened_at?: string | null
@@ -239,11 +242,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bottle_closeouts_open_bottle_id_fkey"
-            columns: ["open_bottle_id"]
+            foreignKeyName: "bottle_closeouts_open_bottle_tenant_wine_fkey"
+            columns: ["open_bottle_id", "restaurant_id", "wine_id"]
             isOneToOne: false
             referencedRelation: "open_bottles"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "restaurant_id", "wine_id"]
           },
           {
             foreignKeyName: "bottle_closeouts_reason_code_id_fkey"
@@ -751,39 +754,90 @@ export type Database = {
           },
         ]
       }
+      inventory_command_bottle_effects: {
+        Row: {
+          effect_type: string
+          entry_ordinal: number
+          open_bottle_id: string
+          operation_id: string
+          restaurant_id: string
+          wine_id: string
+        }
+        Insert: {
+          effect_type: string
+          entry_ordinal: number
+          open_bottle_id: string
+          operation_id: string
+          restaurant_id: string
+          wine_id: string
+        }
+        Update: {
+          effect_type?: string
+          entry_ordinal?: number
+          open_bottle_id?: string
+          operation_id?: string
+          restaurant_id?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_command_bottle_effects_bottle_fkey"
+            columns: ["open_bottle_id", "restaurant_id", "wine_id"]
+            isOneToOne: false
+            referencedRelation: "open_bottles"
+            referencedColumns: ["id", "restaurant_id", "wine_id"]
+          },
+          {
+            foreignKeyName: "inventory_command_bottle_effects_receipt_fkey"
+            columns: ["restaurant_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_command_receipts"
+            referencedColumns: ["restaurant_id", "operation_id"]
+          },
+        ]
+      }
       inventory_command_receipts: {
         Row: {
           actor_user_id: string
+          batch_entry_count: number | null
           command_type: string
+          command_version: number
           completed_at: string | null
           created_at: string
           operation_id: string
           request_payload: Json
           restaurant_id: string
           result_payload: Json | null
-          wine_id: string
+          scope_kind: string
+          wine_id: string | null
         }
         Insert: {
           actor_user_id: string
+          batch_entry_count?: number | null
           command_type: string
+          command_version?: number
           completed_at?: string | null
           created_at?: string
           operation_id: string
           request_payload: Json
           restaurant_id: string
           result_payload?: Json | null
-          wine_id: string
+          scope_kind?: string
+          wine_id?: string | null
         }
         Update: {
           actor_user_id?: string
+          batch_entry_count?: number | null
           command_type?: string
+          command_version?: number
           completed_at?: string | null
           created_at?: string
           operation_id?: string
           request_payload?: Json
           restaurant_id?: string
           result_payload?: Json | null
-          wine_id?: string
+          scope_kind?: string
+          wine_id?: string | null
         }
         Relationships: [
           {
@@ -1244,34 +1298,52 @@ export type Database = {
         Row: {
           closed_at: string | null
           id: string
+          identity_contract: number
+          identity_origin: string
+          nominal_capacity_ml: number | null
           opened_at: string
           opened_by: string | null
+          opening_operation_id: string | null
           preservation_method: string
           remaining_ml: number
           restaurant_id: string
           source_inventory_item_id: string | null
+          source_provenance: string
+          state_version: number
           wine_id: string
         }
         Insert: {
           closed_at?: string | null
           id?: string
+          identity_contract?: number
+          identity_origin?: string
+          nominal_capacity_ml?: number | null
           opened_at?: string
           opened_by?: string | null
+          opening_operation_id?: string | null
           preservation_method?: string
           remaining_ml: number
           restaurant_id: string
           source_inventory_item_id?: string | null
+          source_provenance?: string
+          state_version?: number
           wine_id: string
         }
         Update: {
           closed_at?: string | null
           id?: string
+          identity_contract?: number
+          identity_origin?: string
+          nominal_capacity_ml?: number | null
           opened_at?: string
           opened_by?: string | null
+          opening_operation_id?: string | null
           preservation_method?: string
           remaining_ml?: number
           restaurant_id?: string
           source_inventory_item_id?: string | null
+          source_provenance?: string
+          state_version?: number
           wine_id?: string
         }
         Relationships: [
@@ -1301,50 +1373,83 @@ export type Database = {
       pour_events: {
         Row: {
           actor_user_id: string | null
+          event_contract: number
           id: string
           kind: string
           ml_delta: number
           note: string | null
           occurred_at: string
           open_bottle_id: string | null
+          operation_entry_ordinal: number | null
+          operation_id: string | null
           restaurant_id: string
+          reversal_of_event_id: string | null
           wine_id: string
         }
         Insert: {
           actor_user_id?: string | null
+          event_contract?: number
           id?: string
           kind: string
           ml_delta: number
           note?: string | null
           occurred_at?: string
           open_bottle_id?: string | null
+          operation_entry_ordinal?: number | null
+          operation_id?: string | null
           restaurant_id: string
+          reversal_of_event_id?: string | null
           wine_id: string
         }
         Update: {
           actor_user_id?: string | null
+          event_contract?: number
           id?: string
           kind?: string
           ml_delta?: number
           note?: string | null
           occurred_at?: string
           open_bottle_id?: string | null
+          operation_entry_ordinal?: number | null
+          operation_id?: string | null
           restaurant_id?: string
+          reversal_of_event_id?: string | null
           wine_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pour_events_open_bottle_id_fkey"
-            columns: ["open_bottle_id"]
+            foreignKeyName: "pour_events_open_bottle_tenant_wine_fkey"
+            columns: ["open_bottle_id", "restaurant_id", "wine_id"]
             isOneToOne: false
             referencedRelation: "open_bottles"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "restaurant_id", "wine_id"]
+          },
+          {
+            foreignKeyName: "pour_events_operation_receipt_fkey"
+            columns: ["restaurant_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_command_receipts"
+            referencedColumns: ["restaurant_id", "operation_id"]
           },
           {
             foreignKeyName: "pour_events_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pour_events_reversal_of_event_fkey"
+            columns: ["reversal_of_event_id"]
+            isOneToOne: false
+            referencedRelation: "effective_service_pour_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pour_events_reversal_of_event_fkey"
+            columns: ["reversal_of_event_id"]
+            isOneToOne: false
+            referencedRelation: "pour_events"
             referencedColumns: ["id"]
           },
           {
@@ -2591,7 +2696,80 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      effective_service_pour_events: {
+        Row: {
+          actor_user_id: string | null
+          event_contract: number | null
+          id: string | null
+          kind: string | null
+          ml_delta: number | null
+          note: string | null
+          occurred_at: string | null
+          open_bottle_id: string | null
+          operation_entry_ordinal: number | null
+          operation_id: string | null
+          restaurant_id: string | null
+          wine_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          event_contract?: number | null
+          id?: string | null
+          kind?: string | null
+          ml_delta?: number | null
+          note?: string | null
+          occurred_at?: string | null
+          open_bottle_id?: string | null
+          operation_entry_ordinal?: number | null
+          operation_id?: string | null
+          restaurant_id?: string | null
+          wine_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          event_contract?: number | null
+          id?: string | null
+          kind?: string | null
+          ml_delta?: number | null
+          note?: string | null
+          occurred_at?: string | null
+          open_bottle_id?: string | null
+          operation_entry_ordinal?: number | null
+          operation_id?: string | null
+          restaurant_id?: string | null
+          wine_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pour_events_open_bottle_tenant_wine_fkey"
+            columns: ["open_bottle_id", "restaurant_id", "wine_id"]
+            isOneToOne: false
+            referencedRelation: "open_bottles"
+            referencedColumns: ["id", "restaurant_id", "wine_id"]
+          },
+          {
+            foreignKeyName: "pour_events_operation_receipt_fkey"
+            columns: ["restaurant_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_command_receipts"
+            referencedColumns: ["restaurant_id", "operation_id"]
+          },
+          {
+            foreignKeyName: "pour_events_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pour_events_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_manual_overrides: {
@@ -2656,6 +2834,7 @@ export type Database = {
           actual_remaining_ml: number
           closed_at: string
           closed_by: string | null
+          event_contract: number
           id: string
           open_bottle_id: string | null
           opened_at: string | null
@@ -2699,6 +2878,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_inventory_contract_version: { Args: never; Returns: number }
       delete_invoice_scan: { Args: { p_scan_id: string }; Returns: Json }
       dismiss_pricing_alert: {
         Args: { p_days?: number; p_wine_id: string }
@@ -2732,6 +2912,34 @@ export type Database = {
         }
         Returns: Json
       }
+      execute_physical_bottle_command: {
+        Args: {
+          p_actual_remaining_ml?: number
+          p_command: string
+          p_correction_reason?: string
+          p_ml?: number
+          p_note?: string
+          p_open_bottle_id?: string
+          p_operation_id: string
+          p_operator_confirms_same_bottle_present?: boolean
+          p_predecessor_open_operation_id?: string
+          p_preservation_method?: string
+          p_reason_code_id?: string
+          p_restaurant_id: string
+          p_reversal_of_event_id?: string
+          p_wine_id: string
+          p_written_off_ml?: number
+        }
+        Returns: Json
+      }
+      execute_physical_reconciliation_batch: {
+        Args: {
+          p_entries: Json
+          p_operation_id: string
+          p_restaurant_id: string
+        }
+        Returns: Json
+      }
       find_or_create_wine: {
         Args: {
           p_country?: string
@@ -2759,6 +2967,32 @@ export type Database = {
           required: Database["public"]["Enums"]["membership_role"]
         }
         Returns: boolean
+      }
+      list_active_physical_bottles: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          id: string
+          identity_contract: number
+          identity_origin: string
+          nominal_capacity_ml: number
+          opened_at: string
+          preservation_method: string
+          remaining_ml: number
+          restaurant_id: string
+          source_bin_location: string
+          source_inventory_item_id: string
+          source_provenance: string
+          state_version: number
+          wine_id: string
+        }[]
+      }
+      list_open_bottle_aggregates: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          active_bottle_count: number
+          open_remaining_ml: number
+          wine_id: string
+        }[]
       }
       list_open_bottle_items: {
         Args: { p_restaurant_id: string }
@@ -2899,12 +3133,18 @@ export type Database = {
         Returns: {
           closed_at: string | null
           id: string
+          identity_contract: number
+          identity_origin: string
+          nominal_capacity_ml: number | null
           opened_at: string
           opened_by: string | null
+          opening_operation_id: string | null
           preservation_method: string
           remaining_ml: number
           restaurant_id: string
           source_inventory_item_id: string | null
+          source_provenance: string
+          state_version: number
           wine_id: string
         }
         SetofOptions: {
@@ -2928,12 +3168,18 @@ export type Database = {
         Returns: {
           closed_at: string | null
           id: string
+          identity_contract: number
+          identity_origin: string
+          nominal_capacity_ml: number | null
           opened_at: string
           opened_by: string | null
+          opening_operation_id: string | null
           preservation_method: string
           remaining_ml: number
           restaurant_id: string
           source_inventory_item_id: string | null
+          source_provenance: string
+          state_version: number
           wine_id: string
         }
         SetofOptions: {
@@ -3026,12 +3272,18 @@ export type Database = {
         Returns: {
           closed_at: string | null
           id: string
+          identity_contract: number
+          identity_origin: string
+          nominal_capacity_ml: number | null
           opened_at: string
           opened_by: string | null
+          opening_operation_id: string | null
           preservation_method: string
           remaining_ml: number
           restaurant_id: string
           source_inventory_item_id: string | null
+          source_provenance: string
+          state_version: number
           wine_id: string
         }
         SetofOptions: {
