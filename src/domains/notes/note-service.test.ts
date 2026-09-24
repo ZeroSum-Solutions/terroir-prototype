@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 import { createNote, CreateNoteSchema } from "./note-service";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,6 +37,7 @@ describe.skipIf(!hasLiveDb)("createNote", { timeout: 60_000 }, () => {
   let restaurantId: string;
   let userId: string;
   let wineId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -47,10 +49,9 @@ describe.skipIf(!hasLiveDb)("createNote", { timeout: 60_000 }, () => {
 
     const password = "Note-Service-Test-123!";
     const email = `note-service-${Date.now()}@terroir.test`;
-    const { data: user, error: uErr } = await admin.auth.admin.createUser({
+    const user = await identities.createUser(admin, {
       email, password, email_confirm: true,
     });
-    if (uErr || !user) throw uErr ?? new Error("user insert failed");
     userId = user.user.id;
 
     const { error: mErr } = await admin.from("memberships")
@@ -67,8 +68,7 @@ describe.skipIf(!hasLiveDb)("createNote", { timeout: 60_000 }, () => {
   });
 
   afterAll(async () => {
-    await admin.from("restaurants").delete().eq("id", restaurantId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantId] });
   });
 
   it("writes the note and returns its id", async () => {

@@ -53,6 +53,39 @@ upstream IP, then keeps polling within the same overall timeout. If the API
 still isn't healthy by the deadline, `dev-stack.sh` exits non-zero with a
 loud message instead of seeding against a possibly-broken stack.
 
+## Live-test identity conservation
+
+Use `scripts/run-live-test-conservation.mjs` to wrap live Vitest files that
+create database fixtures. Before invocation, the process environment must
+contain local values for these three names:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+The runner calls `scripts/local/assert-local-db.sh`, then queries the exact local
+container `supabase_db_terroir-vw-local`. It snapshots identity sets before the
+child starts and again after the child returns, signals, throws, or fails to
+spawn. The child always receives `CI=1`. The wrapper exits non-zero when the
+local guard, either snapshot, the child command, or identity comparison fails.
+
+Run it with Node 20, pnpm 9, and one Vitest worker. List the intended live test
+files explicitly:
+
+```bash
+mise exec node@20 -- node scripts/run-live-test-conservation.mjs -- \
+  corepack pnpm@9 exec vitest run src/domains/import/p3-live.test.ts \
+  --maxWorkers=1
+```
+
+The snapshot covers exact identities in six tables: `auth.users`,
+`restaurants`, `workspaces`, `memberships`, `workspace_memberships`, and
+`inventory_command_receipts` (the last uses restaurant/operation ID pairs). It
+does not compare row contents, other tables, or the whole database. The CLI also
+does not prove that a broader requested test inventory ran or that Vitest
+reported zero skipped tests. Gates that need those claims must verify the exact
+file set and result counts separately.
+
 ## Teardown
 
 ```bash

@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -55,6 +56,7 @@ describe.skipIf(!hasLiveDb)("wine_notes cross-tenant containment (MANDATORY)", {
   let wineB: string;
   let canonicalId: string;
   let noteA: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -70,16 +72,14 @@ describe.skipIf(!hasLiveDb)("wine_notes cross-tenant containment (MANDATORY)", {
     const run = Date.now();
     const password = "Notes-Policy-Test-123!";
 
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `notes-policy-a-${run}@terroir.test`, password, email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create user A");
     userAId = userA.user.id;
 
-    const { data: userB, error: userBErr } = await admin.auth.admin.createUser({
+    const userB = await identities.createUser(admin, {
       email: `notes-policy-b-${run}@terroir.test`, password, email_confirm: true,
     });
-    if (userBErr || !userB) throw userBErr ?? new Error("failed to create user B");
     userBId = userB.user.id;
 
     const { error: memAErr } = await admin.from("memberships").insert({ user_id: userAId, restaurant_id: restaurantA, role: "staff" } as never);
@@ -116,9 +116,7 @@ describe.skipIf(!hasLiveDb)("wine_notes cross-tenant containment (MANDATORY)", {
   afterAll(async () => {
     await admin.from("wine_reference_notes").delete().eq("canonical_wine_id", canonicalId);
     await admin.from("canonical_wines").delete().eq("id", canonicalId);
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
-    if (userBId) await admin.auth.admin.deleteUser(userBId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
   });
 
   it("refuses a note naming another tenant's wine", async () => {

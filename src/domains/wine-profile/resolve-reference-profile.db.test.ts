@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 import { resolveReferenceProfile, type ReferenceWine } from "./resolve-reference-profile";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,6 +38,7 @@ describe.skipIf(!hasLiveDb)("resolveReferenceProfile against a real database", {
   let outsiderId: string;
   let canonicalId: string;
   let otherCanonicalId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   const wine = (overrides: Partial<ReferenceWine> = {}): ReferenceWine => ({
     canonicalWineId: canonicalId,
@@ -64,22 +66,20 @@ describe.skipIf(!hasLiveDb)("resolveReferenceProfile against a real database", {
     outsiderRestaurantId = rRows.find((r) => r.name === "Reference Outsider")!.id;
 
     const run = Date.now();
-    const { data: member, error: mErr } = await admin.auth.admin.createUser({
+    const member = await identities.createUser(admin, {
       email: `reference-member-${run}@terroir.test`,
       password: "Reference-Test-123!",
       email_confirm: true,
       user_metadata: { full_name: "Devin" },
     });
-    if (mErr || !member) throw mErr ?? new Error("failed to create member");
     memberId = member.user.id;
 
-    const { data: outsider, error: oErr } = await admin.auth.admin.createUser({
+    const outsider = await identities.createUser(admin, {
       email: `reference-outsider-${run}@terroir.test`,
       password: "Reference-Test-123!",
       email_confirm: true,
       user_metadata: { full_name: "Stranger" },
     });
-    if (oErr || !outsider) throw oErr ?? new Error("failed to create outsider");
     outsiderId = outsider.user.id;
 
     const { error: memErr } = await admin.from("memberships").insert([
@@ -152,9 +152,9 @@ describe.skipIf(!hasLiveDb)("resolveReferenceProfile against a real database", {
       .delete()
       .in("canonical_wine_id", [canonicalId, otherCanonicalId]);
     await admin.from("canonical_wines").delete().in("id", [canonicalId, otherCanonicalId]);
-    await admin.from("restaurants").delete().in("id", [restaurantId, outsiderRestaurantId]);
-    if (memberId) await admin.auth.admin.deleteUser(memberId);
-    if (outsiderId) await admin.auth.admin.deleteUser(outsiderId);
+    await identities.cleanup(admin, {
+      restaurantIds: [restaurantId, outsiderRestaurantId],
+    });
   });
 
   it("reads only this wine's own vintage", async () => {

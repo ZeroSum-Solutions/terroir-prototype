@@ -24,6 +24,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -58,6 +59,7 @@ describe.skipIf(!hasLiveDb)("identity is populated on write (MANDATORY)", { time
   let userBClient: SupabaseClient<Database>;
   let userAId: string;
   let userBId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -73,20 +75,18 @@ describe.skipIf(!hasLiveDb)("identity is populated on write (MANDATORY)", { time
     const run = Date.now();
     const password = "Identity-OnWrite-Test-123!";
 
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `identity-onwrite-a-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create user A");
     userAId = userA.user.id;
 
-    const { data: userB, error: userBErr } = await admin.auth.admin.createUser({
+    const userB = await identities.createUser(admin, {
       email: `identity-onwrite-b-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userBErr || !userB) throw userBErr ?? new Error("failed to create user B");
     userBId = userB.user.id;
 
     const { error: memAErr } = await admin.from("memberships").insert({ user_id: userAId, restaurant_id: restaurantA, role: "staff" } as never);
@@ -105,12 +105,10 @@ describe.skipIf(!hasLiveDb)("identity is populated on write (MANDATORY)", { time
       .from("canonical_wines")
       .select("id")
       .like("producer", `${PRODUCER}%`);
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
     if (canonRows && canonRows.length > 0) {
       await admin.from("canonical_wines").delete().in("id", (canonRows as { id: string }[]).map((r) => r.id));
     }
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
-    if (userBId) await admin.auth.admin.deleteUser(userBId);
   });
 
   async function readIdentity(wineId: string) {

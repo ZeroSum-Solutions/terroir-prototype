@@ -28,6 +28,7 @@ import {
 } from "./batch-service";
 import { createImportSession, revertImportSession } from "./session-service";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -82,6 +83,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
   let restaurantId: string;
   let userClient: SupabaseClient<Database>;
   let userId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -96,12 +98,11 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
 
     const run = Date.now();
     const password = "P3-Critical-Test-123!";
-    const { data: user, error: userError } = await admin.auth.admin.createUser({
+    const user = await identities.createUser(admin, {
       email: `p3-critical-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userError || !user) throw userError ?? new Error("failed to create user");
     userId = user.user.id;
 
     const { error: memError } = await admin
@@ -113,8 +114,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
   }, 30_000);
 
   afterAll(async () => {
-    await admin.from("restaurants").delete().eq("id", restaurantId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantId] });
   });
 
   /** Test-setup shortcut (see file header): flips every pending

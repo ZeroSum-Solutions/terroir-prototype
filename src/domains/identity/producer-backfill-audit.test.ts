@@ -22,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -44,6 +45,7 @@ describe.skipIf(!hasLiveDb)("producer_backfill_audit is operator-only (MANDATORY
   let userId: string;
   const email = `producer-audit-${Date.now()}@example.test`;
   const password = "test-password-1234";
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -53,10 +55,9 @@ describe.skipIf(!hasLiveDb)("producer_backfill_audit is operator-only (MANDATORY
     if (rErr || !r) throw rErr ?? new Error("failed to insert restaurant");
     restaurantId = (r as { id: string }).id;
 
-    const { data: u, error: uErr } = await admin.auth.admin.createUser({
+    const u = await identities.createUser(admin, {
       email, password, email_confirm: true,
     });
-    if (uErr || !u.user) throw uErr ?? new Error("failed to create user");
     userId = u.user.id;
 
     const { error: mErr } = await admin
@@ -95,8 +96,7 @@ describe.skipIf(!hasLiveDb)("producer_backfill_audit is operator-only (MANDATORY
     if (!admin) return;
     await admin.from("producer_backfill_audit").delete().eq("restaurant_id", restaurantId);
     await admin.from("wines").delete().eq("restaurant_id", restaurantId);
-    await admin.from("restaurants").delete().eq("id", restaurantId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantId] });
   });
 
   it("an owner cannot read the audit row for their own wine", async () => {

@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 import { resolveHouseProfile } from "./resolve-house-profile";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,6 +40,7 @@ describe.skipIf(!hasLiveDb)("resolveHouseProfile against a real database", { tim
   let userAId: string;
   let wineA: string;
   let unscoredWine: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, {
@@ -54,12 +56,11 @@ describe.skipIf(!hasLiveDb)("resolveHouseProfile against a real database", { tim
     restaurantA = rRows.find((r) => r.name === "House Aggregate A")!.id;
     restaurantB = rRows.find((r) => r.name === "House Aggregate B")!.id;
 
-    const { data: user, error: uErr } = await admin.auth.admin.createUser({
+    const user = await identities.createUser(admin, {
       email: `house-aggregate-${Date.now()}@terroir.test`,
       password: "House-Aggregate-Test-123!",
       email_confirm: true,
     });
-    if (uErr || !user) throw uErr ?? new Error("failed to create user");
     userAId = user.user.id;
 
     const { error: memErr } = await admin
@@ -121,8 +122,7 @@ describe.skipIf(!hasLiveDb)("resolveHouseProfile against a real database", { tim
   });
 
   afterAll(async () => {
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
   });
 
   it("counts the confirmed descriptor and never the inferred one", async () => {

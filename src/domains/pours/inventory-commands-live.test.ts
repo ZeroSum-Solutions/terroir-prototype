@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -93,6 +94,7 @@ describe.skipIf(!hasLiveDb)("execute_inventory_command (MANDATORY live DB)", { t
   let userA: SupabaseClient<Database>;
   let userANewYork: SupabaseClient<Database>;
   let userB: SupabaseClient<Database>;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   const password = "Inventory-Command-Test-123!";
 
@@ -138,16 +140,14 @@ describe.skipIf(!hasLiveDb)("execute_inventory_command (MANDATORY live DB)", { t
     [restaurantA, restaurantB] = restaurants.map((row) => row.id);
 
     const run = `${Date.now()}-${crypto.randomUUID()}`;
-    const { data: createdA, error: userAError } = await admin.auth.admin.createUser({
+    const createdA = await identities.createUser(admin, {
       email: `inventory-command-a-${run}@terroir.test`, password, email_confirm: true,
     });
-    if (userAError || !createdA.user) throw userAError ?? new Error("failed to create user A");
     userAId = createdA.user.id;
 
-    const { data: createdB, error: userBError } = await admin.auth.admin.createUser({
+    const createdB = await identities.createUser(admin, {
       email: `inventory-command-b-${run}@terroir.test`, password, email_confirm: true,
     });
-    if (userBError || !createdB.user) throw userBError ?? new Error("failed to create user B");
     userBId = createdB.user.id;
 
     const { error: membershipError } = await admin.from("memberships").insert([
@@ -167,11 +167,11 @@ describe.skipIf(!hasLiveDb)("execute_inventory_command (MANDATORY live DB)", { t
   });
 
   afterAll(async () => {
-    if (admin && restaurantA && restaurantB) {
-      await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
+    if (admin) {
+      await identities.cleanup(admin, {
+        restaurantIds: [restaurantA, restaurantB].filter(Boolean),
+      });
     }
-    if (admin && userAId) await admin.auth.admin.deleteUser(userAId);
-    if (admin && userBId) await admin.auth.admin.deleteUser(userBId);
   });
 
   it("opens explicitly, replays every command, and conserves four 150mL pours", async () => {

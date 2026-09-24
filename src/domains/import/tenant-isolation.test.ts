@@ -19,6 +19,7 @@ import type { Database } from "@/types/database";
 import { confirmImportBatch, applyImportBatchChunk, resolveImportBatchRow, revertImportBatch } from "./batch-service";
 import { buildImportPreview } from "./preview-service";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -73,6 +74,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
   let userBClient: SupabaseClient<Database>;
   let userAId: string;
   let userBId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -88,20 +90,18 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const run = Date.now();
     const password = "G1-4-Tenant-Test-123!";
 
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `g1-4-tenant-a-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create user A");
     userAId = userA.user.id;
 
-    const { data: userB, error: userBErr } = await admin.auth.admin.createUser({
+    const userB = await identities.createUser(admin, {
       email: `g1-4-tenant-b-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userBErr || !userB) throw userBErr ?? new Error("failed to create user B");
     userBId = userB.user.id;
 
     const { error: memAErr } = await admin.from("memberships").insert({
@@ -138,9 +138,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     // Cascades: import_batches, import_batch_rows, memberships, and
     // inventory_items/wines this suite created all FK restaurant_id ON
     // DELETE CASCADE.
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
-    if (userBId) await admin.auth.admin.deleteUser(userBId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
   });
 
   // BLOCK 2 (round-13 fix) — match_lwin_bulk (0076_csv_import_batches.sql)

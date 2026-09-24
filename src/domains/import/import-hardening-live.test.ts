@@ -26,6 +26,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { applyImportBatchChunk, revertImportBatch } from "./batch-service";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -68,6 +69,7 @@ describe.skipIf(!hasLiveDb)("import hardening 0127/0128 (MANDATORY, live Postgre
   let userClient: SupabaseClient<Database>;
   let restaurantId: string;
   let userId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -82,12 +84,11 @@ describe.skipIf(!hasLiveDb)("import hardening 0127/0128 (MANDATORY, live Postgre
 
     const password = "Import-Hardening-Test-123!";
     const email = `import-hardening-${Date.now()}@terroir.test`;
-    const { data: user, error: userError } = await admin.auth.admin.createUser({
+    const user = await identities.createUser(admin, {
       email,
       password,
       email_confirm: true,
     });
-    if (userError || !user) throw userError ?? new Error("failed to create user");
     userId = user.user.id;
 
     const { error: memError } = await admin
@@ -99,8 +100,9 @@ describe.skipIf(!hasLiveDb)("import hardening 0127/0128 (MANDATORY, live Postgre
   }, 30_000);
 
   afterAll(async () => {
-    if (restaurantId) await admin.from("restaurants").delete().eq("id", restaurantId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin, {
+      restaurantIds: restaurantId ? [restaurantId] : [],
+    });
   });
 
   /**
