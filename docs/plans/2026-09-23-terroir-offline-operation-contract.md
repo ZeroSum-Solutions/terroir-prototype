@@ -16,9 +16,12 @@ deterministic tests and independent acceptance of that bounded implementation.
 They are not yet connected to application flows. The bounded local session-boundary
 leaf now unmounts private content before sign-out work, conservatively resolves raw
 duplicate marker cookies, and keeps uncertain outcomes data-free and retryable. Its
-focused unit and contract suite has 153 passing tests. Real-browser persistence and
-session proof remain unverified; the public shell, positive-eligibility provider, and
-cached search are not implemented. C03 remains incomplete. This foundation adds no
+focused unit and contract suite has 153 passing tests. A bounded
+[17-case browser checkpoint](#session-boundary-browser-checkpoint) verifies the local
+session leaf; four sign-out states run at both 320 px and 390 px, while the other nine
+cases use the default viewport. Native projection provisioning still lacks browser
+proof. The public shell, positive-eligibility provider, and cached search are not
+implemented. C03 remains incomplete. This foundation adds no
 mutation capture, queue, replay, recovery report, count, transfer, receiving flow,
 provider call, schema migration, dependency, or production activation. Active source
 requirements state scope; they do not prove that the behavior ships.
@@ -252,13 +255,46 @@ required dependencies, not silently deferred features.
 | 1. Pure contract | `src/domains/offline/contract.ts`, `contract.test.ts` | Exact v1 schema; forbidden fields cannot serialize; no role/capability/operation types. |
 | 2. Authorized projection | `src/app/api/offline-context/route.ts` and test; a dedicated server query/mapper module | Actor/site derived from current auth; spoofed IDs ignored; revocation denied; lease <=12h; response `no-store`; every authorized placement preserved. |
 | 3. Native store | [Store policy](../../src/domains/offline/database.ts), [IndexedDB driver](../../src/domains/offline/indexeddb.ts), and focused tests under `src/domains/offline/` | Local deterministic tests and independent review pass; real-browser proof remains required. IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
-| 4. Session boundary | [Offline session boundary](../../src/app/%28app%29/offline-session-boundary.tsx), [application layout](../../src/app/%28app%29/layout.tsx), and [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); signout, callback, and confirmation routes under `src/app/auth/`; `src/app/login/actions.ts`; `src/app/api/dev-login/route.ts`; [proxy](../../src/lib/supabase/proxy.ts); [device marker](../../src/domains/offline/device-lock.ts); [same-origin helper](../../src/lib/auth/same-origin-request.ts); focused tests | Bounded local source and 153 focused unit and contract tests cover no locked-login loop, active-restaurant clearing, session-returning auth transition state, marker conservation, both local persistence failure branches, stable in-flight attempts, and raw duplicate-cookie denial. Real-browser verification remains required. |
+| 4. Session boundary | [Offline session boundary](../../src/app/%28app%29/offline-session-boundary.tsx), [application layout](../../src/app/%28app%29/layout.tsx), and [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); signout, callback, and confirmation routes under `src/app/auth/`; `src/app/login/actions.ts`; `src/app/api/dev-login/route.ts`; [proxy](../../src/lib/supabase/proxy.ts); [device marker](../../src/domains/offline/device-lock.ts); [same-origin helper](../../src/lib/auth/same-origin-request.ts); focused tests | Bounded local source and 153 focused unit and contract tests cover no locked-login loop, active-restaurant clearing, session-returning auth transition state, marker conservation, both local persistence failure branches, stable in-flight attempts, and raw duplicate-cookie denial. The 17-case browser checkpoint includes four sign-out states at both 320 px and 390 px; the other nine cases use the default viewport. |
 | 5. Public shell | Planned offline route and client page under existing `src/app/`; planned offline provider under existing `src/app/(app)/`; [application layout](../../src/app/%28app%29/layout.tsx); `src/lib/context/restaurant.tsx`; planned service worker under existing `public/` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
 | 6. Browser proof | focused Playwright spec | All proofs below pass before any implemented ledger assertion may be promoted to proved; lookup-only scope and C03/C05/Q10/C04 dependency states remain explicit. |
 
 Do not add a PWA/IndexedDB wrapper dependency or reorganize unrelated auth/cellar
 code. The dedicated endpoint, two-store adapter, small provider, public page, worker,
 and sign-out boundary are the whole v1 implementation surface.
+
+## Session-boundary browser checkpoint
+
+The guarded, single-worker Chromium run passed all 17 released cases with no failures,
+skips, or retries. Four sign-out states ran at both 320 px and 390 px. The three states
+that held the data-free warning screen rendered readable status text without horizontal
+overflow and retained a keyboard-focusable retry control with a 44 px minimum target.
+The confirmed server sign-out with durable lock reached login with private application
+content absent and no horizontal overflow; that login screen has no retry control. The
+checkpoint covers durable-lock warnings, total local-persistence failure, confirmed
+server sign-out without a verified local marker, and confirmed server sign-out with a
+durable lock. Those states report what persisted; they do not turn a failed lock into a
+successful result.
+
+The duplicate-cookie case observed the original protected `/cellar` navigation for
+both root/cellar marker-value orders. Each request carried both raw values in browser
+wire order, received a `307` to `/login?next=%2Fcellar`, received no `Set-Cookie`, and
+left the browser marker snapshot unchanged. A hard root marker kept the browser at
+login; a transition root marker allowed the authenticated control surface. The proof
+therefore exercises request-scope cookie behavior instead of inferring denial from the
+final URL.
+
+The run also preserved the exact six-table identity snapshot. Counts remained three
+auth users, 361 restaurants, 364 workspaces, four memberships, four workspace
+memberships, and four inventory command receipts. Browser fixture cleanup completed,
+and no retry or source correction occurred during the run.
+
+Only the wider status column is new runtime behavior in this checkpoint. The session
+and authentication semantics were already implemented. Browser-seeded IndexedDB rows
+remain test fixtures, not product provisioning evidence. This checkpoint does not
+cover real-browser native projection provisioning, the public offline shell, positive
+eligibility, cached lookup, durable replay, whole-C03 completion, deployment, or
+production readiness.
 
 ## Concrete acceptance proof
 
