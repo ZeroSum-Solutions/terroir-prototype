@@ -122,6 +122,8 @@ describe("metadataForRequirement", () => {
     [281, "TER-014", "authorization"],
     [282, "TER-047", "pos-integrations"],
     [290, "TER-047", "pos-integrations"],
+    [291, "TER-048", "offline-lookup"],
+    [297, "TER-048", "offline-lookup"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -129,8 +131,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 290", () => {
-    expect(() => metadataForRequirement(291)).toThrow(
+  it("rejects requirements outside the authoritative 297", () => {
+    expect(() => metadataForRequirement(298)).toThrow(
       "no completion metadata",
     );
   });
@@ -350,10 +352,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 290 as the default approved source count", () => {
+  it("keeps 297 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 290");
+    ).toContain("source feature count must remain 297");
   });
 
   it.each([
@@ -576,8 +578,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 290 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(290);
+  it("accounts for all 297 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(297);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -642,7 +644,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the approved C08 Slice A contract without claiming live activation", () => {
-    expect(ledger.items.slice(281).map((item: { id: string }) => item.id)).toEqual(
+    expect(ledger.items.slice(281, 290).map((item: { id: string }) => item.id)).toEqual(
       Array.from({ length: 9 }, (_, index) => `TER-CF-${282 + index}`),
     );
     expect(ledger.items[281]).toMatchObject({
@@ -653,8 +655,22 @@ describe("checked-in feature ledger", () => {
     expect(ledger.items[282].sourceText).toContain(
       "live activation and any public webhook route disabled",
     );
-    expect(ledger.items.slice(281).map((item: { sourceText: string }) => item.sourceText).join("\n"))
+    expect(ledger.items.slice(281, 290).map((item: { sourceText: string }) => item.sourceText).join("\n"))
       .not.toContain("live-active connection");
+  });
+
+  it("appends lookup-only requirements without granting cached server authority", () => {
+    expect(ledger.items.slice(290).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 7 }, (_, index) => `TER-CF-${291 + index}`),
+    );
+    expect(ledger.items[290]).toMatchObject({
+      completionSpec: "TER-048", evidenceOwner: "offline-lookup", status: "active",
+    });
+    expect(ledger.items[291].sourceText).toContain("without treating");
+    expect(ledger.items[294].sourceText).toContain("when both local writes fail");
+    expect(ledger.items[295].sourceText).toContain("all authorized placements");
+    expect(ledger.items[296].actor).toBe("GET /api/offline-context");
+    expect(plan).toContain("all seven requirements remain unimplemented");
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -692,6 +708,7 @@ describe("checked-in feature ledger", () => {
       "TER-043": 3,
       "TER-044": 15,
       "TER-047": 9,
+      "TER-048": 7,
     });
   });
 

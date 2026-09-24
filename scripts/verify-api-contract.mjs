@@ -22,6 +22,7 @@ const CONCRETE_REQUIREMENT_IDS = [
   "TER-CF-288",
   "TER-CF-289",
   "TER-CF-290",
+  "TER-CF-297",
 ];
 const readJson = (root, file) => JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
 const ids = (items) => items.map((item) => item.operationId);
@@ -152,8 +153,8 @@ export function validateReconciliationSemantics({
     );
   }
   const ledgerById = new Map(ledger.items.map((item) => [item.id, item]));
-  if (ledger.items.length !== 290 || ledger.items.some((item) => item.status !== "active")) {
-    errors.push("all 290 feature-ledger requirements must remain active");
+  if (ledger.items.length !== 297 || ledger.items.some((item) => item.status !== "active")) {
+    errors.push("all 297 feature-ledger requirements must remain active");
   }
   for (const requirementId of CONCRETE_REQUIREMENT_IDS) {
     const ledgerItem = ledgerById.get(requirementId);

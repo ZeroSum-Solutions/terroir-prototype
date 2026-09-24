@@ -1321,6 +1321,14 @@
       ]
     },
     {
+      "operationId": "api:GET:/api/offline-context",
+      "method": "GET",
+      "path": "/api/offline-context",
+      "sourceRequirementIds": [
+        "TER-CF-297"
+      ]
+    },
+    {
       "operationId": "api:GET:/api/restaurant",
       "method": "GET",
       "path": "/api/restaurant",

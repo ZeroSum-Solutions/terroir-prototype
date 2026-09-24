@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 290,
+  "featureCount": 297,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
     "expandedOn": "2026-09-23",
-    "approvedActiveCount": 290
+    "approvedActiveCount": 297
   },
   "items": [
     {
@@ -3780,6 +3780,97 @@
       "status": "active",
       "completionSpec": "TER-047",
       "evidenceOwner": "pos-integrations"
+    },
+    {
+      "id": "TER-CF-291",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 291,
+      "sourceText": "System stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads",
+      "actor": "System",
+      "action": "stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads",
+      "observableOutcome": "System stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads",
+      "negativeCase": "Assertion is not observed: System stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-292",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 292,
+      "sourceText": "System fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security",
+      "actor": "System",
+      "action": "fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security",
+      "observableOutcome": "System fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security",
+      "negativeCase": "Assertion is not observed: System fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-293",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 293,
+      "sourceText": "System atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one",
+      "actor": "System",
+      "action": "atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one",
+      "observableOutcome": "System atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one",
+      "negativeCase": "Assertion is not observed: System atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-294",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 294,
+      "sourceText": "System reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations",
+      "actor": "System",
+      "action": "reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations",
+      "observableOutcome": "System reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations",
+      "negativeCase": "Assertion is not observed: System reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-295",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 295,
+      "sourceText": "System immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail",
+      "actor": "System",
+      "action": "immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail",
+      "observableOutcome": "System immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail",
+      "negativeCase": "Assertion is not observed: System immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-296",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 296,
+      "sourceText": "Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support",
+      "actor": "Staff",
+      "action": "can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support",
+      "observableOutcome": "Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support",
+      "negativeCase": "Assertion is not observed: Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
+    },
+    {
+      "id": "TER-CF-297",
+      "domain": "offline_lookup_foundation",
+      "sourceOrder": 297,
+      "sourceText": "GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
+      "actor": "GET /api/offline-context",
+      "action": "returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
+      "observableOutcome": "GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
+      "negativeCase": "Assertion is not observed: GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
+      "status": "active",
+      "completionSpec": "TER-048",
+      "evidenceOwner": "offline-lookup"
     }
   ]
 }

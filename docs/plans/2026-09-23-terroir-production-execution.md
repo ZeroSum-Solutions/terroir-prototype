@@ -76,6 +76,16 @@ and image rights must be verified before enabling the corresponding live feature
 
 ## Offline engineering policy to prove
 
+Source promotion for the first C03 slice: `TER-CF-291` through `TER-CF-297`, owned by
+`TER-048`, are **UNIMPLEMENTED** requirements. The accepted
+[`offline-operation contract`](2026-09-23-terroir-offline-operation-contract.md)
+defines cost-free cached lookup, complete placements, two replaceable IndexedDB
+stores, a credentialless public shell, and honest shared-device lock behavior.
+Promote this contract before runtime work. Browser and authorization proofs must
+pass before any implementation claim; this slice does not complete C03 or C05.
+C06 individual-bottle receipts and online count/receiving/placement authority gate
+durable capture; C04 site grants and the transfer lifecycle also gate C05 transfers.
+
 Never label a local pending write as synchronized. Persist a stable operation ID
 before acknowledging capture. Partition local data by authenticated user and site;
 do not expose a previous user's cache after switching or signing out. Revalidate

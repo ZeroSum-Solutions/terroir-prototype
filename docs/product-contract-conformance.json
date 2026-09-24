@@ -3,9 +3,9 @@
   "generatorVersion": 2,
   "scope": {
     "firstRequirementId": "TER-CF-180",
-    "lastRequirementId": "TER-CF-290",
-    "requirementCount": 41,
-    "activeFeatureLedgerCount": 290
+    "lastRequirementId": "TER-CF-297",
+    "requirementCount": 42,
+    "activeFeatureLedgerCount": 297
   },
   "inputs": {
     "featureLedger": "docs/feature-ledger.json",
@@ -14,7 +14,7 @@
   "summary": {
     "proved": 0,
     "weak": 23,
-    "unimplemented": 18
+    "unimplemented": 19
   },
   "requirements": [
     {
@@ -609,6 +609,20 @@
         "expectedRoute": {
           "method": "POST",
           "path": "/api/integrations/pos/toast/observations/[id]/interpretations"
+        },
+        "implementation": null
+      }
+    },
+    {
+      "requirementId": "TER-CF-297",
+      "status": "unimplemented",
+      "reason": "current_route_not_discovered",
+      "operationId": "api:GET:/api/offline-context",
+      "evidence": {
+        "ledgerClaim": "GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
+        "expectedRoute": {
+          "method": "GET",
+          "path": "/api/offline-context"
         },
         "implementation": null
       }

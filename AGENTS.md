@@ -105,7 +105,7 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
-| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 290 assertions |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 297 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
@@ -113,11 +113,12 @@ recorded. The required critical subset fails on any skip.
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
-current machine-read source for 290 requirement identities, but the generated
+current machine-read source for 297 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the behavior is complete; the eight C04
-workspace/site shadow-access assertions and nine C08 fixture/manual POS-corroboration
-assertions remain unimplemented. Non-core `app_spec.txt`
+workspace/site shadow-access assertions, nine C08 fixture/manual POS-corroboration
+assertions and seven C03 offline-lookup assertions remain unimplemented. Pure Toast
+modules alone do not complete the C08 workflows. Non-core `app_spec.txt`
 prose can retain historical or drifted claims (including a dead env var name).
 `claude-progress.txt` is a frozen historical record and does not determine current
 scope or status. Both remain at the **repo root**, not in `docs/_archive/`.

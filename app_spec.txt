@@ -6,7 +6,7 @@
   </overview>
 
   <feature_budget>
-    Implement all 290 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, and nine C08 fixture/manual POS-corroboration additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 297 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, and seven C03 offline-lookup foundation additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
   </feature_budget>
 
   <initializer_guidance>
@@ -418,6 +418,16 @@
       - GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth
       - POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory
     </toast_pos_corroboration>
+
+    <offline_lookup_foundation>
+      - System stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads
+      - System fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security
+      - System atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one
+      - System reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations
+      - System immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail
+      - Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support
+      - GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses
+    </offline_lookup_foundation>
 
   </core_features>
 

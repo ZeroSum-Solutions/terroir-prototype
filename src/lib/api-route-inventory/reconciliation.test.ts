@@ -114,21 +114,21 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 290 requirements active and maps the original and C08 route assertions once", () => {
-    expect(ledger.items).toHaveLength(290);
+  it("keeps all 297 requirements active and maps the original, C08 and C03 route assertions once", () => {
+    expect(ledger.items).toHaveLength(297);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {
       const order = Number(item.id.slice("TER-CF-".length));
-      return (order >= 180 && order <= 211) || (order >= 288 && order <= 290);
+      return (order >= 180 && order <= 211) || (order >= 288 && order <= 290) || order === 297;
     });
-    expect(concreteLedger).toHaveLength(35);
+    expect(concreteLedger).toHaveLength(36);
 
     const mapped = uniqueBy(
       reconciliation.concreteRequirements,
       (item) => item.requirementId,
     );
-    expect(mapped.size).toBe(35);
+    expect(mapped.size).toBe(36);
     for (const requirement of concreteLedger) {
       const mapping = mapped.get(requirement.id);
       expect(mapping, `${requirement.id} must be mapped`).toBeDefined();
@@ -153,6 +153,14 @@ describe("TER-020Ab active API requirement reconciliation", () => {
     expect(
       inventory.plannedOperations.some((item) => item.path.includes("webhook")),
     ).toBe(false);
+  });
+
+  it("keeps the C03 lookup endpoint planned without promising a mutation or recovery route", () => {
+    expect(inventory.plannedOperations.filter((item) => item.path.includes("offline")))
+      .toEqual([{
+        operationId: "api:GET:/api/offline-context", method: "GET",
+        path: "/api/offline-context", sourceRequirementIds: ["TER-CF-297"],
+      }]);
   });
 
   it("classifies every discovered and planned operation exactly once", () => {

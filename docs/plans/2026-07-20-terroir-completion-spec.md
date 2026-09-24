@@ -100,7 +100,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Authentication methods | Support magic link plus email/password; retain password reset | No approval unless provider or schema changes |
 | Staff access to wine lists | Read-only view with edit controls absent | Safe default |
 | Missing documented GET APIs | Add thin authenticated handlers over existing query modules | Safe unless a route would expose new public data |
-| Offline promise | Amend to resilient ISR and graceful network-failure behavior; do not add a service worker | Stop only if true offline editing is required |
+| Offline promise | Public ISR remains; September 23 C03 approval adds native public-shell cached lookup under TER-048, followed by dependency-gated offline capture | Cached lookup is not offline editing or C03 completion |
 | Invitation delivery | Use a transactional email provider, with the generated link still copyable by owner/manager | Provider choice and production secret require approval |
 | Staff briefing | A restaurant-scoped daily queue that can be viewed, reordered, removed, printed, and copied | Safe default; notifications are out of scope |
 | Voice commands | Browser speech recognition with a typed fallback; all mutations require a confirmation screen | Stop if a paid speech provider is needed |
@@ -108,7 +108,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Backup connection | Add a dedicated least-privilege direct database URL to GitHub Actions | Secret creation and production restore require approval |
 | Public list navigation | Show a switcher when the same restaurant has multiple published lists | Safe default |
 | Large-file refactors | Split only code touched by a feature, preserving behavior | Safe default |
-| Core feature count | Keep all 281 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02 and eight C04 Slice 1 additions approved 2026-09-23 |
+| Core feature count | Keep all 297 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02, eight C04, nine C08 and seven C03 lookup additions approved 2026-09-23 |
 
 ### 4.1 Human provisioning checklist
 
@@ -765,7 +765,7 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 
 **Acceptance:** All required checks pass on the promoted SHA; no active requirement lacks evidence; production auth, public list, health, queue, and key read paths pass; rollback target is recorded; during the 24-hour observation window, HTTP 5xx stays below 1%, synthetic auth and public-list success stay at or above 99%, background-job success stays at or above 95% with queue age below 5 minutes, public-list p95 response time stays below 2 seconds, and no unresolved severity-1 or severity-2 event is opened. Low-volume metrics must be supported by the scheduled synthetic canaries.
 **Verification:** Release manifest with commit, artifact, migrations, checks, staging report, production canary, and rollback reference.
-**Dependencies:** `TER-002` through `TER-045` and `TER-047`.
+**Dependencies:** `TER-002` through `TER-045`, `TER-047` and `TER-048`.
 **Approval:** Production schema changes, deployment, data writes, and rollback require explicit approval at the release boundary.
 
 ### TER-047: Deliver bounded POS corroboration Slice A
@@ -775,6 +775,14 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 **Acceptance:** Authenticated fixture/manual imports retain explicit non-live provenance; accepted observations, duplicates, changed-body conflicts, out-of-order snapshots, incomplete mapping, and authorized linked interpretations preserve their reviewed evidence. Every exercised path leaves `pour_events`, `open_bottles`, `inventory_items`, `bottle_closeouts`, `stock_adjustments`, and `inventory_command_receipts` unchanged. Connection and coverage states remain truthful, and no public webhook route or Orders pull exists in Slice A.
 **Verification:** Adapter and persistence tests with signed local fixtures, cross-site containment, row-and-value comparisons for the six forbidden physical relations, API contract tests for the three authenticated Slice A routes, and operator UI tests for provenance, abstention, mismatch, coverage-gap, and connection-state presentation. Live C08 remains gated on the provider evidence in the approved Toast contract.
 **Dependencies:** `TER-004`, `TER-012`, `TER-014`, `TER-020`, `TER-023`, `TER-041`.
+
+### TER-048: Deliver the offline lookup foundation
+
+**Outcome:** Staff can find their site's cached wines and every authorized placement after a disconnected restart, with honest projection age and no costs, private session HTML or offline-write promise.
+
+**Acceptance:** Current server authentication derives the actor/site in `GET /api/offline-context`; its strict allowlist contains neither costs nor roles and every response is `no-store`. Native IndexedDB v1 contains only replaceable contexts and projections. Atomic provisioning locks all other partitions. Invalid, ambiguous, expired or clock-rollback state and storage denial reveal no private rows. The worker caches only the credentialless public shell and exact same-build assets, and reports ready only after every entry succeeds. Sign-out blanks private UI immediately, prevents locked-login loops, clears active-site selection remotely, and reports local-lock failures truthfully; remote success does not imply failed local locks were repaired. New sign-in does not unlock an old partition without fresh provisioning.
+**Verification:** Field-exclusion and authorization tests; real-browser two-store, denial, quota, corruption and clock tests; cache/request inspection; actor/site switch and sign-out failure matrix; hard offline reload and lookup at 320, 390 and 768 pixels. All authorized placements must survive projection and search. This source promotion precedes implementation; all seven requirements remain unimplemented until those proofs pass.
+**Dependencies:** `TER-004`, `TER-010`, `TER-012`, `TER-020`, `TER-044`. The approved offline-operation contract governs implementation. C03 mutation capture remains required after C06 physical-bottle receipts and online count/receiving/placement authority; transfers additionally require C04/C05. TER-048 alone cannot close those criteria.
 
 ## 7. Autonomous execution contract
 
