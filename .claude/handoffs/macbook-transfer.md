@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: b0a3ecfec0b08e2d1f84aeb4ccc680323f20709b
+last-code-commit: 0ba6c37ba70431e5d1e2f542ab7bf77afdaaaf85
 
 ## Active Task
 
@@ -68,6 +68,13 @@ bounded checkpoints. These counts are selected tests, not full-release coverage.
 Mini-only evidence: `demo-detail-cost-20260924/` and
 `demo-verification-blockers-20260924/` under the goal proof directory.
 
+Checkpoint `0ba6c37b` protects wine-list detail reads too: safe wine fields go to
+the client, and internal pricing inputs/suggestions require both read grants.
+Read failures leave suggestions unavailable, not zero. Independent focused tests
+passed 5/5, with TypeScript and scoped gates passing; Opus accepted the bounded
+source. Evidence is in `demo-list-cost-20260924/`. No live database or browser
+pass is implied by these unit checks.
+
 These checkpoints are NOT a complete authorization rollout. Without 0154 and explicit
 grants, cost/target displays and suggestions fail closed for owners and managers too;
 manual menu-price entry remains available by source inspection. Raw authenticated
@@ -105,8 +112,11 @@ For the active mini goal, finish database and remaining-screen cost protection b
 team safety, then prove find/open/pour and receive/count/reconcile in the browser.
 The latest isolated schema restore passed after exact source-derived owner-role setup,
 but whole owner/ACL comparison found two missing GraphQL schema permission sets.
-That run stopped before applying 0153/0154. A finite repair is under independent
-review; do not run another blind restore or change the retained active database.
+That run stopped before applying 0153/0154. The reviewed finite repair then stopped
+at a process-identity assertion before any SQL mutation. Its helper must account for
+the captured trailing byte and explicitly cast one catalog field before a fresh
+reviewed invocation. Read-only settlement confirmed the donor and target unchanged.
+Do not run another blind restore or change the retained active database.
 
 On the mini, the guarded development wrapper responds with `--webpack` after the
 default bundler entered a memory/restart loop. The synthetic local login and mobile
