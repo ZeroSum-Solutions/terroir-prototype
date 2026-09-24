@@ -16,6 +16,7 @@ const { GET } = await import("./route");
 const userId = "10000000-0000-4000-8000-000000000001";
 const restaurantId = "10000000-0000-4000-8000-000000000002";
 const wineId = "10000000-0000-4000-8000-000000000003";
+const request = () => new NextRequest("http://localhost/api/offline-context");
 
 const lookupRows = [{
   wineId,
@@ -74,7 +75,7 @@ describe("GET /api/offline-context", () => {
       { status },
     ));
 
-    const response = await GET();
+    const response = await GET(request());
 
     expect(response.status).toBe(status);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -85,7 +86,7 @@ describe("GET /api/offline-context", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     lookup.loadOfflineCellarRows.mockRejectedValue(new Error("private database detail"));
 
-    const response = await GET();
+    const response = await GET(request());
 
     expect(response.status).toBe(500);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -100,7 +101,7 @@ describe("GET /api/offline-context", () => {
       { ...lookupRows[0], currentUnitCost: 42 },
     ]);
 
-    const response = await GET();
+    const response = await GET(request());
 
     expect(response.status).toBe(500);
     expect(response.headers.get("Cache-Control")).toBe("no-store");

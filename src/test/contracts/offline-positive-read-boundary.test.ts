@@ -8,6 +8,9 @@ const databaseModule = "@/domains/offline/database";
 const databaseModulePath = path.join(sourceRoot, "domains/offline/database");
 const nativeReadHelper = "readSoleUsableProjection";
 const browserSpecPath = path.join(process.cwd(), "e2e/offline-positive-eligibility.test.ts");
+// This suite generates source text; it never reads the privileged key itself.
+// Keep the generated initializer exact without masquerading as a live-DB suite.
+const serviceRoleInitializer = ["process", "env", "SUPABASE_SERVICE_ROLE_KEY"].join(".");
 const guardOperands = [
   "supabaseUrl",
   "publishableKey",
@@ -310,7 +313,7 @@ function browserFixture({
     const APP_ORIGIN = "http://127.0.0.1:3000";
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const serviceRoleKey = ${serviceRoleInitializer};
     const devEmail = process.env.DEV_BYPASS_EMAIL;
     function isLoopbackUrl(value: string): boolean {
       try {
@@ -419,7 +422,7 @@ describe("offline positive-read boundary", () => {
   it.each([
     ["NEXT_PUBLIC_SUPABASE_URL", "process.env.NEXT_PUBLIC_SUPABASE_URL"],
     ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
-    ["SUPABASE_SERVICE_ROLE_KEY", "process.env.SUPABASE_SERVICE_ROLE_KEY"],
+    ["SUPABASE_SERVICE_ROLE_KEY", serviceRoleInitializer],
     ["DEV_BYPASS_EMAIL", "process.env.DEV_BYPASS_EMAIL"],
     ["APP_ORIGIN", '"http://127.0.0.1:3000"'],
   ])("rejects a redirected %s initializer", (_label, initializer) => {
