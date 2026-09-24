@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  cancelTypeSafeJevResponseBody,
+  readTypeSafeJevJsonResponse,
+  type TypeSafeJevResponseReadReason,
+} from "./typesafe-jev-response";
+
 export const TYPESAFE_JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 export const TYPESAFE_JEV_MODEL = "jev-1.13.0";
 export const TYPESAFE_JEV_PROBABILITY_SUM_TOLERANCE = 0.001;
@@ -84,6 +90,7 @@ const UsageSchema = z
 export type TypeSafeJevChoiceRequest = z.input<typeof ChoiceRequestSchema>;
 
 export type TypeSafeJevUnavailableReason =
+  | TypeSafeJevResponseReadReason
   | "missing_token"
   | "invalid_request"
   | "request_too_large"
@@ -95,7 +102,6 @@ export type TypeSafeJevUnavailableReason =
   | "http_overloaded"
   | "http_server"
   | "http_error"
-  | "malformed_json"
   | "schema_mismatch"
   | "model_mismatch"
   | "usage_invalid";
@@ -246,7 +252,12 @@ export function createTypeSafeJevClient({
           }),
         )
         .then(
-        (response) => ({ kind: "response" as const, response }),
+        (response) => {
+          if (controller.signal.aborted) {
+            cancelTypeSafeJevResponseBody(response);
+          }
+          return { kind: "response" as const, response };
+        },
         () => ({ kind: "network" as const }),
       );
 
@@ -261,28 +272,31 @@ export function createTypeSafeJevClient({
             elapsed(),
           );
         }
-        if (elapsed() >= deadlineMs) return unavailable("deadline", elapsed());
+        if (elapsed() >= deadlineMs) {
+          controller.abort();
+          cancelTypeSafeJevResponseBody(outcome.response);
+          return unavailable("deadline", elapsed());
+        }
         if (!outcome.response.ok) {
+          cancelTypeSafeJevResponseBody(outcome.response);
           return unavailable(httpFailureReason(outcome.response.status), elapsed());
         }
 
         const parsedBody = await Promise.race([
-          Promise.resolve()
-            .then(() => outcome.response.json())
-            .then(
-              (body) => ({ kind: "body" as const, body }),
-              () => ({ kind: "malformed" as const }),
-            ),
+          readTypeSafeJevJsonResponse(outcome.response, controller.signal),
           deadline,
         ]);
-        if (parsedBody.kind === "deadline") {
+        if ("kind" in parsedBody) {
           return unavailable("deadline", elapsed());
         }
-        if (parsedBody.kind === "malformed") {
-          return unavailable("malformed_json", elapsed());
+        if (parsedBody.status === "unavailable") {
+          return unavailable(parsedBody.reason, elapsed());
         }
-        if (elapsed() >= deadlineMs) return unavailable("deadline", elapsed());
-        const envelope = EnvelopeSchema.safeParse(parsedBody.body);
+        if (elapsed() >= deadlineMs) {
+          controller.abort();
+          return unavailable("deadline", elapsed());
+        }
+        const envelope = EnvelopeSchema.safeParse(parsedBody.value);
         if (!envelope.success) return unavailable("schema_mismatch", elapsed());
         if (envelope.data.model !== TYPESAFE_JEV_MODEL) {
           return unavailable("model_mismatch", elapsed());

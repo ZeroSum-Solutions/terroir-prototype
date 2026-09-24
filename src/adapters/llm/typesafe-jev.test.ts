@@ -10,6 +10,7 @@ import {
   type TypeSafeJevClock,
   type TypeSafeJevTransport,
 } from "./typesafe-jev";
+import { TYPESAFE_JEV_MAX_RESPONSE_BYTES } from "./typesafe-jev-response";
 
 const REQUEST: TypeSafeJevChoiceRequest = {
   state: {
@@ -45,11 +46,10 @@ const VALID_RESPONSE = {
 };
 
 const response = (body: unknown, status = 200) =>
-  ({
-    ok: status >= 200 && status < 300,
+  new Response(JSON.stringify(body), {
     status,
-    json: vi.fn(async () => body),
-  }) as unknown as Response;
+    headers: { "content-type": "application/json" },
+  });
 
 const fixedClock = (start = 100, end = 125): TypeSafeJevClock => ({
   now: vi.fn().mockReturnValueOnce(start).mockReturnValue(end),
@@ -264,7 +264,16 @@ describe("TypeSafe JEV adapter", () => {
     [500, "http_server"],
     [529, "http_overloaded"],
   ])("maps HTTP %s without reading or exposing provider error text", async (status, reason) => {
-    const errorResponse = response({ detail: "private provider error" }, status);
+    const cancel = vi.fn();
+    const errorResponse = new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode("private provider error"));
+        },
+        cancel,
+      }, { highWaterMark: 0 }),
+      { status, headers: { "content-type": "application/json" } },
+    );
     const transport = vi.fn().mockResolvedValue(errorResponse);
     const client = createTypeSafeJevClient({
       token: "token",
@@ -275,17 +284,15 @@ describe("TypeSafe JEV adapter", () => {
     const result = await client.choose(REQUEST);
 
     expect(result).toMatchObject({ status: "unavailable", reason });
-    expect(errorResponse.json).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(result)).not.toContain("private provider error");
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it("maps malformed JSON and synchronous or asynchronous network failure without retry", async () => {
-    const malformed = {
-      ok: true,
-      status: 200,
-      json: vi.fn().mockRejectedValue(new SyntaxError("bad json")),
-    } as unknown as Response;
+    const malformed = new Response("not json", {
+      headers: { "content-type": "application/json" },
+    });
     const malformedTransport = vi.fn().mockResolvedValue(malformed);
     const networkTransport = vi.fn().mockRejectedValue(new Error("secret upstream text"));
     const throwingTransport = vi.fn(() => {
@@ -316,6 +323,42 @@ describe("TypeSafe JEV adapter", () => {
     expect(malformedTransport).toHaveBeenCalledTimes(1);
     expect(networkTransport).toHaveBeenCalledTimes(1);
     expect(throwingTransport).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps oversized delivered bytes without retrying or exposing the response", async () => {
+    let pullCount = 0;
+    const cancel = vi.fn();
+    const transport = vi.fn<TypeSafeJevTransport>().mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pullCount += 1;
+            controller.enqueue(
+              pullCount === 1
+                ? new Uint8Array(TYPESAFE_JEV_MAX_RESPONSE_BYTES).fill(0x20)
+                : new TextEncoder().encode("private oversized payload"),
+            );
+          },
+          cancel,
+        }, { highWaterMark: 0 }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await createTypeSafeJevClient({
+      token: "token",
+      transport,
+      clock: fixedClock(),
+    }).choose(REQUEST);
+
+    expect(result).toEqual({
+      status: "unavailable",
+      reason: "response_too_large",
+      elapsedMs: 25,
+    });
+    expect(JSON.stringify(result)).not.toContain("private");
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it("maps a redirect rejection without retrying or exposing payload or error text", async () => {
@@ -389,12 +432,13 @@ describe("TypeSafe JEV adapter", () => {
       }),
       clearTimeout: vi.fn(),
     };
-    const json = vi.fn(() => new Promise<unknown>(() => undefined));
-    const transport = vi.fn<TypeSafeJevTransport>().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json,
-    } as unknown as Response);
+    const pull = vi.fn(() => new Promise<void>(() => undefined));
+    const cancel = vi.fn(() => new Promise<void>(() => undefined));
+    const transport = vi.fn<TypeSafeJevTransport>().mockResolvedValue(
+      new Response(new ReadableStream<Uint8Array>({ pull, cancel }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
     const pending = createTypeSafeJevClient({
       token: "token",
       transport,
@@ -402,7 +446,7 @@ describe("TypeSafe JEV adapter", () => {
       deadlineMs: 25,
     }).choose(REQUEST);
 
-    await vi.waitFor(() => expect(json).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
     fireDeadline?.();
 
     await expect(pending).resolves.toEqual({
@@ -411,6 +455,100 @@ describe("TypeSafe JEV adapter", () => {
       elapsedMs: 25,
     });
     expect((transport.mock.calls[0][1].signal as AbortSignal).aborted).toBe(true);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns deadline when ready one-byte chunks finish after elapsed total time", async () => {
+    let currentTime = 0;
+    let index = 0;
+    const bytes = new TextEncoder().encode(JSON.stringify(VALID_RESPONSE));
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      if (index >= bytes.byteLength) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(bytes.slice(index, index + 1));
+      index += 1;
+      currentTime = 25;
+    });
+    const clock: TypeSafeJevClock = {
+      now: vi.fn(() => currentTime),
+      setTimeout: vi.fn(() => 10),
+      clearTimeout: vi.fn(),
+    };
+    const transport = vi.fn<TypeSafeJevTransport>().mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({ pull }, { highWaterMark: 0 }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await createTypeSafeJevClient({
+      token: "token",
+      transport,
+      clock,
+      deadlineMs: 25,
+    }).choose(REQUEST);
+
+    expect(result).toEqual({
+      status: "unavailable",
+      reason: "deadline",
+      elapsedMs: 25,
+    });
+    expect(pull).toHaveBeenCalledTimes(bytes.byteLength + 1);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a late response body without changing the typed deadline result", async () => {
+    let fireDeadline: (() => void) | undefined;
+    let resolveTransport: ((response: Response) => void) | undefined;
+    let currentTime = 0;
+    const clock: TypeSafeJevClock = {
+      now: vi.fn(() => currentTime),
+      setTimeout: vi.fn((callback) => {
+        fireDeadline = () => {
+          currentTime = 25;
+          callback();
+        };
+        return 9;
+      }),
+      clearTimeout: vi.fn(),
+    };
+    const transport = vi.fn<TypeSafeJevTransport>().mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveTransport = resolve;
+      }),
+    );
+    const pending = createTypeSafeJevClient({
+      token: "token",
+      transport,
+      clock,
+      deadlineMs: 25,
+    }).choose(REQUEST);
+
+    fireDeadline?.();
+    const result = await pending;
+    const cancel = vi.fn(() => Promise.reject(new Error("private cancel payload")));
+    resolveTransport?.(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.enqueue(new TextEncoder().encode("private late payload"));
+          },
+          cancel,
+        }, { highWaterMark: 0 }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
+    expect(result).toEqual({
+      status: "unavailable",
+      reason: "deadline",
+      elapsedMs: 25,
+    });
+    expect(JSON.stringify(result)).not.toContain("private");
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
