@@ -96,6 +96,23 @@ design decision. The required behavior is:
 - no implementation may infer that a workspace type grants a permission. Membership,
   role, and capability checks remain explicit.
 
+### Decision PDR-015: physical bottle and service-event grain
+
+**Status:** Accepted by the owner on 2026-09-23; source design promoted, implementation
+pending.
+
+Sealed stock remains lot-and-quantity based until custody, placement, condition, or
+service requires unit identity. Each opened bottle then receives one immutable physical
+ID, a captured nominal-capacity snapshot, a state version, and exact source-lot
+provenance when known. Promoted legacy bottles retain an explicit unknown-provenance
+state rather than an invented lot.
+
+Multiple bottles of one wine may be active. Every service command must name one exact
+bottle or an explicit predecessor-opening selector. No writer may select the first,
+newest, fullest, or remembered bottle implicitly; split, replace, reopen, and
+substitution behavior also require explicit commands. Exact-bottle history is
+append-only and receipt-linked.
+
 ## 2. Authority and document boundaries
 
 This document is the planning source for the future product and data model after owner
@@ -109,11 +126,11 @@ approval. It does not replace current implementation truth.
 | What may an implementation ticket change? | An approved requirement promoted into `app_spec.txt` and the generated feature ledger |
 | What is historical context rather than current authority? | Archived plans, `app_spec.txt` drifted prose, and `claude-progress.txt` |
 
-The current feature ledger contains 269 active core requirements. Later planning added
-collector tenancy, evidence states, global vintage identity, physical placements,
-source-aware ratings, stocktakes, custody, and deeper provenance. Those later
-requirements have not all entered the source ledger. This document reconciles them
-without pretending they have shipped.
+The feature ledger contained 297 active requirements before this C06 promotion and now
+contains 315. Later planning still includes collector tenancy, evidence states, global
+vintage identity, physical placements, source-aware ratings, stocktakes, custody, and
+deeper provenance that have not all entered the source ledger. This document reconciles
+those requirements without pretending they have shipped.
 
 ## 3. Product principles
 
@@ -248,6 +265,10 @@ IDs until they enter the approved source ledger.
 - Record case state such as sealed, opened, partial, damaged, or unknown.
 - Preserve bottle or case condition observations over time.
 - Prevent placed physical units from exceeding available quantity.
+- Keep sealed stock in same-site acquisition lots with optional one-to-one sealed tags.
+  A native open consumes exactly one identified lot unit and creates one immutable
+  opened-bottle identity with a captured capacity snapshot. Legacy provenance remains
+  explicitly unknown when the historical source lot cannot be proven.
 
 ### CAP-06: inventory history and stock truth
 
@@ -264,6 +285,11 @@ IDs until they enter the approved source ledger.
 - Keep sealed quantity in units by format and open quantity in mL with exact
   conversions. Distinguish measured volume from estimates based on standard pours.
   A bottle-equivalent display must name its conversion basis.
+- Record contract-2 service events in integer mL against one exact bottle. Each command
+  carries a stable operation UUID, stores immutable receipt and effect evidence, and
+  increments that bottle's state version once. Corrections append linked compensation;
+  they never delete an event. Later catalog-capacity edits cannot rewrite the opening
+  snapshot or historical arithmetic.
 
 ### CAP-07: locations, containers, and custody
 
@@ -290,6 +316,11 @@ IDs until they enter the approved source ledger.
 - Keep sealed-stock counts separate from open-bottle volume reconciliation.
 - Support offline capture only after conflict, retry, and device-loss behavior is
   specified and tested.
+- Reconcile active bottles through one all-or-none exact-bottle batch. Each entry carries
+  only bottle ID, expected state version, target remaining mL, and a nullable note. The
+  server canonicalizes UUID order, locks wines before bottles in sorted order,
+  revalidates the complete wine set under lock, rolls back every entry on failure, and
+  replays only an exact durable payload for the same operation UUID.
 
 ### CAP-09: tasting notes and personal notes
 
@@ -374,6 +405,10 @@ IDs until they enter the approved source ledger.
   shared storage, purchasing, pars, credits/returns, and shift handoff with the pilot.
 - Where transfers are required, represent dispatch, in transit, receipt, and
   discrepancies without duplicating stock at both sites.
+- Retain four required service slices after the physical-bottle foundation:
+  venue-managed pour and tasting presets; flight and split-pour line identity;
+  bottle/table holds; and optional sealed tags. Each slice requires its own concurrency,
+  conservation, authorization, and retry evidence before completion.
 - Treat POS and supplier integrations as versioned adapters. Terroir owns physical
   inventory; the POS owns its financial/order facts and suppliers own their documents.
 - Specify depletion authority per site and service channel. A manual pour and a POS
@@ -908,7 +943,7 @@ approval does not prove either tier works.
 
 | Source | What this document retains | Boundary retained |
 |---|---|---|
-| `app_spec.txt` and `docs/feature-ledger.json` | The 269-feature restaurant core | Active does not prove shipped; later requirements still need promotion |
+| `app_spec.txt` and `docs/feature-ledger.json` | The 297-feature pre-C06 contract, expanded by this promotion to 315 active source requirements | Active does not prove shipped; later requirements still need promotion |
 | `docs/plans/_archive/2026-08-21-camera-first-personal-cellar-prd.md` | Personal tenancy, capture, cases, custody, purchase provenance, search, sharing, privacy | Archived plan was not implementation authority; PDR-001 now resolves its largest blocker |
 | `docs/plans/2026-08-24-visual-wine-platform-prd.md` | Global editions, source-aware ratings, physical placement, voice, 3D substrate | Demo-specific targets and provisional migration numbers are not adopted as current implementation facts |
 | `docs/plans/2026-08-30-terroir-product-prd.md` | One platform for collectors and restaurants, deep wine attributes, conversational access, 3D direction | Field-walk tiers are not a complete domain model |
@@ -954,3 +989,9 @@ This draft is ready for owner review when:
   /goal implementation through production readiness, mobile optimization, arbitrary
   agent delegation, and JEV verification. Prior unapproved status is superseded;
   unknown facts, empirical pilot results, and the approved release gates remain.
+- 2026-09-23: promoted PDR-015 and the physical-bottle source design through the
+  [contract](2026-09-23-terroir-physical-bottle-contract.md),
+  [database transition](2026-09-23-terroir-physical-bottle-database-transition.md), and
+  [application transition](2026-09-23-terroir-physical-bottle-app-transition.md).
+  Promotion authorizes implementation work but does not claim a migration, runtime
+  path, or completed C06 workflow.

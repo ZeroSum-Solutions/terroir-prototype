@@ -13,7 +13,7 @@ export const ALLOWED_STATUSES = [
 
 export const SCHEMA_VERSION = 2;
 export const SOURCE_FILE = "app_spec.txt";
-export const APPROVED_FEATURE_COUNT = 297;
+export const APPROVED_FEATURE_COUNT = 315;
 export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
@@ -82,12 +82,14 @@ export const COMPLETION_RULES = [
   [279, 281, "TER-014", "authorization"],
   [282, 290, "TER-047", "pos-integrations"],
   [291, 297, "TER-048", "offline-lookup"],
+  [298, 315, "TER-041", "physical-bottle-inventory"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,
   /^((?:GET|POST|PATCH|DELETE) \S+) (.+)$/,
   /^(All (?:write endpoints|endpoints|RLS policies)) (.+)$/,
   /^(Dev login route|Migrations|schema\.snapshot\.sql|set_updated_at trigger|handle_new_user trigger|find_or_create_wine and find_or_create_wines_batch|generate_slug|match_lwin and match_lwin_batch|lwin_search|cleanup_scan_idempotency|record_pour|reconcile_open_bottle and reconcile_open_bottles_batch|auto_eightysix_on_low_inventory|enrich_wines_batch|global-error\.tsx|Source maps|Railway deploy|pnpm build|pnpm start|Vitest|Playwright|ESLint 9 flat config|TypeScript strict mode|pnpm types:check|pnpm snapshot:check) (.+)$/,
+  /^(Opening|A pour|Contract-2 events|Undo|\/cellar\/open|Measured close and discard|Fresh physical open, pour, spill, close, discard, and undo writes|Insufficient selected-bottle volume|Venue-managed presets|Reconciliation lists|Reconciliation variance|Every reconciliation, including one bottle,|Each committed reconciliation entry|The database|Version 2|execute_physical_reconciliation_batch|Browser coverage|Fresh opens and closes|Each contract-2 open bottle|Multiple physical bottles of one wine|Every contract-2 pour, spill, reconcile, close, discard, and undo event\/effect|Exact-bottle reconciliation|Phase C|Discard|Exact-bottle readers|Physical source-lot provenance|Venue-managed pour and tasting presets|Flight and split-pour lines|Bottle\/table holds|Optional sealed tags) (.+)$/,
 ];
 
 export function parseCoreFeatures(source) {

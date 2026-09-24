@@ -114,8 +114,8 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 297 requirements active and maps the original, C08 and C03 route assertions once", () => {
-    expect(ledger.items).toHaveLength(297);
+  it("keeps all 315 requirements active and maps the original, C08 and C03 route assertions once", () => {
+    expect(ledger.items).toHaveLength(315);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {
@@ -172,6 +172,19 @@ describe("TER-020Ab active API requirement reconciliation", () => {
       concreteRequirementId: "TER-CF-297",
       semanticAliasContext: [],
     });
+  });
+
+  it("binds the physical-bottle route promises to existing operations without planned duplicates", () => {
+    const discovered = new Set(inventory.discoveredOperations.map((item) => item.operationId));
+    const planned = new Set(inventory.plannedOperations.map((item) => item.operationId));
+
+    for (const order of [311, 312, 313, 314, 315]) {
+      const requirement = ledger.items[order - 1];
+      const actor = apiActor(requirement);
+      const operationId = operationIdFor(actor.method, actor.path);
+      expect(discovered.has(operationId), requirement.id).toBe(true);
+      expect(planned.has(operationId), requirement.id).toBe(false);
+    }
   });
 
   it("classifies every discovered and planned operation exactly once", () => {

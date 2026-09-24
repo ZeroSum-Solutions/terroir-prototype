@@ -124,6 +124,8 @@ describe("metadataForRequirement", () => {
     [290, "TER-047", "pos-integrations"],
     [291, "TER-048", "offline-lookup"],
     [297, "TER-048", "offline-lookup"],
+    [298, "TER-041", "physical-bottle-inventory"],
+    [315, "TER-041", "physical-bottle-inventory"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -131,8 +133,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 297", () => {
-    expect(() => metadataForRequirement(298)).toThrow(
+  it("rejects requirements outside the authoritative 315", () => {
+    expect(() => metadataForRequirement(316)).toThrow(
       "no completion metadata",
     );
   });
@@ -352,10 +354,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 297 as the default approved source count", () => {
+  it("keeps 315 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 297");
+    ).toContain("source feature count must remain 315");
   });
 
   it.each([
@@ -578,8 +580,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 297 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(297);
+  it("accounts for all 315 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(315);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -596,30 +598,37 @@ describe("checked-in feature ledger", () => {
     }
   });
 
-  it("promotes the atomic service-mutation command without renumbering it", () => {
+  it("promotes the physical service command without renumbering it", () => {
     expect(ledger.items[150]).toMatchObject({
       id: "TER-CF-151",
       sourceOrder: 151,
       sourceText:
-        "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+        "Fresh physical open, pour, spill, close, discard, and undo writes use execute_physical_bottle_command; completed version-1 receipts remain replay-only",
       completionSpec: "TER-041",
       evidenceOwner: "pour-reconciliation",
     });
   });
 
-  it("retains TER-CF-244 while replacing the superseded canonical pour writer", () => {
+  it("retains all twenty amended IDs while replacing version-1 promises", () => {
+    expect(APPROVED_SOURCE_REPLACEMENTS.map(({ id }) => id)).toEqual([
+      "TER-CF-142", "TER-CF-143", "TER-CF-146", "TER-CF-147", "TER-CF-148",
+      "TER-CF-150", "TER-CF-151", "TER-CF-152", "TER-CF-153", "TER-CF-157",
+      "TER-CF-159", "TER-CF-160", "TER-CF-161", "TER-CF-164", "TER-CF-192",
+      "TER-CF-193", "TER-CF-244", "TER-CF-245", "TER-CF-263", "TER-CF-273",
+    ]);
     expect(APPROVED_SOURCE_REPLACEMENTS).toContainEqual({
       id: "TER-CF-244",
       domain: "database_constraints_and_functions",
-      fromSourceText: "record_pour is the canonical pour-write entry point",
-      toSourceText:
+      fromSourceText:
         "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+      toSourceText:
+        "Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired",
     });
     expect(ledger.items[243]).toMatchObject({
       id: "TER-CF-244",
       sourceOrder: 244,
       sourceText:
-        "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+        "Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired",
       completionSpec: "TER-020",
       evidenceOwner: "data-platform",
     });
@@ -660,7 +669,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends lookup-only requirements without granting cached server authority", () => {
-    expect(ledger.items.slice(290).map((item: { id: string }) => item.id)).toEqual(
+    expect(ledger.items.slice(290, 297).map((item: { id: string }) => item.id)).toEqual(
       Array.from({ length: 7 }, (_, index) => `TER-CF-${291 + index}`),
     );
     expect(ledger.items[290]).toMatchObject({
@@ -671,6 +680,19 @@ describe("checked-in feature ledger", () => {
     expect(ledger.items[295].sourceText).toContain("all authorized placements");
     expect(ledger.items[296].actor).toBe("GET /api/offline-context");
     expect(plan).toContain("all seven requirements remain unimplemented");
+  });
+
+  it("appends the eighteen physical-bottle requirements as one reviewed interval", () => {
+    expect(ledger.items.slice(297).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 18 }, (_, index) => `TER-CF-${298 + index}`),
+    );
+    expect(ledger.items[297]).toMatchObject({
+      domain: "physical_bottle_inventory",
+      completionSpec: "TER-041",
+      evidenceOwner: "physical-bottle-inventory",
+    });
+    expect(ledger.items[300].sourceText).toContain("all-or-none batch");
+    expect(ledger.items[314].actor).toBe("POST /api/reconcile");
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -703,7 +725,7 @@ describe("checked-in feature ledger", () => {
       "TER-034": 1,
       "TER-035": 2,
       "TER-040": 28,
-      "TER-041": 29,
+      "TER-041": 47,
       "TER-042": 37,
       "TER-043": 3,
       "TER-044": 15,

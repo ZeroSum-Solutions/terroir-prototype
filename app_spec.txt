@@ -6,7 +6,7 @@
   </overview>
 
   <feature_budget>
-    Implement all 297 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, and seven C03 offline-lookup foundation additions on 2026-09-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 315 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, then four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, seven C03 offline-lookup foundation additions, and eighteen C06 physical-bottle additions on 2026-09-23, superseding the previous maximum of 200. Treat each source assertion as one feature; do not split one assertion into sub-features or add features beyond the enumerated contract. This approved count overrides any complexity-tier table.
   </feature_budget>
 
   <initializer_guidance>
@@ -234,33 +234,33 @@
 
     <pour_and_open_bottles>
       - Staff can record a pour from /cellar against a specific bottle
-      - System opens a new bottle if none is currently open for the wine + format
-      - System decrements the open bottle's remaining ounces by the pour amount
+      - Opening is an explicit command that consumes one identified same-site source-lot unit and returns a new immutable bottle ID; an active bottle never triggers or blocks an implicit replacement
+      - A pour decrements only the selected physical bottle's integer remaining mL; it never spills into another bottle
       - System closes a bottle automatically when remaining drops below a threshold
       - System creates a pour_events row for every pour
-      - System maintains the open_bottles table via pour_events_maintain_open_bottle trigger
-      - User can cancel/undo the most recent pour
-      - User can view all currently open bottles at /cellar/open
+      - Contract-2 events mutate by exact bottle ID with site/wine containment; no event trigger updates every open bottle of a wine
+      - Undo appends one linked version-2 compensation against an exact eligible event; it never deletes evidence or targets “latest for wine”
+      - /cellar/open shows every active physical bottle as a distinct stable identity using its captured capacity and provenance state
       - User can manually open a bottle without recording a pour (e.g., for tasting)
-      - User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume
-      - System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function
+      - Measured close and discard act only on the selected immutable bottle ID; discard records its exact remainder as spill and is not a measured closeout
+      - Fresh physical open, pour, spill, close, discard, and undo writes use execute_physical_bottle_command; completed version-1 receipts remain replay-only
       <compatibility_note>record_pour is retained only as additive legacy compatibility and is not an authorized write path for new callers.</compatibility_note>
-      - System rejects pours when no inventory remains
-      - User can configure default pour sizes per format (e.g., 5oz red glass)
+      - Insufficient selected-bottle volume is non-mutating and never auto-opens, splits, or substitutes another bottle
+      - Venue-managed presets are positive integer-mL snapshots and include tasting sizes; editing a preset cannot change an in-flight service action
       - User can record a pour in a custom amount
       - User can attach a note to a pour event
     </pour_and_open_bottles>
 
     <reconciliation>
       - Manager can run end-of-shift reconciliation at /cellar/reconcile
-      - System lists every open bottle with its tracked remaining volume
+      - Reconciliation lists exact active bottle IDs with remaining mL, captured capacity, and the state version frozen into the draft
       - User can enter the actual remaining volume for each open bottle
-      - System computes variance and persists adjustments via reconcile_open_bottle
-      - User can reconcile all open bottles in one batch via reconcile_open_bottles_batch
-      - System logs each reconciliation as an availability_event with the manager's user ID
+      - Reconciliation variance is written as an exact-bottle version-2 event/effect under one batch receipt, not through the retired scalar wine-only RPC
+      - Every reconciliation, including one bottle, uses one all-or-none execute_physical_reconciliation_batch call and one immutable operation UUID/payload
+      - Each committed reconciliation entry has exact bottle/wine event and effect evidence; no availability event is allowed to stand in for physical identity
       - System highlights variances exceeding a configurable threshold
       - User can view reconciliation history with variance trends
-      - System enforces manager-or-owner role for reconciliation writes
+      - The database revalidates current manager/owner authority for execution and exact replay; route UI state is not the authority
     </reconciliation>
 
     <price_comparison>
@@ -297,8 +297,8 @@
       - GET /api/scans/[id] returns a single scan with line items
       - POST /api/scan-bottle decodes a QR code and resolves the wine
       - GET /api/inventory returns aggregate inventory data
-      - POST /api/pour records a pour event
-      - POST /api/reconcile reconciles one or more open bottles
+      - POST /api/pour requires an operation UUID and exactly one exact-bottle or predecessor-opening selector in physical mode, with no implicit open/split/substitution
+      - POST /api/reconcile accepts one exact-bottle batch with frozen expected versions and replays only the same canonical payload
       - GET /api/wine-lists returns lists for the restaurant
       - POST /api/wine-lists creates a new list
       - PATCH /api/wine-lists/[id] updates a list
@@ -355,8 +355,8 @@
       - match_lwin and match_lwin_batch enrich wines from LWIN catalog
       - lwin_search exposes Postgres full-text search over the catalog
       - cleanup_scan_idempotency periodically clears stale idempotency keys
-      - System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility
-      - reconcile_open_bottle and reconcile_open_bottles_batch settle inventory
+      - Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired
+      - execute_physical_reconciliation_batch is the only physical reconciliation writer, including for a one-entry batch
       - auto_eightysix_on_low_inventory flips availability when stock hits zero
       - enrich_wines_batch performs AI enrichment in a single DB-coordinated batch
       - All RLS policies route through is_member or is_member_with_role
@@ -380,7 +380,7 @@
       - Vitest tests cover Zod schemas for OCR-extraction validation
       - Vitest tests cover LWIN matching and slug generation
       - Playwright covers the invoice-scan happy path end-to-end
-      - Playwright covers the pour + reconcile end-to-end
+      - Browser coverage exercises distinct bottle selection, interrupted exact-payload retry, atomic reconciliation, and readable ambiguity/errors at 320px and 390px
       - Playwright covers wine-list publish + public-view end-to-end
       - Playwright covers team invite + accept end-to-end
       - ESLint 9 flat config enforces lint cleanliness
@@ -393,7 +393,7 @@
       - API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay
       - API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change
       - API rejects reuse of an operation UUID with a mismatched payload
-      - System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at
+      - Fresh opens and closes target immutable physical bottle IDs; row ID plus opened_at remains only a version-1 historical receipt shape
     </inventory_operation_integrity>
 
     <workspace_site_access_foundation>
@@ -428,6 +428,27 @@
       - Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support
       - GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses
     </offline_lookup_foundation>
+
+    <physical_bottle_inventory>
+      - Each contract-2 open bottle has an immutable ID, captured positive nominal capacity, exact site/wine containment, state version, opening operation, and known same-site source lot; promoted legacy bottles keep explicit unknown provenance
+      - Multiple physical bottles of one wine may be active, and every service mutation selects one exact bottle without defaulting to first, newest, fullest, or remembered
+      - Every contract-2 pour, spill, reconcile, close, discard, and undo event/effect is receipt-linked and bottle-exact; one command increments the selected bottle version once
+      - Exact-bottle reconciliation is one canonical UUID-sorted, wine-before-bottle locked, all-or-none batch whose changed-payload UUID reuse conflicts and whose exact replay returns stored ordered results
+      - Phase C switches the normative inventory contract from 1 to 2 as the final statement of the writer/trigger/ACL transaction; fresh version-1 or wine-only writes then fail while completed version-1 receipts remain byte-stable and replayable
+      - Discard records one exact-remainder spill plus a distinct discard receipt/effect, closes only that bottle, creates no measured closeout/replacement, and increments its version once
+      - Undo is an append-only linked compensation with a fixed 15-minute window; correcting discard requires mistaken_report and confirmation that the same bottle remains, while actual discard, uncertainty, later activity, or a version-1 target is non-mutating review/error
+      - Exact-bottle readers are tenant-constrained security-invoker projections without raw opener IDs or lot cost; aggregate/effective readers sum duplicate bottles and exclude reversals from sales without deleting history
+      - Physical source-lot provenance blocks import, invoice, and direct lot deletion; wine merge repoints relational dependencies without changing receipt JSON bytes
+      - Venue-managed pour and tasting presets preserve positive integer-mL line snapshots and permission checks through execution and retry
+      - Flight and split-pour lines retain wine, physical bottle, amount, operation-line identity, and explicit recorded/pending/failed status without silent substitution
+      - Bottle/table holds reserve an identified sealed unit or open bottle with audited reserve/release/consume/expire transitions and server-authoritative exclusivity
+      - Optional sealed tags attach one-to-one to an existing lot unit without increasing lot quantity, preserving provenance and duplicate-scan/retag audit
+      - POST /api/open-bottles performs an idempotent explicit open and returns the exact new bottle; another active bottle does not block the operation
+      - POST /api/open-bottles/close performs an idempotent measured close on one exact bottle with actual volume, write-off, and reason
+      - POST /api/open-bottles/[id]/close performs an idempotent discard on the path's exact bottle and returns its linked spill/discard evidence
+      - POST /api/pour/undo requires an operation UUID and exact reversal event, enforces compensation/review rules, and returns the exact bottle and reversal event
+      - POST /api/reconcile preserves the entire failed or uncertain batch draft and clears it only after validated atomic success or exact replay
+    </physical_bottle_inventory>
 
   </core_features>
 
@@ -469,7 +490,7 @@
         - supplier, delivery_date, status, created_by, created_at
       </invoice_scans>
       <inventory_items>
-        - id, restaurant_id, wine_id, scan_id (nullable), format, qty, unit_cost, currency
+        - id, restaurant_id, wine_id, scan_id (nullable), format, qty, unit_cost, currency; serves as the sealed source lot until physical identity is required
       </inventory_items>
       <wine_lists>
         - id, restaurant_id, name, slug (unique per restaurant), description, published, archived
@@ -494,11 +515,17 @@
         - delta, reason, actor_id, created_at
       </availability_events>
       <open_bottles>
-        - id, wine_id, restaurant_id, format, opened_at, remaining_oz, closed_at
+        - immutable id, wine_id, restaurant_id, source_inventory_item_id or explicit legacy-unknown provenance, captured capacity_ml, remaining_ml, state_version, opening_operation_id, opened_at, closed_at
       </open_bottles>
       <pour_events>
-        - id, open_bottle_id, wine_id, restaurant_id, oz, note, actor_id, created_at
+        - id, exact open_bottle_id, wine_id, restaurant_id, integer ml, event kind, receipt link, reversal link, note, actor_id, created_at
       </pour_events>
+      <inventory_command_bottle_effects>
+        - receipt_id, entry ordinal, exact open_bottle_id, wine_id, event_id, before/after state version and remaining mL
+      </inventory_command_bottle_effects>
+      <inventory_command_receipts>
+        - restaurant_id, operation_id, actor_id, command, nullable wine_id for exact-bottle batches, canonical request/result, contract version, created_at
+      </inventory_command_receipts>
     </tables>
   </database_schema>
 
@@ -514,7 +541,11 @@
       - GET / POST /api/scans, GET /api/scans/[id]
       - POST /api/scan, POST /api/scan-bottle
       - GET /api/inventory
+      - POST /api/open-bottles
+      - POST /api/open-bottles/close
+      - POST /api/open-bottles/[id]/close
       - POST /api/pour
+      - POST /api/pour/undo
       - POST /api/reconcile
       - GET / POST /api/wine-lists, PATCH / DELETE /api/wine-lists/[id]
       - GET / POST /api/wine-list-sections, PATCH /api/wine-list-sections/[id]
@@ -580,11 +611,11 @@
       10. User confirms or edits, then commits to inventory
     </invoice_scan_flow>
     <pour_flow>
-      1. Staff opens cellar, taps a wine, selects pour
-      2. Client POSTs to /api/pour with an integer milliliter amount
-      3. Client sends a caller-generated stable operation UUID and immutable pour payload to execute_inventory_command
-      4. execute_inventory_command atomically opens or selects the bottle lifecycle and decrements remaining volume; an exact replay returns the original outcome without a second stock change
-      5. After a confirmed command outcome, the UI refreshes inventory and open-bottle indicators
+      1. Staff opens the cellar, selects one physical bottle or explicitly opens a new one from an identified sealed lot, then chooses an integer-mL amount
+      2. Client stores one operation UUID and immutable exact-bottle or predecessor-opening payload before POSTing to /api/pour
+      3. The physical command revalidates site, wine, bottle, source-lot, authority, and expected version before one atomic mutation
+      4. An uncertain response keeps the same UUID and payload for retry; exact replay returns the stored bottle and event without another stock change
+      5. Only a validated success or exact replay clears the pending action and refreshes inventory and bottle indicators
     </pour_flow>
     <publish_list_flow>
       1. User edits sections and items in /lists/[id]
@@ -594,10 +625,11 @@
     </publish_list_flow>
     <reconcile_flow>
       1. Manager opens /cellar/reconcile at end of shift
-      2. UI lists every open bottle with tracked remaining oz
-      3. Manager enters actual remaining for each
-      4. Client POSTs to /api/reconcile (single or batch)
-      5. reconcile_open_bottles_batch persists deltas as availability_events
+      2. UI lists every active physical bottle with exact ID, remaining mL, captured capacity, and frozen state version
+      3. Manager enters target remaining mL while the client retains one UUID and the complete canonical batch draft
+      4. Client POSTs the all-or-none exact-bottle batch to /api/reconcile, including a one-bottle batch
+      5. The server locks and revalidates the complete sorted set, then commits one receipt and ordered bottle/event/effect results or rolls back every entry
+      6. Failure or uncertainty preserves the entire draft and original UUID; validated success or exact replay clears it
     </reconcile_flow>
   </key_interactions>
 
@@ -639,9 +671,10 @@
     <step number="5">
       <title>Pour + Reconcile</title>
       <tasks>
-        - execute_inventory_command wired to the pour UI with caller-stable operation IDs and confirmed-result refresh
-        - Open bottles view
-        - Reconcile UI driven by reconcile_open_bottles_batch
+        - Version-aware physical command adapter wired to exact-bottle controls with caller-stable operation IDs and confirmed-result refresh
+        - Open bottles view preserves distinct bottle identity, capacity, provenance, state version, and ambiguity handling
+        - Reconcile UI retains one exact canonical all-or-none batch through confirmed success or replay
+        - The first physical-bottle slice is independently shippable only after Phase C accepts contract version 2; it does not complete C06 or the required follow-on service slices
       </tasks>
     </step>
     <step number="6">

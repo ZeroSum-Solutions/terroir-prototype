@@ -105,7 +105,7 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
-| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 297 assertions |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 315 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
@@ -113,13 +113,17 @@ recorded. The required critical subset fails on any skip.
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
-current machine-read source for 297 requirement identities, but the generated
+current machine-read source for 315 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the whole workflow is complete. C04 has a
 locally implemented shadow database foundation, while cost enforcement and expanded
 roles remain incomplete. C03 has a locally implemented TER-CF-297 context-lookup leaf
-with bounded test evidence; TER-CF-291 through TER-CF-293 store work remains unverified WIP,
-and TER-CF-294 through TER-CF-296 shell, session, and cached-search work is incomplete.
+with bounded test evidence and an accepted bounded deterministic TER-CF-291 through
+TER-CF-293 private projection-store leaf. Browser integration and session coordination
+remain unverified, and TER-CF-294 through TER-CF-296 shell, session, and cached-search
+work is incomplete. C06 has 18 accepted physical-bottle source assertions
+(`TER-CF-298` through `TER-CF-315`) and canonical transition plans, but no
+physical-bottle runtime or schema implementation; source promotion does not complete C06.
 The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast
 modules alone do not complete those workflows. Non-core `app_spec.txt`
 prose can retain historical or drifted claims (including a dead env var name).

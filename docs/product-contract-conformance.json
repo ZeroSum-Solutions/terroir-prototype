@@ -3,9 +3,9 @@
   "generatorVersion": 2,
   "scope": {
     "firstRequirementId": "TER-CF-180",
-    "lastRequirementId": "TER-CF-297",
-    "requirementCount": 42,
-    "activeFeatureLedgerCount": 297
+    "lastRequirementId": "TER-CF-315",
+    "requirementCount": 47,
+    "activeFeatureLedgerCount": 315
   },
   "inputs": {
     "featureLedger": "docs/feature-ledger.json",
@@ -13,7 +13,7 @@
   },
   "summary": {
     "proved": 0,
-    "weak": 24,
+    "weak": 29,
     "unimplemented": 18
   },
   "requirements": [
@@ -203,7 +203,7 @@
       "reason": "route_present_executable_proof_not_trusted",
       "operationId": "api:POST:/api/pour",
       "evidence": {
-        "ledgerClaim": "POST /api/pour records a pour event",
+        "ledgerClaim": "POST /api/pour requires an operation UUID and exactly one exact-bottle or predecessor-opening selector in physical mode, with no implicit open/split/substitution",
         "implementation": {
           "method": "POST",
           "path": "/api/pour",
@@ -219,7 +219,7 @@
       "reason": "route_present_executable_proof_not_trusted",
       "operationId": "api:POST:/api/reconcile",
       "evidence": {
-        "ledgerClaim": "POST /api/reconcile reconciles one or more open bottles",
+        "ledgerClaim": "POST /api/reconcile accepts one exact-bottle batch with frozen expected versions and replays only the same canonical payload",
         "implementation": {
           "method": "POST",
           "path": "/api/reconcile",
@@ -624,6 +624,86 @@
           "method": "GET",
           "path": "/api/offline-context",
           "sourceFile": "src/app/api/offline-context/route.ts",
+          "exportKind": "function-declaration"
+        },
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
+      }
+    },
+    {
+      "requirementId": "TER-CF-311",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
+      "operationId": "api:POST:/api/open-bottles",
+      "evidence": {
+        "ledgerClaim": "POST /api/open-bottles performs an idempotent explicit open and returns the exact new bottle; another active bottle does not block the operation",
+        "implementation": {
+          "method": "POST",
+          "path": "/api/open-bottles",
+          "sourceFile": "src/app/api/open-bottles/route.ts",
+          "exportKind": "function-declaration"
+        },
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
+      }
+    },
+    {
+      "requirementId": "TER-CF-312",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
+      "operationId": "api:POST:/api/open-bottles/close",
+      "evidence": {
+        "ledgerClaim": "POST /api/open-bottles/close performs an idempotent measured close on one exact bottle with actual volume, write-off, and reason",
+        "implementation": {
+          "method": "POST",
+          "path": "/api/open-bottles/close",
+          "sourceFile": "src/app/api/open-bottles/close/route.ts",
+          "exportKind": "function-declaration"
+        },
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
+      }
+    },
+    {
+      "requirementId": "TER-CF-313",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
+      "operationId": "api:POST:/api/open-bottles/{param}/close",
+      "evidence": {
+        "ledgerClaim": "POST /api/open-bottles/[id]/close performs an idempotent discard on the path's exact bottle and returns its linked spill/discard evidence",
+        "implementation": {
+          "method": "POST",
+          "path": "/api/open-bottles/[id]/close",
+          "sourceFile": "src/app/api/open-bottles/[id]/close/route.ts",
+          "exportKind": "function-declaration"
+        },
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
+      }
+    },
+    {
+      "requirementId": "TER-CF-314",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
+      "operationId": "api:POST:/api/pour/undo",
+      "evidence": {
+        "ledgerClaim": "POST /api/pour/undo requires an operation UUID and exact reversal event, enforces compensation/review rules, and returns the exact bottle and reversal event",
+        "implementation": {
+          "method": "POST",
+          "path": "/api/pour/undo",
+          "sourceFile": "src/app/api/pour/undo/route.ts",
+          "exportKind": "function-declaration"
+        },
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
+      }
+    },
+    {
+      "requirementId": "TER-CF-315",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
+      "operationId": "api:POST:/api/reconcile",
+      "evidence": {
+        "ledgerClaim": "POST /api/reconcile preserves the entire failed or uncertain batch draft and clears it only after validated atomic success or exact replay",
+        "implementation": {
+          "method": "POST",
+          "path": "/api/reconcile",
+          "sourceFile": "src/app/api/reconcile/route.ts",
           "exportKind": "function-declaration"
         },
         "proofAssessment": "Executable behavioral proof is not yet trusted."

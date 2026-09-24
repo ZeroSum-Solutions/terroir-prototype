@@ -69,6 +69,14 @@ before implementation, following repository rules. No hand-editing generated out
 | C13 | Independent production-readiness verification (Q15) | All required CI-equivalent gates at final revision, zero skipped critical tests, security + TypeScript review, independent browser/database verifier, exact revision evidence, deterministic completion gate |
 | C14 | Pilot measurement capability (Q7) | Tested task/count-duration capture and baseline export using Q7 definitions, scoped to authorized users; synthetic timing fixtures never presented as real four-week pilot observations |
 
+C06 now has an accepted, unimplemented source design in the canonical
+[physical-bottle contract](2026-09-23-terroir-physical-bottle-contract.md),
+[database transition](2026-09-23-terroir-physical-bottle-database-transition.md), and
+[application transition](2026-09-23-terroir-physical-bottle-app-transition.md). Source
+promotion authorizes bounded implementation leaves; it does not reserve a migration,
+activate contract version 2, or complete C06. The full receive, place, find, serve,
+count, reconcile, returns/credits, and discrepancy-review evidence remains required.
+
 Acceptance criteria translate approved behaviors; they do not invent a measured
 baseline. Human task-speed and 50% count-time improvement targets remain external
 pilot validation, with metric definitions from Q7. Live Toast, licensed market data,
@@ -79,12 +87,14 @@ and image rights must be verified before enabling the corresponding live feature
 The first C03 slice is partial local work under `TER-048`, not a C03 completion claim.
 The frozen twelve-path leaf implements the local `GET /api/offline-context` source for
 TER-CF-297; bounded evidence records 81 passing tests, including three live loopback
-tenant-containment tests, plus independent acceptance of this bounded leaf. TER-CF-291 through
-TER-CF-293 store work remains concurrent, unverified WIP. TER-CF-294 through
-TER-CF-296 public-shell, session-boundary, and cached-search work is incomplete.
-This evidence covers the endpoint only; deployment and the full offline workflow are
-unverified. Completion status remains in the generated feature ledger and product
-conformance report. The accepted
+tenant-containment tests, plus independent acceptance of this bounded leaf. The
+TER-CF-291 through TER-CF-293 private projection-store leaf has bounded deterministic
+unit, type, and lint evidence plus independent acceptance, but it is not wired to
+browser storage, the endpoint, or session lifecycle. TER-CF-294 through TER-CF-296
+public-shell, session-boundary, and cached-search work is incomplete. The evidence
+covers the endpoint and private store modules separately; their integration, deployment,
+and the full offline workflow are unverified. Completion status remains in the generated
+feature ledger and product conformance report. The accepted
 [`offline-operation contract`](2026-09-23-terroir-offline-operation-contract.md)
 keeps this slice cost-free and mutation-free. C06 individual-bottle receipts and
 online count/receiving/placement authority gate durable capture; C04 site grants and

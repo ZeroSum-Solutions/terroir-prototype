@@ -18,28 +18,124 @@ import {
 
 export const APPROVED_SOURCE_REPLACEMENTS = [
   {
+    id: "TER-CF-142",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "System opens a new bottle if none is currently open for the wine + format",
+    toSourceText: "Opening is an explicit command that consumes one identified same-site source-lot unit and returns a new immutable bottle ID; an active bottle never triggers or blocks an implicit replacement",
+  },
+  {
+    id: "TER-CF-143",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "System decrements the open bottle's remaining ounces by the pour amount",
+    toSourceText: "A pour decrements only the selected physical bottle's integer remaining mL; it never spills into another bottle",
+  },
+  {
+    id: "TER-CF-146",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "System maintains the open_bottles table via pour_events_maintain_open_bottle trigger",
+    toSourceText: "Contract-2 events mutate by exact bottle ID with site/wine containment; no event trigger updates every open bottle of a wine",
+  },
+  {
+    id: "TER-CF-147",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "User can cancel/undo the most recent pour",
+    toSourceText: "Undo appends one linked version-2 compensation against an exact eligible event; it never deletes evidence or targets “latest for wine”",
+  },
+  {
+    id: "TER-CF-148",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "User can view all currently open bottles at /cellar/open",
+    toSourceText: "/cellar/open shows every active physical bottle as a distinct stable identity using its captured capacity and provenance state",
+  },
+  {
     id: "TER-CF-150",
     domain: "pour_and_open_bottles",
-    fromSourceText: "User can manually close an open bottle and discard remaining",
-    toSourceText:
-      "User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
+    fromSourceText: "User can atomically close only the selected open-bottle lifecycle identified by row ID plus opened_at, recording its discarded remaining volume",
+    toSourceText: "Measured close and discard act only on the selected immutable bottle ID; discard records its exact remainder as spill and is not a measured closeout",
   },
   {
     id: "TER-CF-151",
     domain: "pour_and_open_bottles",
-    fromSourceTexts: [
-      "System exposes record_pour DB function as the only write path for pours",
-      "System applies service inventory mutations through the atomic execute_inventory_command database function",
-    ],
-    toSourceText:
-      "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+    fromSourceText: "System applies bottle-opening, pour, spill and close operations through the atomic execute_inventory_command database function",
+    toSourceText: "Fresh physical open, pour, spill, close, discard, and undo writes use execute_physical_bottle_command; completed version-1 receipts remain replay-only",
+  },
+  {
+    id: "TER-CF-152",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "System rejects pours when no inventory remains",
+    toSourceText: "Insufficient selected-bottle volume is non-mutating and never auto-opens, splits, or substitutes another bottle",
+  },
+  {
+    id: "TER-CF-153",
+    domain: "pour_and_open_bottles",
+    fromSourceText: "User can configure default pour sizes per format (e.g., 5oz red glass)",
+    toSourceText: "Venue-managed presets are positive integer-mL snapshots and include tasting sizes; editing a preset cannot change an in-flight service action",
+  },
+  {
+    id: "TER-CF-157",
+    domain: "reconciliation",
+    fromSourceText: "System lists every open bottle with its tracked remaining volume",
+    toSourceText: "Reconciliation lists exact active bottle IDs with remaining mL, captured capacity, and the state version frozen into the draft",
+  },
+  {
+    id: "TER-CF-159",
+    domain: "reconciliation",
+    fromSourceText: "System computes variance and persists adjustments via reconcile_open_bottle",
+    toSourceText: "Reconciliation variance is written as an exact-bottle version-2 event/effect under one batch receipt, not through the retired scalar wine-only RPC",
+  },
+  {
+    id: "TER-CF-160",
+    domain: "reconciliation",
+    fromSourceText: "User can reconcile all open bottles in one batch via reconcile_open_bottles_batch",
+    toSourceText: "Every reconciliation, including one bottle, uses one all-or-none execute_physical_reconciliation_batch call and one immutable operation UUID/payload",
+  },
+  {
+    id: "TER-CF-161",
+    domain: "reconciliation",
+    fromSourceText: "System logs each reconciliation as an availability_event with the manager's user ID",
+    toSourceText: "Each committed reconciliation entry has exact bottle/wine event and effect evidence; no availability event is allowed to stand in for physical identity",
+  },
+  {
+    id: "TER-CF-164",
+    domain: "reconciliation",
+    fromSourceText: "System enforces manager-or-owner role for reconciliation writes",
+    toSourceText: "The database revalidates current manager/owner authority for execution and exact replay; route UI state is not the authority",
+  },
+  {
+    id: "TER-CF-192",
+    domain: "api_layer",
+    fromSourceText: "POST /api/pour records a pour event",
+    toSourceText: "POST /api/pour requires an operation UUID and exactly one exact-bottle or predecessor-opening selector in physical mode, with no implicit open/split/substitution",
+  },
+  {
+    id: "TER-CF-193",
+    domain: "api_layer",
+    fromSourceText: "POST /api/reconcile reconciles one or more open bottles",
+    toSourceText: "POST /api/reconcile accepts one exact-bottle batch with frozen expected versions and replays only the same canonical payload",
   },
   {
     id: "TER-CF-244",
     domain: "database_constraints_and_functions",
-    fromSourceText: "record_pour is the canonical pour-write entry point",
-    toSourceText:
-      "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+    fromSourceText: "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+    toSourceText: "Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired",
+  },
+  {
+    id: "TER-CF-245",
+    domain: "database_constraints_and_functions",
+    fromSourceText: "reconcile_open_bottle and reconcile_open_bottles_batch settle inventory",
+    toSourceText: "execute_physical_reconciliation_batch is the only physical reconciliation writer, including for a one-entry batch",
+  },
+  {
+    id: "TER-CF-263",
+    domain: "testing_quality",
+    fromSourceText: "Playwright covers the pour + reconcile end-to-end",
+    toSourceText: "Browser coverage exercises distinct bottle selection, interrupted exact-payload retry, atomic reconciliation, and readable ambiguity/errors at 320px and 390px",
+  },
+  {
+    id: "TER-CF-273",
+    domain: "inventory_operation_integrity",
+    fromSourceText: "System applies explicit bottle opening and closing atomically to the open-bottle lifecycle identified by row ID plus opened_at",
+    toSourceText: "Fresh opens and closes target immutable physical bottle IDs; row ID plus opened_at remains only a version-1 historical receipt shape",
   },
 ];
 
