@@ -296,6 +296,373 @@ cover real-browser native projection provisioning, the public offline shell, pos
 eligibility, cached lookup, durable replay, whole-C03 completion, deployment, or
 production readiness.
 
+## Positive eligibility and native provisioning design
+
+Status: **PROPOSED, UNIMPLEMENTED, PENDING INDEPENDENT REVIEW.** This section defines
+the next lookup-only source slice. It does not make the public shell, cached search,
+service worker, or any offline mutation available.
+
+The current source cannot establish positive eligibility. `OfflineContextResponseSchema`
+strictly validates the server payload, `provisionOfflineContext` writes a context and
+projection atomically, and IndexedDB v1 has only `contexts` and `projections`.
+However, persisted contexts have no eligibility or authorization-generation fields,
+projections have no `contextId`, and `readSoleUsableProjection` treats one unlocked
+row as readable. `lockAllContexts` reports `locked: true` when any context row exists,
+even if the current partition is absent and only another locked partition exists.
+The layout mounts no provisioning provider. The marker module has no deletion
+primitive, and `hasRecognizedDeviceDenial` has no production read consumer. These are
+source gaps, not behavior proved by the endpoint, native-store, or session-boundary
+checkpoints.
+
+### Persisted shapes and durable denial fence
+
+Keep IndexedDB at database version 1 with the same two stores and key paths. Add these
+fields to the strict current record shapes:
+
+    context:    eligibilityVersion=1, authorizationGeneration
+    projection: contextId
+
+Add one tagged `DeviceAccessFence` record to the existing `contexts` store. It uses
+the reserved compound key
+`["__terroir_device_access_fence__", "__v1__"]`. Neither sentinel is a valid UUID, so
+it cannot collide with an actor/site context. The strict fence shape contains:
+
+    recordType="device_access_fence"
+    fenceVersion=1
+    revision=<random UUID>
+    state="denied" | "eligible"
+    authorizationGeneration=<UUID or null>
+    eligibleUserId=<UUID or null>
+    eligibleRestaurantId=<UUID or null>
+    eligibleContextId=<UUID or null>
+    changedAt=<offset timestamp>
+    reason="sign_out" | "access_changed" | "provisioned"
+
+The `userId` and `restaurantId` key-path properties hold only the two sentinels.
+The `eligible*` properties carry the bound actor, site, and context when `state` is
+`eligible`. A denied fence carries no eligible binding. Its
+`authorizationGeneration` records the exact generation observed by the denial
+operation when one valid generation is available.
+
+`lockAllContexts` and the session boundary dependency must use the distinct exported
+`OfflineLockResult` type:
+
+    export type OfflineLockResult = {
+      locked: boolean
+      denialFenceCommitted: boolean
+      projectionsDeleted: boolean
+    }
+
+`locked` keeps its accepted legacy meaning. It is true only after the readwrite
+transaction completes with at least one well-formed current or legacy context row in
+the transaction, including an already locked row; the tagged fence is not a context
+row for this count. It therefore remains false when there are zero contexts.
+`denialFenceCommitted` is separate. It is true only after the same transaction locks
+every well-formed current or legacy context, writes `state="denied"` with a fresh
+`revision`, and emits `complete`. This fence write is required when the current
+partition is absent, all contexts are legacy, there are zero contexts, or only
+another already locked partition exists. A failed or aborted transaction returns
+both `locked: false` and `denialFenceCommitted: false`, even if an earlier row was
+already locked. Projection deletion remains a separate best-effort result because a
+committed denied fence blocks every native read even when projection bytes remain.
+
+The session boundary computes durable denial as
+`denialFenceCommitted || locked || clientCookieVerified || responseCookieVerified`.
+This preserves the accepted zero-context truth (`locked: false`) while allowing a
+committed zero-context fence to select `locked_server_confirmed` or
+`locked_server_unconfirmed` instead of the unlocked outcome. Tests must assert the
+two booleans independently; neither may be inferred from the other.
+
+After its cookie gates pass, the provider captures the fence revision before its
+network request. The later provision transaction must compare the current fence with
+that captured snapshot, including absent-versus-present state. A changed revision
+aborts the transaction.
+An initial provision may create an eligible fence when both the captured and
+transaction-time fence are absent. A provision that starts from a denied fence also
+requires the exact `reprovision_required` marker. If the fence records a denied
+authorization generation, the candidate generation must differ. The transaction
+changes the fence to `eligible` and binds its actor, site, context, and generation
+only alongside the new context and projection writes. Every fence write, denied or
+eligible, generates a fresh revision. An exact replay may return the existing result
+without a fence write; if it writes, it must also use a fresh revision.
+
+This compare-and-set rule is the transaction's denial fence. A same-generation
+current-partition check alone is insufficient: there may be no current partition,
+the current row may be legacy, or an unrelated locked partition may be the row that
+made the old lock helper report success.
+
+### Marker and authorization-generation rules
+
+`authorizationGeneration` is a random UUID in a second readable cookie with
+`Path=/`, `SameSite=Lax`, `Secure` in production, no `HttpOnly`, and a 400-day maximum
+age. Every successful session-returning auth transition, accepted active-site change,
+and hard-lock write rotates it while writing the transition or hard marker. It is
+authorization-transition evidence, not the serialization primitive. The IndexedDB
+fence supplies serialization when cookie or generation writes fail.
+
+The marker, generation cookie, and fence are browser display and native-eligibility
+state only. Server routes must continue to derive authentication and authorization
+from the verified server session and membership. None of these browser values is
+authentication evidence or permission to serve API data.
+
+Generation parsing accepts exactly one UUID cookie. Missing, malformed, or duplicate
+generation cookies are unavailable, including duplicates with the same value. An
+existing valid server session with no exact generation keeps the online application
+available but makes native provisioning and native reads unavailable. The UI reports
+that offline setup requires a new sign-in or explicit site selection. It does not
+invent a generation, use a legacy row, or open IndexedDB before the marker and
+generation gate passes.
+
+`setActiveRestaurant` is the explicit active-site marker writer. After it verifies
+membership, the accepted response writes the signed active-site cookie, a fresh
+authorization generation, and `reprovision_required`. Partial cookie persistence
+cannot authorize a native read because the provider requires the current layout
+actor/site, exact generation, fence binding, and marker state. The active-site route
+and helper tests must prove all three writes for the accepted case and no transition
+write for a rejected membership.
+
+`resolveActiveMembership` remains a read-only resolver. Its deterministic fallback
+does not write a marker, rotate a generation, or silently provision. If fallback
+changes the layout's actor/site props, the provider invalidates the old attempt and
+the marker-checked read requires the new exact site. A prior site's record cannot
+render. With no matching eligible record and no `reprovision_required` marker, the
+provider reports `site_transition_unacknowledged` and asks for explicit site
+selection or a new sign-in. It does not treat fallback as consent to provision.
+This behavior also covers a membership change that invalidates the signed active-site
+cookie.
+
+There is one permitted transition-marker deletion primitive,
+`clearReprovisionMarkerAfterCommit`, and one production call site in
+`src/app/(app)/offline-context-provider.tsx`. The provider calls it only after the
+provision transaction commits. The primitive accepts the captured generation,
+requires the exact
+`reprovision_required` marker and unchanged generation, expires only the root marker,
+then reads both cookies back. It succeeds only when the marker is absent and the
+generation is unchanged. A hard marker, changed generation, duplicate stronger
+marker, cookie failure, or readback failure leaves the marker in force. The
+marker-conservation contract allowlists only this primitive and provider call site.
+Proxy and auth handlers gain no deletion authority.
+
+The marker-conservation test must keep its exact literal-owner and mutation checks
+while making these bounded updates:
+
+- the exact `device-lock` production importer set becomes
+  `src/app/(app)/offline-context-provider.tsx`,
+  `src/app/(app)/offline-session-boundary.tsx`,
+  `src/app/api/dev-login/route.ts`, `src/app/auth/callback/route.ts`,
+  `src/app/auth/confirm/route.ts`, `src/app/auth/signout/route.ts`,
+  `src/app/login/actions.ts`, `src/domains/offline/eligibility.ts`,
+  `src/lib/api/active-restaurant.ts`, and `src/lib/supabase/proxy.ts`;
+- the exact `setDeviceLockCookie` helper-writer set adds only
+  `src/lib/api/active-restaurant.ts` to the four existing session-returning auth
+  writers;
+- the exact `writeClientDeviceLock` caller remains
+  `src/app/(app)/offline-session-boundary.tsx`, and the direct cookie-option writer
+  remains `src/app/auth/signout/route.ts`;
+- the former blanket assertion forbidding exported names containing
+  `delete|clear|expire` becomes an exact assertion allowing only
+  `clearReprovisionMarkerAfterCommit`; and
+- the exact production caller set for that primitive contains only the private
+  provider. Any other importer, writer, deletion primitive, or caller fails the
+  contract.
+
+### Marker-checked native read layer
+
+Add `src/domains/offline/eligibility.ts` as the only production entry point for a
+positive native read. `readEligibleOfflineContext` receives the current layout
+`userId` and `restaurantId`. It checks the browser marker and exact generation before
+opening IndexedDB. Any recognized marker, missing or invalid generation, or missing
+current actor/site returns unavailable without returning private data.
+
+The database read then parses each raw row independently as one exact current record,
+one exact legacy record, or the single fence. It ignores well-formed legacy rows for
+eligibility instead of letting one legacy row poison the whole array. It aborts on an
+unknown or corrupt row, duplicate fences, or a corrupt current record. Projection
+rows follow the same per-row current-or-legacy classification.
+
+A ready result requires one eligible fence whose generation, actor, site, and
+`contextId` match the caller and exactly one unlocked, time-valid current context.
+The context must have `eligibilityVersion === 1` and the same generation. Exactly one
+current projection must match its actor, site, `contextId`, kind, and version.
+Everything else returns no private value. The private provider uses this entry point
+for its readiness decision. The later public shell must use the same entry point; it
+may not call `readSoleUsableProjection` directly.
+
+A source contract test must establish `src/domains/offline/eligibility.ts` as the
+only production caller of `readSoleUsableProjection`. Tests may exercise the database
+helper directly. No provider, layout, public route, or future shell may import or call
+it as a production read boundary. This private provider is deliberately implemented
+before the public offline shell: it establishes the one positive-read gate that the
+later shell must consume without making any public route or cached-search UI
+available in this slice.
+
+### Provider protocol and transaction order
+
+Mount the private-tree provider inside `OfflineSessionBoundary` and pass the server
+layout's exact `user.id` and `restaurantId`. One attempt follows this order:
+
+1. Capture the actor/site props, raw marker and exact generation cookies, and an
+   in-memory attempt number. Do not open IndexedDB.
+2. Apply the cookie gates before every IndexedDB opening. A hard marker returns
+   unavailable. A missing, malformed, or duplicate generation returns unavailable.
+   With no recognized marker, call only `readEligibleOfflineContext`; that function
+   repeats the marker and generation checks before opening IndexedDB. Do not fetch or
+   provision after a read miss. Provision begins only from the exact
+   `reprovision_required` marker.
+3. Only after the exact reprovision marker and generation pass, capture the fence
+   revision and state. Fence-read failure returns unavailable without fetching.
+4. Run an abortable, bounded, `no-store` same-origin GET to
+   `/api/offline-context`. Reject a non-200 response, invalid strict payload,
+   actor/site mismatch, or invalid lease before the write transaction.
+5. Immediately before opening the readwrite transaction, require unchanged props,
+   attempt number, marker, and authorization generation.
+6. In one transaction, classify every context and projection row, compare the
+   captured fence revision, reject an older response for the same generation, reject
+   equal-time different-context ambiguity, lock every non-current current or legacy
+   partition, write the current context and projection, and bind the fence eligible.
+7. Wait for the transaction's `complete` event. Then attempt the one marker
+   acknowledgment. A fetch response or `stored` result alone never means ready.
+8. Call `readEligibleOfflineContext`. Report ready only if that marker-checked read
+   returns the exact committed value.
+
+Unmount, sign-out intent, changed props, or a newer attempt aborts the fetch and
+invalidates the callback. A late callback cannot start a valid transaction, report
+readiness, or remove a marker. Server `issuedAt` orders responses within one
+authorization generation. An exact replay may be idempotent. A newer response may
+replace an older one. The fence revision, not `issuedAt` or the cookie alone,
+serializes a denial against stale work.
+
+The critical counterexample has this order: a provider captures revision F1, its
+fetch returns, and its final cookie/prop precheck passes; sign-out then commits a
+denied fence with revision F2; only after that commit does the stale provider create
+its provision transaction. The transaction reads F2, detects the F1 mismatch, and
+aborts. This remains denied even if both hard-marker writes and the generation
+rotation fail. The stale transaction cannot recreate an unlocked partition or
+acknowledge a marker.
+
+Two concurrent provisions that capture the same fence revision do not both commit.
+IndexedDB serializes their readwrite transactions. The first eligible write creates
+a fresh revision. The second transaction then sees a revision mismatch and aborts,
+even when both responses carry the same generation and payload. The loser never
+acknowledges the marker or reports its failed transaction as ready. After the winner
+commits and acknowledges the marker, a later marker-checked read may observe the
+winner's exact record. If the winner cannot acknowledge the marker, both tabs remain
+unavailable even though eligible bytes exist. A newer response that lost this race
+requires a fresh attempt from the new revision; response time cannot bypass the
+fence comparison.
+
+### Required race and failure outcomes
+
+| Race or failure | Required result |
+| --- | --- |
+| Zero contexts when sign-out starts | The transaction returns `locked: false`, `denialFenceCommitted: true`, and a fresh denied fence. The durable-denial expression selects a locked outcome; a stale provision with the captured absent fence aborts. |
+| Current partition absent but another current context exists | The transaction preserves legacy `locked: true`, commits `denialFenceCommitted: true`, and denies every native read. The missing current partition does not weaken the fence. |
+| Current partition is legacy | The transaction locks the legacy row, returns `locked: true`, commits `denialFenceCommitted: true`, and never treats legacy bytes as eligible. |
+| Only another partition is already locked | Legacy `locked` remains true because a context row exists. `denialFenceCommitted` independently proves the fresh fence commit; the unrelated row must not be mistaken for that proof. |
+| Fence transaction aborts | Both `locked: false` and `denialFenceCommitted: false`, even if a context was already locked. Sign-out navigation still needs another verified durable denial. |
+| Sign-out commits between precheck and transaction creation | The stale provision aborts on the fence revision mismatch. Marker and generation write failure do not weaken this outcome. |
+| Sign-out or actor/site change before fetch settles | The attempt is invalidated. No late transaction, readiness report, or marker deletion occurs. |
+| Two tabs capture one fence revision | The first eligible transaction writes a fresh revision. The second aborts on mismatch, never acknowledges the marker, and can become ready only through a later marker-checked read of the winner or a fresh attempt. |
+| Actor A signs out and actor B signs in | B needs a fresh exact generation and reprovision marker. A's captured fence revision or generation cannot acknowledge or become eligible for B. |
+| Marker deletion or readback fails | The marker-checked read returns unavailable although eligible bytes may exist. |
+| Storage denial, quota, timeout, abort, or version change | The transaction rolls back, no eligibility is acknowledged, and the marker remains. |
+| Reload before commit or acknowledgment | The marker-checked layer denies before returning private data. |
+| Silent membership fallback selects a different site | The expected-site check rejects the prior site. Without an explicit transition marker, no automatic provision occurs. |
+| A valid existing session has no generation | Online use continues; native read and provision return unavailable without opening IndexedDB until a new acknowledged transition. |
+| A well-formed legacy row shares the array | Per-row classification skips it for reads and can lock or replace it during provision. One legacy row does not poison unrelated current rows. |
+
+The fence remains browser application state. A device owner can edit it, storage can
+be evicted, and simultaneous failure or loss of every denial write remains the
+limitation stated earlier. It does not provide secure erase, trusted time,
+instantaneous remote revocation while offline, or confidentiality from the device
+owner. The implementation does not depend on Web Locks, BroadcastChannel, or another
+coordination service. Missing IndexedDB, cookies, `crypto.randomUUID`, or abort
+support keeps provisioning unavailable.
+
+### Frozen implementation and proof paths
+
+The minimal path set is:
+
+- marker, generation, and transition writers:
+  `src/domains/offline/device-lock.ts`,
+  `src/domains/offline/device-lock.test.ts`,
+  `src/app/auth/signout/route.ts`,
+  `src/app/auth/signout/route.test.ts`,
+  `src/lib/api/active-restaurant.ts`,
+  `src/lib/api/active-restaurant.test.ts`,
+  `src/app/api/restaurant/[id]/route.test.ts`, and
+  `src/test/contracts/offline-device-marker-conservation.test.ts`;
+- native fence, record, and read policy:
+  `src/domains/offline/database.ts`,
+  `src/domains/offline/database.test.ts`,
+  new `src/domains/offline/eligibility.ts`, and
+  new `src/domains/offline/eligibility.test.ts`, plus
+  new `src/test/contracts/offline-positive-read-boundary.test.ts`;
+- private integration:
+  new `src/app/(app)/offline-context-provider.tsx`,
+  new `src/app/(app)/offline-context-provider.test.tsx`,
+  `src/app/(app)/offline-session-boundary.tsx`,
+  `src/app/(app)/offline-session-boundary.test.tsx`,
+  `src/app/(app)/layout.tsx`, and `src/app/(app)/layout.test.tsx`;
+- unchanged auth-flow call sites with generation assertions in their existing tests:
+  `src/app/login/actions.test.ts`,
+  `src/app/auth/callback/route.test.ts`,
+  `src/app/auth/confirm/route.test.ts`, and
+  `src/app/api/dev-login/route.test.ts`; and
+- real-browser proof:
+  existing `e2e/offline-session-boundary.test.ts` and new
+  `e2e/offline-positive-eligibility.test.ts`, using the existing guarded fixture and
+  cleanup harness.
+
+Do not change the offline endpoint response, IndexedDB version, store list, key paths,
+proxy, public routes, service worker, or dependency graph in this slice. If
+implementation needs another production path, stop and amend this design before
+coding.
+
+The deterministic matrix must cover current and legacy per-row classification,
+unknown-row refusal, strict actor/site/context/projection/generation/fence matching,
+initial absent-fence provision, every denied-fence case in the table, the exact
+precheck-then-denial-then-transaction race, same-generation stale-response rejection,
+idempotent replay, equal-time ambiguity, two concurrent provisions from one fence
+revision, all-or-nothing faults at each write, and zero private output for malformed,
+expired, rollback, ambiguous, or storage-failure states. Database and session-boundary
+tests must assert `locked` and `denialFenceCommitted` separately, including the exact
+zero-context result `{ locked: false, denialFenceCommitted: true }` and abort result
+`{ locked: false, denialFenceCommitted: false }`. Provider tests must prove that hard
+markers and invalid generations return before any IndexedDB call, then cover
+commit-before-delete, post-ack marker-checked read, no delete after late fetch or
+invalidated props, no delete after transaction failure, hard-marker precedence,
+failed-deletion denial, missing-generation unavailability, silent site fallback, and
+no readiness claim from a fetched response alone. The positive-read boundary
+contract must fail for any production caller of `readSoleUsableProjection` other than
+`src/domains/offline/eligibility.ts`. Marker tests must cover generation rotation on
+hard, session, and explicit site transitions, duplicate-generation denial,
+exact-generation deletion refusal, and missing browser primitive refusal.
+
+The existing 17-case `e2e/offline-session-boundary.test.ts` checkpoint must be rerun
+without retry or skip after its fixture helpers distinguish user context rows from
+the tagged fence. Its zero-context case must assert zero user contexts, one denied
+fence, and the locked-server-unconfirmed visible outcome when server sign-out is
+unconfirmed; the focused database test owns the exact `locked: false` and
+`denialFenceCommitted: true` return assertion. Its context-bearing cases must assert
+the expected locked user rows and one denied fence rather than weakening raw row-count
+checks. The earlier 17-case proof remains revision-scoped; prose is not a substitute
+for this rerun.
+
+The guarded single-worker Chromium matrix must inspect real cookies and IndexedDB for
+fresh provision, an existing session with no generation, reload before
+acknowledgment, transaction abort, marker-write failure, marker-deletion failure,
+actor A to actor B, explicit site switch, silent membership fallback, sign-out during
+a delayed fetch, the exact post-precheck fence race, absent and legacy current
+partitions, an unrelated locked partition, and a two-tab older-response race. Each
+case must prove that no stale row renders, the legacy `locked` value reflects context
+row truth, `denialFenceCommitted` reflects the separate fresh fence commit, and the
+marker disappears only after the exact committed generation-bound record exists.
+This browser leaf may prove native provisioning only.
+The later public shell and cached-search slice must consume the marker-checked read
+entry point, preserve the `asOf` label, and pass their own cache/offline UX matrix
+before any offline-ready claim.
+
 ## Concrete acceptance proof
 
 1. **Contract/API tests:** unauthenticated, revoked, cross-site and spoofed-identity
