@@ -46,6 +46,104 @@ export function composeArtifact(body) {
   return HEADER + body.trimEnd() + "\n";
 }
 
+// Supabase's generator derives Insert optionality from column defaults and
+// attnotnull. It cannot see that these two NOT NULL columns are populated by
+// 0152 BEFORE INSERT triggers for legacy writers. Keep Row and Update exactly
+// as generated; only make the trigger-derived Insert inputs optional.
+const TRIGGER_DERIVED_INSERT_FIELDS = [
+  { table: "memberships", field: "workspace_membership_id" },
+  { table: "restaurants", field: "workspace_id" },
+];
+
+function countOccurrences(value, needle) {
+  return value.split(needle).length - 1;
+}
+
+function requireOne(value, needle, label) {
+  const count = countOccurrences(value, needle);
+  if (count !== 1) {
+    throw new Error(`Expected exactly one ${label}; found ${count}.`);
+  }
+}
+
+function requireOneFieldDeclaration(value, field, label) {
+  const escapedField = field.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const declarationPattern = new RegExp(
+    `^          ${escapedField}\\??:`,
+    "gmu",
+  );
+  const count = value.match(declarationPattern)?.length ?? 0;
+  if (count !== 1) {
+    throw new Error(`Expected exactly one ${label} declaration; found ${count}.`);
+  }
+}
+
+export function applyTriggerDerivedInsertOptionality(body) {
+  let result = body;
+
+  for (const { table, field } of TRIGGER_DERIVED_INSERT_FIELDS) {
+    const tableMarker = `      ${table}: {\n`;
+    requireOne(result, tableMarker, `${table} table block`);
+
+    const tableStart = result.indexOf(tableMarker);
+    const afterMarker = tableStart + tableMarker.length;
+    const nextTableMatch = /^      [a-z][a-z0-9_]*: \{$/mu.exec(
+      result.slice(afterMarker),
+    );
+    const tableEnd = nextTableMatch
+      ? afterMarker + nextTableMatch.index
+      : result.length;
+    const tableBlock = result.slice(tableStart, tableEnd);
+
+    const rowMarker = "        Row: {\n";
+    const insertMarker = "        Insert: {\n";
+    const updateMarker = "        Update: {\n";
+    requireOne(tableBlock, rowMarker, `${table}.Row section`);
+    requireOne(tableBlock, insertMarker, `${table}.Insert section`);
+    requireOne(tableBlock, updateMarker, `${table}.Update section`);
+
+    const rowStart = tableBlock.indexOf(rowMarker);
+    const insertStart = tableBlock.indexOf(insertMarker);
+    const updateStart = tableBlock.indexOf(updateMarker);
+    if (!(rowStart < insertStart && insertStart < updateStart)) {
+      throw new Error(`Unexpected section order in generated ${table} type.`);
+    }
+
+    const requiredLine = `          ${field}: string\n`;
+    const optionalLine = `          ${field}?: string\n`;
+    const rowBlock = tableBlock.slice(rowStart, insertStart);
+    const insertBlock = tableBlock.slice(insertStart, updateStart);
+    const updateBlock = tableBlock.slice(updateStart);
+
+    requireOneFieldDeclaration(rowBlock, field, `${table}.Row.${field}`);
+    requireOneFieldDeclaration(insertBlock, field, `${table}.Insert.${field}`);
+    requireOneFieldDeclaration(updateBlock, field, `${table}.Update.${field}`);
+    requireOne(rowBlock, requiredLine, `${table}.Row.${field}`);
+    requireOne(updateBlock, optionalLine, `${table}.Update.${field}`);
+
+    const requiredInsertCount = countOccurrences(insertBlock, requiredLine);
+    const optionalInsertCount = countOccurrences(insertBlock, optionalLine);
+    if (requiredInsertCount + optionalInsertCount !== 1) {
+      throw new Error(
+        `Expected exactly one generated ${table}.Insert.${field}; ` +
+          `found required=${requiredInsertCount}, optional=${optionalInsertCount}.`,
+      );
+    }
+
+    if (requiredInsertCount === 1) {
+      const insertAbsoluteStart = tableStart + insertStart;
+      const fieldAbsoluteStart =
+        insertAbsoluteStart + insertBlock.indexOf(requiredLine);
+      result =
+        result.slice(0, fieldAbsoluteStart) +
+        optionalLine +
+        result.slice(fieldAbsoluteStart + requiredLine.length);
+    }
+  }
+
+  return result;
+}
+
 async function generateBody() {
   if (process.argv.includes("--local")) {
     const result = spawnSync(
@@ -99,6 +197,6 @@ async function generateBody() {
 // by the contract test without firing a network request on import.
 if (process.argv[1] && process.argv[1].endsWith("generate-supabase-types.mjs")) {
   const body = await generateBody();
-  writeFileSync(OUT, composeArtifact(body));
+  writeFileSync(OUT, composeArtifact(applyTriggerDerivedInsertOptionality(body)));
   console.log(`Wrote ${OUT} (${body.length} bytes).`);
 }

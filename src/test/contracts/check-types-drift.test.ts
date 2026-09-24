@@ -7,6 +7,7 @@ import {
 } from "../../../scripts/check-types-drift.mjs";
 import {
   HEADER,
+  applyTriggerDerivedInsertOptionality,
   composeArtifact,
 } from "../../../scripts/generate-supabase-types.mjs";
 
@@ -148,6 +149,107 @@ describe("composeArtifact", () => {
     expect(composeArtifact(body)).not.toBe(
       composeArtifact(body.replace("wines", "vintages")),
     );
+  });
+});
+
+describe("trigger-derived Insert optionality", () => {
+  const generatedBody = `export type Database = {
+  public: {
+    Tables: {
+      memberships: {
+        Row: {
+          workspace_membership_id: string
+        }
+        Insert: {
+          workspace_membership_id: string
+        }
+        Update: {
+          workspace_membership_id?: string
+        }
+      }
+      restaurants: {
+        Row: {
+          workspace_id: string
+        }
+        Insert: {
+          workspace_id: string
+        }
+        Update: {
+          workspace_id?: string
+        }
+      }
+      wines: {
+        Row: { id: string }
+        Insert: { id?: string }
+        Update: { id?: string }
+      }
+    }
+  }
+}
+`;
+
+  test("changes only the two trigger-derived Insert fields", () => {
+    const normalized = applyTriggerDerivedInsertOptionality(generatedBody);
+    const expected = generatedBody
+      .replace(
+        "        Insert: {\n          workspace_membership_id: string\n",
+        "        Insert: {\n          workspace_membership_id?: string\n",
+      )
+      .replace(
+        "        Insert: {\n          workspace_id: string\n",
+        "        Insert: {\n          workspace_id?: string\n",
+      );
+    expect(normalized).toBe(expected);
+  });
+
+  test("is idempotent for an already normalized artifact", () => {
+    const normalized = applyTriggerDerivedInsertOptionality(generatedBody);
+    expect(applyTriggerDerivedInsertOptionality(normalized)).toBe(normalized);
+  });
+
+  test.each([
+    ["missing table", generatedBody.replace("      memberships: {\n", "")],
+    [
+      "missing field",
+      generatedBody.replaceAll("          workspace_id: string\n", ""),
+    ],
+    [
+      "changed field type",
+      generatedBody.replace(
+        "          workspace_membership_id: string\n",
+        "          workspace_membership_id: string | null\n",
+      ),
+    ],
+    [
+      "duplicate field",
+      generatedBody.replace(
+        "        Insert: {\n          workspace_id: string\n",
+        "        Insert: {\n          workspace_id: string\n          workspace_id: string\n",
+      ),
+    ],
+    [
+      "Row duplicate field with a different type",
+      generatedBody.replace(
+        "        Row: {\n          workspace_membership_id: string\n",
+        "        Row: {\n          workspace_membership_id: string\n          workspace_membership_id: number\n",
+      ),
+    ],
+    [
+      "Insert duplicate field with a different type",
+      generatedBody.replace(
+        "        Insert: {\n          workspace_id: string\n",
+        "        Insert: {\n          workspace_id: string\n          workspace_id?: number\n",
+      ),
+    ],
+    [
+      "Update duplicate field with a different type",
+      generatedBody.replace(
+        "        Update: {\n          workspace_membership_id?: string\n",
+        "        Update: {\n          workspace_membership_id?: string\n          workspace_membership_id: number\n",
+      ),
+    ],
+  ])("fails closed on %s", (_name, malformed) => {
+    expect(() => applyTriggerDerivedInsertOptionality(malformed)).toThrow();
   });
 });
 

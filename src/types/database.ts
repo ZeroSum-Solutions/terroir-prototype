@@ -1189,24 +1189,39 @@ export type Database = {
       memberships: {
         Row: {
           created_at: string
+          expires_at: string | null
+          granted_by: string | null
           id: string
           restaurant_id: string
+          revoked_at: string | null
           role: Database["public"]["Enums"]["membership_role"]
+          status: string
           user_id: string
+          workspace_membership_id: string
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
+          granted_by?: string | null
           id?: string
           restaurant_id: string
+          revoked_at?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
+          status?: string
           user_id: string
+          workspace_membership_id?: string
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
+          granted_by?: string | null
           id?: string
           restaurant_id?: string
+          revoked_at?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
+          status?: string
           user_id?: string
+          workspace_membership_id?: string
         }
         Relationships: [
           {
@@ -1214,6 +1229,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_workspace_membership_fkey"
+            columns: ["workspace_membership_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_memberships"
             referencedColumns: ["id"]
           },
         ]
@@ -1572,6 +1594,8 @@ export type Database = {
           logo_url: string | null
           name: string
           updated_at: string
+          workspace_id: string
+          workspace_kind: string | null
         }
         Insert: {
           auto_eightysix_from_inventory?: boolean
@@ -1584,6 +1608,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           updated_at?: string
+          workspace_id?: string
+          workspace_kind?: string | null
         }
         Update: {
           auto_eightysix_from_inventory?: boolean
@@ -1596,8 +1622,18 @@ export type Database = {
           logo_url?: string | null
           name?: string
           updated_at?: string
+          workspace_id?: string
+          workspace_kind?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "restaurants_workspace_kind_fkey"
+            columns: ["workspace_id", "workspace_kind"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "kind"]
+          },
+        ]
       }
       scan_idempotency: {
         Row: {
@@ -2348,6 +2384,74 @@ export type Database = {
           },
         ]
       }
+      workspace_memberships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          governance_role: string | null
+          id: string
+          revoked_at: string | null
+          status: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          governance_role?: string | null
+          id?: string
+          revoked_at?: string | null
+          status?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          governance_role?: string | null
+          id?: string
+          revoked_at?: string | null
+          status?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_memberships_workspace_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          expanded_at: string | null
+          id: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          expanded_at?: string | null
+          id?: string
+          kind: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          expanded_at?: string | null
+          id?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: []
+      }
       xwines_catalog: {
         Row: {
           abv: number | null
@@ -2890,6 +2994,25 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      shadow_effective_site_access: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          access_source: string
+          capabilities: string[]
+          legacy_role: Database["public"]["Enums"]["membership_role"]
+          preset_key: string
+          restaurant_id: string
+          workspace_id: string
+        }[]
+      }
+      shadow_effective_site_ids: {
+        Args: { p_capability_key: string }
+        Returns: string[]
+      }
+      shadow_has_site_capability: {
+        Args: { p_capability_key: string; p_restaurant_id: string }
+        Returns: boolean
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

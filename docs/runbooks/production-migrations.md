@@ -117,6 +117,80 @@ outstanding new-client retry can apply its physical effect twice. Before any app
 downgrade, quiesce affected inventory traffic and assess outstanding client operations;
 otherwise keep the receipt-aware endpoint in service until those operations are resolved.
 
+### 4b. Maintenance-window and operator boundary for 0152
+
+Migration 0152 is backward-compatible after commit, but applying its schema is an
+explicit maintenance-window operation. It does not promise zero downtime.
+
+1. Pause application ingress, background jobs, invitation acceptance, and auth signup.
+   Let in-flight writers drain. Do not terminate sessions without separate incident
+   authority.
+2. Resolve the exact production migration credential. Do not assume a role named
+   `postgres` can lock or alter `auth.users`: table ownership and role membership vary
+   by environment. With traffic still paused, use that same credential for the bundled
+   no-DDL catalog and lock preflight, and retain its complete output:
+
+   ```bash
+   psql "$DB_URL" -X -v ON_ERROR_STOP=1 \
+     -f scripts/0152-production-preflight.sql
+   ```
+
+   Before the forward migration, this proves that `current_user` is the **direct shared
+   owner** of `public.restaurants`, `public.memberships`, and the existing
+   `public.handle_new_user()` function; has `USAGE` plus `CREATE` on schema `public`;
+   has `USAGE` on schema `auth`; has both `REFERENCES` and the narrowly required
+   runtime `SELECT` on `auth.users`; can execute `auth.uid()` and
+   `seed_reason_codes(uuid)`; can use `membership_role` and the SQL/PLpgSQL languages;
+   has either `rolsuper` or `rolbypassrls` so the provenance trigger can distinguish an
+   actually deleted auth parent from an RLS-hidden live one; and can obtain the exact
+   forward lock set. The evidence also reports inherited authority with PostgreSQL's
+   correctly spelled `pg_has_role(..., 'USAGE')`, but inherited-only ownership is
+   rejected: `CREATE OR REPLACE` preserves the signup function's security-definer
+   owner while new objects belong to `current_user`. If the connection login is only a
+   member of the shared owner, explicitly `SET ROLE` to that owner before running both
+   this preflight and the migration. The preflight records `rolsuper` and
+   `rolbypassrls`; one must be true for auth-row visibility, but neither substitutes
+   for the coherent direct-owner boundary. Ownership of `auth.users` is not required.
+
+   Any failed catalog gate, permission error, or SQLSTATE `55P03` blocks the apply. Do
+   not grant broader access ad hoc; resolve the approved migration operator and its
+   established role membership with the provider, then repeat the complete preflight.
+3. Apply through the direct PostgreSQL session used by this runbook. The migration and
+   its `schema_migrations` row must share one outer transaction:
+
+   ```bash
+   psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -q \
+     -f supabase/migrations/0152_workspace_access_foundation.sql \
+     -c "insert into supabase_migrations.schema_migrations(version,name) values ('0152','workspace_access_foundation');"
+   ```
+
+4. The migration's first statements take `SHARE ROW EXCLUSIVE NOWAIT` on `auth.users`
+   and `ACCESS EXCLUSIVE NOWAIT` on `restaurants` plus `memberships`. SQLSTATE `55P03`
+   is a clean pre-DDL refusal: keep the maintenance window in place, identify and drain
+   the conflicting session, and make one deliberate retry. Never loop-retry against
+   live traffic.
+5. After commit, run containment, signup, old-writer, cascade, exact-capability,
+   privilege, and query-plan smokes before restoring traffic. Existing application code
+   may resume because omitted workspace/lifecycle columns are derived by compatibility
+   triggers; application code that depends on the new schema must not deploy first.
+   During the pre-deployment window, generate and check types only against the guarded
+   local schema (`node scripts/generate-supabase-types.mjs --local` /
+   `pnpm run types:check:local`). Hosted type generation is expected to fail closed until
+   0152 has been separately authorized and applied there; never apply a production
+   migration merely to resolve local compilation.
+6. The paired down owns its own explicit transaction and must not be wrapped in
+   `--single-transaction`. It also requires paused traffic and refuses any state that the
+   legacy model cannot preserve. Re-run the bundled preflight with the exact rollback
+   credential after 0152 exists; it then checks direct ownership of the four public
+   tables and all C04 functions and probes the down lock set. The down itself first
+   takes `ACCESS EXCLUSIVE NOWAIT` on `auth.users`, then on `workspaces`, `restaurants`,
+   `workspace_memberships`, and `memberships`, before its first guard or DDL. SQLSTATE
+   `55P03` is a clean no-change refusal; do not loop-retry it against traffic.
+
+Generic migration runners are not approved for production 0152 unless their per-file
+transaction boundary has been demonstrated. The local/disposable path uses `psql -1`;
+the repository production path uses `psql --single-transaction`.
+
 ### 5. Verify the effect, not the record
 
 Assert the thing the migration was for. A `schema_migrations` row proves only that an
