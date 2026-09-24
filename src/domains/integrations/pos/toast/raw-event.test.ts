@@ -79,4 +79,17 @@ describe("Toast raw-byte verification", () => {
       allowedRestaurantGuids: new Set([restaurantGuid]),
     })).toThrowError(expect.objectContaining({ code: "invalid_signature" }));
   });
+
+  it("rejects a syntactically shaped but impossible signed calendar instant", () => {
+    const impossible = "2024-02-30T15:11:01.050Z";
+    const invalidRaw = raw.replace(timestamp, impossible);
+    const invalidBody = new TextEncoder().encode(invalidRaw);
+    expect(() => parseSignedProviderEvent({
+      body: invalidBody,
+      signature: computeToastSignature(invalidBody, impossible, secret),
+      secret,
+      connectionId: "connection-1",
+      allowedRestaurantGuids: new Set([restaurantGuid]),
+    })).toThrowError(expect.objectContaining({ code: "invalid_event_timestamp" }));
+  });
 });

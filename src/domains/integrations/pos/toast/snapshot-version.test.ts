@@ -49,9 +49,9 @@ describe("Toast snapshot partial order", () => {
 
   it("digests allowlisted normalized content and preserves exact quantity/check provenance", () => {
     const selection: SelectionObservation = {
-      guid: "selection-1",
-      itemGuid: "item-1",
-      checkGuid: "check-1",
+      guid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      itemGuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      checkGuid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       parentGuid: null,
       depth: 0,
       quantityToken: "1.00",
@@ -67,20 +67,34 @@ describe("Toast snapshot partial order", () => {
       refunded: false,
       excludedReason: null,
     };
-    const first = digestNormalizedSnapshot({
-      orderGuid: "order-1",
+    const input = {
+      orderGuid: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       orderVoided: false,
       selections: [selection],
-    });
-    expect(digestNormalizedSnapshot({
-      orderGuid: "order-1",
+    };
+    const first = digestNormalizedSnapshot(input);
+    expect(first).toBe("84188dc294007ccaaaafca7ea9d6d5b41ceb98148299b0a6c4cb5c87f154121a");
+    const quantityChanged = digestNormalizedSnapshot({
+      orderGuid: input.orderGuid,
       orderVoided: false,
       selections: [{ ...selection, quantityToken: "1.0" }],
-    })).not.toBe(first);
-    expect(digestNormalizedSnapshot({
-      orderGuid: "order-1",
+    });
+    const checkChanged = digestNormalizedSnapshot({
+      orderGuid: input.orderGuid,
       orderVoided: false,
-      selections: [{ ...selection, checkGuid: "check-2" }],
-    })).not.toBe(first);
+      selections: [{
+        ...selection,
+        checkGuid: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      }],
+    });
+    expect(quantityChanged).not.toBe(first);
+    expect(checkChanged).not.toBe(first);
+    expect(quantityChanged).not.toBe(checkChanged);
+
+    const second = { ...selection, guid: "ffffffff-ffff-4fff-8fff-ffffffffffff" };
+    expect(digestNormalizedSnapshot({ ...input, selections: [selection, second] }))
+      .toBe(digestNormalizedSnapshot({ ...input, selections: [second, selection] }));
+    expect(digestNormalizedSnapshot({ ...input, selections: [selection, selection] }))
+      .not.toBe(first);
   });
 });

@@ -12,6 +12,12 @@ business workflows. Adapter modules own external/provider mechanics.
   orchestration around `execute_inventory_command` and `undo_last_pour`.
 - `src/domains/cellar`: reconcile transaction orchestration around
   `reconcile_open_bottles_batch`.
+- `src/domains/integrations/pos/toast`: internal, pure Toast observation
+  normalization, strict manual/operator snapshot guards, and versioned canonical
+  framing/digests for domains `0x01`, `0x02`, and `0x03`, backed by checked literal vectors.
+  It has no persistence, API, provider, or live-runtime wiring. See the
+  [Toast integration contract](plans/2026-09-23-terroir-toast-integration-contract.md)
+  for the approved vendor and activation plan.
 - `src/adapters/ocr`: Azure Document Intelligence boundary.
 - `src/adapters/llm`: Anthropic invoice extraction boundary.
 - `src/adapters/pdf`: Puppeteer HTML-to-PDF boundary.

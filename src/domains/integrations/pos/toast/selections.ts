@@ -1,9 +1,23 @@
 import {
   isJsonObject,
   isLosslessNumber,
+  isToastTimestampToken,
   LosslessJson,
   TOAST_MODIFIER_DEPTH_LIMIT,
 } from "./contracts";
+import type { InterpretationDerivedResultReason } from "./canonical-frame-manifest";
+import {
+  guardNormalizedSnapshot,
+  type GuardedNormalizedSnapshot,
+  type SelectionObservation,
+} from "./normalized-snapshot";
+
+export { guardNormalizedSnapshot } from "./normalized-snapshot";
+export type {
+  GuardedNormalizedSnapshot,
+  NormalizedSnapshotInput,
+  SelectionObservation,
+} from "./normalized-snapshot";
 
 const UNITS = new Set([
   "NONE", "LB", "OZ", "KG", "G", "GAL", "L", "ML", "FL_OZ",
@@ -14,33 +28,8 @@ const NONPHYSICAL_TYPES = new Set([
   "TOAST_CARD_RELOAD",
   "HOUSE_ACCOUNT_PAY_BALANCE",
 ]);
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
 
-export type SelectionObservation = Readonly<{
-  guid: string | null;
-  itemGuid: string | null;
-  checkGuid: string | null;
-  parentGuid: string | null;
-  depth: number;
-  quantityToken: string | null;
-  unit: string | null;
-  createdDate: string | null;
-  modifiedDate: string | null;
-  fulfillmentStatus: string | null;
-  selectionType: string | null;
-  splitOriginGuid: string | null;
-  deferred: boolean;
-  voided: boolean;
-  deleted: boolean;
-  refunded: boolean;
-  excludedReason: "deferred" | "nonphysical_selection_type" | null;
-}>;
-
-export type SelectionExtraction = Readonly<{
-  selections: SelectionObservation[];
-  issues: string[];
-  incomplete: boolean;
-}>;
+export type SelectionExtraction = GuardedNormalizedSnapshot;
 
 export type SelectionMappingCandidate =
   | Readonly<{
@@ -91,7 +80,6 @@ export function extractSelections(
 ): SelectionExtraction {
   const selections: SelectionObservation[] = [];
   const issues: string[] = [];
-  const seen = new Set<string>();
 
   const visit = (
     value: LosslessJson,
@@ -108,11 +96,6 @@ export function extractSelections(
       return;
     }
     const guid = string(value.guid);
-    if (guid && seen.has(guid)) {
-      issues.push("duplicate_selection_guid");
-      return;
-    }
-    if (guid) seen.add(guid);
 
     const selectionType = string(value.selectionType);
     const deferred = bool(value.deferred);
@@ -147,18 +130,18 @@ export function extractSelections(
   for (const { checkGuid, selection } of selectionsFromChecks(order)) {
     visit(selection, checkGuid, null, 0);
   }
-  return {
+  return guardNormalizedSnapshot({
+    orderGuid: string(order.guid) ?? "",
+    orderVoided: bool(order.voided),
     selections,
-    issues: [...new Set(issues)],
-    incomplete: issues.length > 0,
-  };
+  }, issues);
 }
 
 export function assessAutomatedMapping(
   selection: SelectionObservation,
   mapping: SelectionMappingCandidate | null,
 ) {
-  const reasons: string[] = [];
+  const reasons: InterpretationDerivedResultReason[] = [];
   if (!selection.guid) reasons.push("missing_selection_guid");
   if (!selection.itemGuid) reasons.push("missing_item_guid");
   if (!selection.quantityToken) reasons.push("missing_quantity");
@@ -217,15 +200,19 @@ export function assessAutomatedMapping(
 }
 
 function instant(value: string | null | undefined) {
-  if (!value || !ISO_INSTANT.test(value)) return null;
+  if (!value || !isToastTimestampToken(value)) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function selectMappedContributions(
-  selections: SelectionObservation[],
+  extraction: GuardedNormalizedSnapshot,
   liquidIdByItemGuid: ReadonlyMap<string, string>,
 ) {
+  if (extraction.incomplete) {
+    return { contributions: [], issues: [...extraction.issues] };
+  }
+  const selections = extraction.selections;
   const byGuid = new Map(
     selections.flatMap((selection) => selection.guid ? [[selection.guid, selection] as const] : []),
   );

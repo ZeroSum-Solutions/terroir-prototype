@@ -1,4 +1,7 @@
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
+import { encodeNormalizedSnapshotFrame, sha256Hex } from "./canonical-frame";
+import { isToastTimestampToken } from "./contracts";
+import { guardNormalizedSnapshot } from "./normalized-snapshot";
+import type { SelectionObservation } from "./selections";
 
 export type SnapshotVersion = Readonly<{
   eventTimestamp: string | null;
@@ -18,40 +21,11 @@ export function digestNormalizedSnapshot(input: {
   orderVoided: boolean;
   selections: SelectionObservation[];
 }) {
-  const selections = input.selections
-    .map((selection) => ({
-      guid: selection.guid,
-      itemGuid: selection.itemGuid,
-      checkGuid: selection.checkGuid,
-      parentGuid: selection.parentGuid,
-      depth: selection.depth,
-      quantityToken: selection.quantityToken,
-      unit: selection.unit,
-      createdDate: selection.createdDate,
-      modifiedDate: selection.modifiedDate,
-      fulfillmentStatus: selection.fulfillmentStatus,
-      selectionType: selection.selectionType,
-      splitOriginGuid: selection.splitOriginGuid,
-      deferred: selection.deferred,
-      voided: selection.voided,
-      deleted: selection.deleted,
-      refunded: selection.refunded,
-      excludedReason: selection.excludedReason,
-    }))
-    .sort((left, right) =>
-      (left.guid ?? "").localeCompare(right.guid ?? "") ||
-      (left.parentGuid ?? "").localeCompare(right.parentGuid ?? ""));
-  return createHash("sha256")
-    .update(JSON.stringify({
-      orderGuid: input.orderGuid,
-      orderVoided: input.orderVoided,
-      selections,
-    }))
-    .digest("hex");
+  return sha256Hex(encodeNormalizedSnapshotFrame(guardNormalizedSnapshot(input)));
 }
 
 function instant(value: string | null) {
-  if (!value || !ISO_INSTANT.test(value)) return null;
+  if (!value || !isToastTimestampToken(value)) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -100,6 +74,3 @@ export function maximumModifiedTimestamp(input: {
     instant(value)! > instant(latest)! ? value : latest,
   );
 }
-import { createHash } from "node:crypto";
-
-import { SelectionObservation } from "./selections";

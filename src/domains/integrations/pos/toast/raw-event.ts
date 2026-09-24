@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   isJsonObject,
+  isToastTimestampToken,
   LosslessJson,
   ToastContractError,
 } from "./contracts";
@@ -9,7 +10,6 @@ import { parseLosslessJson } from "./lossless-json";
 import { verifyToastSignature } from "./signature";
 
 const GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
 declare const verifiedProviderBrand: unique symbol;
 const verifiedProviderValues = new WeakSet<object>();
 
@@ -84,7 +84,7 @@ export function parseSignedProviderEvent(input: {
 }): SignedToastEvent {
   const root = objectField(parseLosslessJson(input.body), "body");
   const timestamp = stringField(root.timestamp, "timestamp");
-  if (!ISO_INSTANT.test(timestamp) || !Number.isFinite(Date.parse(timestamp))) {
+  if (!isToastTimestampToken(timestamp)) {
     throw new ToastContractError("invalid_event_timestamp", "timestamp must be an ISO-8601 instant");
   }
   if (!verifyToastSignature({

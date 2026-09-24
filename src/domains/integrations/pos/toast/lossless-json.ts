@@ -2,12 +2,13 @@ import {
   LosslessJson,
   LosslessNumber,
   TOAST_BODY_LIMIT_BYTES,
+  TOAST_NUMBER_TOKEN_LIMIT,
+  TOAST_NUMBER_TOKEN_PATTERN,
   ToastContractError,
 } from "./contracts";
 
 const DEFAULT_MAX_DEPTH = 64;
 const DEFAULT_MAX_NODES = 100_000;
-const DEFAULT_MAX_NUMBER_LENGTH = 128;
 
 type ParseLimits = Readonly<{
   maxBytes?: number;
@@ -36,7 +37,7 @@ export function parseLosslessJson(
   let nodes = 0;
   const maxDepth = limits.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = limits.maxNodes ?? DEFAULT_MAX_NODES;
-  const maxNumberLength = limits.maxNumberLength ?? DEFAULT_MAX_NUMBER_LENGTH;
+  const maxNumberLength = limits.maxNumberLength ?? TOAST_NUMBER_TOKEN_LIMIT;
 
   const fail = (message: string): never => {
     throw new ToastContractError("invalid_json", `${message} at offset ${index}`);
@@ -71,7 +72,9 @@ export function parseLosslessJson(
     return fail("unterminated JSON string");
   };
   const number = (): LosslessNumber => {
-    const match = source.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    const match = source.slice(index).match(
+      new RegExp(TOAST_NUMBER_TOKEN_PATTERN.source.replace(/\$$/, "")),
+    );
     if (!match) return fail("invalid JSON number");
     if (match[0].length > maxNumberLength) {
       throw new ToastContractError(

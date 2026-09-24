@@ -5,6 +5,7 @@ import { parseLosslessJson } from "./lossless-json";
 import {
   assessAutomatedMapping,
   extractSelections,
+  guardNormalizedSnapshot,
   type SelectionMappingCandidate,
   selectMappedContributions,
 } from "./selections";
@@ -34,16 +35,17 @@ const approvedMapping = (
 describe("Toast selection observations", () => {
   it("walks recursive modifiers with parent identity and exact quantity tokens", () => {
     const order = parseOrder(`{
-      "checks":[{"guid":"check-1","selections":[{
-        "guid":"selection-1",
-        "item":{"guid":"item-1"},
+      "guid":"00000000-0000-4000-8000-000000000001",
+      "checks":[{"guid":"00000000-0000-4000-8000-000000000002","selections":[{
+        "guid":"00000000-0000-4000-8000-000000000003",
+        "item":{"guid":"00000000-0000-4000-8000-000000000004"},
         "quantity":1.2300,
         "unitOfMeasure":"ML",
         "createdDate":"2024-03-28T15:10:00.000Z",
         "modifiedDate":"2024-03-28T15:11:00.000Z",
         "modifiers":[{
-          "guid":"selection-2",
-          "item":{"guid":"item-2"},
+          "guid":"00000000-0000-4000-8000-000000000005",
+          "item":{"guid":"00000000-0000-4000-8000-000000000006"},
           "quantity":2e-3,
           "unitOfMeasure":"L",
           "createdDate":"2024-03-28T15:10:01.000Z"
@@ -55,18 +57,18 @@ describe("Toast selection observations", () => {
     expect(result).toMatchObject({ incomplete: false, issues: [] });
     expect(result.selections).toEqual([
       expect.objectContaining({
-        guid: "selection-1",
-        itemGuid: "item-1",
-        checkGuid: "check-1",
+        guid: "00000000-0000-4000-8000-000000000003",
+        itemGuid: "00000000-0000-4000-8000-000000000004",
+        checkGuid: "00000000-0000-4000-8000-000000000002",
         parentGuid: null,
         depth: 0,
         quantityToken: "1.2300",
       }),
       expect.objectContaining({
-        guid: "selection-2",
-        itemGuid: "item-2",
-        checkGuid: "check-1",
-        parentGuid: "selection-1",
+        guid: "00000000-0000-4000-8000-000000000005",
+        itemGuid: "00000000-0000-4000-8000-000000000006",
+        checkGuid: "00000000-0000-4000-8000-000000000002",
+        parentGuid: "00000000-0000-4000-8000-000000000003",
         depth: 1,
         quantityToken: "2e-3",
       }),
@@ -219,18 +221,112 @@ describe("Toast selection observations", () => {
   });
 
   it("allows at most one contribution when an ancestor and modifier map to one liquid", () => {
-    const selections = extractSelections(parseOrder(`{
+    const extraction = extractSelections(parseOrder(`{
+      "guid":"00000000-0000-4000-8000-000000000001",
       "checks":[{"selections":[{
-        "guid":"parent","item":{"guid":"wine-item"},"quantity":1,
-        "modifiers":[{"guid":"modifier","item":{"guid":"wine-option"},"quantity":1}]
+        "guid":"00000000-0000-4000-8000-000000000002",
+        "item":{"guid":"00000000-0000-4000-8000-000000000003"},"quantity":1,
+        "modifiers":[{
+          "guid":"00000000-0000-4000-8000-000000000004",
+          "item":{"guid":"00000000-0000-4000-8000-000000000005"},"quantity":1
+        }]
       }]}]
-    }`)).selections;
-    expect(selectMappedContributions(selections, new Map([
-      ["wine-item", "liquid-1"],
-      ["wine-option", "liquid-1"],
+    }`));
+    expect(selectMappedContributions(extraction, new Map([
+      ["00000000-0000-4000-8000-000000000003", "liquid-1"],
+      ["00000000-0000-4000-8000-000000000005", "liquid-1"],
     ]))).toEqual({
-      contributions: [{ selectionGuid: "parent", liquidId: "liquid-1" }],
+      contributions: [{
+        selectionGuid: "00000000-0000-4000-8000-000000000002",
+        liquidId: "liquid-1",
+      }],
       issues: ["ancestor_descendant_same_liquid"],
     });
+  });
+
+  it("normalizes UUID identity before duplicate detection and preserves both facts", () => {
+    const lower = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const upper = lower.toUpperCase();
+    const result = guardNormalizedSnapshot({
+      orderGuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      orderVoided: false,
+      selections: [
+        {
+          guid: upper,
+          itemGuid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          checkGuid: null,
+          parentGuid: null,
+          depth: 0,
+          quantityToken: "1.00",
+          unit: "ML",
+          createdDate: "2024-01-01T00:00:00Z",
+          modifiedDate: null,
+          fulfillmentStatus: null,
+          selectionType: null,
+          splitOriginGuid: null,
+          deferred: false,
+          voided: false,
+          deleted: false,
+          refunded: false,
+          excludedReason: null,
+        },
+        {
+          guid: lower,
+          itemGuid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          checkGuid: null,
+          parentGuid: null,
+          depth: 0,
+          quantityToken: "1.00",
+          unit: "ML",
+          createdDate: "2024-01-01T00:00:00Z",
+          modifiedDate: null,
+          fulfillmentStatus: null,
+          selectionType: null,
+          splitOriginGuid: null,
+          deferred: false,
+          voided: false,
+          deleted: false,
+          refunded: false,
+          excludedReason: null,
+        },
+      ],
+    });
+
+    expect(result.selections).toHaveLength(2);
+    expect(result.selections.map((selection) => selection.guid)).toEqual([lower, lower]);
+    expect(result).toMatchObject({
+      incomplete: true,
+      issues: ["duplicate_selection_guid"],
+    });
+    expect(selectMappedContributions(result, new Map([
+      ["cccccccc-cccc-4ccc-8ccc-cccccccccccc", "liquid-1"],
+    ]))).toEqual({
+      contributions: [],
+      issues: ["duplicate_selection_guid"],
+    });
+  });
+
+  it("normalizes fixture parent and child identity before ancestor matching", () => {
+    const parent = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const child = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const result = extractSelections(parseOrder(`{
+      "guid":"cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "checks":[{"selections":[{
+        "guid":"${parent.toUpperCase()}",
+        "item":{"guid":"dddddddd-dddd-4ddd-8ddd-dddddddddddd"},
+        "quantity":1,
+        "modifiers":[{
+          "guid":"${child.toUpperCase()}",
+          "item":{"guid":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"},
+          "quantity":1
+        }]
+      }]}]
+    }`));
+
+    expect(result.incomplete).toBe(false);
+    expect(result.selections).toEqual([
+      expect.objectContaining({ guid: parent, parentGuid: null }),
+      expect.objectContaining({ guid: child, parentGuid: parent }),
+    ]);
   });
 });
