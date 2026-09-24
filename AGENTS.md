@@ -104,6 +104,7 @@ recorded. The required critical subset fails on any skip.
 | Concern | Home |
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
+| Local stack startup and conservation safety | `docs/runbooks/local-stack.md` (canonical) |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
 | Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 324 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
@@ -115,23 +116,41 @@ recorded. The required critical subset fails on any skip.
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
 current machine-read source for 324 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
-assertion is in contract scope, not that the whole workflow is complete. C04 has a
-locally implemented shadow database foundation plus a bounded server-private
-observation attached after legacy active-membership selection. It does not authorize;
-legacy membership remains the sole authority while capability cutover, cost
-enforcement, and expanded roles remain incomplete. The accepted, unimplemented
-[site-capability cutover](docs/plans/2026-09-24-terroir-site-capability-cutover.md)
-defines the first authoritative grant and pricing leaf; it activates no permission and
-does not complete C04. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#shadow-access-observation) for its
-server-only data boundary and per-resolution deadline. C03 has a locally implemented
+assertion is in contract scope, not that the whole workflow is complete.
+
+## Current implementation checkpoints
+
+The pushed branch includes the bounded exact-bottle Open/Pour application checkpoint
+at `44d046d5` and the guarded local-runtime checkpoints at `d35a9dae` and
+`3532f13e`. These are partial implementations, not completion claims. The current
+physical-bottle and database contracts are owned by
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#database-contracts); local startup,
+port selection, and live-test conservation are owned by
+[`docs/runbooks/local-stack.md`](docs/runbooks/local-stack.md).
+
+Migration 0154's exact 22-path source checkpoint is saved and pushed at `29b06e78`.
+Its isolated V6 rehearsal and immutable-range security review passed. This does not
+activate it: the retained local stack is still at schema 0152 with physical contract
+version 1, and all nine measured raw-cost exposures remain open.
+
+The working tree contains an uncommitted effective service-event reader packet. Its
+presence does not make it shipped, and it still needs a service-role view grant before
+positive live proof. The measured-closeout V2 packet is saved and pushed at
+`e9a49e5d`; its 100/100 focused checks, native independent verification, and bounded
+Opus source review passed, as did its immutable-range security review. See the current
+[MacBook handoff](.claude/handoffs/macbook-transfer.md#current-transfer-ledger) for
+the transfer ledger. Do not mark C04, D1, C06, or Phase B complete from these
+checkpoints.
+
+C03 has a locally implemented
 TER-CF-297 context-lookup leaf, an accepted bounded deterministic TER-CF-291 through
 TER-CF-293 private projection-store leaf, and a bounded local session-boundary leaf
 with 153 passing focused unit and contract tests. Real-browser verification, the public
 offline shell, positive eligibility, and the whole C03 workflow remain incomplete. C06
-has 18 accepted physical-bottle source assertions
-(`TER-CF-298` through `TER-CF-315`) and canonical transition plans, but no
-physical-bottle runtime or schema implementation; source promotion does not complete C06.
+has 18 accepted physical-bottle source assertions (`TER-CF-298` through
+`TER-CF-315`) and canonical transition plans. Its committed Open/Pour checkpoint is
+only one part of that transition; contract version 2 is not active and source
+promotion does not complete C06.
 The three C14 pilot-measurement assertions (`TER-CF-318` through `TER-CF-320`) are
 active, but no measurement capture/export runtime exists and source promotion does not
 complete C14. The pure nine-path calculation/export leaf cannot complete it alone.

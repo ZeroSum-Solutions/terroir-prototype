@@ -8,8 +8,10 @@ business workflows. Adapter modules own external/provider mechanics.
 
 - `src/domains/scanning`: invoice OCR/LLM extraction orchestration.
 - `src/domains/wine-lists`: wine-list PDF generation workflow.
-- `src/domains/pours`: bottle-open, pour, spill, close, discard, and Undo
-  orchestration around `execute_inventory_command` and `undo_last_pour`.
+- `src/domains/pours`: versioned bottle command orchestration. Contract version 1
+  uses `execute_inventory_command` and `undo_last_pour`; the committed version 2
+  Open/Pour application path uses `execute_physical_bottle_command` and exact
+  physical-bottle identities. Version 2 is not active yet.
 - `src/domains/cellar`: reconcile transaction orchestration around
   `reconcile_open_bottles_batch`.
 - `src/domains/offline`: the versioned private projection contract, IndexedDB
@@ -36,6 +38,10 @@ business workflows. Adapter modules own external/provider mechanics.
 - `src/lib/api/shadow-site-access.ts`: server-private C04 workspace/site access
   observation. It validates exact legacy-role capability sets behind one 750 ms
   total deadline; it is not a client contract or authorization authority.
+- `src/lib/api/site-capability.ts`: exact-site application authority for
+  `cost.read`, `margin.read`, and `pricing.manage`. It fails closed when the RPC is
+  missing, denied, malformed, timed out, or unavailable. Migration 0154's source is
+  committed, but it is not yet part of the retained local stack.
 - `src/lib/bins`, `src/lib/cellar-facets`, and `src/lib/cellar-health`:
   physical placement, URL-backed cellar views, and health classification.
 - `src/lib/reconcile-queue` and `src/lib/reconcile-ledger`: derived issue
@@ -52,6 +58,10 @@ business workflows. Adapter modules own external/provider mechanics.
   The backup transport retains its service-file and exported-snapshot path;
   the restore transport uses the isolated container directly. See
   [the restore guide](RESTORE-DRILL.md) for coverage and limitations.
+- `scripts/run-live-test-conservation.mjs`: guarded live-test wrapper for the exact
+  local project and immutable database container admitted from
+  `supabase/config.toml`. Its startup and six-table identity scope are documented in
+  the [local-stack runbook](runbooks/local-stack.md#live-test-identity-conservation).
 
 Provider boundaries have two branding exceptions. Menu-theme proposals in
 `src/lib/branding/menu-design.ts` call the shared Anthropic client directly.
@@ -77,6 +87,27 @@ directly. Wine-list PDF generation still reaches Puppeteer through
 
 ## Database Contracts
 
+- The retained configured local stack is at schema 0152 and physical contract
+  version 1. Migration 0154 has passed an isolated V6 apply and settlement rehearsal,
+  and its exact 22-path source checkpoint is committed at `29b06e78`. The rehearsal
+  is not proof that the retained stack, a hosted database, or all raw cost paths are
+  protected. All nine measured raw-cost exposures remain open.
+- Migration 0153 defines `physical_bottles`, immutable command receipts,
+  `execute_physical_bottle_command`, and the `effective_service_pour_events` view.
+  The committed application checkpoint at `44d046d5` implements selected exact-bottle
+  Open/Pour surfaces while preserving version 1. The application must not enable
+  contract version 2 until closeout, Undo, reconciliation, analytics, provenance, and
+  the canonical pre-cutover gates are complete.
+- Saved and pushed commit `e9a49e5d` adds exact-row close/discard routes and `/cellar/open`
+  integration. Its corrected V2 author and native independent checkpoints pass
+  100/100 focused tests, Opus accepted the bounded source, and immutable-range security
+  review passed. Runtime proof remains outstanding.
+- The uncommitted effective-reader packet redirects five application readers to
+  `effective_service_pour_events`, which excludes version 2 reversals and reversed
+  originals while retaining legacy history. Positive service-role runtime proof is
+  blocked because the view does not yet grant `SELECT` to `service_role`. A separate
+  migration 0155 is planned but is not implemented.
+
 - The legacy end-of-shift `POST /api/reconcile` path calls
   `reconcile_open_bottles_batch` through `src/domains/cellar/reconcile-service.ts`;
   that batch is one database transaction.
@@ -87,12 +118,12 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   database transaction.
 - Public wine-list reads stay explicitly protected by RLS policies and contract
   tests.
-- First-party open, pour, spill, and measured-close routes send a caller-generated UUID
-  to `execute_inventory_command`; quantity-bearing fields use integer milliliters. The RPC applies
-  the physical effects and durable receipt atomically, returns the stored outcome for
-  an exact replay without applying stock twice, and rechecks current membership before
-  replay. Close commands bind to both the reusable `open_bottles` row ID and its
-  `opened_at` lifecycle timestamp.
+- Version 1 open, pour, spill, and measured-close routes send a caller-generated UUID
+  to `execute_inventory_command`; quantity-bearing fields use integer milliliters. The
+  RPC applies physical effects and a durable receipt atomically, returns the stored
+  outcome for an exact replay without applying stock twice, and rechecks current
+  membership before replay. Close commands bind to both the reusable `open_bottles`
+  row ID and its `opened_at` lifecycle timestamp.
 - `execute_inventory_command` and the C02 Undo path serialize on the wine row with
   `FOR NO KEY UPDATE` before locking the reusable bottle slot. That lock still excludes
   another C02 writer, but permits the wine foreign key's `FOR KEY SHARE` after a

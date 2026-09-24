@@ -5,17 +5,22 @@ ever talks to hosted Supabase — see "Safety model" below.
 
 ## Bring-up
 
+`dev-stack.sh` resets the configured retained local database. It drops local data and
+replays every migration, so it is destructive and is not safe to run blindly or call
+idempotent. Confirm that you intend to erase that exact local stack before invoking
+it. This runbook does not provide a fresh-stack creation recipe.
+
 ```bash
 scripts/local/dev-stack.sh
 ```
 
-Idempotent — safe to re-run. It will:
+It will:
 
-1. Create `.env.local` from `.env.local.example` if missing.
+1. Create `.env.local` from `.env.local.example` with mode `0600` if it is missing.
 2. Refuse to continue if the configured Supabase URL isn't local
    (`scripts/local/assert-local-db.sh`).
 3. `supabase start` (no-op if already running).
-4. `supabase db reset` — drops and recreates the local DB, applying every
+4. `supabase db reset`, which drops and recreates the retained local DB and applies every
    migration in `supabase/migrations/` from scratch.
 5. Wait for the API to actually be ready (see "Post-reset readiness"
    below) before touching it.
@@ -28,6 +33,16 @@ Then boot the app against it:
 scripts/local/dev-local.sh
 curl -i http://127.0.0.1:3000/api/dev-login   # expect a 30x + session cookies
 ```
+
+`dev-local.sh` obtains local Supabase process values from `supabase status`; it does
+not read `.env.local`. It pins those local values for Next, while Next may still load
+unrelated variables through its normal dotenv handling. It derives
+`NEXT_PUBLIC_APP_URL` from the effective Next port.
+An explicit `--port`, `--port=<value>`, `-p`, or `-p<value>` wins over a nonempty
+`PORT`, which wins over 3000. The wrapper refuses malformed or conflicting port flags
+before reading local credentials or launching Next. For a non-3000 port, the isolated
+Supabase config must also use matching `[auth].site_url` and
+`additional_redirect_urls`; the wrapper does not rewrite auth redirect settings.
 
 `pnpm test:e2e` uses the same guarded wrapper and starts a fresh server. It does
 not reuse an unrelated process already listening on port 3000. The local auth
@@ -63,11 +78,23 @@ contain local values for these three names:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-The runner calls `scripts/local/assert-local-db.sh`, then queries the exact local
-container `supabase_db_terroir-vw-local`. It snapshots identity sets before the
-child starts and again after the child returns, signals, throws, or fails to
-spawn. The child always receives `CI=1`. The wrapper exits non-zero when the
-local guard, either snapshot, the child command, or identity comparison fails.
+The runner requires the guarded URL to use exactly `127.0.0.1` and the configured API
+port. It derives `project_id`, the database port, and the API port from
+`supabase/config.toml`; it never falls back to a retained default project or an
+environment override. Before the child starts, it requires the exact running
+`supabase_db_<project_id>` container, matching project labels, and database and API
+bindings that cover IPv4 loopback. It rejects invalid or ambiguous config, wrong
+labels and port mismatches. It accepts an IPv4 binding on `127.0.0.1` or
+`0.0.0.0`; this retained-stack compatibility check does not prove loopback-only
+exposure. A newly isolated demo stack must bind its API explicitly to
+`127.0.0.1`.
+
+The runner admits one immutable database container ID, applies read-only PostgreSQL
+options and timeouts to its snapshots, and uses that same ID before and after the
+child. It refuses container replacement or identity drift instead of switching to a
+new target. The child always receives `CI=1`. The wrapper exits non-zero when the
+local guard, Docker admission, either snapshot, the child command, or identity
+comparison fails.
 
 Run it with Node 20, pnpm 9, and one Vitest worker. List the intended live test
 files explicitly:
@@ -151,10 +178,10 @@ remains canonical for the stack's ports, bring-up, and safety model.
   supabase:seed:local:apply`) requires `NEXT_PUBLIC_SUPABASE_URL` to be set
   explicitly — no hardcoded fallback — and runs the same
   `assert-local-db.sh` gate before any write.
-- `.env.local` is gitignored and is created fresh per-worktree — it is
-  never copied from another checkout. `.env.local.example` commits the
-  well-known local supabase-cli default keys (anon/publishable +
-  service-role), which are public constants for local dev, not secrets.
+- `.env.local` is gitignored and must never be copied from another checkout.
+  `dev-local.sh` does not read it. `.env.local.example` commits well-known local
+  supabase-cli default keys (anon/publishable + service-role), which are public
+  constants for local development, not secrets.
 - Local-only CLI operations: `supabase init | start | stop | status | db
   reset`. Never `supabase db push` or `supabase link` from these scripts —
   those talk to a hosted project and are out of scope for anything under

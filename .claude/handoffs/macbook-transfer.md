@@ -2,7 +2,7 @@
 status: in-progress
 date: 2026-09-24
 branch: feat/production-readiness-20260923
-last-code-commit: 698587e3813014f3b499051f73c783feef8e3690
+last-code-commit: e9a49e5da6562a2a49cbd6226ecf21f1b84c2868
 
 ## Active Task
 
@@ -28,10 +28,9 @@ at pause; T02–T14 remain incomplete.
 
 - This transfer authorizes a feature-branch push, not merge or deployment.
 - Main deploys to both Railway environments sharing one hosted database.
-- Keep unfinished 0154 out of the active migration directory on the transferred
-  branch. Its source is preserved in `0154-unverified-recovery.patch` beside this
-  file. Review it before restoration; SQL runtime checks and generated artifacts
-  are missing. Do not apply it to any hosted database.
+- Migration 0154's exact 22-path source checkpoint, including generated type and
+  schema-snapshot artifacts, is saved and pushed at `29b06e78`. Its isolated proof
+  does not authorize a hosted apply.
 - Credentials, local database contents, dependencies and raw goal evidence stay
   on the mini. GitHub alone does not reproduce the running development setup.
 - Do not copy production credentials into local testing. Follow AGENTS.md and
@@ -43,10 +42,26 @@ at pause; T02–T14 remain incomplete.
 - `docs/plans/2026-09-23-terroir-production-execution.md`: execution contract.
 - `docs/plans/2026-09-20-terroir-product-data-requirements.md`: approved scope.
 - `docs/feature-ledger.json`: completion ledger; active is not complete.
-- `.claude/handoffs/terroir-production-credit-pause.md`: detailed prior evidence,
+- [Prior pause handoff](terroir-production-credit-pause.md): detailed prior evidence,
   suspended database actions and mini-only recovery paths. Its earlier no-push
   instruction is superseded only by this owner's transfer request.
-- `.claude/handoffs/0154-unverified-recovery.patch`: 20-path unfinished packet.
+- `docs/ARCHITECTURE.md`: canonical current code and database contracts.
+- `docs/runbooks/local-stack.md`: canonical local startup, port, and conservation
+  safety contract.
+
+## Current transfer ledger
+
+| State | Checkpoint | Evidence and limit |
+|---|---|---|
+| Saved and pushed | `44d046d5` exact-bottle Open/Pour application slice | 141/141 focused checks plus native, Opus, and immutable-range security review passed. This is a partial Phase B checkpoint; physical contract version 2 remains disabled. |
+| Saved and pushed | `d35a9dae` live-test conservation and `3532f13e` local app origin | 41/41 combined focused checks plus native gates, Opus review, and exact-range security review passed. These are launch and conservation safeguards, not a runtime application proof. |
+| Saved and pushed | `29b06e78` 0154 authority source checkpoint, 22 paths | Isolated V6 apply, fresh settlement, and immutable-range security review passed. The retained full local stack remains at schema 0152 and physical contract version 1; all nine measured raw-cost exposures remain open. |
+| Frozen on mini, uncommitted | Effective service-event readers, 10 paths | Source checks passed. Positive live service-role proof is blocked because `effective_service_pour_events` lacks a `service_role` `SELECT` grant. Migration 0155 is planned but not implemented. |
+| Saved and pushed | `e9a49e5d` measured closeout integration, 20-path V2 checkpoint | The corrected author and native independent sets pass 100/100, Opus accepted the bounded source, and immutable-range security review passed. Runtime proof remains pending. |
+
+`docs/feature-ledger.json` remains the only completion authority. The uncommitted
+effective-reader packet cannot be reconstructed from the pushed branch, and none of
+these checkpoints completes C04, D1, C06, or Phase B.
 
 ## Evidence
 
@@ -95,17 +110,15 @@ test reproduced that failure before the fix. Concurrent uncommitted Cellar work
 temporarily failed the repository-wide size gate, so these results do not establish
 a green full checkout. Mini-only evidence: `demo-insights-cost-implementation-20260924/`.
 
-The alternate browser capture path now works with the already-installed Playwright
-Chromium. Real 390px screenshots show the cellar, unavailable price comparison and
-Insights page without horizontal overflow. Insights preserves bottle counts while
-showing unavailable cost value and CSV. These captures use the synthetic local owner,
-whose grants are denied because the active database lacks0154. They do not prove
-staff-role isolation or a completed inventory journey. The development indicator
-overlaps the first navigation item, and some metric headings truncate. Evidence:
-`demo-playwright-capture-20260924/`. Earlier screenshot failures remain historical.
+Historical 390px browser captures used a synthetic local owner against a database
+without 0154. They do not prove staff-role isolation, positive grants, or a completed
+inventory journey. This transfer does not claim a current positive browser result.
+Earlier screenshot failures and captures remain in
+`demo-playwright-capture-20260924/` as historical evidence.
 
-These checkpoints are NOT a complete authorization rollout. Without 0154 and explicit
-grants, cost/target displays and suggestions fail closed for owners and managers too;
+These checkpoints are NOT a complete authorization rollout. Until 0154 is applied and
+explicit grants exist, cost/target displays and suggestions fail closed for owners and
+managers too;
 manual menu-price entry remains available by source inspection. Raw authenticated
 database access, several other screens and historical JSON cost copies remain open.
 Do not expose this branch
@@ -118,9 +131,10 @@ Historical checkpoints, not rerun for transfer: C03 browser checkpoint 27 pass,
 0 fail, 0 skip; Toast pure contracts 217 tests; JEV advisory modules 145 tests;
 pilot calculations 59 tests. These do not prove complete end-to-end workflows.
 Physical-bottle foundation b7fba749 passed earlier disposable SQL and generated-artifact
-checks; API/auth checks and application integration remain incomplete. 0153 was
-not applied to the active local database. A later run applied0153 on the isolated
-disposable target but stopped in0154 preflight before applying0154.
+checks. A later run applied 0153 on an isolated disposable target and stopped in the
+0154 preflight. That failure remains valid historical evidence, but the later isolated
+V6 run superseded it for the bounded 0154 apply and settlement result. V6 did not
+change the retained full local stack or prove a hosted rollout.
 The outgoing 44-commit range passed a redacted Gitleaks scan before transfer.
 
 ## Open Questions
@@ -134,30 +148,27 @@ archives to GitHub.
 
 ## Next Action
 
-On the MacBook, read this handoff and AGENTS.md, verify the checked-out branch,
-then prepare an isolated local test setup from the local-stack runbook. Report
-setup blockers before running tests. Do not resume suspended C13 database work.
+On the MacBook, read this handoff and AGENTS.md, verify the checked-out branch and
+exact commit, then follow the local-stack runbook. Do not run `dev-stack.sh` against
+an existing local stack unless erasing its database is intentional. Report setup
+blockers instead of inventing a fresh-stack procedure.
 
-For the active mini goal, finish database and remaining-screen cost protection before
-claiming team safety, then prove find/open/pour and receive/count/reconcile in the
-browser. The fourth reviewed runner repaired the disposable target's two GraphQL
-schema permission sets and applied0153. It stopped at0154 preflight because a
-combined SQL condition referenced the not-yet-created capability ledger. The0154
-apply and subsequent acceptance tests never ran. Measured settlement confirms the
-donor unchanged, target roles conserved, and exactly the expected0153 additions.
-The run is spent; do not retry it or reapply0153. Correct the preflight and review
-a continuation from that measured state. Preserve all failed packets and targets.
-No blind restore or change to the retained active database is authorized.
+For the active mini goal, preserve the frozen effective-reader packet and closeout
+commit.
+Migration 0154 is committed, but do not start migration 0155 until its separate grant
+change is reviewed. Do not alter the retained local database, retry spent historical
+runs, or treat the isolated V6 result as permission for a hosted apply.
 
-Exact-bottle Open/Pour application work remains uncommitted on the mini and is not
-part of checkpoint698587e3. It is only part of the required physical-bottle transition.
-Do not enable contract version2 until all required readers, writers, Undo,
-reconciliation, analytics and provenance paths pass the canonical pre-cutover gate.
+Exact-bottle Open/Pour application work is saved in `44d046d5`. The corrected closeout
+V2 leaf is saved and pushed at `e9a49e5d`; its 100/100 focused author and native
+independent checks passed, Opus accepted the bounded source, and immutable-range
+security review passed. The exact commit is saved and pushed; runtime proof remains
+outstanding. Do not enable contract version 2 until
+all required readers, writers, Undo, reconciliation, analytics, provenance, and the
+canonical pre-cutover gates pass.
 
-On the mini, the guarded development wrapper responds with `--webpack` after the
-default bundler entered a memory/restart loop. The synthetic local login, mobile
-content and alternate Playwright captures work. No completed browser-to-database
-service demo or all-width visual-QA pass is claimed.
+No completed browser-to-database service demo, current positive browser pass, or
+all-width visual-QA pass is claimed.
 
 ## Suggested Skills
 
