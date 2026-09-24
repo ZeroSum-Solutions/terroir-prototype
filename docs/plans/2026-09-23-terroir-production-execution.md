@@ -76,15 +76,19 @@ and image rights must be verified before enabling the corresponding live feature
 
 ## Offline engineering policy to prove
 
-Source promotion for the first C03 slice: `TER-CF-291` through `TER-CF-297`, owned by
-`TER-048`, are **UNIMPLEMENTED** requirements. The accepted
+The first C03 slice is partial local work under `TER-048`, not a C03 completion claim.
+The frozen twelve-path leaf implements the local `GET /api/offline-context` source for
+TER-CF-297; bounded evidence records 81 passing tests, including three live loopback
+tenant-containment tests, plus independent acceptance of this bounded leaf. TER-CF-291 through
+TER-CF-293 store work remains concurrent, unverified WIP. TER-CF-294 through
+TER-CF-296 public-shell, session-boundary, and cached-search work is incomplete.
+This evidence covers the endpoint only; deployment and the full offline workflow are
+unverified. Completion status remains in the generated feature ledger and product
+conformance report. The accepted
 [`offline-operation contract`](2026-09-23-terroir-offline-operation-contract.md)
-defines cost-free cached lookup, complete placements, two replaceable IndexedDB
-stores, a credentialless public shell, and honest shared-device lock behavior.
-Promote this contract before runtime work. Browser and authorization proofs must
-pass before any implementation claim; this slice does not complete C03 or C05.
-C06 individual-bottle receipts and online count/receiving/placement authority gate
-durable capture; C04 site grants and the transfer lifecycle also gate C05 transfers.
+keeps this slice cost-free and mutation-free. C06 individual-bottle receipts and
+online count/receiving/placement authority gate durable capture; C04 site grants and
+the transfer lifecycle also gate C05 transfers.
 
 Never label a local pending write as synchronized. Persist a stable operation ID
 before acknowledging capture. Partition local data by authenticated user and site;

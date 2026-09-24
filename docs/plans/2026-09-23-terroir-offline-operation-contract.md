@@ -1,15 +1,22 @@
 # Terroir offline operation contract
 
-Status: accepted engineering scope for source promotion, September 23, 2026.
-Implementation status: UNIMPLEMENTED. The first C03 slice is cached lookup only. It adds no mutation capture,
-queue, replay, recovery report, count, transfer, receiving flow, provider call,
-schema migration, dependency, or production activation.
+Status: accepted engineering contract with a partial local implementation, September 23, 2026.
+Implementation status: **PARTIAL, NOT C03 COMPLETE.** The frozen twelve-path lookup
+leaf implements the local `GET /api/offline-context` source for TER-CF-297. Bounded
+evidence records 81 passing tests, including three live loopback tenant-containment
+tests, plus independent acceptance of this bounded leaf. Each relation rejects more
+than 50,000 rows with a `500` and no partial projection. Keyset pages use separate
+database snapshots, so projection `asOf` is the route's advisory read-start time, not
+an atomic inventory timestamp. This evidence covers the endpoint only; deployment and
+the full offline workflow are unverified. Completion status remains in the generated
+feature ledger and product conformance report.
 
-The amended offline contract and execution ledger must be source-promoted before
-runtime implementation starts. Every new lookup-foundation assertion remains
-marked **UNIMPLEMENTED** in that promotion until its corresponding source and proof
-exist; source adoption is a requirement statement, not evidence that the behavior
-already ships.
+TER-CF-291 through TER-CF-293 store work exists only as concurrent, unverified WIP.
+TER-CF-294 through TER-CF-296 public-shell, session-boundary, and cached-search work
+is incomplete. This lookup slice adds no mutation capture, queue, replay, recovery
+report, count, transfer, receiving flow, provider call, schema migration, dependency,
+or production activation. Active source requirements state scope; they do not prove
+that the behavior ships.
 
 Two accepted limits remain explicit:
 
@@ -84,7 +91,7 @@ unbound or retired-bin stock has no authorized placement entry. Never substitute
 denormalized first-bin label, and do not select unit cost, section, note, price, or
 other cellar-row fields for this mapping.
 
-Pass the online `auth.user.id` from `src/app/(app)/layout.tsx` into the offline
+Pass the online `auth.user.id` from the [application layout](../../src/app/%28app%29/layout.tsx) into the offline
 provider, alongside the existing server-resolved restaurant ID. The client compares
 these expected values with the endpoint response before committing, but this is a
 mix-up check only; server authorization remains authoritative. One IndexedDB
@@ -96,7 +103,8 @@ zero or multiple eligible partitions fail closed.
 
 Add `/offline` to `PUBLIC_PATHS` in `src/lib/supabase/proxy.ts`. The page performs no
 server auth, membership, tenant, or cellar fetch and must return a non-redirecting
-`200` without credentials. `public/sw.js` remains outside the proxy because the
+`200` without credentials. The planned service worker under existing `public/`
+remains outside the proxy because the
 current matcher excludes `.js`; preserve and test that assumption.
 
 After an online `/offline` load, its client sends the worker only its same-origin,
@@ -201,9 +209,9 @@ required dependencies, not silently deferred features.
 | 0. Source/contract promotion | `docs/plans/2026-09-23-terroir-offline-operation-contract.md` and `docs/plans/2026-09-23-terroir-production-execution.md` | Adopt this exact lookup-only scope first. Mark every new requirement **UNIMPLEMENTED** and preserve C03/C05/Q10/C04 dependencies; make no shipped/runtime claim. |
 | 1. Pure contract | `src/domains/offline/contract.ts`, `contract.test.ts` | Exact v1 schema; forbidden fields cannot serialize; no role/capability/operation types. |
 | 2. Authorized projection | `src/app/api/offline-context/route.ts` and test; a dedicated server query/mapper module | Actor/site derived from current auth; spoofed IDs ignored; revocation denied; lease <=12h; response `no-store`; every authorized placement preserved. |
-| 3. Native store | `src/domains/offline/database.ts` and test | IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
-| 4. Session boundary | `src/app/(app)/offline-aware-signout.tsx`; `settings-dropdown.tsx`; `auth/signout/route.ts`; `auth/callback/route.ts`; `api/dev-login/route.ts`; `lib/supabase/proxy.ts`; existing focused tests | No locked-login loop; active restaurant cleared; success-only unlock cookie; both local persistence failure branches render honestly. |
-| 5. Public shell | `src/app/offline/page.tsx`, `offline-client.tsx`; `src/app/(app)/offline-provider.tsx`; `src/app/(app)/layout.tsx`; `src/lib/context/restaurant.tsx`; `public/sw.js` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
+| 3. Native store | Planned IndexedDB store module and test under existing `src/domains/offline/` | IndexedDB v1 has exactly `contexts` and `projections`; atomic provision; sole-eligible-partition, lock, expiry, rollback, corruption and denial cases fail closed. |
+| 4. Session boundary | Planned offline-aware sign-out component under existing `src/app/(app)/`; [settings dropdown](../../src/app/%28app%29/settings-dropdown.tsx); `src/app/auth/signout/route.ts`; `src/app/auth/callback/route.ts`; `src/app/api/dev-login/route.ts`; `src/lib/supabase/proxy.ts`; existing focused tests | No locked-login loop; active restaurant cleared; success-only unlock cookie; both local persistence failure branches render honestly. |
+| 5. Public shell | Planned offline route and client page under existing `src/app/`; planned offline provider under existing `src/app/(app)/`; [application layout](../../src/app/%28app%29/layout.tsx); `src/lib/context/restaurant.tsx`; planned service worker under existing `public/` | Worker cache allowlist and complete-shell acknowledgment pass before registration is called ready. No shell activation before orders 1–4 pass. |
 | 6. Browser proof | focused Playwright spec | All proofs below pass before any implemented ledger assertion may be promoted to proved; lookup-only scope and C03/C05/Q10/C04 dependency states remain explicit. |
 
 Do not add a PWA/IndexedDB wrapper dependency or reorganize unrelated auth/cellar

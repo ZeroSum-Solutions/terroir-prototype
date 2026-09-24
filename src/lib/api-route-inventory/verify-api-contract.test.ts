@@ -336,9 +336,11 @@ describe("checked-in API contract gate", () => {
       // The import template moved off a data: URI onto a real route,
       // GET /api/import/template, because mobile Safari will not download a
       // data: URL and navigated the tab to raw CSV instead — 114 + 1 = 115.
-      discoveredOperationCount: 115,
-      plannedOperationCount: 19,
-      classificationCount: 115,
+      // C03 added the authenticated cost-free lookup projection at
+      // GET /api/offline-context — 115 + 1 = 116.
+      discoveredOperationCount: 116,
+      plannedOperationCount: 18,
+      classificationCount: 116,
     });
     expect(paths.map((file) => readFileSync(resolve(file), "utf8"))).toEqual(
       before,

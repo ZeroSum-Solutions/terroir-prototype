@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generatorVersion": 1,
   "sourceRoot": "src/app/api",
-  "routeFileCount": 99,
-  "discoveredOperationCount": 115,
+  "routeFileCount": 100,
+  "discoveredOperationCount": 116,
   "discoveredOperations": [
     {
       "operationId": "api:GET:/api/assistant",
@@ -484,6 +484,17 @@
       "path": "/api/member-analytics",
       "source": {
         "file": "src/app/api/member-analytics/route.ts",
+        "exportKind": "function-declaration",
+        "localName": "GET",
+        "moduleSpecifier": null
+      }
+    },
+    {
+      "operationId": "api:GET:/api/offline-context",
+      "method": "GET",
+      "path": "/api/offline-context",
+      "source": {
+        "file": "src/app/api/offline-context/route.ts",
         "exportKind": "function-declaration",
         "localName": "GET",
         "moduleSpecifier": null
@@ -1318,14 +1329,6 @@
       "path": "/api/inventory",
       "sourceRequirementIds": [
         "TER-CF-191"
-      ]
-    },
-    {
-      "operationId": "api:GET:/api/offline-context",
-      "method": "GET",
-      "path": "/api/offline-context",
-      "sourceRequirementIds": [
-        "TER-CF-297"
       ]
     },
     {

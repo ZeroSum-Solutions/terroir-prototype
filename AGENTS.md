@@ -115,10 +115,13 @@ recorded. The required critical subset fails on any skip.
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
 current machine-read source for 297 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
-assertion is in contract scope, not that the behavior is complete; the eight C04
-workspace/site shadow-access assertions, nine C08 fixture/manual POS-corroboration
-assertions and seven C03 offline-lookup assertions remain unimplemented. Pure Toast
-modules alone do not complete the C08 workflows. Non-core `app_spec.txt`
+assertion is in contract scope, not that the whole workflow is complete. C04 has a
+locally implemented shadow database foundation, while cost enforcement and expanded
+roles remain incomplete. C03 has a locally implemented TER-CF-297 context-lookup leaf
+with bounded test evidence; TER-CF-291 through TER-CF-293 store work remains unverified WIP,
+and TER-CF-294 through TER-CF-296 shell, session, and cached-search work is incomplete.
+The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast
+modules alone do not complete those workflows. Non-core `app_spec.txt`
 prose can retain historical or drifted claims (including a dead env var name).
 `claude-progress.txt` is a frozen historical record and does not determine current
 scope or status. Both remain at the **repo root**, not in `docs/_archive/`.

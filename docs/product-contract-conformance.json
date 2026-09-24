@@ -13,8 +13,8 @@
   },
   "summary": {
     "proved": 0,
-    "weak": 23,
-    "unimplemented": 19
+    "weak": 24,
+    "unimplemented": 18
   },
   "requirements": [
     {
@@ -615,16 +615,18 @@
     },
     {
       "requirementId": "TER-CF-297",
-      "status": "unimplemented",
-      "reason": "current_route_not_discovered",
+      "status": "weak",
+      "reason": "route_present_executable_proof_not_trusted",
       "operationId": "api:GET:/api/offline-context",
       "evidence": {
         "ledgerClaim": "GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses",
-        "expectedRoute": {
+        "implementation": {
           "method": "GET",
-          "path": "/api/offline-context"
+          "path": "/api/offline-context",
+          "sourceFile": "src/app/api/offline-context/route.ts",
+          "exportKind": "function-declaration"
         },
-        "implementation": null
+        "proofAssessment": "Executable behavioral proof is not yet trusted."
       }
     }
   ]

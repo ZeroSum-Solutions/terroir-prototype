@@ -155,12 +155,23 @@ describe("TER-020Ab active API requirement reconciliation", () => {
     ).toBe(false);
   });
 
-  it("keeps the C03 lookup endpoint planned without promising a mutation or recovery route", () => {
+  it("classifies the C03 lookup route exactly without promising mutation or recovery", () => {
     expect(inventory.plannedOperations.filter((item) => item.path.includes("offline")))
-      .toEqual([{
-        operationId: "api:GET:/api/offline-context", method: "GET",
-        path: "/api/offline-context", sourceRequirementIds: ["TER-CF-297"],
-      }]);
+      .toEqual([]);
+    expect(inventory.discoveredOperations.filter((item) => item.path.includes("offline")))
+      .toEqual([expect.objectContaining({
+        operationId: "api:GET:/api/offline-context",
+        method: "GET",
+        path: "/api/offline-context",
+      })]);
+    expect(reconciliation.discoveredClassifications.find(
+      (item) => item.operationId === "api:GET:/api/offline-context",
+    )).toEqual({
+      operationId: "api:GET:/api/offline-context",
+      classification: "exact",
+      concreteRequirementId: "TER-CF-297",
+      semanticAliasContext: [],
+    });
   });
 
   it("classifies every discovered and planned operation exactly once", () => {
