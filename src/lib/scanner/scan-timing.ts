@@ -1,26 +1,17 @@
 /**
- * M1-1: client-side scan latency instrumentation.
+ * Local client-side scan latency measurement.
  *
  * Records User Timing marks (`performance.mark`) for the client-observable
  * stages of a scan — capture (tap-to-file-selected), prep (building the
  * upload request), upload (the network round trip), and render (state
- * update through next paint) — then reports each stage's measured
- * duration to Sentry as a structured log entry. `enableLogs` is already
- * configured in instrumentation-client.ts, so this is a complement to
- * existing Sentry conventions rather than a new integration: logs aren't
- * subject to the 10%-in-prod trace sampling, so a single scan's stage
- * breakdown isn't lost the way a sampled-out span would be. Correlate a
- * scan's client stages with its server-side spans (see
- * `src/domains/scanning/scan-telemetry.ts`) via `scanId`, which is the
- * scan's existing idempotency key (a random client-generated UUID).
+ * update through next paint). The measurements stay in the current
+ * process and are not exported to Sentry.
  *
  * Every export here is defensive: capturing or reporting timing can never
  * throw, block, or otherwise affect the scan itself (M1-1 acceptance #2).
- * Marks and log attributes carry only stage names, the scan id, byte/item
- * counts, and durations — never file contents, OCR text, wine names, or
- * invoice amounts.
+ * The legacy parameters remain for caller compatibility while the export
+ * channel is retired.
  */
-import * as Sentry from "@sentry/nextjs";
 
 export type ClientScanStage = "capture" | "prep" | "upload" | "render";
 
@@ -41,17 +32,16 @@ export function markScanStage(stage: ClientScanStage, edge: "start" | "end"): vo
 }
 
 /**
- * Measures a stage's most recent start/end mark pair and reports the
- * duration to Sentry as a `scan.client.<stage>` log entry, then clears
- * those marks so a retried scan measures fresh boundaries. Returns the
+ * Measures a stage's most recent start/end mark pair, then clears those
+ * marks so a retried scan measures fresh boundaries. Returns the
  * measured duration in ms, or null if the stage was never fully marked
  * (e.g. a test that dispatches the file input directly, skipping the
  * button click that marks "capture:start"). Never throws.
  */
 export function reportScanStage(
-  scanId: string,
+  _scanId: string,
   stage: ClientScanStage,
-  extra: Record<string, string | number | boolean> = {},
+  _extra: Record<string, string | number | boolean> = {},
 ): number | null {
   try {
     if (typeof performance === "undefined" || typeof performance.measure !== "function") {
@@ -65,13 +55,6 @@ export function reportScanStage(
     const measureName = `${MARK_NAMESPACE}:${stage}:measure`;
     const measure = performance.measure(measureName, startKey, endKey);
     const durationMs = Math.round(measure.duration);
-
-    Sentry.logger?.info?.(`scan.client.${stage}`, {
-      scanId,
-      stage,
-      durationMs,
-      ...extra,
-    });
 
     performance.clearMarks(startKey);
     performance.clearMarks(endKey);

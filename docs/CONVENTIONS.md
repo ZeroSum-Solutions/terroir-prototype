@@ -94,8 +94,9 @@ predecessor that drifted for four months.
 
 ## Observability
 
-The source-backed policy in this section was verified against `49a77d3d` on
-2026-09-23.
+The error-only SDK configuration in this section was verified against `49a77d3d`
+on 2026-09-23. The M1-1 retirement below is the accompanying tested change and is
+not part of that earlier verification.
 
 - **Sentry** wraps the Next.js build; server, edge, and client instrumented
   separately (`instrumentation.ts`, `instrumentation-client.ts`,
@@ -118,6 +119,11 @@ The source-backed policy in this section was verified against `49a77d3d` on
 - `src/lib/monitoring/error-privacy.ts` owns the allowlist. The installed-SDK envelope
   contract lives in `src/test/contracts/sentry-envelope-privacy.test.ts`. Any wider
   telemetry channel needs a separate reviewed data contract and regression proof.
+- **M1-1 scan-latency export is retired.** `src/lib/scanner/scan-timing.ts` keeps
+  local User Timing measurements and cleanup only. The compatibility wrapper in
+  `src/domains/scanning/scan-telemetry.ts` runs each stage once without Sentry spans,
+  SDK logs, console logging, or error capture. Re-enabling remote scan timing requires
+  a reviewed data contract and installed-SDK recording proof before activation.
 - Source maps upload on Railway deploy, gated on `SENTRY_AUTH_TOKEN` presence.
 - Provider-side retention and Sentry project permissions remain unverified release
   gates; application tests cannot prove either setting.

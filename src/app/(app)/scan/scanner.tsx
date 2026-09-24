@@ -93,10 +93,9 @@ class ScanError extends Error {
 }
 
 async function postScan(files: File[], signal: AbortSignal, key?: string | null): Promise<Scan> {
-  // M1-1: client-side "prep" (building the request) and "upload" (the
-  // network round trip) stages. scanId is the scan's own idempotency key
-  // so these reports correlate with the server-side spans in
-  // src/domains/scanning/scan-telemetry.ts.
+  // Local User Timing measures "prep" and the client-observed "upload"
+  // round trip. scanId remains only as a compatibility argument; these
+  // durations are not aggregated or exported.
   const scanId = key ?? "unkeyed";
   markScanStage("prep", "start");
   const body = new FormData();
@@ -325,8 +324,8 @@ export function Scanner({
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
-    // M1-1: scanTelemetryId keys the client-side stage reports so they
-    // correlate across a retry even after scanKeyRef is cleared below.
+    // Keep the legacy identifier argument stable across a retry. The timing
+    // helper measures and clears local marks without exporting the value.
     const scanTelemetryId = scanKeyRef.current ?? "unkeyed";
     reportScanStage(scanTelemetryId, "capture", { fileCount: files.length });
     try {

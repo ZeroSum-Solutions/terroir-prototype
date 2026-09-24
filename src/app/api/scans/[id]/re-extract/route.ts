@@ -108,9 +108,8 @@ export async function POST(
 
     let parsed;
     try {
-      // M1-1: same scan.extract / scan.extract.retry spans as the initial
-      // scan pass (src/domains/scanning/invoice-scan-service.ts), so a
-      // re-extraction's timing is visible the same way.
+      // Keep the same stage boundaries as the initial scan pass for control-flow
+      // compatibility. The retired wrapper does not export remote timing.
       parsed = await withScanSpan(
         "extract",
         { attempt: 1, model: INVOICE_EXTRACTION.model, effort: INVOICE_EXTRACTION.effort ?? "default" },
