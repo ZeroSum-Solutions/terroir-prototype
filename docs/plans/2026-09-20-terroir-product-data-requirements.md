@@ -9,8 +9,8 @@ behavior to implementation tasks and proof; it does not replace this product PRD
 
 **Date:** 2026-09-20
 
-**Last revised:** 2026-09-23, after the owner's offline decision, request for
-recommended interview answers, and identification of Toast as the likely primary POS.
+**Last revised:** 2026-09-23, after the owner's offline decision, identification of
+Toast as the likely primary POS, approval of Q6–Q15 and autonomous build request.
 Restaurants launch first; serious private collectors follow. This is an evolving
 PRD, not a claim that all listed capabilities belong in the first release.
 See [the audit and revised planning sequence](2026-09-22-terroir-plan-audit.md)
@@ -21,9 +21,9 @@ for evidence corrections, recommendations, and remaining interview topics.
 **Purpose:** Consolidate the restaurant, collector, wine-intelligence, inventory,
 pricing, tasting-note, spatial-cellar, and integration requirements that currently
 live across separate plans. Use this document to settle product decisions and design
-the next database contract. Continue to use `docs/feature-ledger.json` for the current
-269-feature contract until approved requirements are promoted through the repository's
-source-ledger process.
+the next database contract. Continue to use `docs/feature-ledger.json` for the
+enumerated implementation contract. Promote approved requirements through the
+repository's source-ledger process; an active requirement is not evidence it works.
 
 ## 1. Product definition
 
@@ -46,16 +46,19 @@ as a restaurant merely to reuse existing tables.
 - Target a sophisticated wine program with multiple locations. The owner's initial
   profile is “70 people,” “35 wines,” and “20 staff.” Whether these are per-site
   or group totals, the number of sites, and physical bottle counts remain open.
-- Terroir is the authoritative physical wine inventory system. Recommend keeping
+- Terroir is the authoritative physical wine inventory system. Approved Q8 keeps
   orders, checks, payments, and financial sales records authoritative in the POS.
-  The service/depletion contract remains open. For Q8 the owner said the operation
+  Staff-recorded physical events own initial depletion; POS events corroborate and
+  never subtract a second time. For Q8 the owner said the operation
   will “probably mainly” use Toast: record Toast as the provisional primary POS
   integration target, not an exclusive vendor commitment. Actual pilot use, API
   access, integration permissions, and available data remain unverified.
 - Preserve three experiences: rapid restaurant service and management; an image-led
   collector experience; and later enthusiast discovery and purchasing assistance.
-- Explore role-aware business UI and extensive AI assistance. The role permission
-  matrix, automation thresholds, and generative layout behavior remain proposals.
+- Approved Q9/Q13 define role-aware business UI and extensive bounded AI assistance.
+  Site access and cost visibility are explicit; service controls remain stable.
+  Exact capability implementation and exceptional-action thresholds need engineering
+  specifications and tests, not a second approval of the same product direction.
 - Q5: the owner accepts B for the first release: cached lookup plus offline pours,
   opened bottles, waste, and counts, synchronized afterward. C is the intended
   outcome as quickly as possible: extend offline operation to receiving, transfers,
@@ -69,10 +72,11 @@ or exclusive allocation of the last bottle. Preserve conflicting physical report
 for reconciliation without silently overwriting or dropping them. The build contract
 must define secure local persistence, device-loss/revocation handling, and recovery.
 
-Multi-location support is part of the target. Central purchasing, shared warehouses,
-inter-site transfers, group reports, and staff access across sites need a bounded
-pilot definition before they become committed release requirements. Personal
-collector support follows the restaurant pilot; its release date remains unset.
+Approved Q6 commits separately controlled sites, group oversight, consolidated stock
+views and tracked transfers. Central purchasing and warehouse automation remain
+deferred. Actual pilot sites and legal stock owners remain unknown. Personal
+collector support follows the restaurant pilot under Q14; its release date remains
+unset, but it remains in the approved autonomous build scope.
 
 ### Decision PDR-001: shared workspace foundation
 

@@ -125,6 +125,17 @@ targets, and image-led collector browsing. Refero/craft research supports intera
 details; it does not authorize replacing the existing product identity. Inspect real
 rendered states before selecting changes. No generic new design system or heavy UI kit.
 
+September 23 reference refresh: three style searches, full Authkit and Vivid+Co
+references, and full Shopify inventory / Vinyls collection-details screen references.
+These support bounded interaction choices; `DESIGN.md` remains the visual authority.
+
+| Decision | Evidence and role | Constraint |
+|---|---|---|
+| Preserve existing glass depth and hierarchy | DESIGN.md; Authkit style `9712d1d1-ef0a-4a9d-a266-57f5cd2a34b7`; Vivid+Co style `72ad95ca-7714-402d-a520-5161516f0eaf` | Borrow no external palette/font changes; reject their blue/violet accents where they conflict with Terroir |
+| Put wine identity, location and quantity together in a scan-friendly mobile row | [Shopify inventory reference](https://refero.design/screens/68052d70-a8ac-41d6-8170-bcbe22ce6178), Q7/Q12 | Do not copy direct stock overwrites; count changes retain the approved review/audit rules |
+| Use full-row targets and grouped details for collection metadata | [Vinyls dark details reference](https://refero.design/screens/e845e936-2838-4984-b5c5-7e008246679e), Q14 | Price visibility follows permissions; detailed metadata must not crowd out service actions |
+| Keep primary controls stable and recover interrupted work | Q12/Q13; Refero craft focus/touch/form guidance | >=44px service targets, visible keyboard focus, no surprise mobile autofocus or moving primary buttons |
+
 ## Review and proof protocol
 
 The goal skill controls durable state and proof; Fable controls evidence-first
