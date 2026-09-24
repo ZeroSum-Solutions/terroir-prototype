@@ -18,6 +18,13 @@ function item(overrides: Partial<LineItem> = {}): LineItem {
 }
 
 describe("toCsv", () => {
+  it("preserves the existing scanner fixture byte-for-byte", () => {
+    expect(toCsv([item()])).toBe(
+      "\ufeffWine,Producer,Vintage,Varietal,Region,Quantity,Unit cost (USD),Line total (USD),Confidence\r\n" +
+        "Pinot Noir,Domaine Test,2020,Pinot Noir,Burgundy,6,42.00,252.00,0.95",
+    );
+  });
+
   it("prepends a UTF-8 BOM so Excel decodes the file as UTF-8", () => {
     const out = toCsv([]);
     expect(out.charCodeAt(0)).toBe(0xfeff);
