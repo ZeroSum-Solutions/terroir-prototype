@@ -10,6 +10,7 @@ const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
 const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
+const REVERSAL_EVENT_ID = "77777777-7777-4777-8777-777777777777";
 
 describe("physical bottle database adapters", () => {
   it("derives count and total from one exact array without collapsing siblings", () => {
@@ -219,6 +220,82 @@ describe("physical bottle database adapters", () => {
       restaurantId: RESTAURANT_ID, command: "discard", wineId: WINE_ID,
       openBottleId: BOTTLE_ID,
     })).resolves.toMatchObject({ command: "discard", closeout: null });
+  });
+
+  it("binds undo to the receipt event without sending a bottle selector", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { ...physicalCommandResult(), command: "undo" },
+      error: null,
+    });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      command: "undo",
+      wineId: WINE_ID,
+      expectedOpenBottleId: BOTTLE_ID,
+      reversalOfEventId: REVERSAL_EVENT_ID,
+    })).resolves.toMatchObject({
+      command: "undo",
+      openBottle: { id: BOTTLE_ID },
+      pourEventIds: ["88888888-8888-4888-8888-888888888888"],
+    });
+    expect(rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
+      expect.objectContaining({
+        p_command: "undo",
+        p_wine_id: WINE_ID,
+        p_open_bottle_id: undefined,
+        p_reversal_of_event_id: REVERSAL_EVENT_ID,
+      }));
+  });
+
+  it.each([
+    ["operation", { operation_id: "99999999-9999-4999-8999-999999999999" }],
+    ["command", { command: "pour" }],
+    ["restaurant", { open_bottle: {
+      ...physicalCommandResult().open_bottle,
+      restaurant_id: "99999999-9999-4999-8999-999999999999",
+    } }],
+    ["wine", { open_bottle: {
+      ...physicalCommandResult().open_bottle,
+      wine_id: "99999999-9999-4999-8999-999999999999",
+    } }],
+    ["bottle", { open_bottle: {
+      ...physicalCommandResult().open_bottle,
+      id: "99999999-9999-4999-8999-999999999999",
+    } }],
+    ["new Undo event", { pour_event_ids: [] }],
+  ])("rejects an Undo result with mismatched %s", async (_field, override) => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { ...physicalCommandResult(), command: "undo", ...override },
+      error: null,
+    });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      command: "undo",
+      wineId: WINE_ID,
+      expectedOpenBottleId: BOTTLE_ID,
+      reversalOfEventId: REVERSAL_EVENT_ID,
+    })).rejects.toMatchObject({ message: "invalid_physical_command_result" });
+  });
+
+  it("rejects an Undo result that reuses the original reversal event", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        ...physicalCommandResult(),
+        command: "undo",
+        pour_event_ids: [REVERSAL_EVENT_ID],
+      },
+      error: null,
+    });
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never, operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID, command: "undo", wineId: WINE_ID,
+      expectedOpenBottleId: BOTTLE_ID,
+      reversalOfEventId: REVERSAL_EVENT_ID,
+    })).rejects.toMatchObject({ message: "invalid_physical_command_result" });
   });
 });
 

@@ -319,6 +319,49 @@ describe("WineDetailDrawer bottle state", () => {
     await act(async () => root.unmount());
   });
 
+  it("threads the exact physical pour receipt into Undo", async () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    const bottle = {
+      ...physicalBottle("66666666-6666-4666-8666-666666666666", 600),
+      wineId,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        pour_event_id: "77777777-7777-4777-8777-777777777777",
+        open_bottle: {
+          id: bottle.id, wine_id: wineId, opened_at: bottle.openedAt,
+          remaining_ml: 450,
+        },
+      }, 200))
+      .mockResolvedValueOnce(jsonResponse({
+        undo_event_id: "88888888-8888-4888-8888-888888888888",
+        open_bottle: {
+          id: bottle.id, wine_id: wineId, opened_at: bottle.openedAt,
+          remaining_ml: 600,
+        },
+      }, 200));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderPhysicalDrawer(root, row({
+      wine_id: wineId, activeBottleCount: 1, activeOpenMl: 600,
+      activeBottles: [bottle], opened_at: bottle.openedAt, glass_pour_ml: 150,
+    }), bottle.id);
+
+    await click(button(container, "Pour 5.1 oz"));
+    await click(button(container, "Undo last pour (5.1 oz)"));
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+      wine_id: wineId,
+      open_bottle_id: bottle.id,
+      reversal_of_event_id: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toMatch(/^[0-9a-f-]{36}$/i);
+    await act(async () => root.unmount());
+  });
+
   it("hides immediately when Close is tapped while its URL owner catches up", async () => {
     const onClose = vi.fn();
     const container = document.createElement("div");

@@ -184,6 +184,10 @@ describe("POST /api/open-bottles/[id]/close", () => {
     allow(supabase);
     const response = await POST(request({ wine_id: WINE_ID }), context);
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      discard_event_id: "77777777-7777-4777-8777-777777777777",
+      closed: { id: BOTTLE_ID, wine_id: WINE_ID },
+    });
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
       expect.objectContaining({ p_command: "discard", p_wine_id: WINE_ID,

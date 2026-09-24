@@ -21,10 +21,23 @@ function makeSupabase(opts: {
   undo:
     | { data: { wine_id: string; remaining_ml: number } | null; error: null }
     | { data: null; error: { code?: string; message?: string } };
+  contractVersion?: unknown;
+  physicalError?: { code?: string; message?: string } | null;
+  replayed?: boolean;
 }) {
   const calls: RpcCall[] = [];
   const rpc = vi.fn((fn: string, args: unknown) => {
     calls.push({ fn, args });
+    if (fn === "current_inventory_contract_version") {
+      return Promise.resolve({
+        data: "contractVersion" in opts ? opts.contractVersion : 1,
+        error: null,
+      });
+    }
+    if (fn === "execute_physical_bottle_command") return Promise.resolve({
+      data: opts.physicalError ? null : physicalUndoResult(opts.replayed),
+      error: opts.physicalError ?? null,
+    });
     if (fn === "undo_last_pour") return Promise.resolve(opts.undo);
     if (fn === "wine_published_list_slugs") {
       return Promise.resolve({ data: [], error: null });
@@ -44,15 +57,21 @@ function makeSupabase(opts: {
   return { supabase: { rpc, from }, calls };
 }
 
-function makeRequest(body: unknown): NextRequest {
+function makeRequest(body: unknown, operationId?: string): NextRequest {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (operationId) headers.set("Idempotency-Key", operationId);
   return new Request("http://localhost/api/pour/undo", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   }) as unknown as NextRequest;
 }
 
 const WINE_ID = "a1b2c3d4-e5f6-4789-8abc-def012345678";
+const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
+const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
+const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
+const REVERSAL_EVENT_ID = "77777777-7777-4777-8777-777777777777";
 
 describe("POST /api/pour/undo", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -163,4 +182,174 @@ describe("POST /api/pour/undo", () => {
       },
     });
   });
+
+  it("dispatches a strict receipt-bound physical Undo with no bottle selector", async () => {
+    const { supabase, calls } = makeSupabase({
+      contractVersion: 2,
+      undo: { data: null, error: { message: "unused" } },
+      replayed: true,
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    const response = await POST(makeRequest({
+      wine_id: WINE_ID,
+      open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+    }, OPERATION_ID));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      open_bottle: physicalUndoResult(true).open_bottle,
+      undo_event_id: "88888888-8888-4888-8888-888888888888",
+    });
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(calls).toContainEqual({
+      fn: "execute_physical_bottle_command",
+      args: expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_wine_id: WINE_ID,
+        p_open_bottle_id: undefined,
+        p_reversal_of_event_id: REVERSAL_EVENT_ID,
+      }),
+    });
+    expect(calls.filter((call) => call.fn === "current_inventory_contract_version"))
+      .toHaveLength(1);
+  });
+
+  it.each([
+    ["missing key", {
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+    }, undefined],
+    ["wine-only body", { wine_id: WINE_ID }, OPERATION_ID],
+    ["unknown key", {
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID, latest: true,
+    }, OPERATION_ID],
+    ["bad event UUID", {
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: "not-an-event",
+    }, OPERATION_ID],
+  ])("rejects physical Undo with %s before mutation", async (_case, body, key) => {
+    const { supabase, calls } = makeSupabase({
+      contractVersion: 2,
+      undo: { data: null, error: { message: "unused" } },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    expect((await POST(makeRequest(body, key))).status).toBe(400);
+    expect(calls.some((call) => call.fn === "execute_physical_bottle_command"))
+      .toBe(false);
+  });
+
+  it("maps a physical replay-payload conflict without exposing database detail", async () => {
+    const { supabase } = makeSupabase({
+      contractVersion: 2,
+      undo: { data: null, error: { message: "unused" } },
+      physicalError: {
+        code: "P0001",
+        message: "inventory_operation_payload_conflict",
+      },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    const response = await POST(makeRequest({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+    }, OPERATION_ID));
+    expect(response.status).toBe(409);
+    const text = await response.text();
+    expect(JSON.parse(text).error.code).toBe("idempotency_conflict");
+    expect(text).not.toContain("P0001");
+  });
+
+  it("requires and forwards both mistaken-discard attestations together", async () => {
+    const { supabase, calls } = makeSupabase({
+      contractVersion: 2,
+      undo: { data: null, error: { message: "unused" } },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    const partial = await POST(makeRequest({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+      correction_reason: "mistaken_report",
+    }, OPERATION_ID));
+    expect(partial.status).toBe(400);
+    expect(calls.some((call) => call.fn === "execute_physical_bottle_command"))
+      .toBe(false);
+
+    const complete = await POST(makeRequest({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+      correction_reason: "mistaken_report",
+      operator_confirms_same_bottle_present: true,
+    }, OPERATION_ID));
+    expect(complete.status).toBe(200);
+    expect(calls).toContainEqual({
+      fn: "execute_physical_bottle_command",
+      args: expect.objectContaining({
+        p_correction_reason: "mistaken_report",
+        p_operator_confirms_same_bottle_present: true,
+      }),
+    });
+  });
+
+  it("maps an unknown contract without losing a supplied operation receipt", async () => {
+    const { supabase } = makeSupabase({
+      contractVersion: null,
+      undo: { data: null, error: { message: "unused" } },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    const response = await POST(makeRequest({ wine_id: WINE_ID }, OPERATION_ID));
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect((await response.json()).error.message).toBe("Inventory command failed.");
+  });
+
+  it.each([
+    ["undo_window_expired", "undo_window_expired"],
+    ["undo_already_applied", "undo_already_applied"],
+    ["undo_requires_review", "undo_requires_review"],
+  ])("maps physical %s without falling back to latest-wine Undo", async (message, code) => {
+    const { supabase, calls } = makeSupabase({
+      contractVersion: 2,
+      undo: { data: null, error: { message: "unused" } },
+      physicalError: { code: "P0001", message },
+    });
+    mockRequireMembership.mockResolvedValue({
+      supabase, restaurantId: RESTAURANT_ID, user: { id: "u-1" }, role: "staff",
+    });
+    const response = await POST(makeRequest({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      reversal_of_event_id: REVERSAL_EVENT_ID,
+    }, OPERATION_ID));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe(code);
+    expect(calls.some((call) => call.fn === "undo_last_pour")).toBe(false);
+  });
 });
+
+function physicalUndoResult(replayed = false) {
+  return {
+    operation_id: OPERATION_ID,
+    command: "undo",
+    pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+    replayed,
+    closeout: null,
+    open_bottle: {
+      id: BOTTLE_ID, restaurant_id: RESTAURANT_ID, wine_id: WINE_ID,
+      remaining_ml: 0, nominal_capacity_ml: 750,
+      opened_at: "2026-09-23T12:00:00.000Z", closed_at: null,
+      preservation_method: "argon",
+      source_inventory_item_id: "99999999-9999-4999-8999-999999999999",
+      source_provenance: "known", identity_contract: 2,
+      identity_origin: "native", state_version: 3,
+    },
+  };
+}

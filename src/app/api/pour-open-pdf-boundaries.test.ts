@@ -81,7 +81,10 @@ function request(path: string, body: string): NextRequest {
 }
 
 function allow() {
-  const supabase = { from: vi.fn() };
+  const supabase = {
+    from: vi.fn(),
+    rpc: vi.fn().mockResolvedValue({ data: 1, error: null }),
+  };
   const auth = {
     supabase,
     restaurantId: "restaurant-a",

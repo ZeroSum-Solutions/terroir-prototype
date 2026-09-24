@@ -5,7 +5,7 @@ import type { PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 import { InventoryCommandError } from "./inventory-command";
 
 export type InventoryContractVersion = 1 | 2;
-type PhysicalCommandName = "open" | "pour" | "spill" | "close" | "discard";
+type PhysicalCommandName = "open" | "pour" | "spill" | "close" | "discard" | "undo";
 
 const uuid = z.string().uuid();
 const preservation = z.enum(["coravin", "argon", "vacuum", "none"]);
@@ -74,7 +74,7 @@ const closeoutSchema = z.strictObject({
 
 const activeCommandResultSchema = z.strictObject({
   operation_id: uuid,
-  command: z.enum(["open", "pour", "spill"]),
+  command: z.enum(["open", "pour", "spill", "undo"]),
   open_bottle: commandBottleSchema,
   pour_event_ids: z.array(uuid).length(1),
   closeout: z.null(),
@@ -174,28 +174,46 @@ export type ExecutePhysicalBottleCommandInput = {
   command: PhysicalCommandName;
   wineId: string;
   openBottleId?: string;
+  expectedOpenBottleId?: string;
   ml?: number;
   note?: string;
   preservationMethod?: string;
   actualRemainingMl?: number;
   writtenOffMl?: number;
   reasonCodeId?: string;
+  reversalOfEventId?: string;
+  correctionReason?: "mistaken_report";
+  operatorConfirmsSameBottlePresent?: boolean;
 };
 
 export async function executePhysicalBottleCommand(
   input: ExecutePhysicalBottleCommandInput,
 ) {
-  if (input.command !== "open" && !input.openBottleId) {
+  if (input.command !== "open" && input.command !== "undo" && !input.openBottleId) {
     throw new InventoryCommandError("legacy_inventory_command_retired");
   }
   const isPour = input.command === "pour" || input.command === "spill";
   const isClose = input.command === "close";
   const isDiscard = input.command === "discard";
-  if ((input.command === "open" && (input.openBottleId !== undefined || input.ml !== undefined)) ||
+  const isUndo = input.command === "undo";
+  const hasDiscardCorrection = input.correctionReason === "mistaken_report" &&
+    input.operatorConfirmsSameBottlePresent === true;
+  if ((!isUndo && (input.expectedOpenBottleId !== undefined ||
+      input.reversalOfEventId !== undefined || input.correctionReason !== undefined ||
+      input.operatorConfirmsSameBottlePresent !== undefined)) ||
+    (input.command === "open" && (input.openBottleId !== undefined || input.ml !== undefined)) ||
     (isPour && (input.ml === undefined || input.preservationMethod !== undefined)) ||
     (isClose && (input.ml !== undefined || input.actualRemainingMl === undefined)) ||
     (isDiscard && (input.ml !== undefined || input.actualRemainingMl !== undefined ||
-      input.writtenOffMl !== undefined || input.reasonCodeId !== undefined))) {
+      input.writtenOffMl !== undefined || input.reasonCodeId !== undefined)) ||
+    (isUndo && (
+      input.openBottleId !== undefined || input.expectedOpenBottleId === undefined ||
+      input.reversalOfEventId === undefined || input.ml !== undefined ||
+      input.preservationMethod !== undefined || input.actualRemainingMl !== undefined ||
+      input.writtenOffMl !== undefined || input.reasonCodeId !== undefined ||
+      ((input.correctionReason !== undefined ||
+        input.operatorConfirmsSameBottlePresent !== undefined) && !hasDiscardCorrection)
+    ))) {
     throw new InventoryCommandError("invalid_physical_command");
   }
 
@@ -212,9 +230,10 @@ export async function executePhysicalBottleCommand(
     p_actual_remaining_ml: input.actualRemainingMl,
     p_written_off_ml: input.writtenOffMl ?? 0,
     p_reason_code_id: input.reasonCodeId,
-    p_reversal_of_event_id: undefined,
-    p_correction_reason: undefined,
-    p_operator_confirms_same_bottle_present: false,
+    p_reversal_of_event_id: input.reversalOfEventId,
+    p_correction_reason: input.correctionReason,
+    p_operator_confirms_same_bottle_present:
+      input.operatorConfirmsSameBottlePresent ?? false,
   });
   if (error) {
     throw new InventoryCommandError(
@@ -234,7 +253,9 @@ export async function executePhysicalBottleCommand(
     result.command !== input.command ||
     result.open_bottle.restaurant_id !== input.restaurantId ||
     result.open_bottle.wine_id !== input.wineId ||
-    (input.openBottleId !== undefined && result.open_bottle.id !== input.openBottleId)
+    (input.openBottleId !== undefined && result.open_bottle.id !== input.openBottleId) ||
+    (isUndo && (result.open_bottle.id !== input.expectedOpenBottleId ||
+      result.pour_event_ids[0] === input.reversalOfEventId))
     || (result.command === "close" && (
       result.closeout.restaurant_id !== input.restaurantId ||
       result.closeout.wine_id !== input.wineId ||

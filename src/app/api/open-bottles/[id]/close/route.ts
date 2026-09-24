@@ -74,7 +74,10 @@ async function postCloseBottle(
         : undefined,
     });
     return inventoryResponse(
-      { closed: outcome.closed },
+      {
+        closed: outcome.closed,
+        ...(outcome.eventId ? { discard_event_id: outcome.eventId } : {}),
+      },
       200,
       operationId,
       outcome.replayed,

@@ -100,7 +100,11 @@ export async function recordPour(input: RecordPourInput) {
     sinceTs,
   });
 
-  return { openBottle: result.openBottle, replayed: result.replayed };
+  return {
+    openBottle: result.openBottle,
+    replayed: result.replayed,
+    eventId: contractVersion === 2 ? result.pourEventIds[0] : null,
+  };
 
   async function executeLegacyPour() {
     if (openBottleId !== undefined) {
@@ -156,11 +160,42 @@ export type UndoLastPourInput = {
   supabase: SupabaseClient<Database>;
   restaurantId: string;
   wineId: string;
+  contractVersion?: 1 | 2;
+  operationId?: string;
+  expectedOpenBottleId?: string;
+  reversalOfEventId?: string;
+  correctionReason?: "mistaken_report";
+  operatorConfirmsSameBottlePresent?: boolean;
 };
 
 export async function undoLastPour(input: UndoLastPourInput) {
-  const { supabase, restaurantId, wineId } = input;
+  const { supabase, restaurantId, wineId, contractVersion = 1 } = input;
   const sinceTs = new Date().toISOString();
+
+  if (contractVersion === 2) {
+    if (!input.operationId || !input.expectedOpenBottleId ||
+      !input.reversalOfEventId) {
+      throw new InventoryCommandError("invalid_physical_command");
+    }
+    const result = await executePhysicalBottleCommand({
+      supabase,
+      operationId: input.operationId,
+      restaurantId,
+      command: "undo",
+      wineId,
+      expectedOpenBottleId: input.expectedOpenBottleId,
+      reversalOfEventId: input.reversalOfEventId,
+      correctionReason: input.correctionReason,
+      operatorConfirmsSameBottlePresent:
+        input.operatorConfirmsSameBottlePresent,
+    });
+    await finishUndo(result.openBottle.wine_id);
+    return {
+      openBottle: result.openBottle,
+      eventId: result.pourEventIds[0],
+      replayed: result.replayed,
+    };
+  }
 
   const { data, error } = await supabase.rpc("undo_last_pour", {
     p_wine_id: wineId,
@@ -186,16 +221,18 @@ export async function undoLastPour(input: UndoLastPourInput) {
     throw new PourRpcError("Undo failed.", { cause: error });
   }
 
-  revalidatePath("/availability");
+  await finishUndo(wineId);
+  return { openBottle: data, eventId: null, replayed: false };
 
-  await revalidateAutoEightysixedWines({
-    supabase,
-    restaurantId,
-    touchedWineIds: [wineId],
-    sinceTs,
-  });
-
-  return data;
+  async function finishUndo(touchedWineId: string) {
+    revalidatePath("/availability");
+    await revalidateAutoEightysixedWines({
+      supabase,
+      restaurantId,
+      touchedWineIds: [touchedWineId],
+      sinceTs,
+    });
+  }
 }
 
 export type CloseOpenBottleInput = {
@@ -299,7 +336,11 @@ export async function discardOpenBottle(input: DiscardOpenBottleInput) {
       openBottleId: bottleId,
     });
     revalidateClosePaths();
-    return { closed: result.openBottle, replayed: result.replayed };
+    return {
+      closed: result.openBottle,
+      replayed: result.replayed,
+      eventId: result.pourEventIds[0],
+    };
   }
   if (!expectedOpenedAt) throw new InventoryCommandError("invalid_inventory_command");
   const { data: bottle, error: fetchError } = await supabase
@@ -328,7 +369,7 @@ export async function discardOpenBottle(input: DiscardOpenBottleInput) {
   revalidatePath("/cellar/open");
   revalidatePath("/cellar");
   revalidatePath("/insights");
-  return { closed: result.openBottle, replayed: result.replayed };
+  return { closed: result.openBottle, replayed: result.replayed, eventId: null };
 }
 
 function revalidateClosePaths() {

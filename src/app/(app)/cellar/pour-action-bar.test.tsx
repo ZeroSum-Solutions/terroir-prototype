@@ -213,18 +213,25 @@ describe("PourActionBar", () => {
     expect(retryPriorOpen).toHaveBeenCalledOnce();
   });
 
-  it("shows the undo button only when there is a last pour and canPour", async () => {
+  it("shows receipt-bound Undo even after physical availability changes", async () => {
     const doUndo = vi.fn();
     await act(async () => {
       root.render(
         <PourActionBar
           row={baseRow({ sealed_count: 0, glass_pour_ml: 150 })}
-          canPour={true}
+          contractVersion={2}
+          canPour={false}
           outOfStock={false}
           pickerItem={null}
           busy={false}
           openBottleBusy={false}
-          lastPour={{ ml: 150 }}
+          lastPour={{
+            contractVersion: 2,
+            wineId: "55555555-5555-4555-8555-555555555555",
+            bottleId: "66666666-6666-4666-8666-666666666666",
+            eventId: "77777777-7777-4777-8777-777777777777",
+            ml: 150,
+          }}
           doOpenBottle={vi.fn()}
           doPour={vi.fn()}
           doUndo={doUndo}
@@ -241,6 +248,54 @@ describe("PourActionBar", () => {
       undoButton.click();
     });
     expect(doUndo).toHaveBeenCalledOnce();
+  });
+
+  it("keeps an unresolved Undo retry reachable without a current receipt", async () => {
+    const retryPriorUndo = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 0, glass_pour_ml: null })}
+        contractVersion={2}
+        canPour={false}
+        outOfStock={false}
+        pickerItem={null}
+        busy={false}
+        openBottleBusy={false}
+        undoNeedsReview
+        lastPour={null}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        retryPriorUndo={retryPriorUndo}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+    await act(async () => button("Retry prior Undo")!.click());
+    expect(retryPriorUndo).toHaveBeenCalledOnce();
+  });
+
+  it("preserves the legacy canPour gate for version-1 Undo", async () => {
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ glass_pour_ml: 150 })}
+        contractVersion={1}
+        canPour={false}
+        outOfStock={false}
+        pickerItem={null}
+        busy={false}
+        openBottleBusy={false}
+        lastPour={{
+          contractVersion: 1,
+          wineId: "55555555-5555-4555-8555-555555555555",
+          ml: 150,
+        }}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+    expect(button("Undo last pour (5.1 oz)")).toBeUndefined();
   });
 
   it("disables the pour button and shows Out of stock when out of stock", async () => {

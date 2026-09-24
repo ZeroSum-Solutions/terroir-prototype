@@ -4,6 +4,7 @@ import { ChevronDown, PackageOpen, Undo2 } from "lucide-react";
 import { ML_PER_OZ } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import type { CellarWineRow } from "./types";
+import type { LastPourReceipt } from "./use-inventory-commands";
 
 /**
  * Sticky action bar pinned at the drawer's foot (Undo last pour / Open
@@ -23,12 +24,14 @@ export function PourActionBar({
   openBottleBusy,
   openNeedsReview = false,
   pourNeedsReview = false,
+  undoNeedsReview = false,
   lastPour,
   doOpenBottle,
   doPour,
+  doUndo,
   retryPriorOpen = doOpenBottle,
   retryPriorPour = () => row.glass_pour_ml && doPour(row.glass_pour_ml),
-  doUndo,
+  retryPriorUndo = doUndo,
   onOpenPicker,
 }: {
   row: CellarWineRow;
@@ -41,11 +44,13 @@ export function PourActionBar({
   openBottleBusy: boolean;
   openNeedsReview?: boolean;
   pourNeedsReview?: boolean;
-  lastPour: { ml: number } | null;
+  undoNeedsReview?: boolean;
+  lastPour: LastPourReceipt | null;
   doOpenBottle: () => void;
   doPour: (ml: number) => void;
   retryPriorOpen?: () => void;
   retryPriorPour?: () => void;
+  retryPriorUndo?: () => void;
   doUndo: () => void;
   onOpenPicker: () => void;
 }) {
@@ -53,6 +58,7 @@ export function PourActionBar({
   const hasActiveBottle = physicalMode
     ? row.activeBottleCount > 0
     : Boolean(row.open_bottle_id);
+  const showUndo = (lastPour || undoNeedsReview) && (physicalMode || canPour);
 
   return (
     <div
@@ -60,15 +66,17 @@ export function PourActionBar({
       style={{ paddingBottom: "calc(var(--safe-bottom) + var(--spacing-sm))" }}
     >
       {/* BND-119: Undo last pour */}
-      {lastPour && canPour && !physicalMode && (
+      {showUndo && (
         <button
           type="button"
           disabled={busy}
-          onClick={doUndo}
+          onClick={undoNeedsReview ? retryPriorUndo : doUndo}
           className="mb-xs flex h-11 w-full items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-[13px] font-medium text-ink transition-colors hover:bg-wash disabled:opacity-60"
         >
           <Undo2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-          Undo last pour ({(lastPour.ml / ML_PER_OZ).toFixed(1)} oz)
+          {undoNeedsReview
+            ? "Retry prior Undo"
+            : `Undo last pour (${(lastPour!.ml / ML_PER_OZ).toFixed(1)} oz)`}
         </button>
       )}
       <div className="flex gap-xs">

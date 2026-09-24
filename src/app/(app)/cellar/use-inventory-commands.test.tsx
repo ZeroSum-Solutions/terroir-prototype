@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { baseRow } from "./test-row";
 import type { CellarWineRow } from "./types";
 import { useInventoryCommands } from "./use-inventory-commands";
+import type { LastPourReceipt } from "./use-inventory-commands";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -20,15 +21,18 @@ const onBottleStale = vi.fn();
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
 const BOTTLE_A = "66666666-6666-4666-8666-666666666666";
 const BOTTLE_B = "77777777-7777-4777-8777-777777777777";
+const POUR_EVENT = "88888888-8888-4888-8888-888888888888";
 
 function Harness({
   row,
   contractVersion = 1,
   selectedBottleId = null,
+  lastPour = null,
 }: {
   row: CellarWineRow;
   contractVersion?: 1 | 2;
   selectedBottleId?: string | null;
+  lastPour?: LastPourReceipt | null;
 }) {
   const commands = useInventoryCommands({
     row,
@@ -37,6 +41,7 @@ function Harness({
     preservationMethod: "coravin",
     setBusy,
     setErrorMsg,
+    lastPour,
     setLastPour,
     refresh,
     toast,
@@ -107,6 +112,155 @@ describe("useInventoryCommands retry state", () => {
     }
     expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
       .toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Idempotency-Key"));
+  });
+
+  it("retains the exact physical pour receipt for Undo", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      pour_event_id: "88888888-8888-4888-8888-888888888888",
+      open_bottle: {
+        id: BOTTLE_A,
+        wine_id: WINE_ID,
+        opened_at: "2026-09-23T12:00:00.000Z",
+        remaining_ml: 510,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID, glass_pour_ml: 150 })}
+        contractVersion={2} selectedBottleId={BOTTLE_A} />,
+    ));
+
+    await act(async () => api().doPour(90));
+
+    expect(setLastPour).toHaveBeenLastCalledWith({
+      contractVersion: 2,
+      wineId: WINE_ID,
+      bottleId: BOTTLE_A,
+      eventId: "88888888-8888-4888-8888-888888888888",
+      ml: 90,
+    });
+  });
+
+  it.each([
+    ["missing", {}],
+    ["wrong", { pour_event_id: "not-an-event" }],
+    ["hyphen-only", { pour_event_id: "------------------------------------" }],
+    ["ungrouped", { pour_event_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }],
+    ["extra", {
+      pour_event_id: POUR_EVENT,
+      pour_event_ids: [POUR_EVENT],
+    }],
+  ])("fails closed for %s physical pour event identity", async (_case, event) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ...event,
+      open_bottle: {
+        id: BOTTLE_A,
+        wine_id: WINE_ID,
+        opened_at: "2026-09-23T12:00:00.000Z",
+        remaining_ml: 510,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID, glass_pour_ml: 150 })}
+        contractVersion={2} selectedBottleId={BOTTLE_A} />,
+    ));
+    await act(async () => api().doPour(90));
+    expect(setLastPour).not.toHaveBeenCalledWith(expect.objectContaining({
+      contractVersion: 2,
+    }));
+    expect(setErrorMsg).toHaveBeenLastCalledWith(expect.stringContaining(
+      "Pour not confirmed",
+    ));
+  });
+
+  it("freezes the receipt and UUID for an unresolved physical Undo", async () => {
+    const receipt = {
+      contractVersion: 2 as const,
+      wineId: WINE_ID,
+      bottleId: BOTTLE_A,
+      eventId: POUR_EVENT,
+      ml: 90,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Bad gateway", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        undo_event_id: "99999999-9999-4999-8999-999999999999",
+        open_bottle: {
+          id: BOTTLE_A,
+          wine_id: WINE_ID,
+          opened_at: "2026-09-23T12:00:00.000Z",
+          remaining_ml: 600,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID })} contractVersion={2}
+        selectedBottleId={BOTTLE_A} lastPour={receipt} />,
+    ));
+    await act(async () => api().doUndo());
+    expect(api().undoNeedsReview).toBe(true);
+
+    await act(async () => root.render(
+      <Harness row={baseRow({
+        wine_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      })} contractVersion={2} selectedBottleId={BOTTLE_B} lastPour={receipt} />,
+    ));
+    await act(async () => api().retryPriorUndo());
+
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body))))
+      .toEqual([{
+        wine_id: WINE_ID,
+        open_bottle_id: BOTTLE_A,
+        reversal_of_event_id: POUR_EVENT,
+      }, {
+        wine_id: WINE_ID,
+        open_bottle_id: BOTTLE_A,
+        reversal_of_event_id: POUR_EVENT,
+      }]);
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Idempotency-Key"));
+    expect(setLastPour).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps the receipt after a definitive physical Undo refusal", async () => {
+    const receipt = {
+      contractVersion: 2 as const, wineId: WINE_ID, bottleId: BOTTLE_A,
+      eventId: POUR_EVENT, ml: 90,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "undo_requires_review", message: "Ask a manager to reconcile." },
+    }), { status: 409, headers: { "content-type": "application/json" } })));
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID })} contractVersion={2}
+        selectedBottleId={BOTTLE_A} lastPour={receipt} />,
+    ));
+    await act(async () => api().doUndo());
+    expect(setLastPour).not.toHaveBeenCalled();
+    expect(api().undoNeedsReview).toBe(false);
+    expect(setErrorMsg).toHaveBeenLastCalledWith("Ask a manager to reconcile.");
+  });
+
+  it.each([
+    ["malformed", "------------------------------------"],
+    ["same reversal", POUR_EVENT],
+  ])("retains uncertain retry for a %s Undo event result", async (_case, undoEventId) => {
+    const receipt = {
+      contractVersion: 2 as const, wineId: WINE_ID, bottleId: BOTTLE_A,
+      eventId: POUR_EVENT, ml: 90,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      undo_event_id: undoEventId,
+      open_bottle: {
+        id: BOTTLE_A, wine_id: WINE_ID,
+        opened_at: "2026-09-23T12:00:00.000Z", remaining_ml: 600,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+    await act(async () => root.render(
+      <Harness row={baseRow({ wine_id: WINE_ID })} contractVersion={2}
+        selectedBottleId={BOTTLE_A} lastPour={receipt} />,
+    ));
+    await act(async () => api().doUndo());
+    expect(api().undoNeedsReview).toBe(true);
+    expect(setLastPour).not.toHaveBeenCalled();
   });
 
   it("selects only the exact bottle returned by a valid contract-2 open", async () => {

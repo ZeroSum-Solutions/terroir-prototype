@@ -31,6 +31,10 @@ type PourPayload = {
   preservationMethod: PreservationMethod;
 };
 
+export type LastPourReceipt =
+  | { contractVersion: 1; wineId: string; ml: number }
+  | { contractVersion: 2; wineId: string; bottleId: string; eventId: string; ml: number };
+
 export function useInventoryCommands(input: {
   row: CellarWineRow | null;
   contractVersion: 1 | 2;
@@ -38,7 +42,8 @@ export function useInventoryCommands(input: {
   preservationMethod: PreservationMethod;
   setBusy: Dispatch<SetStateAction<boolean>>;
   setErrorMsg: Dispatch<SetStateAction<string | null>>;
-  setLastPour: Dispatch<SetStateAction<{ ml: number } | null>>;
+  lastPour: LastPourReceipt | null;
+  setLastPour: Dispatch<SetStateAction<LastPourReceipt | null>>;
   toast: Toast;
   refresh: () => void;
   onBottleOpened: (bottleId: string) => void;
@@ -58,19 +63,22 @@ export function useInventoryCommands(input: {
     pending: pendingPour,
   } = useIdempotentCommand<PourPayload>();
   const {
+    begin: beginUndo, retry: retryUndo, finish: finishUndo, pending: pendingUndo,
+  } = useIdempotentCommand<LastPourReceipt>();
+  const {
     row,
     contractVersion,
     selectedBottleId,
     preservationMethod,
     setBusy,
     setErrorMsg,
+    lastPour,
     setLastPour,
     toast,
     refresh,
     onBottleOpened,
     onBottleStale,
   } = input;
-
   const runOpenCommand = useCallback((attempt: CommandAttempt<OpenPayload>) => {
     setErrorMsg(null);
     let definitive = false;
@@ -182,11 +190,10 @@ export function useInventoryCommands(input: {
         }),
       });
       const payload = await readPayload(response);
-      definitive = isDefinitiveCommandResponse(
-        response,
-        payload,
-        isOpenBottleSuccess,
-      );
+      definitive = isDefinitiveCommandResponse(response, payload,
+        attempt.payload.contractVersion === 2
+          ? (value) => isPhysicalPourSuccess(value, attempt.payload)
+          : isOpenBottleSuccess);
       if (!response.ok) {
         const errorCode = readErrorCode(payload);
         if (
@@ -207,8 +214,14 @@ export function useInventoryCommands(input: {
         isReplayedCommandResponse(response) ? "Already recorded" : "Glass poured",
       );
       setLastPour(attempt.payload.contractVersion === 1
-        ? { ml: attempt.payload.ml }
-        : null);
+        ? { contractVersion: 1, wineId: attempt.payload.wineId, ml: attempt.payload.ml }
+        : {
+            contractVersion: 2,
+            wineId: attempt.payload.wineId,
+            bottleId: attempt.payload.openBottleId!,
+            eventId: readUuidField(payload, "pour_event_id")!,
+            ml: attempt.payload.ml,
+          });
       refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Pour failed.";
@@ -264,23 +277,67 @@ export function useInventoryCommands(input: {
       : Promise.resolve();
   }, [retryPour, runPourCommand]);
 
+  const runUndoCommand = useCallback(async (attempt: CommandAttempt<LastPourReceipt>) => {
+    setErrorMsg(null); setBusy(true);
+    let definitive = false; let successful = false;
+    try {
+      const physical = attempt.payload.contractVersion === 2;
+      const response = await fetch("/api/pour/undo", {
+        method: "POST",
+        headers: physical ? commandHeaders(attempt.operationId) : { "Content-Type": "application/json" },
+        body: JSON.stringify(attempt.payload.contractVersion === 2 ? {
+          wine_id: attempt.payload.wineId,
+          open_bottle_id: attempt.payload.bottleId,
+          reversal_of_event_id: attempt.payload.eventId,
+        } : { wine_id: attempt.payload.wineId }),
+      });
+      const payload = await readPayload(response);
+      definitive = isDefinitiveCommandResponse(response, payload,
+        physical ? (value) => isPhysicalUndoSuccess(value, attempt.payload) : isOpenBottleSuccess);
+      if (!response.ok) throw new Error(readError(payload) ?? `Undo failed (${response.status}).`);
+      if (!definitive) throw new Error("Invalid Undo response.");
+      successful = true; setLastPour(null);
+      toast.success(isReplayedCommandResponse(response) ? "Already recorded" : "Pour undone");
+      refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Undo failed.";
+      if (!definitive || attempt.wasUncertain) {
+        setErrorMsg(unknownCommandOutcomeMessage("Undo", "undo it again", definitive ? message : undefined));
+      } else { toast.error("Undo failed"); setErrorMsg(message); }
+    } finally {
+      finishUndo(attempt.fingerprint, definitive, successful); setBusy(false);
+    }
+  }, [finishUndo, refresh, setBusy, setErrorMsg, setLastPour, toast]);
+
+  const doUndo = useCallback(() => {
+    if (!lastPour || pendingUndo?.state === "unresolved") return Promise.resolve();
+    const fingerprint = JSON.stringify(["undo", lastPour]);
+    const operationId = beginUndo(fingerprint, lastPour);
+    return operationId
+      ? runUndoCommand({ fingerprint, operationId, payload: lastPour, wasUncertain: false })
+      : Promise.resolve();
+  }, [beginUndo, lastPour, pendingUndo, runUndoCommand]);
+  const retryPriorUndo = useCallback(() => {
+    const attempt = retryUndo();
+    return attempt ? runUndoCommand({ ...attempt, wasUncertain: true }) : Promise.resolve();
+  }, [retryUndo, runUndoCommand]);
+
   return {
     doOpenBottle,
     doPour,
     retryPriorOpen,
     retryPriorPour,
+    doUndo,
+    retryPriorUndo,
     openBottleBusy,
     openNeedsReview: pendingOpen?.state === "unresolved",
     pourNeedsReview: pendingPour?.state === "unresolved",
+    undoNeedsReview: pendingUndo?.state === "unresolved",
   };
 }
 
-type CommandAttempt<TPayload> = {
-  operationId: string;
-  fingerprint: string;
-  payload: TPayload;
-  wasUncertain: boolean;
-};
+type CommandAttempt<TPayload> = { operationId: string; fingerprint: string;
+  payload: TPayload; wasUncertain: boolean };
 
 function commandHeaders(operationId: string) {
   return {
@@ -314,4 +371,29 @@ function readOpenBottleId(payload: unknown) {
   return typeof result?.open_bottle?.id === "string"
     ? result.open_bottle.id
     : null;
+}
+
+function readUuidField(payload: unknown, key: string) {
+  const value = (payload as Record<string, unknown> | null)?.[key];
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value : null;
+}
+
+function isPhysicalPourSuccess(payload: unknown, expected: PourPayload) {
+  const bottle = (payload as { open_bottle?: Record<string, unknown> } | null)?.open_bottle;
+  return isExactEnvelope(payload, ["open_bottle", "pour_event_id"]) &&
+    isOpenBottleSuccess(payload) && bottle?.id === expected.openBottleId &&
+    bottle.wine_id === expected.wineId && Boolean(readUuidField(payload, "pour_event_id"));
+}
+
+function isPhysicalUndoSuccess(payload: unknown, expected: LastPourReceipt) {
+  if (expected.contractVersion !== 2) return false;
+  const bottle = (payload as { open_bottle?: Record<string, unknown> } | null)?.open_bottle;
+  const undoEventId = readUuidField(payload, "undo_event_id");
+  return isExactEnvelope(payload, ["open_bottle", "undo_event_id"]) &&
+    isOpenBottleSuccess(payload) && bottle?.id === expected.bottleId &&
+    bottle.wine_id === expected.wineId && undoEventId !== null && undoEventId !== expected.eventId;
+}
+function isExactEnvelope(value: unknown, keys: string[]) {
+  return Boolean(value && typeof value === "object" &&
+    Object.keys(value).sort().join() === [...keys].sort().join());
 }

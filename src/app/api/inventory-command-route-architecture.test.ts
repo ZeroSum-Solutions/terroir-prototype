@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 const routes = [
   "open-bottles/route.ts",
   "pour/route.ts",
+  "pour/undo/route.ts",
   "open-bottles/close/route.ts",
   "open-bottles/[id]/close/route.ts",
 ];
@@ -21,7 +22,8 @@ describe("inventory command route architecture", () => {
     expect(source).not.toContain("@/lib/supabase/service-role");
     expect(source).not.toContain('rpc("record_pour"');
     expect(source).not.toContain('rpc("close_open_bottle"');
-    if (relativePath.includes("/close/route.ts") || relativePath === "open-bottles/close/route.ts") {
+    if (relativePath.includes("/close/route.ts") || relativePath === "open-bottles/close/route.ts" ||
+      relativePath === "pour/undo/route.ts") {
       expect(source).toContain("getInventoryContractVersion");
     }
   });

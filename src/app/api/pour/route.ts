@@ -52,7 +52,10 @@ async function postPour(request: NextRequest) {
       preservationMethod: parsed.data.preservation_method,
     });
     return inventoryResponse(
-      { open_bottle: outcome.openBottle },
+      {
+        open_bottle: outcome.openBottle,
+        ...(outcome.eventId ? { pour_event_id: outcome.eventId } : {}),
+      },
       200,
       operationId,
       outcome.replayed,

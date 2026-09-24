@@ -8,6 +8,7 @@ import { useToast } from "@/lib/toast";
 import {
   isClosedBottleSuccess,
   isDefinitiveCommandResponse,
+  isOpenBottleSuccess,
   isReplayedCommandResponse,
   unknownCommandOutcomeMessage,
   useIdempotentCommand,
@@ -20,6 +21,8 @@ interface Props {
   openedAt: string;
   remainingOz: number;
 }
+
+type DiscardReceipt = { bottleId: string; wineId: string; eventId: string };
 
 /**
  * BND-122 — "Close bottle" button for the /cellar/open page.
@@ -38,6 +41,8 @@ export function CloseBottleButton({
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [uncertaintyMessage, setUncertaintyMessage] = useState<string | null>(null);
+  const [discardReceipt, setDiscardReceipt] = useState<DiscardReceipt | null>(null);
+  const [needsReview, setNeedsReview] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -47,7 +52,9 @@ export function CloseBottleButton({
     identityContract: 1 | 2;
     openedAt: string;
   }>();
+  const correction = useIdempotentCommand<DiscardReceipt>();
   const retrying = pending?.state === "unresolved";
+  const correctionLocked = isPending || correction.pending !== null;
 
   const handleClose = () => {
     if (!confirming && !retrying) {
@@ -86,15 +93,22 @@ export function CloseBottleButton({
             : { expected_opened_at: command.openedAt }),
         });
         const body = await res.json().catch(() => null);
-        definitive = isDefinitiveCommandResponse(
-          res,
-          body,
-          isClosedBottleSuccess,
-        );
+        definitive = isDefinitiveCommandResponse(res, body, (value) =>
+          command.identityContract === 2
+            ? isPhysicalDiscardSuccess(value, command.bottleId, command.wineId)
+            : isClosedBottleSuccess(value));
         if (res.ok && definitive) {
           successful = true;
           if (isReplayedCommandResponse(res)) toast.success("Already recorded");
-          router.refresh();
+          if (command.identityContract === 2) {
+            setDiscardReceipt({
+              bottleId: command.bottleId,
+              wineId: command.wineId!,
+              eventId: readUuidField(body, "discard_event_id")!,
+            });
+          } else {
+            router.refresh();
+          }
         } else {
           const message = res.ok
             ? "Couldn't confirm the bottle was closed. Retry the close."
@@ -125,14 +139,102 @@ export function CloseBottleButton({
     });
   };
 
+  const correctDiscard = () => {
+    if (!discardReceipt) return;
+    const fingerprint = JSON.stringify(["undo-discard", discardReceipt]);
+    const prior = correction.pending?.state === "unresolved" ? correction.retry() : null;
+    const operationId = prior?.operationId ?? correction.begin(fingerprint, discardReceipt);
+    const command = prior?.payload ?? discardReceipt;
+    const commandFingerprint = prior?.fingerprint ?? fingerprint;
+    if (!operationId) return;
+    startTransition(async () => {
+      setUncertaintyMessage(null);
+      let definitive = false;
+      let successful = false;
+      try {
+        const res = await fetch("/api/pour/undo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
+          body: JSON.stringify({
+            wine_id: command.wineId,
+            open_bottle_id: command.bottleId,
+            reversal_of_event_id: command.eventId,
+            correction_reason: "mistaken_report",
+            operator_confirms_same_bottle_present: true,
+          }),
+        });
+        const body = await res.json().catch(() => null);
+        definitive = isDefinitiveCommandResponse(res, body, (value) =>
+          isPhysicalUndoSuccess(value, command));
+        if (!res.ok || !definitive) {
+          throw new Error(res.ok
+            ? "Couldn't confirm the correction."
+            : readApiError(body, `Correction failed (${res.status}).`).message);
+        }
+        successful = true;
+        setDiscardReceipt(null);
+        setConfirming(false);
+        toast.success(isReplayedCommandResponse(res) ? "Already recorded" : "Discard corrected");
+        router.refresh();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : undefined;
+        setUncertaintyMessage(unknownCommandOutcomeMessage(
+          "Correction", "restore the bottle again", definitive ? message : undefined,
+        ));
+      } finally {
+        correction.finish(commandFingerprint, definitive, successful);
+      }
+    });
+  };
+
   const handleCancel = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setConfirming(false);
   };
 
+  const guardRowAction = (event: React.MouseEvent, action: () => void) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  };
+
   return (
     <>
+      {discardReceipt && !needsReview ? (
+        <div className="col-span-full grid w-full gap-xs md:grid-cols-3">
+          <button type="button" aria-label="Mistaken report — same bottle is here"
+            disabled={isPending} onClick={(event) => guardRowAction(event, correctDiscard)}
+            className="min-h-11 rounded-pill border border-risk-ink/40 bg-risk-wash px-sm text-caption font-medium text-risk-ink">
+            {correction.pending?.state === "unresolved"
+              ? "Retry mistaken-discard correction"
+              : "Mistaken report — same bottle is here"}
+          </button>
+          <button type="button" aria-label="Discard was correct"
+            disabled={correctionLocked}
+            onClick={(event) => guardRowAction(event, () => router.refresh())}
+            className="min-h-11 rounded-pill border border-rule-strong px-sm text-caption font-medium text-ink disabled:opacity-60">
+            Discard was correct
+          </button>
+          <button type="button" aria-label="Bottle status uncertain"
+            disabled={correctionLocked}
+            onClick={(event) => guardRowAction(event, () => setNeedsReview(true))}
+            className="min-h-11 rounded-pill border border-rule-strong px-sm text-caption font-medium text-ink disabled:opacity-60">
+            Bottle status uncertain
+          </button>
+        </div>
+      ) : needsReview ? (
+        <div className="col-span-full w-full text-left md:text-right">
+          <p role="alert" className="text-body-sm text-risk-ink">
+            Bottle status needs review. Do not restore or discard it again.
+          </p>
+          <button type="button" aria-label="Refresh bottle list"
+            onClick={(event) => guardRowAction(event, () => router.refresh())}
+            className="mt-xs min-h-11 rounded-pill border border-rule-strong px-sm text-caption font-medium text-ink">
+            Refresh bottle list
+          </button>
+        </div>
+      ) : (
       <div
         className={confirming
           ? "col-span-full flex w-full items-center justify-end gap-xs"
@@ -177,6 +279,7 @@ export function CloseBottleButton({
                 : "Close"}
         </button>
       </div>
+      )}
       {uncertaintyMessage && (
         <p
           role="alert"
@@ -187,4 +290,32 @@ export function CloseBottleButton({
       )}
     </>
   );
+}
+
+function readUuidField(payload: unknown, key: string) {
+  const value = (payload as Record<string, unknown> | null)?.[key];
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value : null;
+}
+
+function isPhysicalDiscardSuccess(payload: unknown, bottleId: string, wineId?: string) {
+  const closed = (payload as { closed?: Record<string, unknown> } | null)?.closed;
+  return isExactEnvelope(payload, ["closed", "discard_event_id"]) &&
+    isClosedBottleSuccess(payload) && closed?.id === bottleId &&
+    closed.wine_id === wineId && Boolean(readUuidField(payload, "discard_event_id"));
+}
+
+function isPhysicalUndoSuccess(payload: unknown, receipt: DiscardReceipt) {
+  const bottle = (payload as { open_bottle?: Record<string, unknown> } | null)?.open_bottle;
+  const undoEventId = readUuidField(payload, "undo_event_id");
+  return isExactEnvelope(payload, ["open_bottle", "undo_event_id"]) &&
+    isOpenBottleSuccess(payload) && bottle?.id === receipt.bottleId &&
+    bottle.wine_id === receipt.wineId && undoEventId !== null &&
+    undoEventId !== receipt.eventId;
+}
+
+function isExactEnvelope(value: unknown, keys: string[]) {
+  return Boolean(value && typeof value === "object" &&
+    Object.keys(value).sort().join() === [...keys].sort().join());
 }

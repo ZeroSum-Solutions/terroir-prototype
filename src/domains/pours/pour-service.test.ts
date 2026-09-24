@@ -259,6 +259,36 @@ function physicalCommandResult(command: "open" | "pour") {
 describe("undoLastPour", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("uses the physical receipt without a mutable bottle or event pre-read", async () => {
+    const supabase = makeRpcSupabase({
+      data: { ...physicalCommandResult("pour"), command: "undo" },
+      error: null,
+    }, 2);
+    await expect(undoLastPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      contractVersion: 2,
+      expectedOpenBottleId: BOTTLE_ID,
+      reversalOfEventId: "99999999-9999-4999-8999-999999999999",
+    })).resolves.toMatchObject({
+      openBottle: { id: BOTTLE_ID, wine_id: WINE_ID },
+      eventId: "77777777-7777-4777-8777-777777777777",
+      replayed: false,
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.objectContaining({
+        p_command: "undo",
+        p_wine_id: WINE_ID,
+        p_open_bottle_id: undefined,
+        p_reversal_of_event_id: "99999999-9999-4999-8999-999999999999",
+      }),
+    );
+  });
+
   it("does not export a raw database error or wine identity", async () => {
     const databaseError = { code: "XX000", message: "private customer note" };
     const supabase = makeRpcSupabase({ data: null, error: databaseError });
@@ -305,7 +335,11 @@ describe("undoLastPour", () => {
       supabase: supabase as never,
       restaurantId: RESTAURANT_ID,
       wineId: WINE_ID,
-    })).resolves.toEqual({ wine_id: WINE_ID });
+    })).resolves.toEqual({
+      openBottle: { wine_id: WINE_ID },
+      eventId: null,
+      replayed: false,
+    });
     expect(supabase.rpc).toHaveBeenCalledWith("undo_last_pour", {
       p_wine_id: WINE_ID,
     });

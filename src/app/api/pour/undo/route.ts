@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { InventoryCommandError } from "@/domains/pours/inventory-command";
 import {
   PourForbiddenError,
   PourNotFoundError,
@@ -7,33 +8,37 @@ import {
   PourRpcError,
   undoLastPour,
 } from "@/domains/pours/pour-service";
+import { getInventoryContractVersion } from "@/domains/pours/physical-bottle-command";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import {
+  inventoryCommandErrorResponse,
+  inventoryResponse,
+  requireInventoryOperationId,
+  withInventoryHeaders,
+} from "@/lib/api/inventory-command";
 import { parseJson } from "@/lib/api/validation";
 
 export const runtime = "nodejs";
 
-const BodySchema = z.object({
+const LegacyBodySchema = z.object({ wine_id: z.string().uuid() });
+const PhysicalBodySchema = z.strictObject({
   wine_id: z.string().uuid(),
+  open_bottle_id: z.string().uuid(),
+  reversal_of_event_id: z.string().uuid(),
+  correction_reason: z.literal("mistaken_report").optional(),
+  operator_confirms_same_bottle_present: z.literal(true).optional(),
+}).superRefine((body, context) => {
+  if ((body.correction_reason === undefined) !==
+    (body.operator_confirms_same_bottle_present === undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "Discard correction requires both affirmations.",
+    });
+  }
 });
 
-/**
- * POST /api/pour/undo
- *
- * BND-119. Undoes the most recent pour or spill for a wine.
- * Calls undo_last_pour RPC (atomic: deletes latest pour_event,
- * restores open_bottles.remaining_ml, inserts availability_events row).
- * Role-gated inside the RPC to owner | manager | staff.
- *
- * 200: { open_bottle: { wine_id, remaining_ml, ... } }
- * 400: invalid body
- * 401: unauthenticated
- * 403: not a member
- * 404: no recent pour to undo
- * 409: latest pour cannot be reversed safely
- * 500: any other RPC error
- */
 export async function POST(request: NextRequest) {
   return withApiHandler(() => postUndo(request));
 }
@@ -43,20 +48,64 @@ async function postUndo(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
 
-  const parsed = await parseJson(request, BodySchema, {
-    message: "Invalid body.",
-  });
-  if (!parsed.ok) return parsed.response;
-  const { wine_id } = parsed.data;
+  let contractVersion: 1 | 2;
+  try {
+    contractVersion = await getInventoryContractVersion(supabase);
+  } catch (error) {
+    const providedOperationId = requireInventoryOperationId(request);
+    if (typeof providedOperationId === "string") {
+      const response = inventoryCommandErrorResponse(error, providedOperationId);
+      if (response) return response;
+    }
+    if (error instanceof InventoryCommandError) {
+      return Errors.internal("Inventory command failed.");
+    }
+    throw error;
+  }
+  const operationId = contractVersion === 2
+    ? requireInventoryOperationId(request)
+    : null;
+  if (operationId instanceof NextResponse) return operationId;
+
+  const parsed = await parseJson(
+    request,
+    contractVersion === 2 ? PhysicalBodySchema : LegacyBodySchema,
+    { message: "Invalid body." },
+  );
+  if (!parsed.ok) {
+    return operationId
+      ? withInventoryHeaders(parsed.response, operationId)
+      : parsed.response;
+  }
 
   try {
-    const openBottle = await undoLastPour({
-      supabase,
-      restaurantId,
-      wineId: wine_id,
+    const physicalData = contractVersion === 2
+      ? PhysicalBodySchema.parse(parsed.data)
+      : null;
+    const outcome = await undoLastPour({
+      supabase, restaurantId, wineId: parsed.data.wine_id, contractVersion,
+      ...(physicalData ? {
+        operationId: operationId!,
+        expectedOpenBottleId: physicalData.open_bottle_id,
+        reversalOfEventId: physicalData.reversal_of_event_id,
+        correctionReason: physicalData.correction_reason,
+        operatorConfirmsSameBottlePresent:
+          physicalData.operator_confirms_same_bottle_present,
+      } : {}),
     });
-    return NextResponse.json({ open_bottle: openBottle });
+    return operationId
+      ? inventoryResponse({
+          open_bottle: outcome.openBottle,
+          undo_event_id: outcome.eventId,
+        }, 200, operationId, outcome.replayed)
+      : NextResponse.json({ open_bottle: outcome.openBottle });
   } catch (error) {
+    if (operationId && error instanceof InventoryCommandError) {
+      const undoResponse = physicalUndoError(error.message);
+      if (undoResponse) return withInventoryHeaders(undoResponse, operationId);
+      const response = inventoryCommandErrorResponse(error, operationId);
+      if (response) return response;
+    }
     if (error instanceof PourNotFoundError) {
       return Errors.notFound("Pour to undo");
     }
@@ -75,5 +124,27 @@ async function postUndo(request: NextRequest) {
       return Errors.internal("Undo failed.");
     }
     throw error;
+  }
+}
+
+function physicalUndoError(message: string): NextResponse | null {
+  switch (message.trim()) {
+    case "undo_window_expired":
+      return Errors.conflict(
+        "undo_window_expired",
+        "The 15-minute Undo window has expired. Ask a manager to reconcile.",
+      );
+    case "undo_already_applied":
+      return Errors.conflict(
+        "undo_already_applied",
+        "This event was already undone.",
+      );
+    case "undo_requires_review":
+      return Errors.conflict(
+        "undo_requires_review",
+        "This event cannot be undone safely. Ask a manager to reconcile.",
+      );
+    default:
+      return null;
   }
 }

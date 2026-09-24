@@ -28,7 +28,10 @@ import { EnrichControl } from "./enrich-control";
 import { PourActionBar } from "./pour-action-bar";
 import { useHeroImageActions } from "./use-hero-image-actions";
 import { useEightysixToggle } from "./use-eightysix-toggle";
-import { useInventoryCommands } from "./use-inventory-commands";
+import {
+  useInventoryCommands,
+  type LastPourReceipt,
+} from "./use-inventory-commands";
 import { wineDisplayName } from "@/lib/wine-display-name";
 import {
   PhysicalBottleSelector,
@@ -92,7 +95,7 @@ export function WineDetailDrawer({
   }, [onClose]);
 
   // BND-119: track last pour for undo.
-  const [lastPour, setLastPour] = useState<{ ml: number } | null>(null);
+  const [lastPour, setLastPour] = useState<LastPourReceipt | null>(null);
 
   // OPP-1 (EV-1.2) — merge-duplicate confirmation state (mergeConfirm) now
   // lives inside merge-duplicates-panel.tsx; `busy`/`errorMsg` above stay
@@ -153,50 +156,24 @@ export function WineDetailDrawer({
   ) ?? null;
   const physicalStateInvalid = inventoryContractVersion === 2 &&
     bottleSelection.status === "invalid";
-  const { doOpenBottle, doPour, retryPriorOpen, retryPriorPour, openBottleBusy, openNeedsReview, pourNeedsReview } = useInventoryCommands({
+  const {
+    doOpenBottle, doPour, doUndo, retryPriorOpen, retryPriorPour,
+    retryPriorUndo, openBottleBusy, openNeedsReview, pourNeedsReview,
+    undoNeedsReview,
+  } = useInventoryCommands({
     row,
     contractVersion: inventoryContractVersion,
     selectedBottleId: effectiveBottleId,
     preservationMethod,
     setBusy,
     setErrorMsg,
+    lastPour,
     setLastPour,
     toast,
     refresh,
     onBottleOpened,
     onBottleStale,
   });
-
-  // BND-119: undo the most recent pour.
-  const doUndo = useCallback(
-    async () => {
-      if (!row || !lastPour) return;
-      setErrorMsg(null);
-      setBusy(true);
-      try {
-        const res = await fetch("/api/pour/undo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wine_id: row.wine_id }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          throw new Error(payload?.error ?? `Undo failed (${res.status}).`);
-        }
-        toast.success("Pour undone");
-        setLastPour(null);
-        startTransition(() => router.refresh());
-      } catch (err) {
-        toast.error("Undo failed");
-        setErrorMsg(err instanceof Error ? err.message : "Undo failed.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [row, lastPour, router, toast],
-  );
 
   if (!row) return null;
 
@@ -563,7 +540,8 @@ export function WineDetailDrawer({
               (Kimi audit 2026-08-26). Reference sections scroll; actions
               don't. */}
           {!physicalStateInvalid &&
-            (canPour || requiresBottleSelection || row.sealed_count > 0 || openNeedsReview || pourNeedsReview) && (
+            (canPour || requiresBottleSelection || row.sealed_count > 0 ||
+              openNeedsReview || pourNeedsReview || lastPour || undoNeedsReview) && (
             <PourActionBar
               row={row}
               contractVersion={inventoryContractVersion}
@@ -575,8 +553,10 @@ export function WineDetailDrawer({
               openBottleBusy={openBottleBusy}
               openNeedsReview={openNeedsReview}
               pourNeedsReview={pourNeedsReview}
+              undoNeedsReview={undoNeedsReview}
               retryPriorOpen={retryPriorOpen}
               retryPriorPour={retryPriorPour}
+              retryPriorUndo={retryPriorUndo}
               lastPour={lastPour}
               doOpenBottle={doOpenBottle}
               doPour={doPour}
