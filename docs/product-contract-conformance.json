@@ -5,7 +5,7 @@
     "firstRequirementId": "TER-CF-180",
     "lastRequirementId": "TER-CF-315",
     "requirementCount": 47,
-    "activeFeatureLedgerCount": 320
+    "activeFeatureLedgerCount": 324
   },
   "inputs": {
     "featureLedger": "docs/feature-ledger.json",

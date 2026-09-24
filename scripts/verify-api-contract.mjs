@@ -153,8 +153,8 @@ export function validateReconciliationSemantics({
     );
   }
   const ledgerById = new Map(ledger.items.map((item) => [item.id, item]));
-  if (ledger.items.length !== 320 || ledger.items.some((item) => item.status !== "active")) {
-    errors.push("all 320 feature-ledger requirements must remain active");
+  if (ledger.items.length !== 324 || ledger.items.some((item) => item.status !== "active")) {
+    errors.push("all 324 feature-ledger requirements must remain active");
   }
   for (const requirementId of CONCRETE_REQUIREMENT_IDS) {
     const ledgerItem = ledgerById.get(requirementId);

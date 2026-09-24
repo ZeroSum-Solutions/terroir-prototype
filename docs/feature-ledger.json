@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 320,
+  "featureCount": 324,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
     "expandedOn": "2026-09-24",
-    "approvedActiveCount": 320
+    "approvedActiveCount": 324
   },
   "items": [
     {
@@ -4170,6 +4170,58 @@
       "status": "active",
       "completionSpec": "TER-050",
       "evidenceOwner": "pilot-measurement"
+    },
+    {
+      "id": "TER-CF-321",
+      "domain": "site_capability_authority",
+      "sourceOrder": 321,
+      "sourceText": "System authorizes only cost.read, margin.read, and pricing.manage on an exact site when one current unexpired grant, both current membership parents, both database-owned lifecycle generations, and every stored subject, site, workspace-link, and workspace snapshot equal the live auth.uid() identity chain; workspace governance, legacy role, active-site cookie, and shadow observation alone never authorize",
+      "actor": "System",
+      "action": "authorizes only cost.read, margin.read, and pricing.manage on an exact site when one current unexpired grant, both current membership parents, both database-owned lifecycle generations, and every stored subject, site, workspace-link, and workspace snapshot equal the live auth.uid() identity chain; workspace governance, legacy role, active-site cookie, and shadow observation alone never authorize",
+      "observableOutcome": "System authorizes only cost.read, margin.read, and pricing.manage on an exact site when one current unexpired grant, both current membership parents, both database-owned lifecycle generations, and every stored subject, site, workspace-link, and workspace snapshot equal the live auth.uid() identity chain; workspace governance, legacy role, active-site cookie, and shadow observation alone never authorize",
+      "negativeCase": "Assertion is not observed: System authorizes only cost.read, margin.read, and pricing.manage on an exact site when one current unexpired grant, both current membership parents, both database-owned lifecycle generations, and every stored subject, site, workspace-link, and workspace snapshot equal the live auth.uid() identity chain; workspace governance, legacy role, active-site cookie, and shadow observation alone never authorize",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-322",
+      "domain": "site_capability_authority",
+      "sourceOrder": 322,
+      "sourceText": "System lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace",
+      "actor": "System",
+      "action": "lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace",
+      "observableOutcome": "System lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace",
+      "negativeCase": "Assertion is not observed: System lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-323",
+      "domain": "site_capability_authority",
+      "sourceOrder": 323,
+      "sourceText": "System reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome",
+      "actor": "System",
+      "action": "reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome",
+      "observableOutcome": "System reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome",
+      "negativeCase": "Assertion is not observed: System reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-324",
+      "domain": "site_capability_authority",
+      "sourceOrder": 324,
+      "sourceText": "System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
+      "actor": "System",
+      "action": "cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
+      "observableOutcome": "System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
+      "negativeCase": "Assertion is not observed: System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
     }
   ]
 }

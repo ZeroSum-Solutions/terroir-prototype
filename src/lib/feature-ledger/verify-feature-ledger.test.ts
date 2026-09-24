@@ -142,6 +142,8 @@ describe("metadataForRequirement", () => {
     [317, "TER-049", "csv-identity-review"],
     [318, "TER-050", "pilot-measurement"],
     [320, "TER-050", "pilot-measurement"],
+    [321, "TER-014", "authorization"],
+    [324, "TER-014", "authorization"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -149,8 +151,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 320", () => {
-    expect(() => metadataForRequirement(321)).toThrow(
+  it("rejects requirements outside the authoritative 324", () => {
+    expect(() => metadataForRequirement(325)).toThrow(
       "no completion metadata",
     );
   });
@@ -370,10 +372,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 320 as the default approved source count", () => {
+  it("keeps 324 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 320");
+    ).toContain("source feature count must remain 324");
   });
 
   it.each([
@@ -596,8 +598,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 320 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(320);
+  it("accounts for all 324 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(324);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -735,7 +737,7 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the approved C14 measurement contract without claiming implementation", () => {
-    expect(ledger.items.slice(317).map((item: { id: string }) => item.id)).toEqual([
+    expect(ledger.items.slice(317, 320).map((item: { id: string }) => item.id)).toEqual([
       "TER-CF-318",
       "TER-CF-319",
       "TER-CF-320",
@@ -752,6 +754,28 @@ describe("checked-in feature ledger", () => {
     }
     expect(plan).toContain("### TER-050: Deliver pilot measurement capability");
     expect(plan).toContain("do not require real four-week pilot observations");
+  });
+
+  it("appends the accepted C04 authority contract without claiming implementation", () => {
+    expect(ledger.items.slice(320).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-321",
+      "TER-CF-322",
+      "TER-CF-323",
+      "TER-CF-324",
+    ]);
+    for (const item of ledger.items.slice(320)) {
+      expect(item).toMatchObject({
+        domain: "site_capability_authority",
+        actor: "System",
+        status: "active",
+        completionSpec: "TER-014",
+        evidenceOwner: "authorization",
+      });
+    }
+    expect(ledger.items[320].sourceText).toContain("cost.read, margin.read, and pricing.manage");
+    expect(ledger.items[321].sourceText).toContain("plain BEFORE UPDATE triggers use IS DISTINCT FROM");
+    expect(ledger.items[322].sourceText).toContain("SQLSTATE 23505");
+    expect(ledger.items[323].sourceText).toContain("additive migration A");
   });
 
   it("preserves the complete first 317 source and ledger objects from 006330bb", () => {
@@ -778,7 +802,7 @@ describe("checked-in feature ledger", () => {
       "TER-010": 13,
       "TER-012": 6,
       "TER-013": 2,
-      "TER-014": 7,
+      "TER-014": 11,
       "TER-015": 7,
       "TER-020": 49,
       "TER-023": 7,

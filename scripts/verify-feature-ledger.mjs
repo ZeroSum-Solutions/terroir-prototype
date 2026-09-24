@@ -13,7 +13,7 @@ export const ALLOWED_STATUSES = [
 
 export const SCHEMA_VERSION = 2;
 export const SOURCE_FILE = "app_spec.txt";
-export const APPROVED_FEATURE_COUNT = 320;
+export const APPROVED_FEATURE_COUNT = 324;
 export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
@@ -85,6 +85,7 @@ export const COMPLETION_RULES = [
   [298, 315, "TER-041", "physical-bottle-inventory"],
   [316, 317, "TER-049", "csv-identity-review"],
   [318, 320, "TER-050", "pilot-measurement"],
+  [321, 324, "TER-014", "authorization"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,

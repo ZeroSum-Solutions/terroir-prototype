@@ -114,8 +114,8 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 320 requirements active and maps the original, C08 and C03 route assertions once", () => {
-    expect(ledger.items).toHaveLength(320);
+  it("keeps all 324 requirements active and maps the original, C08 and C03 route assertions once", () => {
+    expect(ledger.items).toHaveLength(324);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {

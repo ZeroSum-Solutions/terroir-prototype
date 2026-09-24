@@ -105,7 +105,7 @@ recorded. The required critical subset fails on any skip.
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
-| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 320 assertions |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 324 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
@@ -113,13 +113,16 @@ recorded. The required critical subset fails on any skip.
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
-current machine-read source for 320 requirement identities, but the generated
+current machine-read source for 324 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the whole workflow is complete. C04 has a
 locally implemented shadow database foundation plus a bounded server-private
 observation attached after legacy active-membership selection. It does not authorize;
 legacy membership remains the sole authority while capability cutover, cost
-enforcement, and expanded roles remain incomplete. See
+enforcement, and expanded roles remain incomplete. The accepted, unimplemented
+[site-capability cutover](docs/plans/2026-09-24-terroir-site-capability-cutover.md)
+defines the first authoritative grant and pricing leaf; it activates no permission and
+does not complete C04. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#shadow-access-observation) for its
 server-only data boundary and per-resolution deadline. C03 has a locally implemented
 TER-CF-297 context-lookup leaf, an accepted bounded deterministic TER-CF-291 through

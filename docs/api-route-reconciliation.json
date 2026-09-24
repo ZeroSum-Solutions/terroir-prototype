@@ -5,7 +5,7 @@
   "featureLedger": "docs/feature-ledger.json",
   "completionPlan": "docs/plans/2026-07-20-terroir-completion-spec.md",
   "summary": {
-    "activeRequirementCount": 320,
+    "activeRequirementCount": 324,
     "concreteRequirementCount": 36,
     "exactDiscoveredCount": 18,
     "plannedPromiseCount": 18,
