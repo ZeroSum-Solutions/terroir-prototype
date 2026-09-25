@@ -17,6 +17,7 @@ export function PourActionBar({
   row,
   contractVersion = 1,
   canPour,
+  freshActionsAvailable = true,
   requiresBottleSelection = false,
   outOfStock,
   pickerItem,
@@ -37,6 +38,7 @@ export function PourActionBar({
   row: CellarWineRow;
   contractVersion?: 1 | 2;
   canPour: boolean;
+  freshActionsAvailable?: boolean;
   requiresBottleSelection?: boolean;
   outOfStock: boolean;
   pickerItem: unknown;
@@ -58,7 +60,8 @@ export function PourActionBar({
   const hasActiveBottle = physicalMode
     ? row.activeBottleCount > 0
     : Boolean(row.open_bottle_id);
-  const showUndo = (lastPour || undoNeedsReview) && (physicalMode || canPour);
+  const showUndo = undoNeedsReview ||
+    (freshActionsAvailable && Boolean(lastPour) && (physicalMode || canPour));
 
   return (
     <div
@@ -91,7 +94,7 @@ export function PourActionBar({
             <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
             Retry prior open
           </button>
-        ) : row.sealed_count > 0 && (
+        ) : freshActionsAvailable && row.sealed_count > 0 && (
           <button
             type="button"
             disabled={openBottleBusy || (!physicalMode && hasActiveBottle)}
@@ -122,7 +125,7 @@ export function PourActionBar({
           >
             Retry prior pour
           </button>
-        ) : requiresBottleSelection ? (
+        ) : freshActionsAvailable && requiresBottleSelection ? (
           <button
             type="button"
             disabled
@@ -130,7 +133,7 @@ export function PourActionBar({
           >
             Select a bottle
           </button>
-        ) : canPour && (
+        ) : freshActionsAvailable && canPour && (
           <>
             <button
               type="button"

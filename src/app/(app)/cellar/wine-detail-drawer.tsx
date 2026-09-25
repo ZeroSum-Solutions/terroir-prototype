@@ -539,13 +539,14 @@ export function WineDetailDrawer({
               Undo) pinned at the foot so they never sit below the fold
               (Kimi audit 2026-08-26). Reference sections scroll; actions
               don't. */}
-          {!physicalStateInvalid &&
-            (canPour || requiresBottleSelection || row.sealed_count > 0 ||
-              openNeedsReview || pourNeedsReview || lastPour || undoNeedsReview) && (
+          {(openNeedsReview || pourNeedsReview || undoNeedsReview ||
+            (!physicalStateInvalid && (canPour || requiresBottleSelection ||
+              row.sealed_count > 0 || lastPour))) && (
             <PourActionBar
               row={row}
               contractVersion={inventoryContractVersion}
               canPour={canPour}
+              freshActionsAvailable={!physicalStateInvalid}
               requiresBottleSelection={requiresBottleSelection}
               outOfStock={outOfStock}
               pickerItem={pickerItem}

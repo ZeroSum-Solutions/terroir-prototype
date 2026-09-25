@@ -319,6 +319,42 @@ describe("WineDetailDrawer bottle state", () => {
     await act(async () => root.unmount());
   });
 
+  it("keeps the exact unresolved pour retry when refreshed physical state is invalid", async () => {
+    const bottle = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({ error: "still unconfirmed" }, 500));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderPhysicalDrawer(root, row({
+      activeBottleCount: 1, activeOpenMl: 600, activeBottles: [bottle],
+      opened_at: bottle.openedAt, glass_pour_ml: 150, sealed_count: 2,
+    }), bottle.id);
+
+    await click(button(container, "Pour 5.1 oz"));
+    await renderPhysicalDrawer(root, row({
+      activeBottleCount: 1, activeOpenMl: 600, activeBottles: undefined as never,
+      opened_at: bottle.openedAt, glass_pour_ml: 150, sealed_count: 2,
+    }), bottle.id);
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+    expect(button(container, "Retry prior pour")).toBeDefined();
+    expect(button(container, "Open another bottle")).toBeUndefined();
+    expect(button(container, "Undo last pour (5.1 oz)")).toBeUndefined();
+    await click(button(container, "Retry prior pour"));
+
+    const first = fetchMock.mock.calls[0];
+    const retry = fetchMock.mock.calls[1];
+    expect(retry[1]?.body).toBe(first[1]?.body);
+    expect(new Headers(retry[1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(first[1]?.headers).get("Idempotency-Key"));
+    await act(async () => root.unmount());
+  });
+
   it("threads the exact physical pour receipt into Undo", async () => {
     const wineId = "55555555-5555-4555-8555-555555555555";
     const bottle = {

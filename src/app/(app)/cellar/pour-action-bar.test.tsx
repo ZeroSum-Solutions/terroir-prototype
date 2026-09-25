@@ -250,12 +250,12 @@ describe("PourActionBar", () => {
     expect(doUndo).toHaveBeenCalledOnce();
   });
 
-  it("keeps an unresolved Undo retry reachable without a current receipt", async () => {
+  it.each([1, 2] as const)("keeps contract-%i unresolved Undo reachable without a current receipt", async (contractVersion) => {
     const retryPriorUndo = vi.fn();
     await act(async () => root.render(
       <PourActionBar
         row={baseRow({ sealed_count: 0, glass_pour_ml: null })}
-        contractVersion={2}
+        contractVersion={contractVersion}
         canPour={false}
         outOfStock={false}
         pickerItem={null}
@@ -272,6 +272,70 @@ describe("PourActionBar", () => {
     ));
     await act(async () => button("Retry prior Undo")!.click());
     expect(retryPriorUndo).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { name: "open", flags: { openNeedsReview: true }, label: "Retry prior open" },
+    { name: "pour", flags: { pourNeedsReview: true }, label: "Retry prior pour" },
+    { name: "Undo", flags: { undoNeedsReview: true }, label: "Retry prior Undo" },
+  ])("keeps only the retained $name retry when fresh physical state is invalid", async ({ flags, label }) => {
+    const retry = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 3, glass_pour_ml: 150, activeBottleCount: 1, pour_size_mode: "picker" })}
+        contractVersion={2}
+        canPour
+        freshActionsAvailable={false}
+        outOfStock={false}
+        pickerItem={{}}
+        busy={false}
+        openBottleBusy={false}
+        lastPour={{ contractVersion: 2, wineId: "55555555-5555-4555-8555-555555555555",
+          bottleId: "66666666-6666-4666-8666-666666666666",
+          eventId: "77777777-7777-4777-8777-777777777777", ml: 150 }}
+        {...flags}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        retryPriorOpen={retry}
+        retryPriorPour={retry}
+        retryPriorUndo={retry}
+        onOpenPicker={vi.fn()}
+      />,
+    ));
+
+    expect(button(label)).toBeDefined();
+    expect(button("Open another bottle")).toBeUndefined();
+    expect(button("Pour 5.1 oz")).toBeUndefined();
+    expect(button("Undo last pour (5.1 oz)")).toBeUndefined();
+    expect(container.querySelector('button[aria-label="Pick a custom pour size"]')).toBeNull();
+    await act(async () => button(label)!.click());
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("exposes the custom picker when fresh physical actions are available", async () => {
+    const onOpenPicker = vi.fn();
+    await act(async () => root.render(
+      <PourActionBar
+        row={baseRow({ sealed_count: 3, glass_pour_ml: 150, activeBottleCount: 1, pour_size_mode: "picker" })}
+        contractVersion={2}
+        canPour
+        freshActionsAvailable
+        outOfStock={false}
+        pickerItem={{}}
+        busy={false}
+        openBottleBusy={false}
+        lastPour={null}
+        doOpenBottle={vi.fn()}
+        doPour={vi.fn()}
+        doUndo={vi.fn()}
+        onOpenPicker={onOpenPicker}
+      />,
+    ));
+    const picker = container.querySelector<HTMLButtonElement>('button[aria-label="Pick a custom pour size"]');
+    expect(picker).not.toBeNull();
+    await act(async () => picker!.click());
+    expect(onOpenPicker).toHaveBeenCalledOnce();
   });
 
   it("preserves the legacy canPour gate for version-1 Undo", async () => {
