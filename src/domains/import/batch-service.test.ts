@@ -3500,23 +3500,23 @@ describe("revertImportBatch", () => {
     const result = await revertImportBatch(supabase as never, RESTAURANT_ID, BATCH_ID, supabase as never);
     expect(result).toEqual({ ok: true, revertedCount: 4, orphanWinesDeleted: 0, lwinStampsCleared: 0, cleanupTruncated: false, orphanCleanupSkipped: false, cleanupFailures: 0 });
   });
-
   it("translates a not-found error", async () => {
-    const supabase = {
-      rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "P0002", message: "not found" } }),
-      from: noopCleanupFrom(),
-    };
+    const supabase = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "P0002", message: "not found" } }), from: noopCleanupFrom() };
     const result = await revertImportBatch(supabase as never, RESTAURANT_ID, BATCH_ID, supabase as never);
     expect(result).toMatchObject({ ok: false, error: { code: "not_found" } });
   });
-
-  it("translates a not-completed error", async () => {
-    const supabase = {
-      rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "not completed" } }),
-      from: noopCleanupFrom(),
-    };
+  it.each(["not completed", "physical_bottle_dependency: detail"])("keeps generic P0001 message %j mapped to not_completed", async (message) => {
+    const supabase = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message } }), from: noopCleanupFrom() };
     const result = await revertImportBatch(supabase as never, RESTAURANT_ID, BATCH_ID, supabase as never);
     expect(result).toMatchObject({ ok: false, error: { code: "not_completed" } });
+  });
+  it("maps only the exact dependency signal and never enters post-RPC cleanup", async () => {
+    const from = noopCleanupFrom();
+    const supabase = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: " physical_bottle_dependency " } }), from };
+    const result = await revertImportBatch(supabase as never, RESTAURANT_ID, BATCH_ID, supabase as never);
+    expect(result).toEqual({ ok: false, error: { code: "physical_bottle_dependency", message: "Import batch cannot be reverted because physical bottles depend on its source inventory." } });
+    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("import_batch_rows");
   });
 
   it("still calls the revert RPC and returns ok with zero cleanup counts when the applied-rows snapshot read itself throws (Sol audit 2026-08-27 round 3, finding 4 — the inventory revert must never be blocked by a cleanup-support read)", async () => {

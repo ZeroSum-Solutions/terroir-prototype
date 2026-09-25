@@ -100,10 +100,14 @@ export async function DELETE(
     });
 
     if (error) {
-      const code = (error as { code?: string }).code;
+      const pgError = error as { code?: string; message?: string };
+      const code = pgError.code;
       // P0002: RLS already narrowed the lookup to scans this session can
       // read, so another tenant's id is indistinguishable from a missing
       // one — which is the point.
+      if (code === "P0001" && pgError.message?.trim() === "physical_bottle_dependency") {
+        return Errors.conflict("physical_bottle_dependency", "Invoice cannot be deleted because physical bottles depend on its imported inventory.");
+      }
       if (code === "P0002") return Errors.notFound("Scan");
       if (code === "P0003") {
         return Errors.forbidden("Only an owner or manager can delete an invoice.");

@@ -5,7 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireMembership } from "@/lib/api/auth";
 import { withApiHandler } from "@/lib/api/handler";
-import { Errors } from "@/lib/api/errors";
+import { Errors, apiError } from "@/lib/api/errors";
 import { parseParams } from "@/lib/api/validation";
 import { SessionIdParamsSchema } from "@/domains/import/request-schemas";
 import { revertImportSession } from "@/domains/import/session-service";
@@ -31,6 +31,9 @@ async function postRevert(params: Params) {
   const result = await revertImportSession(supabase, id);
   if (!result.ok) {
     if (result.error.code === "not_found") return Errors.notFound("Import session");
+    if (result.error.code === "physical_bottle_dependency") {
+      return apiError(409, result.error.code, result.error.message, { batches: result.batches });
+    }
     throw new Error(result.error.message);
   }
 

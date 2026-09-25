@@ -2070,12 +2070,11 @@ export async function revertImportBatch(
 
   if (error) {
     const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "P0002") {
-      return { ok: false, error: { code: "not_found", message: "Import batch not found." } };
+    if (pgError.code === "P0002") return { ok: false, error: { code: "not_found", message: "Import batch not found." } };
+    if (pgError.code === "P0001" && pgError.message?.trim() === "physical_bottle_dependency") {
+      return { ok: false, error: { code: "physical_bottle_dependency", message: "Import batch cannot be reverted because physical bottles depend on its source inventory." } };
     }
-    if (pgError.code === "P0001") {
-      return { ok: false, error: { code: "not_completed", message: "Import batch is already reverted." } };
-    }
+    if (pgError.code === "P0001") return { ok: false, error: { code: "not_completed", message: "Import batch is already reverted." } };
     throw error;
   }
 

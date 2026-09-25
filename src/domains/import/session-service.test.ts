@@ -8,7 +8,7 @@
 // a DB write. See the audit's finding #4.
 
 import { describe, expect, it, vi } from "vitest";
-import { getImportSessionProgress } from "./session-service";
+import { getImportSessionProgress, revertImportSession } from "./session-service";
 
 const SESSION_ID = "44444444-4444-4444-8444-444444444444";
 
@@ -117,5 +117,49 @@ describe("getImportSessionProgress — derived status", () => {
     const progress = await getImportSessionProgress(supabase as never, SESSION_ID);
 
     expect(progress?.status).toBe("reverted");
+  });
+});
+
+describe("revertImportSession", () => {
+  function makeRevertSupabase(data: unknown, error: unknown = null) {
+    return { rpc: vi.fn().mockResolvedValue({ data, error }) };
+  }
+
+  it("returns the parsed child outcomes when every child reverted", async () => {
+    const data = {
+      sessionId: SESSION_ID,
+      batches: [{ batchId: "b2", chunkIndex: 2, skipped: false, revertedCount: 4 }],
+    };
+    const result = await revertImportSession(makeRevertSupabase(data) as never, SESSION_ID);
+    expect(result).toEqual({ ok: true, ...data });
+  });
+
+  it("returns a dependency conflict with every parsed outcome when one skipped child has the exact reason", async () => {
+    const batches = [
+      { batchId: "b2", chunkIndex: 2, skipped: true, reason: "physical_bottle_dependency" },
+      { batchId: "b1", chunkIndex: 1, skipped: false, revertedCount: 3 },
+    ];
+    const result = await revertImportSession(makeRevertSupabase({ sessionId: SESSION_ID, batches }) as never, SESSION_ID);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "physical_bottle_dependency",
+        message: "Import session cannot be fully reverted because physical bottles depend on imported inventory.",
+      },
+      batches,
+    });
+  });
+
+  it("keeps a near-match skipped reason in the existing successful result", async () => {
+    const batches = [{ batchId: "b1", chunkIndex: 1, skipped: true, reason: "physical_bottle_dependency: detail" }];
+    const result = await revertImportSession(makeRevertSupabase({ sessionId: SESSION_ID, batches }) as never, SESSION_ID);
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, batches });
+  });
+
+  it("keeps not-found and unknown RPC errors distinct", async () => {
+    const missing = await revertImportSession(makeRevertSupabase(null, { code: "P0002", message: "raw missing" }) as never, SESSION_ID);
+    expect(missing).toEqual({ ok: false, error: { code: "not_found", message: "Import session not found." } });
+    const unknown = { code: "P0001", message: "other failure" };
+    await expect(revertImportSession(makeRevertSupabase(null, unknown) as never, SESSION_ID)).rejects.toBe(unknown);
   });
 });

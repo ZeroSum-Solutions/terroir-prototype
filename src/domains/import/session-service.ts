@@ -187,7 +187,7 @@ export type RevertSessionBatchResult =
 
 export type RevertSessionResult =
   | { ok: true; sessionId: string; batches: RevertSessionBatchResult[] }
-  | { ok: false; error: { code: string; message: string } };
+  | { ok: false; error: { code: string; message: string }; batches?: RevertSessionBatchResult[] };
 
 /** P3 §3.4: reverts every non-reverted batch in a session, in reverse
  * chunk order, via the revert_import_session RPC (0110). */
@@ -216,6 +216,14 @@ export async function revertImportSession(
     }
     return { batchId, chunkIndex, skipped: false, revertedCount: b.revertedCount as number };
   });
+
+  if (batches.some((batch) => batch.skipped && batch.reason === "physical_bottle_dependency")) {
+    return {
+      ok: false,
+      error: { code: "physical_bottle_dependency", message: "Import session cannot be fully reverted because physical bottles depend on imported inventory." },
+      batches,
+    };
+  }
 
   return { ok: true, sessionId: result.sessionId, batches };
 }

@@ -272,6 +272,40 @@ describe("DELETE /api/scans/[id]", () => {
     expect(response.status).toBe(403);
   });
 
+  it("maps only the exact dependency signal to a sanitized 409 and still calls one RPC", async () => {
+    const { supabase, rpc } = makeRpcSupabase({
+      data: null,
+      error: { code: "P0001", message: " physical_bottle_dependency " },
+    });
+    auth.requireRole.mockResolvedValue({ supabase, restaurantId: RESTAURANT_ID, role: "owner" });
+
+    const response = await DELETE(makeDeleteRequest(), {
+      params: Promise.resolve({ id: SCAN_ID }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "physical_bottle_dependency",
+        message: "Invoice cannot be deleted because physical bottles depend on its imported inventory.",
+      },
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [{ code: "P0001", message: "other failure" }],
+    [{ code: "P0001", message: "physical_bottle_dependency: detail" }],
+    [{ code: "23503", message: "physical_bottle_dependency" }],
+  ])("keeps non-exact dependency errors on the redacted 500 path", async (error) => {
+    const { supabase } = makeRpcSupabase({ data: null, error });
+    auth.requireRole.mockResolvedValue({ supabase, restaurantId: RESTAURANT_ID, role: "owner" });
+
+    const response = await DELETE(makeDeleteRequest(), { params: Promise.resolve({ id: SCAN_ID }) });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: { code: "internal_error", message: "Internal server error." } });
+  });
+
   it("rejects a non-uuid scan id before touching the database", async () => {
     const { supabase, rpc } = makeRpcSupabase({ data: null, error: null });
     auth.requireRole.mockResolvedValue({ supabase, restaurantId: RESTAURANT_ID, role: "owner" });

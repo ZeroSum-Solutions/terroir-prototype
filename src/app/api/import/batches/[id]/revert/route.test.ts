@@ -73,6 +73,22 @@ describe("POST /api/import/batches/[id]/revert", () => {
     expect(response.status).toBe(409);
   });
 
+  it("returns the stable 409 envelope for a physical-bottle dependency", async () => {
+    allow(makeSupabase({ id: BATCH_ID }));
+    mockRevertImportBatch.mockResolvedValue({
+      ok: false,
+      error: { code: "physical_bottle_dependency", message: "Import batch cannot be reverted because physical bottles depend on its source inventory." },
+    });
+    const response = await POST(request(), { params: params() });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "physical_bottle_dependency",
+        message: "Import batch cannot be reverted because physical bottles depend on its source inventory.",
+      },
+    });
+  });
+
   it("returns the reverted count, orphan-wine cleanup count, cleanupTruncated, orphanCleanupSkipped, and cleanupFailures on success", async () => {
     allow(makeSupabase({ id: BATCH_ID }));
     mockRevertImportBatch.mockResolvedValue({
