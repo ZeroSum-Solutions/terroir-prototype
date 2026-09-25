@@ -121,6 +121,11 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   focused tests. Its exact `1c37b7ab..9f3a1b25` range passed the immutable security
   certificate across 20 changed paths and 22 reviewed blobs. No SQL or browser result
   is claimed.
+- The drawer keeps unresolved Open, Pour, and Undo retries reachable even when
+  refreshed bottle data cannot support a fresh action. In that state it hides fresh
+  commands and the custom-pour picker, while retry keeps the original operation
+  identity and payload. Checkpoint `6163388a` passed 32 focused independent tests;
+  this is component proof, not browser or server-replay proof.
 - The effective-reader checkpoint redirects five application readers to
   `effective_service_pour_events`, which excludes version 2 reversals and reversed
   originals while retaining legacy history. Migration 0155 grants only non-grantable
@@ -132,6 +137,28 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   semantics and conservation of all six non-target databases. That target now holds
   0155; the normal retained stack and separate browser stack do not. This is bounded
   database proof, not a browser, Phase B, cost-secrecy or production completion claim.
+
+- Yield reporting prefers each closeout's captured bottle capacity. Only a legacy
+  contract-1 closeout without that value falls back to catalogue size; a physical
+  closeout without captured capacity fails instead of publishing a fabricated yield.
+  The reader retains its restaurant/date filters and selects no bottle cost or
+  opener fields. This application change does not prove the live relational query.
+- In contract 2, legacy Open/Pour/Close/Discard request shapes reach the completed-v1
+  replay boundary. A successful replay must match the operation, command, tenant and
+  historical wine or bottle/lifecycle identity. Contract 1 keeps its existing parser.
+  Only Open falls through to the physical writer, and only on the exact SQLSTATE
+  `P0001` plus `legacy_inventory_command_retired` pair. Other failures remain terminal.
+  Close/Discard do not compare historical receipt wine with a mutable merged wine.
+  Phase C still must install replay-only SQL and retire fresh legacy writes atomically;
+  these response checks cannot prevent a write that an old RPC already performed.
+- Import-batch reversal and invoice deletion recognize only SQLSTATE `P0001` with
+  the trimmed message `physical_bottle_dependency` as the named provenance conflict.
+  They return HTTP 409 with stable copy and do not run post-reversal cleanup on that
+  error. A session reversal with that exact skipped-child reason returns 409 with
+  the existing child outcomes instead of reporting success. Other error mappings
+  remain unchanged. The application mapping does not enforce the source-lot
+  restriction: Phase C still must supply the SQL producer, protect referenced lots,
+  and keep a partially reverted session's persisted status truthful.
 
 - The legacy end-of-shift `POST /api/reconcile` path calls
   `reconcile_open_bottles_batch` through `src/domains/cellar/reconcile-service.ts`;
