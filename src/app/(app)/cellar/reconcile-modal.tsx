@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 import { ReconcileList } from "./reconcile-list";
 import { ActionDialog } from "@/components/action-dialog";
 import { clearReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
@@ -33,13 +34,15 @@ export function ReconcileModal({
   onClose,
   restaurantId,
   userId,
+  inventoryContractVersion = 1,
 }: {
   open: boolean;
-  items: OpenBottleRow[];
+  items: OpenBottleRow[] | PhysicalReconcileItem[];
   varianceThresholdOz?: number;
   onClose: () => void;
   restaurantId: string;
   userId: string;
+  inventoryContractVersion?: 1 | 2;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingId = "reconcile-modal-heading";
@@ -108,7 +111,7 @@ export function ReconcileModal({
         </header>
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-md py-md md:px-lg md:py-lg">
-          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog restaurantId={restaurantId} userId={userId} />
+          <ReconcileList initialItems={items} varianceThresholdOz={varianceThresholdOz} onStateChange={setEditState} inDialog restaurantId={restaurantId} userId={userId} inventoryContractVersion={inventoryContractVersion} />
         </div>
       </div>
       {/* This confirm flow is independent of ReconcileList's own dirty-state

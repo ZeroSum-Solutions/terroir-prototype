@@ -1,3 +1,5 @@
+import { serializePhysicalReconcileRequest } from "@/domains/cellar/reconcile-contract";
+
 /**
  * Reconciliation draft persistence — the safety net beneath
  * ReconcileNavigationGuard (BND-??? — Back/Forward draft loss).
@@ -30,9 +32,28 @@ export type ReconcileDraftEntries = Record<
   { newRemainingMl: number; note?: string }
 >;
 
+export type PhysicalReconcileDraftEntries = Record<string, {
+  expectedStateVersion: number;
+  targetRemainingMl: number;
+  note: string | null;
+}>;
+
+export type FrozenPhysicalReconcileOperation = {
+  operationId: string;
+  payload: string;
+};
+
+export type PhysicalReconcileDraft = {
+  version: 2;
+  entries: PhysicalReconcileDraftEntries;
+  frozenOperation: FrozenPhysicalReconcileOperation | null;
+};
+
 interface StoredDraft {
   savedAt: number;
-  entries: ReconcileDraftEntries;
+  version?: 1 | 2;
+  entries: ReconcileDraftEntries | PhysicalReconcileDraftEntries;
+  frozenOperation?: FrozenPhysicalReconcileOperation | null;
 }
 
 /**
@@ -65,6 +86,7 @@ function getStorage(): Storage | null {
 export type ReconcileDraftReadResult =
   | { kind: "none" }
   | { kind: "restored"; entries: ReconcileDraftEntries; count: number }
+  | { kind: "restored-physical"; draft: PhysicalReconcileDraft; count: number }
   | { kind: "expired"; count: number };
 
 /**
@@ -75,6 +97,7 @@ export type ReconcileDraftReadResult =
 export function readReconcileDraft(
   restaurantId: string,
   userId: string,
+  contractVersion: 1 | 2 = 1,
 ): ReconcileDraftReadResult {
   const storage = getStorage();
   if (!storage) return { kind: "none" };
@@ -91,13 +114,56 @@ export function readReconcileDraft(
     }
     const count = Object.keys(parsed.entries).length;
     if (count === 0) return { kind: "none" };
-    if (Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
+    const physicalDraft = contractVersion === 2 ? parsePhysicalDraft(parsed) : null;
+    if (contractVersion === 2 && parsed.version === 2 && !physicalDraft) {
+      clearReconcileDraft(restaurantId, userId);
+      return { kind: "none" };
+    }
+    if (!physicalDraft?.frozenOperation && Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
       clearReconcileDraft(restaurantId, userId);
       return { kind: "expired", count };
+    }
+    if (contractVersion === 2) {
+      if (!physicalDraft) {
+        clearReconcileDraft(restaurantId, userId);
+        return { kind: "none" };
+      }
+      return { kind: "restored-physical", draft: physicalDraft, count };
+    }
+    if (parsed.version === 2 || !isLegacyEntries(parsed.entries)) {
+      clearReconcileDraft(restaurantId, userId);
+      return { kind: "none" };
     }
     return { kind: "restored", entries: parsed.entries, count };
   } catch {
     return { kind: "none" };
+  }
+}
+
+export function persistPhysicalReconcileDraft(
+  restaurantId: string,
+  userId: string,
+  draft: PhysicalReconcileDraft,
+): boolean {
+  if (!draft.frozenOperation || !parsePhysicalDraft({
+    savedAt: Date.now(),
+    ...draft,
+  })) return false;
+  const storage = getStorage();
+  if (!storage) return false;
+  try {
+    storage.setItem(reconcileDraftKey(restaurantId, userId), JSON.stringify({
+      savedAt: Date.now(),
+      ...draft,
+    }));
+    const raw = storage.getItem(reconcileDraftKey(restaurantId, userId));
+    if (!raw) return false;
+    const stored = JSON.parse(raw) as Partial<StoredDraft>;
+    const verified = parsePhysicalDraft(stored);
+    return verified?.frozenOperation?.operationId === draft.frozenOperation.operationId &&
+      verified.frozenOperation.payload === draft.frozenOperation.payload;
+  } catch {
+    return false;
   }
 }
 
@@ -109,8 +175,10 @@ export function readReconcileDraft(
 export function writeReconcileDraft(
   restaurantId: string,
   userId: string,
-  entries: ReconcileDraftEntries,
+  value: ReconcileDraftEntries | PhysicalReconcileDraft,
 ): void {
+  const physical = isPhysicalDraftValue(value);
+  const entries = physical ? value.entries : value;
   if (Object.keys(entries).length === 0) {
     clearReconcileDraft(restaurantId, userId);
     return;
@@ -118,7 +186,9 @@ export function writeReconcileDraft(
   const storage = getStorage();
   if (!storage) return;
   try {
-    const draft: StoredDraft = { savedAt: Date.now(), entries };
+    const draft: StoredDraft = physical
+      ? { savedAt: Date.now(), ...value }
+      : { savedAt: Date.now(), version: 1, entries };
     storage.setItem(reconcileDraftKey(restaurantId, userId), JSON.stringify(draft));
   } catch {
     // Storage full or blocked — the in-memory `pending` state in
@@ -136,7 +206,13 @@ export function writeReconcileDraft(
 export function describeReconcileDraft(
   result: ReconcileDraftReadResult,
 ): { message: string; canUndo: boolean } | null {
-  if (result.kind === "restored") {
+  if (result.kind === "restored-physical" && result.draft.frozenOperation) {
+    return {
+      message: "Restored an unconfirmed prior reconciliation. Retry it before making other changes.",
+      canUndo: false,
+    };
+  }
+  if (result.kind === "restored" || result.kind === "restored-physical") {
     const n = result.count;
     return { message: `Restored ${n} unsaved count${n === 1 ? "" : "s"} from before you left.`, canUndo: true };
   }
@@ -145,6 +221,70 @@ export function describeReconcileDraft(
     return { message: `Your previous draft (${n} count${n === 1 ? "" : "s"}) was more than 12 hours old and was discarded.`, canUndo: false };
   }
   return null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function parsePhysicalDraft(parsed: Partial<StoredDraft>): PhysicalReconcileDraft | null {
+  if (parsed.version !== 2 || !isPhysicalEntries(parsed.entries)) return null;
+  const frozen = parsed.frozenOperation ?? null;
+  if (frozen !== null && (
+    typeof frozen !== "object" ||
+    !UUID.test(frozen.operationId) ||
+    typeof frozen.payload !== "string" ||
+    !payloadMatchesEntries(frozen.payload, parsed.entries)
+  )) return null;
+  return { version: 2, entries: parsed.entries, frozenOperation: frozen };
+}
+
+function isLegacyEntries(entries: unknown): entries is ReconcileDraftEntries {
+  return isRecord(entries) && Object.values(entries).every((entry) =>
+    isRecord(entry) && typeof entry.newRemainingMl === "number" &&
+    Number.isFinite(entry.newRemainingMl) &&
+    (entry.note === undefined || typeof entry.note === "string"),
+  );
+}
+
+function isPhysicalEntries(entries: unknown): entries is PhysicalReconcileDraftEntries {
+  return isRecord(entries) && Object.entries(entries).every(([id, entry]) =>
+    UUID.test(id) && isRecord(entry) &&
+    typeof entry.expectedStateVersion === "number" &&
+    Number.isSafeInteger(entry.expectedStateVersion) && entry.expectedStateVersion >= 0 &&
+    typeof entry.targetRemainingMl === "number" &&
+    Number.isInteger(entry.targetRemainingMl) && entry.targetRemainingMl >= 0 &&
+    (entry.note === null || typeof entry.note === "string"),
+  );
+}
+
+function payloadMatchesEntries(
+  payload: string,
+  entries: PhysicalReconcileDraftEntries,
+): boolean {
+  try {
+    const parsed = JSON.parse(payload) as { entries?: unknown };
+    if (!Array.isArray(parsed.entries) || parsed.entries.length !== Object.keys(entries).length) {
+      return false;
+    }
+    const expected = Object.entries(entries).map(([openBottleId, entry]) => ({
+      open_bottle_id: openBottleId,
+      expected_state_version: entry.expectedStateVersion,
+      target_remaining_ml: entry.targetRemainingMl,
+      note: entry.note,
+    }));
+    return JSON.stringify(parsed) === serializePhysicalReconcileRequest(expected);
+  } catch {
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPhysicalDraftValue(
+  value: ReconcileDraftEntries | PhysicalReconcileDraft,
+): value is PhysicalReconcileDraft {
+  return "version" in value && value.version === 2 && "entries" in value;
 }
 
 export function clearReconcileDraft(restaurantId: string, userId: string): void {

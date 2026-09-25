@@ -11,17 +11,14 @@ import { isCellarHealthSegment } from "@/lib/cellar-health/classify";
 import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { fetchCellarInventoryRows } from "./inventory-data";
 import { getInventoryContractVersion, listActivePhysicalBottles, summarizePhysicalBottlesByWine } from "@/domains/pours/physical-bottle-command";
+import { buildPhysicalReconcileItems, type PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
+import type { GridData } from "./grid-types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-import type { GridData } from "./grid-types";
-
 export const metadata: Metadata = { title: "Cellar" };
-
 const FETCH_PAGE_SIZE = 1000;
 
-// PostgREST caps a single response at db.max_rows (1000 — see
-// supabase/config.toml); unpaginated reads silently truncate on large
+// PostgREST caps a response at db.max_rows (1000); unpaginated reads silently truncate large
 // cellars (the OPP-3 lesson — see src/lib/cellar-health/recompute.ts,
 // which paginates the same wines/inventory_items tables for this exact
 // reason). Every potentially-large cellar read pages to exhaustion.
@@ -395,17 +392,21 @@ export default async function CellarPage() {
     };
   });
 
+  const wineById = new Map((wineRows ?? []).map((wine) => [wine.id, wine]));
+
   // Reconcile modal feed: only rows with a currently-open bottle. The
   // ReconcileList component already filters internally, but doing it
   // here keeps the prop simple.
-  const reconcileItems: OpenBottleRow[] = ((openBottleRows ?? []) as OpenBottleRow[]).filter(
-    (i) => i.open_remaining_ml !== null,
-  );
+  const reconcileItems: OpenBottleRow[] | PhysicalReconcileItem[] =
+    inventoryContractVersion === 2
+      ? buildPhysicalReconcileItems(activePhysicalBottles, wineRows ?? [])
+      : ((openBottleRows ?? []) as OpenBottleRow[]).filter(
+          (item) => item.open_remaining_ml !== null,
+        );
 
   // Bin grid view data (kept from the prior /cellar page so the Grid
   // toggle continues to work).
   // BND-200 / PERF — Map-based lookup replaces O(n*m) .find()
-  const wineById = new Map((wineRows ?? []).map((w) => [w.id, w]));
   const gridData: GridData = {};
   for (const item of inventoryRows ?? []) {
     if (!item.bin_location || !item.wine_id) continue;

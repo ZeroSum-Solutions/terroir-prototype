@@ -6,7 +6,8 @@ describe("Cellar partial-bottle row wiring", () => {
   it("keeps stored open remainder separate from recomputed theoretical remainder", () => {
     const source = readFileSync(resolve("src/app/(app)/cellar/page.tsx"), "utf8");
 
-    expect(source).toMatch(/open_remaining_ml:\s*directOpen\?\.remaining_ml\s*\?\?\s*ob\?\.open_remaining_ml\s*\?\?\s*null/);
+    expect(source).toMatch(/open_remaining_ml:\s*activeBottles\.length\s*>\s*0\s*\?\s*activeOpenMl\s*:\s*ob\?\.open_remaining_ml\s*\?\?\s*null/);
     expect(source).toMatch(/theoretical_remaining_ml:\s*directOpen\s*\?\s*theoreticalRemaining\(/);
+    expect(source).toContain("buildPhysicalReconcileItems(activePhysicalBottles, wineRows ?? [])");
   });
 });

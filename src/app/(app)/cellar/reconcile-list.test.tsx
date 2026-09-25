@@ -4,7 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ML_PER_OZ } from "@/lib/units";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
-import { readReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
+import { readReconcileDraft, reconcileDraftKey, writeReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
+import { formatPhysicalBottleId } from "@/domains/pours/physical-bottle-command";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 
 vi.mock("next/navigation", () => ({
   // `push` is exercised by ReconcileNavigationGuard's discard-confirm flow.
@@ -33,9 +35,40 @@ const item: OpenBottleRow = {
   glass_pour_ml: 148,
   pour_size_mode: "fixed",
 };
+const BOTTLE_A = "00000000-0000-4000-8000-00000000000f";
+const BOTTLE_B = "00000000-0000-4000-8000-000000000010";
+const OPERATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const physicalItems: PhysicalReconcileItem[] = [BOTTLE_A, BOTTLE_B].map((id, index) => ({
+  openBottleId: id,
+  wineId: "11111111-1111-4111-8111-111111111111",
+  producer: "Test Producer",
+  name: "Sibling Wine",
+  vintage: 2022,
+  nominalCapacityMl: 750,
+  remainingMl: index === 0 ? 500 : 400,
+  openedAt: "2026-09-24T12:00:00.000Z",
+  preservationMethod: "none",
+  sourceProvenance: "known",
+  sourceBinLocation: index === 0 ? "A1" : "A2",
+  stateVersion: index + 3,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
+
+function mockSessionStorage(overrides: Partial<Storage>) {
+  const actual = window.sessionStorage;
+  const storage: Storage = {
+    get length() { return actual.length; },
+    clear: actual.clear.bind(actual),
+    getItem: actual.getItem.bind(actual),
+    key: actual.key.bind(actual),
+    removeItem: actual.removeItem.bind(actual),
+    setItem: actual.setItem.bind(actual),
+    ...overrides,
+  };
+  return vi.spyOn(window, "sessionStorage", "get").mockReturnValue(storage);
+}
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -48,6 +81,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function setInputValueOn(container: HTMLElement, ml: number) {
@@ -241,6 +275,236 @@ describe("ReconcileList draft persistence (Back/Forward safety net)", () => {
 
     getSpy.mockRestore();
     setSpy.mockRestore();
+  });
+});
+
+describe("ReconcileList physical bottle mode", () => {
+  it("renders identical-wine siblings as separate stable bottle rows", async () => {
+    await act(async () => root.render(
+      <ReconcileList initialItems={physicalItems} inventoryContractVersion={2} {...ids} />,
+    ));
+
+    expect(container.querySelectorAll("li")).toHaveLength(2);
+    for (const bottle of physicalItems) {
+      const identity = container.querySelector(`[data-physical-bottle-id="${bottle.openBottleId}"]`);
+      expect(identity?.textContent).toBe(formatPhysicalBottleId(bottle.openBottleId));
+      expect(identity?.closest("li")?.textContent).toContain(bottle.sourceBinLocation);
+    }
+  });
+
+  it("retries one frozen UUID and byte-identical payload after loss, reorder, and remount", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(OPERATION_ID);
+    const fetcher = vi.fn()
+      .mockRejectedValueOnce(new Error("response lost"))
+      .mockImplementationOnce(async (_url: string, init: RequestInit) => {
+        const operationId = new Headers(init.headers).get("Idempotency-Key")!;
+        const body = JSON.parse(String(init.body)) as { entries: Array<{
+          open_bottle_id: string;
+          expected_state_version: number;
+          target_remaining_ml: number;
+        }> };
+        return {
+          ok: true,
+          headers: new Headers({
+            "Idempotency-Key": operationId,
+            "Idempotency-Replayed": "true",
+          }),
+          json: async () => ({
+            operation_id: operationId,
+            command: "reconcile_batch",
+            entries: body.entries.map((entry, index) => ({
+              entry_ordinal: index,
+              open_bottle_id: entry.open_bottle_id,
+              wine_id: physicalItems[0].wineId,
+              pour_event_id: `${index + 3}3333333-3333-4333-8333-333333333333`,
+              remaining_ml: entry.target_remaining_ml,
+              state_version: entry.expected_state_version + 1,
+            })),
+          }),
+        };
+      });
+    vi.stubGlobal("fetch", fetcher);
+    await act(async () => root.render(
+      <ReconcileList initialItems={physicalItems} inventoryContractVersion={2} {...ids} />,
+    ));
+    const rowA = container.querySelector(`[data-physical-bottle-id="${BOTTLE_A}"]`)!.closest("li")!;
+    const rowB = container.querySelector(`[data-physical-bottle-id="${BOTTLE_B}"]`)!.closest("li")!;
+    setInputValue(rowA.querySelector('input[type="number"]')!, 111);
+    setInputValue(rowB.querySelector('input[type="number"]')!, 222);
+    const save = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save 2 changes")!;
+    await act(async () => save.click());
+
+    const firstInit = fetcher.mock.calls[0][1] as RequestInit;
+    const firstPayload = String(firstInit.body);
+    expect(new Headers(firstInit.headers).get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(readReconcileDraft(RESTAURANT_ID, USER_ID, 2)).toMatchObject({
+      kind: "restored-physical",
+      draft: { frozenOperation: { operationId: OPERATION_ID, payload: firstPayload } },
+    });
+
+    act(() => root.unmount());
+    container.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const refreshed = [...physicalItems].reverse().map((bottle) => ({ ...bottle, stateVersion: 99 }));
+    await act(async () => root.render(
+      <ReconcileList initialItems={refreshed} inventoryContractVersion={2} {...ids} />,
+    ));
+    const actualStorage = window.sessionStorage;
+    const setItem = vi.fn((key: string, value: string) => actualStorage.setItem(key, value));
+    mockSessionStorage({ setItem });
+    await act(async () => root.render(
+      <ReconcileList initialItems={[]} inventoryContractVersion={2} {...ids} />,
+    ));
+    const retry = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Retry prior reconciliation",
+    )!;
+    expect(container.querySelector("fieldset")?.hasAttribute("disabled")).toBe(true);
+    await act(async () => retry.click());
+
+    const retryInit = fetcher.mock.calls[1][1] as RequestInit;
+    expect(String(retryInit.body)).toBe(firstPayload);
+    expect(new Headers(retryInit.headers).get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(setItem).toHaveBeenCalledWith(reconcileDraftKey(RESTAURANT_ID, USER_ID), expect.any(String));
+    expect(JSON.parse(setItem.mock.calls[0][1]).frozenOperation).toEqual({
+      operationId: OPERATION_ID,
+      payload: firstPayload,
+    });
+    expect(readReconcileDraft(RESTAURANT_ID, USER_ID, 2)).toEqual({ kind: "none" });
+    await act(async () => root.render(
+      <ReconcileList initialItems={refreshed} inventoryContractVersion={2} {...ids} />,
+    ));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("2 bottles reconciled");
+    expect(container.textContent).not.toContain("Retry prior reconciliation");
+  });
+
+  it("retains the frozen draft when a successful HTTP response is incomplete", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(OPERATION_ID);
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      headers: new Headers({
+        "Idempotency-Key": OPERATION_ID,
+        "Idempotency-Replayed": "false",
+      }),
+      json: async () => ({ operation_id: OPERATION_ID, command: "reconcile_batch", entries: [] }),
+    })));
+    await act(async () => root.render(
+      <ReconcileList initialItems={[physicalItems[0]]} inventoryContractVersion={2} {...ids} />,
+    ));
+    setInputValueOn(container, 123);
+    const save = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save 1 change")!;
+    await act(async () => save.click());
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("could not be verified");
+    expect(readReconcileDraft(RESTAURANT_ID, USER_ID, 2)).toMatchObject({
+      kind: "restored-physical",
+      draft: { frozenOperation: { operationId: OPERATION_ID } },
+    });
+  });
+
+  it("removes a restored Undo exit as soon as an operation becomes unresolved", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(OPERATION_ID);
+    writeReconcileDraft(RESTAURANT_ID, USER_ID, {
+      version: 2,
+      entries: { [BOTTLE_A]: {
+        expectedStateVersion: physicalItems[0].stateVersion,
+        targetRemainingMl: 123,
+        note: null,
+      } },
+      frozenOperation: null,
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("response lost")));
+    await act(async () => root.render(
+      <ReconcileList initialItems={[physicalItems[0]]} inventoryContractVersion={2} {...ids} />,
+    ));
+    expect(container.textContent).toContain("Restored 1 unsaved count");
+    expect(container.textContent).toContain("Undo");
+    const save = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save 1 change")!;
+    await act(async () => save.click());
+
+    expect(container.textContent).toContain("Retry prior reconciliation");
+    expect(container.textContent).not.toContain("Undo");
+    expect(readReconcileDraft(RESTAURANT_ID, USER_ID, 2)).toMatchObject({
+      kind: "restored-physical",
+      draft: { frozenOperation: { operationId: OPERATION_ID } },
+    });
+  });
+
+  it.each(["setItem", "getItem"] as const)(
+    "does not POST when retry-safe %s persistence fails",
+    async (method) => {
+      const fetcher = vi.fn();
+      vi.stubGlobal("fetch", fetcher);
+      await act(async () => root.render(
+        <ReconcileList initialItems={[physicalItems[0]]} inventoryContractVersion={2} {...ids} />,
+      ));
+      setInputValueOn(container, 123);
+      const storage = mockSessionStorage({ [method]: () => {
+        throw new Error("storage unavailable");
+      } });
+      const save = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save 1 change")!;
+      await act(async () => save.click());
+
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain("was not sent");
+      expect(container.textContent).not.toContain("Retry prior reconciliation");
+      expect(container.querySelector("fieldset")?.hasAttribute("disabled")).toBe(false);
+      storage.mockRestore();
+    },
+  );
+
+  it("keeps a frozen retry and sends nothing when re-persistence fails", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const payload = JSON.stringify({ entries: [{
+      open_bottle_id: BOTTLE_A,
+      expected_state_version: physicalItems[0].stateVersion,
+      target_remaining_ml: 123,
+      note: null,
+    }] });
+    writeReconcileDraft(RESTAURANT_ID, USER_ID, {
+      version: 2,
+      entries: { [BOTTLE_A]: {
+        expectedStateVersion: physicalItems[0].stateVersion,
+        targetRemainingMl: 123,
+        note: null,
+      } },
+      frozenOperation: { operationId: OPERATION_ID, payload },
+    });
+    await act(async () => root.render(
+      <ReconcileList initialItems={[]} inventoryContractVersion={2} {...ids} />,
+    ));
+    const setItem = mockSessionStorage({ setItem: () => {
+      throw new Error("storage unavailable");
+    } });
+    const retry = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Retry prior reconciliation",
+    )!;
+    await act(async () => retry.click());
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Retry prior reconciliation");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("was not sent");
+    setItem.mockRestore();
+  });
+
+  it("does not freeze or POST a fractional physical volume", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await act(async () => root.render(
+      <ReconcileList initialItems={[physicalItems[0]]} inventoryContractVersion={2} {...ids} />,
+    ));
+    const input = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    act(() => { setter?.call(input, "100.5"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    const save = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save 1 change")!;
+    await act(async () => save.click());
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Check each bottle");
+    expect(container.textContent).not.toContain("Retry prior reconciliation");
+    expect(container.querySelector("fieldset")?.hasAttribute("disabled")).toBe(false);
   });
 });
 

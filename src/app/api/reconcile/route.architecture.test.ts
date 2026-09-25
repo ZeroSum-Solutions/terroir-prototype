@@ -11,10 +11,11 @@ const routeSource = readFileSync(
 describe("/api/reconcile architecture boundary", () => {
   it("keeps transactional RPC and revalidation orchestration out of the route", () => {
     expect(routeSource).toContain("@/domains/cellar/reconcile-service");
+    expect(routeSource).toContain("getInventoryContractVersion");
+    expect(routeSource).toContain("reconcilePhysicalBottles");
     expect(routeSource).not.toContain("@sentry/nextjs");
     expect(routeSource).not.toContain("next/cache");
     expect(routeSource).not.toContain("revalidateAutoEightysixedWines");
     expect(routeSource).not.toContain(".rpc(");
   });
 });
-

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { isClosingWindow, isHolding } from "@/lib/drink-window/status";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 import type { CellarWineRow } from "./types";
 import { CellarList, FILTER_LABELS } from "./cellar-list";
 import { drawerStateKey, WineDetailDrawer } from "./wine-detail-drawer";
@@ -47,7 +48,7 @@ export function CellarShell({
   inventoryContractVersion,
 }: {
   rows: CellarWineRow[];
-  reconcileItems: OpenBottleRow[];
+  reconcileItems: OpenBottleRow[] | PhysicalReconcileItem[];
   cellarConfig: { id: string; rows: number; columns: number; name: string; lowStockThreshold: number; reconcileVarianceThresholdOz: number } | null;
   gridData: GridData;
   restaurantName: string;
@@ -447,6 +448,7 @@ export function CellarShell({
         items={reconcileItems}
         varianceThresholdOz={cellarConfig?.reconcileVarianceThresholdOz ?? 1.0}
         onClose={() => setReconcileOpen(false)} restaurantId={restaurantId} userId={userId}
+        inventoryContractVersion={inventoryContractVersion}
       />
 
       {isOwner && (

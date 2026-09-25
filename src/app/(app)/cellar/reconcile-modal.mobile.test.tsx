@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ReconcileModal } from "./reconcile-modal";
 import { readReconcileDraft } from "@/lib/reconcile-draft/draft-storage";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import { formatPhysicalBottleId } from "@/domains/pours/physical-bottle-command";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const RESTAURANT_ID = "restaurant-1";
@@ -69,4 +71,32 @@ it("clears the persisted draft when the modal's own discard is confirmed, so reo
   await act(async () => root.render(<ReconcileModal open items={[item]} onClose={close} restaurantId={RESTAURANT_ID} userId={USER_ID} />));
   expect(container.textContent).not.toContain("Restored");
   expect(container.querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe("500");
+});
+
+it("passes exact physical sibling DTOs through the modal without collapsing their identities", async () => {
+  const physicalItems: PhysicalReconcileItem[] = [
+    "00000000-0000-4000-8000-00000000000f",
+    "00000000-0000-4000-8000-000000000010",
+  ].map((openBottleId, index) => ({
+    openBottleId,
+    wineId: "11111111-1111-4111-8111-111111111111",
+    producer: "Producer",
+    name: "Wine",
+    vintage: 2020,
+    nominalCapacityMl: 750,
+    remainingMl: 500 - index * 100,
+    openedAt: "2026-09-24T12:00:00.000Z",
+    preservationMethod: "none",
+    sourceProvenance: "known",
+    sourceBinLocation: null,
+    stateVersion: index + 2,
+  }));
+
+  await act(async () => root.render(
+    <ReconcileModal open items={physicalItems} inventoryContractVersion={2} onClose={close} restaurantId={RESTAURANT_ID} userId={USER_ID} />,
+  ));
+
+  expect(container.querySelectorAll("li")).toHaveLength(2);
+  expect(container.textContent).toContain(formatPhysicalBottleId(physicalItems[0].openBottleId));
+  expect(container.textContent).toContain(formatPhysicalBottleId(physicalItems[1].openBottleId));
 });

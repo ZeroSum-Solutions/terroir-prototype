@@ -13,8 +13,12 @@ business workflows. Adapter modules own external/provider mechanics.
   version 2 routes Open, Pour, close/discard, and receipt-bound Undo through
   `execute_physical_bottle_command` with exact event, bottle, and wine identities.
   Version 2 is not active yet.
-- `src/domains/cellar`: reconcile transaction orchestration around
-  `reconcile_open_bottles_batch`.
+- `src/domains/cellar`: versioned reconciliation contracts and orchestration.
+  Version 1 still uses the wine-keyed `reconcile_open_bottles_batch`. The
+  version 2 application boundary validates and canonicalizes one exact-bottle
+  batch before calling `execute_physical_reconciliation_batch`, then rejects any
+  result that does not match the requested operation, order, identities, volume,
+  and next state version.
 - `src/domains/offline`: the versioned private projection contract, IndexedDB
   policy and driver, and deny-only device marker. The marker is not authentication
   or positive offline eligibility.
@@ -47,6 +51,9 @@ business workflows. Adapter modules own external/provider mechanics.
   physical placement, URL-backed cellar views, and health classification.
 - `src/lib/reconcile-queue` and `src/lib/reconcile-ledger`: derived issue
   ranking plus reversible accept and undo workflows.
+- `src/lib/reconcile-draft`: restaurant-and-user-scoped reconciliation drafts.
+  Version 2 freezes one operation UUID and canonical payload for unresolved
+  exact-bottle batches and verifies the persisted copy before each send.
 - `src/lib/partial-bottles` and `src/lib/member-analytics`: close-out yield
   calculations and member-attributed operational metrics.
 - `src/lib/pricing-recommendations`: pricing classification, timing, and
@@ -128,7 +135,27 @@ directly. Wine-list PDF generation still reaches Puppeteer through
 
 - The legacy end-of-shift `POST /api/reconcile` path calls
   `reconcile_open_bottles_batch` through `src/domains/cellar/reconcile-service.ts`;
-  that batch is one database transaction.
+  that version 1 contract and response remain unchanged.
+- The version 2 `POST /api/reconcile` source checkpoint requires one operation
+  UUID and 1-100 exact-bottle entries with captured state versions. It submits
+  the canonical bottle-sorted set through one
+  `execute_physical_reconciliation_batch` call and accepts only a strict result
+  for the same operation, entry order, bottle identities, target volumes, and
+  incremented state versions. This is the application contract for an atomic
+  batch; the current source and mocked tests do not prove the SQL transaction,
+  RLS, concurrency, or replay implementation.
+- Before an initial version 2 request or retry, the client writes and reads back
+  the same operation UUID and canonical payload in scoped session storage. A
+  missing, throwing, or unverifiable storage write prevents the POST. An
+  unresolved frozen operation survives remounts and the legacy 12-hour draft
+  expiry, and refreshed, reordered, or missing rows do not change its retry
+  payload. Invalid new input remains editable and creates no frozen operation or
+  request.
+- The bounded version 2 source checkpoint passed 98 focused native tests and
+  independent source review. Terminal stale/conflict recovery still needs an
+  explicit workflow; the checkpoint keeps the unresolved operation rather than
+  clearing it. This checkpoint does not claim SQL, browser, runtime-recovery,
+  contract-version cutover, Phase C, or full D1 completion.
 - The newer reconciliation queue does not use that RPC. Accept and undo in
   `src/lib/reconcile-ledger/index.ts` issue ordered table reads, subject updates,
   and ledger inserts through the authenticated Supabase client, with explicit
