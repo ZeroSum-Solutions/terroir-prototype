@@ -4,8 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidateAutoEightysixedWines } from "@/lib/api/auto-eightysix-revalidation";
 import type { Database } from "@/types/database";
 import {
+  executeCompletedInventoryReplay,
   executeInventoryCommand,
   InventoryCommandError,
+  isLegacyInventoryCommandRetired,
 } from "./inventory-command";
 import {
   executePhysicalBottleCommand,
@@ -74,7 +76,8 @@ export async function recordPour(input: RecordPourInput) {
   } = input;
   const sinceTs = new Date().toISOString();
   const contractVersion = await getInventoryContractVersion(supabase);
-  const result = contractVersion === 2
+  const usePhysicalCommand = contractVersion === 2 && openBottleId !== undefined;
+  const result = usePhysicalCommand
     ? await executePhysicalBottleCommand({
         supabase,
         operationId,
@@ -103,14 +106,14 @@ export async function recordPour(input: RecordPourInput) {
   return {
     openBottle: result.openBottle,
     replayed: result.replayed,
-    eventId: contractVersion === 2 ? result.pourEventIds[0] : null,
+    eventId: usePhysicalCommand ? result.pourEventIds[0] : null,
   };
 
   async function executeLegacyPour() {
     if (openBottleId !== undefined) {
       throw new InventoryCommandError("invalid_inventory_command");
     }
-    return executeInventoryCommand({
+    const legacyInput = {
       supabase,
       operationId,
       restaurantId,
@@ -119,7 +122,10 @@ export async function recordPour(input: RecordPourInput) {
       ml,
       note,
       preservationMethod,
-    });
+    };
+    return contractVersion === 2
+      ? executeCompletedInventoryReplay(legacyInput, { wineId })
+      : executeInventoryCommand(legacyInput);
   }
 }
 
@@ -131,27 +137,28 @@ export async function openBottle(input: {
   preservationMethod: string;
 }) {
   const contractVersion = await getInventoryContractVersion(input.supabase);
-  const result = contractVersion === 2
-    ? await executePhysicalBottleCommand({
-        supabase: input.supabase,
-        operationId: input.operationId,
-        restaurantId: input.restaurantId,
-        command: "open",
-        wineId: input.wineId,
-        preservationMethod: input.preservationMethod,
-      })
-    : await executeInventoryCommand({
-        supabase: input.supabase,
-        operationId: input.operationId,
-        restaurantId: input.restaurantId,
-        command: "open",
-        wineId: input.wineId,
-        preservationMethod: input.preservationMethod,
-      });
+  const legacyInput = {
+    supabase: input.supabase,
+    operationId: input.operationId,
+    restaurantId: input.restaurantId,
+    command: "open" as const,
+    wineId: input.wineId,
+    preservationMethod: input.preservationMethod,
+  };
+  let result;
+  if (contractVersion === 1) {
+    result = await executeInventoryCommand(legacyInput);
+  } else {
+    try {
+      result = await executeCompletedInventoryReplay(legacyInput, { wineId: input.wineId });
+    } catch (error) {
+      if (!isLegacyInventoryCommandRetired(error)) throw error;
+      result = await executePhysicalBottleCommand(legacyInput);
+    }
+  }
   if (!result.openBottle) {
     throw new InventoryCommandError("invalid_inventory_command_result");
   }
-
   revalidatePath("/cellar/open");
   return { openBottle: result.openBottle, replayed: result.replayed };
 }
@@ -262,7 +269,7 @@ export async function closeOpenBottle(input: CloseOpenBottleInput) {
     reasonCodeId,
   } = input;
 
-  if (contractVersion === 2) {
+  if (contractVersion === 2 && wineId !== undefined) {
     if (!wineId) throw new InventoryCommandError("invalid_physical_command");
     const result = await executePhysicalBottleCommand({
       supabase, operationId, restaurantId, command: "close", wineId,
@@ -293,18 +300,24 @@ export async function closeOpenBottle(input: CloseOpenBottleInput) {
     throw new PourForbiddenError();
   }
 
-  const result = await executeInventoryCommand({
+  const legacyInput = {
     supabase,
     operationId,
     restaurantId,
-    command: "close",
+    command: "close" as const,
     wineId: bottle.wine_id,
     expectedOpenBottleId: bottleId,
     expectedOpenedAt,
     actualRemainingMl,
     writtenOffMl,
     reasonCodeId,
-  });
+  };
+  const result = contractVersion === 2
+    ? await executeCompletedInventoryReplay(legacyInput, {
+      expectedOpenBottleId: bottleId,
+      expectedOpenedAt,
+    })
+    : await executeInventoryCommand(legacyInput);
   if (!result.closeout) {
     throw new InventoryCommandError("invalid_inventory_command_result");
   }
@@ -329,7 +342,7 @@ export type DiscardOpenBottleInput = {
 export async function discardOpenBottle(input: DiscardOpenBottleInput) {
   const { supabase, operationId, restaurantId, bottleId, expectedOpenedAt,
     wineId, contractVersion = 1 } = input;
-  if (contractVersion === 2) {
+  if (contractVersion === 2 && wineId !== undefined) {
     if (!wineId) throw new InventoryCommandError("invalid_physical_command");
     const result = await executePhysicalBottleCommand({
       supabase, operationId, restaurantId, command: "discard", wineId,
@@ -353,15 +366,21 @@ export async function discardOpenBottle(input: DiscardOpenBottleInput) {
   if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
   if (!bottle) throw new PourNotFoundError("Bottle not found.");
 
-  const result = await executeInventoryCommand({
+  const legacyInput = {
     supabase,
     operationId,
     restaurantId,
-    command: "discard",
+    command: "discard" as const,
     wineId: bottle.wine_id,
     expectedOpenBottleId: bottleId,
     expectedOpenedAt,
-  });
+  };
+  const result = contractVersion === 2
+    ? await executeCompletedInventoryReplay(legacyInput, {
+      expectedOpenBottleId: bottleId,
+      expectedOpenedAt,
+    })
+    : await executeInventoryCommand(legacyInput);
   if (!result.openBottle) {
     throw new InventoryCommandError("invalid_inventory_command_result");
   }

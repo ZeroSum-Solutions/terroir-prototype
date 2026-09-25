@@ -28,6 +28,15 @@ export type InventoryCommandResult = {
   closeout: Record<string, Json> | null;
 };
 
+export type CompletedInventoryReplayExpectation = {
+  operationId: string;
+  restaurantId: string;
+  command: InventoryCommandName;
+  wineId?: string;
+  expectedOpenBottleId?: string;
+  expectedOpenedAt?: string;
+};
+
 export class InventoryCommandError extends Error {
   readonly databaseCode?: string;
 
@@ -36,6 +45,64 @@ export class InventoryCommandError extends Error {
     this.name = "InventoryCommandError";
     this.databaseCode = databaseCode;
   }
+}
+
+export function isLegacyInventoryCommandRetired(
+  error: unknown,
+): error is InventoryCommandError {
+  return error instanceof InventoryCommandError &&
+    error.databaseCode === "P0001" &&
+    error.message.trim() === "legacy_inventory_command_retired";
+}
+
+export function validateCompletedInventoryReplay(
+  result: InventoryCommandResult,
+  expected: CompletedInventoryReplayExpectation,
+): InventoryCommandResult {
+  const bottle = result.openBottle;
+  if (
+    result.replayed !== true ||
+    result.operationId !== expected.operationId ||
+    result.command !== expected.command ||
+    bottle === null ||
+    bottle.restaurant_id !== expected.restaurantId ||
+    (expected.wineId !== undefined && bottle.wine_id !== expected.wineId) ||
+    (expected.expectedOpenBottleId !== undefined &&
+      bottle.id !== expected.expectedOpenBottleId) ||
+    (expected.expectedOpenedAt !== undefined &&
+      !isSameInstant(bottle.opened_at, expected.expectedOpenedAt))
+  ) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
+  }
+
+  const closeout = result.closeout;
+  if (closeout !== null && (
+    closeout.restaurant_id !== expected.restaurantId ||
+    (expected.expectedOpenBottleId !== undefined &&
+      closeout.open_bottle_id !== expected.expectedOpenBottleId) ||
+    (expected.expectedOpenedAt !== undefined &&
+      !isSameInstant(closeout.opened_at, expected.expectedOpenedAt))
+  )) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
+  }
+
+  return result;
+}
+
+export async function executeCompletedInventoryReplay(
+  input: InventoryCommandInput,
+  binding: Pick<
+    CompletedInventoryReplayExpectation,
+    "wineId" | "expectedOpenBottleId" | "expectedOpenedAt"
+  >,
+): Promise<InventoryCommandResult> {
+  const result = await executeInventoryCommand(input);
+  return validateCompletedInventoryReplay(result, {
+    operationId: input.operationId,
+    restaurantId: input.restaurantId,
+    command: input.command,
+    ...binding,
+  });
 }
 
 export async function executeInventoryCommand(
@@ -110,4 +177,11 @@ function isRecord(value: Json | null | undefined): value is Record<string, Json>
 function isCommand(value: Json | undefined): value is InventoryCommandName {
   return value === "open" || value === "pour" || value === "spill" ||
     value === "close" || value === "discard";
+}
+
+function isSameInstant(value: Json | undefined, expected: string): boolean {
+  if (typeof value !== "string") return false;
+  const actualMs = Date.parse(value);
+  const expectedMs = Date.parse(expected);
+  return Number.isFinite(actualMs) && actualMs === expectedMs;
 }

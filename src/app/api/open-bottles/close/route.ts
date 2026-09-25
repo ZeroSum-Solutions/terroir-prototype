@@ -33,6 +33,7 @@ const PhysicalBodySchema = z.strictObject({
   written_off_ml: z.number().int().nonnegative().max(2_147_483_647).default(0),
   reason_code_id: z.string().uuid().optional(),
 });
+const Contract2BodySchema = z.union([LegacyBodySchema, PhysicalBodySchema]);
 
 export async function POST(request: NextRequest) {
   return withApiHandler(() => postCloseout(request));
@@ -55,7 +56,7 @@ async function postCloseout(request: NextRequest) {
   }
   const parsed = await parseJson(
     request,
-    contractVersion === 2 ? PhysicalBodySchema : LegacyBodySchema,
+    contractVersion === 2 ? Contract2BodySchema : LegacyBodySchema,
     { message: "Invalid body." },
   );
   if (!parsed.ok) return withInventoryHeaders(parsed.response, operationId);

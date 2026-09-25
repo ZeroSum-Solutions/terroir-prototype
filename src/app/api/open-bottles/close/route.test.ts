@@ -14,6 +14,7 @@ const { POST } = await import("./route");
 const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
+const HISTORICAL_WINE_ID = "44444444-4444-4444-8444-444444444444";
 const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
 const REASON_ID = "77777777-7777-4777-8777-777777777777";
 const OPENED_AT = "2026-09-23T12:00:00.000Z";
@@ -47,10 +48,20 @@ function makeSupabase(options: {
           command: "close",
           pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
           replayed: options.replayed ?? false,
+          open_bottle: {
+            id: BOTTLE_ID,
+            restaurant_id: RESTAURANT_ID,
+            wine_id: WINE_ID,
+            remaining_ml: 0,
+            opened_at: OPENED_AT,
+            closed_at: "2026-09-23T13:00:00.000Z",
+          },
           closeout: {
             id: "closeout-1",
+            restaurant_id: RESTAURANT_ID,
             open_bottle_id: BOTTLE_ID,
             wine_id: WINE_ID,
+            opened_at: OPENED_AT,
             actual_remaining_ml: 570,
           },
         },
@@ -222,6 +233,113 @@ describe("POST /api/open-bottles/close", () => {
       wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, expected_opened_at: OPENED_AT,
       actual_remaining_ml: 570, written_off_ml: 0,
     }))).status).toBe(400);
+  });
+
+  it("accepts the strict legacy body under contract 2 for a completed replay", async () => {
+    const supabase = makeSupabase({ contractVersion: 2, replayed: true });
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect((await response.json()).closeout).toMatchObject({
+      open_bottle_id: BOTTLE_ID,
+      wine_id: WINE_ID,
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "close",
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+      }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("accepts a merged-wine legacy close replay without binding mutable wine identity", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    supabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "current_inventory_contract_version"
+        ? { data: 2, error: null }
+        : {
+            data: {
+              operation_id: OPERATION_ID,
+              command: "close",
+              pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+              replayed: true,
+              open_bottle: {
+                id: BOTTLE_ID,
+                restaurant_id: RESTAURANT_ID,
+                wine_id: HISTORICAL_WINE_ID,
+                remaining_ml: 0,
+                opened_at: OPENED_AT,
+                closed_at: "2026-09-23T13:00:00.000Z",
+              },
+              closeout: {
+                id: "closeout-1",
+                restaurant_id: RESTAURANT_ID,
+                wine_id: HISTORICAL_WINE_ID,
+                open_bottle_id: BOTTLE_ID,
+                opened_at: OPENED_AT,
+                actual_remaining_ml: 570,
+              },
+            },
+            error: null,
+          },
+    ));
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect((await response.json()).closeout.wine_id).toBe(HISTORICAL_WINE_ID);
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("returns 409 for a fresh legacy close under contract 2 without physical fallback", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      rpcError: { code: "P0001", message: "legacy_inventory_command_retired" },
+    });
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("legacy_inventory_command_retired");
+    expect(response.headers.get("Idempotency-Replayed")).toBe("false");
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("keeps a non-retirement legacy close error terminal under contract 2", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      rpcError: { code: "P0001", message: "inventory_operation_actor_conflict" },
+    });
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("idempotency_conflict");
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
   });
 });
 

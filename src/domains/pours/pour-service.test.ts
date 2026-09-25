@@ -25,6 +25,8 @@ const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
 const WINE_ID = "55555555-5555-4555-8555-555555555555";
 const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
 const OPENED_AT = "2026-09-23T12:00:00.000Z";
+const HISTORICAL_WINE_ID = "44444444-4444-4444-8444-444444444444";
+const OTHER_RESTAURANT_ID = "33333333-3333-4333-8333-333333333333";
 
 function commandResult(command: "open" | "pour" | "spill" | "close" | "discard") {
   return {
@@ -42,6 +44,50 @@ function commandResult(command: "open" | "pour" | "spill" | "close" | "discard")
             closed_at: command === "discard" ? "2026-09-23T13:00:00.000Z" : null,
           },
         }),
+  };
+}
+
+function completedLegacyReplay(
+  command: "open" | "pour" | "spill" | "close" | "discard",
+  overrides: {
+    operationId?: string;
+    resultCommand?: "open" | "pour" | "spill" | "close" | "discard";
+    replayed?: boolean;
+    restaurantId?: string;
+    wineId?: string;
+    bottleId?: string;
+    openedAt?: string;
+    closeoutRestaurantId?: string;
+    closeoutBottleId?: string;
+    closeoutOpenedAt?: string;
+  } = {},
+) {
+  const restaurantId = overrides.restaurantId ?? RESTAURANT_ID;
+  const wineId = overrides.wineId ?? WINE_ID;
+  const bottleId = overrides.bottleId ?? BOTTLE_ID;
+  const openedAt = overrides.openedAt ?? OPENED_AT;
+  return {
+    operation_id: overrides.operationId ?? OPERATION_ID,
+    command: overrides.resultCommand ?? command,
+    pour_event_ids: ["77777777-7777-4777-8777-777777777777"],
+    replayed: overrides.replayed ?? true,
+    open_bottle: {
+      id: bottleId,
+      restaurant_id: restaurantId,
+      wine_id: wineId,
+      remaining_ml: command === "discard" || command === "close" ? 0 : 600,
+      opened_at: openedAt,
+      closed_at: command === "discard" || command === "close"
+        ? "2026-09-23T13:00:00.000Z"
+        : null,
+    },
+    closeout: command === "close" ? {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      restaurant_id: overrides.closeoutRestaurantId ?? restaurantId,
+      wine_id: wineId,
+      open_bottle_id: overrides.closeoutBottleId ?? bottleId,
+      opened_at: overrides.closeoutOpenedAt ?? openedAt,
+    } : null,
   };
 }
 
@@ -191,11 +237,20 @@ describe("inventory command services", () => {
     );
   });
 
-  it("keeps Open explicit in contract 2 and returns the exact new bottle", async () => {
-    const supabase = makeRpcSupabase({
-      data: physicalCommandResult("open"),
-      error: null,
-    }, 2);
+  it("opens a fresh physical bottle only after the legacy replay probe is retired", async () => {
+    const supabase = makeRpcSupabase({ data: null, error: null }, 2);
+    supabase.rpc.mockImplementation((name: string) => {
+      if (name === "current_inventory_contract_version") {
+        return Promise.resolve({ data: 2, error: null });
+      }
+      if (name === "execute_inventory_command") {
+        return Promise.resolve({
+          data: null,
+          error: { code: "P0001", message: "legacy_inventory_command_retired" },
+        });
+      }
+      return Promise.resolve({ data: physicalCommandResult("open"), error: null });
+    });
     await expect(openBottle({
       supabase: supabase as never,
       operationId: OPERATION_ID,
@@ -204,12 +259,160 @@ describe("inventory command services", () => {
       preservationMethod: "argon",
     })).resolves.toMatchObject({ openBottle: { id: BOTTLE_ID } });
     expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "open",
+        p_wine_id: WINE_ID,
+      }),
+    );
+    expect(supabase.rpc).toHaveBeenCalledWith(
       "execute_physical_bottle_command",
       expect.objectContaining({
         p_command: "open",
         p_open_bottle_id: undefined,
         p_preservation_method: "argon",
       }),
+    );
+  });
+
+  it("replays a completed version-1 open without reaching the physical writer", async () => {
+    const supabase = makeRpcSupabase({
+      data: completedLegacyReplay("open"),
+      error: null,
+    }, 2);
+
+    await expect(openBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      preservationMethod: "coravin",
+    })).resolves.toMatchObject({ replayed: true, openBottle: { id: BOTTLE_ID } });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({ p_operation_id: OPERATION_ID, p_command: "open" }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    ["wrong operation", { operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+    ["wrong command", { resultCommand: "pour" as const }],
+    ["not a replay", { replayed: false }],
+    ["wrong restaurant", { restaurantId: OTHER_RESTAURANT_ID }],
+    ["wrong caller-known wine", { wineId: HISTORICAL_WINE_ID }],
+  ])("rejects a contract-2 legacy Open result with %s", async (_label, overrides) => {
+    const supabase = makeRpcSupabase({
+      data: completedLegacyReplay("open", overrides),
+      error: null,
+    }, 2);
+
+    await expect(openBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      preservationMethod: "coravin",
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("does not fall through to physical open on a non-retirement replay error", async () => {
+    const supabase = makeRpcSupabase({
+      data: null,
+      error: { code: "P0001", message: "inventory_operation_actor_conflict" },
+    }, 2);
+
+    await expect(openBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      preservationMethod: "coravin",
+    })).rejects.toMatchObject({
+      databaseCode: "P0001",
+      message: "inventory_operation_actor_conflict",
+    });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("replays a completed version-1 pour under contract 2 without a physical write", async () => {
+    const supabase = makeRpcSupabase({
+      data: completedLegacyReplay("pour"),
+      error: null,
+    }, 2);
+
+    await expect(recordPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      ml: 150,
+      kind: "pour",
+      note: "glass",
+      preservationMethod: "argon",
+    })).resolves.toMatchObject({ replayed: true, eventId: null });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "pour",
+        p_preservation_method: "argon",
+      }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("binds a contract-2 legacy pour replay to the caller-known wine", async () => {
+    const supabase = makeRpcSupabase({
+      data: completedLegacyReplay("pour", { wineId: HISTORICAL_WINE_ID }),
+      error: null,
+    }, 2);
+
+    await expect(recordPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      ml: 150,
+      kind: "pour",
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces fresh version-1 retirement under contract 2 without physical fallback", async () => {
+    const supabase = makeRpcSupabase({
+      data: null,
+      error: { code: "P0001", message: "legacy_inventory_command_retired" },
+    }, 2);
+
+    await expect(recordPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      ml: 150,
+      kind: "spill",
+    })).rejects.toMatchObject({
+      databaseCode: "P0001",
+      message: "legacy_inventory_command_retired",
+    });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
     );
   });
 
@@ -379,7 +582,10 @@ function makeCloseSupabase(options: {
   fetchError?: { code?: string } | null;
   rpcError?: { code?: string; message?: string } | null;
 }) {
-  const rpc = vi.fn(() => Promise.resolve({
+  const rpc = vi.fn((): Promise<{
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  }> => Promise.resolve({
     data: options.rpcError ? null : commandResult("close"),
     error: options.rpcError ?? null,
   }));
@@ -508,6 +714,81 @@ describe("closeOpenBottle", () => {
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalledWith("current_inventory_contract_version");
   });
+
+  it("replays a completed version-1 close under contract 2", async () => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    supabase.rpc.mockResolvedValueOnce({
+      data: completedLegacyReplay("close", { wineId: HISTORICAL_WINE_ID }),
+      error: null,
+    });
+
+    await expect(closeOpenBottle({
+      ...closeInput(supabase),
+      contractVersion: 2,
+    })).resolves.toMatchObject({
+      replayed: true,
+      closeout: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "close",
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+      }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    ["wrong bottle", { bottleId: "99999999-9999-4999-8999-999999999999" }],
+    ["wrong lifecycle", { openedAt: "2026-09-23T11:00:00.000Z" }],
+    ["wrong tenant", { restaurantId: OTHER_RESTAURANT_ID }],
+    ["wrong closeout bottle", {
+      closeoutBottleId: "99999999-9999-4999-8999-999999999999",
+    }],
+    ["wrong closeout lifecycle", {
+      closeoutOpenedAt: "2026-09-23T11:00:00.000Z",
+    }],
+  ])("rejects a contract-2 legacy close replay with %s", async (_label, overrides) => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    supabase.rpc.mockResolvedValueOnce({
+      data: completedLegacyReplay("close", {
+        ...overrides,
+        wineId: HISTORICAL_WINE_ID,
+      }),
+      error: null,
+    });
+
+    await expect(closeOpenBottle({
+      ...closeInput(supabase),
+      contractVersion: 2,
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps a fresh version-1 close retired under contract 2", async () => {
+    const supabase = makeCloseSupabase({
+      bottle: activeBottle,
+      rpcError: { code: "P0001", message: "legacy_inventory_command_retired" },
+    });
+
+    await expect(closeOpenBottle({
+      ...closeInput(supabase),
+      contractVersion: 2,
+    })).rejects.toMatchObject({
+      databaseCode: "P0001",
+      message: "legacy_inventory_command_retired",
+    });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
 });
 
 describe("discardOpenBottle", () => {
@@ -556,6 +837,36 @@ describe("discardOpenBottle", () => {
     })).resolves.toMatchObject({ closed: { id: BOTTLE_ID } });
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalledWith("current_inventory_contract_version");
+  });
+
+  it("replays a completed version-1 discard under contract 2", async () => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    supabase.rpc.mockResolvedValueOnce({
+      data: completedLegacyReplay("discard", { wineId: HISTORICAL_WINE_ID }),
+      error: null,
+    });
+
+    await expect(discardOpenBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      bottleId: BOTTLE_ID,
+      expectedOpenedAt: OPENED_AT,
+      contractVersion: 2,
+    })).resolves.toMatchObject({ replayed: true, eventId: null });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "discard",
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+      }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
   });
 });
 

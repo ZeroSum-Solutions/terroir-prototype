@@ -24,6 +24,7 @@ const LegacyBodySchema = z.strictObject({
   expected_opened_at: z.string().datetime({ offset: true }),
 });
 const PhysicalBodySchema = z.strictObject({ wine_id: z.string().uuid() });
+const Contract2BodySchema = z.union([LegacyBodySchema, PhysicalBodySchema]);
 
 export async function POST(
   request: NextRequest,
@@ -56,7 +57,7 @@ async function postCloseBottle(
   }
   const parsedBody = await parseJson(
     request,
-    contractVersion === 2 ? PhysicalBodySchema : LegacyBodySchema,
+    contractVersion === 2 ? Contract2BodySchema : LegacyBodySchema,
     { message: "Invalid body." },
   );
   if (!parsedBody.ok) return withInventoryHeaders(parsedBody.response, operationId);

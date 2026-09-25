@@ -41,8 +41,8 @@ function makeSupabase(options: {
           replayed: options.replayed ?? false,
           open_bottle: {
             id: "66666666-6666-4666-8666-666666666666",
+            restaurant_id: RESTAURANT_ID,
             ...(name === "execute_physical_bottle_command" ? {
-              restaurant_id: RESTAURANT_ID,
               nominal_capacity_ml: 750,
               closed_at: null,
               source_inventory_item_id: "88888888-8888-4888-8888-888888888888",
@@ -165,14 +165,91 @@ describe("POST /api/pour", () => {
         p_preservation_method: undefined,
       }),
     );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.anything(),
+    );
   });
 
-  it("rejects a contract-2 pour without an exact selector", async () => {
-    const supabase = makeSupabase({ contractVersion: 2 });
+  it("preserves the physical replay header and exact response envelope", async () => {
+    const supabase = makeSupabase({ contractVersion: 2, replayed: true });
+    allow(supabase);
+
+    const response = await POST(request({
+      wine_id: WINE_ID,
+      open_bottle_id: "66666666-6666-4666-8666-666666666666",
+      ml: 150,
+      kind: "pour",
+      note: "glass",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(await response.json()).toMatchObject({
+      pour_event_id: "77777777-7777-4777-8777-777777777777",
+      open_bottle: { id: "66666666-6666-4666-8666-666666666666" },
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.objectContaining({ p_command: "pour" }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.anything(),
+    );
+  });
+
+  it("replays a completed version-1 pour under contract 2", async () => {
+    const supabase = makeSupabase({ contractVersion: 2, replayed: true });
+    allow(supabase);
+    const response = await POST(request({ wine_id: WINE_ID, ml: 150, kind: "pour" }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(await response.json()).toEqual({
+      open_bottle: expect.objectContaining({ wine_id: WINE_ID }),
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({ p_operation_id: OPERATION_ID, p_command: "pour" }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("keeps a fresh version-1 pour retired under contract 2", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      error: { code: "P0001", message: "legacy_inventory_command_retired" },
+    });
     allow(supabase);
     const response = await POST(request({ wine_id: WINE_ID, ml: 150, kind: "pour" }));
     expect(response.status).toBe(409);
     expect((await response.json()).error.code).toBe("legacy_inventory_command_retired");
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({ p_operation_id: OPERATION_ID, p_command: "pour" }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("does not reinterpret another legacy replay error as a physical pour", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      error: { code: "42501", message: "private-policy-detail" },
+    });
+    allow(supabase);
+
+    const response = await POST(request({ wine_id: WINE_ID, ml: 150, kind: "spill" }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("forbidden");
     expect(supabase.rpc).not.toHaveBeenCalledWith(
       "execute_physical_bottle_command",
       expect.anything(),
