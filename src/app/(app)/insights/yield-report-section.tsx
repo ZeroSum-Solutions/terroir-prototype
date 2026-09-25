@@ -89,7 +89,7 @@ export async function fetchYieldGroups(
   for (let from = 0; ; from += pageSize) {
     let query = supabase
       .from("bottle_closeouts")
-      .select("id, open_bottle_id, wine_id, preservation_method, theoretical_remaining_ml, actual_remaining_ml, written_off_ml, wines!inner(size_ml)")
+      .select("id, open_bottle_id, wine_id, event_contract, preservation_method, theoretical_remaining_ml, actual_remaining_ml, written_off_ml, captured_bottle:open_bottles!bottle_closeouts_open_bottle_tenant_wine_fkey(nominal_capacity_ml), wines!inner(size_ml)")
       .eq("restaurant_id", restaurantId)
       .order("closed_at", { ascending: false });
     if (rangeSince) {
@@ -104,13 +104,22 @@ export async function fetchYieldGroups(
     if ((data?.length ?? 0) < pageSize) break;
   }
 
-  return aggregateYieldByPreservation(rows.map((row) => ({
-    bottleId: row.open_bottle_id ?? row.id,
-    wineId: row.wine_id,
-    preservationMethod: row.preservation_method as PreservationMethod,
-    sizeMl: (row.wines as unknown as { size_ml: number }).size_ml,
-    theoreticalRemainingMl: row.theoretical_remaining_ml,
-    actualRemainingMl: row.actual_remaining_ml,
-    writtenOffMl: row.written_off_ml,
-  })));
+  return aggregateYieldByPreservation(rows.map((row) => {
+    const capturedCapacityMl = (
+      row.captured_bottle as unknown as { nominal_capacity_ml: number | null } | null
+    )?.nominal_capacity_ml ?? null;
+    if (capturedCapacityMl === null && row.event_contract !== 1) {
+      throw new Error("physical_closeout_missing_captured_capacity");
+    }
+
+    return {
+      bottleId: row.open_bottle_id ?? row.id,
+      wineId: row.wine_id,
+      preservationMethod: row.preservation_method as PreservationMethod,
+      sizeMl: capturedCapacityMl ?? (row.wines as unknown as { size_ml: number }).size_ml,
+      theoreticalRemainingMl: row.theoretical_remaining_ml,
+      actualRemainingMl: row.actual_remaining_ml,
+      writtenOffMl: row.written_off_ml,
+    };
+  }));
 }
