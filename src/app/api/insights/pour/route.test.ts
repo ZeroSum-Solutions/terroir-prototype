@@ -58,11 +58,11 @@ function allow(supabase: ReturnType<typeof makeSupabase>) {
 describe("GET /api/insights/pour", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it.each(["pour_events", "inventory_items", "wine_list_items"])(
+  it.each(["effective_service_pour_events", "inventory_items", "wine_list_items"])(
     "redacts a %s query failure instead of returning partial analytics",
     async (failedTable) => {
       const results = Object.fromEntries(
-        ["pour_events", "inventory_items", "wine_list_items"].map((table) => [
+        ["effective_service_pour_events", "inventory_items", "wine_list_items"].map((table) => [
           table,
           {
             data: [],
@@ -94,7 +94,7 @@ describe("GET /api/insights/pour", () => {
 
   it("preserves one-sided custom ranges, tenant filters, and response shape", async () => {
     const supabase = makeSupabase({
-      pour_events: { data: [], error: null },
+      effective_service_pour_events: { data: [], error: null },
       inventory_items: { data: [], error: null },
       wine_list_items: { data: [], error: null },
     });
@@ -116,9 +116,14 @@ describe("GET /api/insights/pour", () => {
       topWinesByRevenue: [],
     });
     expect(supabase.calls).toContainEqual({
-      table: "pour_events",
+      table: "effective_service_pour_events",
       method: "gte",
       args: ["occurred_at", new Date("2026-01-02T00:00:00").toISOString()],
+    });
+    expect(supabase.calls).toContainEqual({
+      table: "effective_service_pour_events",
+      method: "eq",
+      args: ["restaurant_id", "restaurant-a"],
     });
     expect(
       supabase.calls.filter(
@@ -126,5 +131,54 @@ describe("GET /api/insights/pour", () => {
           call.method === "eq" && call.args.includes("restaurant-a"),
       ),
     ).toHaveLength(3);
+  });
+
+  it("counts legacy rows supplied by the effective source without reading raw events", async () => {
+    const supabase = makeSupabase({
+      effective_service_pour_events: {
+        data: [{
+          event_contract: 1,
+          wine_id: "wine-a",
+          ml_delta: 148,
+          kind: "pour",
+          occurred_at: "2026-09-20T12:00:00.000Z",
+          wines: { id: "wine-a", name: "Legacy Red", producer: "House", vintage: 2020 },
+        }],
+        error: null,
+      },
+      inventory_items: { data: [{ wine_id: "wine-a", section: "Reds" }], error: null },
+      wine_list_items: { data: [], error: null },
+    });
+    allow(supabase);
+
+    const response = await GET(new NextRequest("http://localhost/api/insights/pour?range=all"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.totalPours).toBe(1);
+    expect(body.pourVolumeBySection).toEqual([{ section: "Reds", oz: 5 }]);
+    expect(body.topWinesByPours[0]).toMatchObject({
+      wine_id: "wine-a",
+      name: "Legacy Red",
+      pour_count: 1,
+    });
+    expect(supabase.from).toHaveBeenCalledWith("effective_service_pour_events");
+    expect(supabase.from).not.toHaveBeenCalledWith("pour_events");
+  });
+
+  it("fails closed when the effective source returns an incomplete row", async () => {
+    const supabase = makeSupabase({
+      effective_service_pour_events: {
+        data: [{ wine_id: null, ml_delta: 148, kind: "pour", occurred_at: "2026-09-20T12:00:00.000Z" }],
+        error: null,
+      },
+      inventory_items: { data: [], error: null },
+      wine_list_items: { data: [], error: null },
+    });
+    allow(supabase);
+
+    const response = await GET(new NextRequest("http://localhost/api/insights/pour?range=all"));
+
+    expect(response.status).toBe(500);
   });
 });

@@ -45,9 +45,10 @@ const derive = (input: Partial<Parameters<typeof deriveCellarFacts>[0]> = {}) =>
     ...input,
   });
 
-function cellarClient() {
+function cellarClient(lastPour: { data: unknown; error: unknown } = { data: null, error: null }) {
   const selected: Record<string, string> = {};
-  const responses: Record<string, { data: unknown; error: null }> = {
+  const filters: Array<{ table: string; column: string; value: unknown }> = [];
+  const responses: Record<string, { data: unknown; error: unknown }> = {
     inventory_items: {
       data: [{
         quantity: 2,
@@ -59,7 +60,7 @@ function cellarClient() {
       }],
       error: null,
     },
-    pour_events: { data: null, error: null },
+    effective_service_pour_events: lastPour,
     wine_list_items: {
       data: [{
         bottle_price: 35,
@@ -80,7 +81,10 @@ function cellarClient() {
           selected[table] = columns;
           return query;
         },
-        eq: () => query,
+        eq: (column: string, value: unknown) => {
+          filters.push({ table, column, value });
+          return query;
+        },
         order: () => query,
         limit: () => query,
         maybeSingle: () => Promise.resolve(responses[table]),
@@ -90,7 +94,7 @@ function cellarClient() {
       return query;
     },
   } as unknown as SupabaseClient<Database>;
-  return { client, selected };
+  return { client, selected, filters };
 }
 
 describe("selling format", () => {
@@ -206,6 +210,32 @@ describe("the published price", () => {
 });
 
 describe("dates and locations", () => {
+  it("uses the latest effective legacy-compatible pour for depletion", async () => {
+    const { client, selected, filters } = cellarClient({
+      data: { occurred_at: "2026-09-21T12:34:56.000Z", event_contract: 1 },
+      error: null,
+    });
+
+    const facts = await resolveCellarContext(client, "restaurant", "wine", 750);
+
+    expect(facts.lastDepletionAt).toBe("2026-09-21");
+    expect(selected.effective_service_pour_events).toBe("occurred_at");
+    expect(selected.pour_events).toBeUndefined();
+    expect(filters).toContainEqual({
+      table: "effective_service_pour_events",
+      column: "restaurant_id",
+      value: "restaurant",
+    });
+  });
+
+  it("fails closed when the effective depletion timestamp is unknown", async () => {
+    const { client } = cellarClient({ data: { occurred_at: null }, error: null });
+
+    await expect(resolveCellarContext(client, "restaurant", "wine", 750)).rejects.toThrow(
+      "Invalid effective service event",
+    );
+  });
+
   it("takes the latest put-away as a plain date", () => {
     const facts = derive({
       inventory: [lot({ added_at: "2026-03-01T10:00:00.000Z" }), lot({ added_at: "2026-08-14T23:30:00.000Z" })],

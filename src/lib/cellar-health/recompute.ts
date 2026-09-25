@@ -111,7 +111,7 @@ async function loadInputs(admin: Client, restaurantId: string) {
     ),
     fetchAll((from, to) =>
       admin
-        .from("pour_events")
+        .from("effective_service_pour_events")
         .select("wine_id, occurred_at")
         .eq("restaurant_id", restaurantId)
         .order("id")
@@ -214,6 +214,9 @@ function laterOf(a: string | null, b: string | null): string | null {
 function latestPourDates(inputs: LoadedInputs["pours"]) {
   const latest = new Map<string, string>();
   for (const pour of inputs) {
+    if (pour.wine_id === null || pour.occurred_at === null) {
+      throw new Error("Invalid effective service event.");
+    }
     const current = latest.get(pour.wine_id);
     if (!current || pour.occurred_at > current) latest.set(pour.wine_id, pour.occurred_at);
   }

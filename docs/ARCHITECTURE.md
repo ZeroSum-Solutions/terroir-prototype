@@ -114,17 +114,17 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   focused tests. Its exact `1c37b7ab..9f3a1b25` range passed the immutable security
   certificate across 20 changed paths and 22 reviewed blobs. No SQL or browser result
   is claimed.
-- The uncommitted effective-reader packet redirects five application readers to
+- The effective-reader checkpoint redirects five application readers to
   `effective_service_pour_events`, which excludes version 2 reversals and reversed
-  originals while retaining legacy history. Positive service-role runtime proof
-  remains blocked because the retained stack does not grant the view to `service_role`.
-  Migration 0155 source is implemented but uncommitted. Its V2 live admission stopped
-  before mutation when the retained database exposed the historical authenticated
-  five-privilege ACL shape. V3 review then found that an unwrapped invocation could
-  mutate the ACL before detecting the missing outer transaction. V4 adds pre-mutation
-  outer-transaction guards. Native and Opus review accepted the bounded V4 source and
-  runtime plan. The finite independent C runtime matrix is released, but it has no
-  result yet; V4 has not run against a live database.
+  originals while retaining legacy history. Migration 0155 grants only non-grantable
+  `SELECT` to `service_role`; it does not expand authenticated access. Forward and
+  down migrations require a caller-owned transaction and reject unexpected ACLs
+  before mutation. Native and Opus review accepted the bounded V4 source. The
+  independent V4.1 matrix passed on the isolated retained-C database: 16 rollback-only
+  ACL cases, unwrapped-call refusals, fault rollback, up/down/reapply, effective-reader
+  semantics and conservation of all six non-target databases. That target now holds
+  0155; the normal retained stack and separate browser stack do not. This is bounded
+  database proof, not a browser, Phase B, cost-secrecy or production completion claim.
 
 - The legacy end-of-shift `POST /api/reconcile` path calls
   `reconcile_open_bottles_batch` through `src/domains/cellar/reconcile-service.ts`;

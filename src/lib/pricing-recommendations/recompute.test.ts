@@ -31,7 +31,7 @@ describe("runPricingRecommendationsRecompute", () => {
         wine_id: "wine-1",
         class: "feature_btg",
         rationale: expect.any(String),
-        evidence: expect.objectContaining({ selectedDay: "Tuesday" }),
+        evidence: expect.objectContaining({ selectedDay: "Tuesday", velocity30d: 3 }),
         timing: "Feature BTG Tuesday",
       }),
     ]);
@@ -42,6 +42,13 @@ describe("runPricingRecommendationsRecompute", () => {
     });
     expect(fixture.jobUpdates.at(-1)).toMatchObject({ status: "succeeded" });
     expect(fixture.ranges.length).toBeGreaterThan(0);
+    expect(fixture.tables).toContain("effective_service_pour_events");
+    expect(fixture.tables).not.toContain("pour_events");
+    expect(fixture.filters).toContainEqual([
+      "effective_service_pour_events",
+      "restaurant_id",
+      "restaurant-1",
+    ]);
   });
 
   it("records a redacted failed background job when input loading fails", async () => {
@@ -97,6 +104,28 @@ describe("runPricingRecommendationsRecompute", () => {
       }),
     ]);
   });
+
+  it("records a failed job when the effective event read is interrupted", async () => {
+    const fixture = makeClient({ pourError: new Error("effective reader unavailable") });
+
+    await expect(
+      runPricingRecommendationsRecompute(fixture.client, "restaurant-1", "user-1", NOW),
+    ).rejects.toThrow("effective reader unavailable");
+    expect(fixture.jobUpdates.at(-1)).toMatchObject({
+      status: "failed",
+      error_message: "Pricing recommendations recompute failed.",
+    });
+  });
+
+  it("fails closed when effective movement data is incomplete", async () => {
+    const fixture = makeClient({
+      pours: [{ id: "pour-unknown", wine_id: null, kind: "pour", ml_delta: 148, occurred_at: "2026-08-18T12:00:00.000Z" }],
+    });
+
+    await expect(
+      runPricingRecommendationsRecompute(fixture.client, "restaurant-1", "user-1", NOW),
+    ).rejects.toThrow("Invalid effective service event");
+  });
 });
 
 function makeClient(
@@ -104,6 +133,8 @@ function makeClient(
     wineError?: Error;
     unitCost?: number;
     listRestaurantId?: string;
+    pourError?: Error;
+    pours?: unknown[];
   } = {},
 ) {
   const fixture = {
@@ -112,6 +143,8 @@ function makeClient(
     jobInserts: [] as Array<Record<string, unknown>>,
     jobUpdates: [] as Array<Record<string, unknown>>,
     ranges: [] as Array<[number, number]>,
+    tables: [] as string[],
+    filters: [] as Array<[string, string, unknown]>,
   };
   const results: Record<string, { data: unknown[]; error: unknown }> = {
     wines: {
@@ -131,13 +164,13 @@ function makeClient(
       data: [{ wine_id: "wine-1", segment: "healthy" }],
       error: null,
     },
-    pour_events: {
-      data: [
-        { id: "pour-1", wine_id: "wine-1", kind: "pour", ml_delta: 148, occurred_at: "2026-08-18T12:00:00.000Z" },
+    effective_service_pour_events: {
+      data: options.pours ?? [
+        { id: "pour-1", wine_id: "wine-1", kind: "pour", ml_delta: 148, occurred_at: "2026-08-18T12:00:00.000Z", event_contract: 1 },
         { id: "pour-2", wine_id: "wine-1", kind: "pour", ml_delta: 148, occurred_at: "2026-08-15T12:00:00.000Z" },
         { id: "pour-3", wine_id: "wine-1", kind: "pour", ml_delta: 148, occurred_at: "2026-08-15T13:00:00.000Z" },
       ],
-      error: null,
+      error: options.pourError ?? null,
     },
     wine_list_items: {
       data: [{
@@ -161,6 +194,7 @@ function makeClient(
   };
 
   const from = (table: string) => {
+    fixture.tables.push(table);
     if (table === "background_jobs") {
       return {
         insert: (row: Record<string, unknown>) => ({
@@ -182,7 +216,10 @@ function makeClient(
     const result = results[table] ?? { data: [], error: null };
     const chain = {
       select: () => chain,
-      eq: () => chain,
+      eq: (column: string, value: unknown) => {
+        fixture.filters.push([table, column, value]);
+        return chain;
+      },
       gte: () => chain,
       lte: () => chain,
       order: () => chain,

@@ -24,7 +24,7 @@ async function getMemberAnalytics() {
       .order("id")
       .range(from, to)),
     fetchAll((from, to) => auth.supabase
-      .from("pour_events")
+      .from("effective_service_pour_events")
       .select("actor_user_id, ml_delta, kind")
       .eq("restaurant_id", auth.restaurantId)
       .order("id")
@@ -49,11 +49,16 @@ async function getMemberAnalytics() {
       userId: member.user_id,
       role: member.role as MemberRole,
     })),
-    pours: pours.map((pour) => ({
-      actorUserId: pour.actor_user_id,
-      mlDelta: pour.ml_delta,
-      kind: pour.kind,
-    })),
+    pours: pours.map((pour) => {
+      if (pour.ml_delta === null || pour.kind === null) {
+        throw new Error("Invalid effective service event.");
+      }
+      return {
+        actorUserId: pour.actor_user_id,
+        mlDelta: pour.ml_delta,
+        kind: pour.kind,
+      };
+    }),
     adjustments: adjustments.map((adjustment) => ({
       actingUserId: adjustment.acting_user_id,
       kind: adjustment.kind,

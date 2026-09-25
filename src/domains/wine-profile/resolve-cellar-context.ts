@@ -193,7 +193,7 @@ export async function resolveCellarContext(
     // adjustment, new_bottle/finish_bottle are lifecycle — none of them is a
     // sale, and a badge cleared by a spill is the noise the audit named.
     supabase
-      .from("pour_events")
+      .from("effective_service_pour_events")
       .select("occurred_at")
       .eq("wine_id", wineId)
       .eq("restaurant_id", restaurantId)
@@ -219,6 +219,9 @@ export async function resolveCellarContext(
   if (lastPour.error) throw lastPour.error;
   if (lists.error) throw lists.error;
   if (config.error) throw config.error;
+  if (lastPour.data?.occurred_at === null) {
+    throw new Error("Invalid effective service event.");
+  }
 
   const rawInventory = (inventory.data ?? []) as InventoryRow[];
   const inventoryRows: InventoryRow[] = rawInventory.map((lot) => ({

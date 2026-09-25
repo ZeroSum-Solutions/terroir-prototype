@@ -29,6 +29,13 @@ describe("runCellarHealthRecompute", () => {
       reason: expect.stringMatching(/^dead_stock rule:/),
     });
     expect(fixture.jobUpdates.filter((row) => row.status === "succeeded")).toHaveLength(2);
+    expect(fixture.tables).toContain("effective_service_pour_events");
+    expect(fixture.tables).not.toContain("pour_events");
+    expect(fixture.filters).toContainEqual([
+      "effective_service_pour_events",
+      "restaurant_id",
+      "restaurant-1",
+    ]);
   });
 
   it("records a failed background job when input loading fails", async () => {
@@ -64,6 +71,43 @@ describe("runCellarHealthRecompute", () => {
 
     expect(fixture.deletedHealthIds).toEqual(["wine-empty"]);
   });
+
+  it("uses a supplied legacy effective pour as the latest movement", async () => {
+    const fixture = makeClient({
+      pours: [{
+        wine_id: "wine-1",
+        occurred_at: "2026-08-18T12:00:00.000Z",
+        event_contract: 1,
+      }],
+    });
+
+    await runCellarHealthRecompute(fixture.client, "restaurant-1", "user-1", NOW);
+
+    expect(fixture.healthRows.at(-1)).toMatchObject({
+      wine_id: "wine-1",
+      segment: "healthy",
+    });
+  });
+
+  it("records failure when the effective reader is interrupted", async () => {
+    const fixture = makeClient({ pourError: new Error("effective reader unavailable") });
+
+    await expect(
+      runCellarHealthRecompute(fixture.client, "restaurant-1", "user-1", NOW),
+    ).rejects.toThrow("effective reader unavailable");
+    expect(fixture.jobUpdates.at(-1)).toMatchObject({
+      status: "failed",
+      error_message: "Cellar health recompute failed.",
+    });
+  });
+
+  it("fails closed when effective movement data is incomplete", async () => {
+    const fixture = makeClient({ pours: [{ wine_id: "wine-1", occurred_at: null }] });
+
+    await expect(
+      runCellarHealthRecompute(fixture.client, "restaurant-1", "user-1", NOW),
+    ).rejects.toThrow("Invalid effective service event");
+  });
 });
 
 type HealthConfig = {
@@ -77,6 +121,8 @@ function makeClient(
     wineError?: Error;
     unitCost?: number;
     existingHealthWineIds?: string[];
+    pourError?: Error;
+    pours?: unknown[];
   } = {},
 ) {
   const fixture = {
@@ -85,6 +131,8 @@ function makeClient(
     deletedHealthIds: [] as string[],
     jobInserts: [] as Array<Record<string, unknown>>,
     jobUpdates: [] as Array<Record<string, unknown>>,
+    tables: [] as string[],
+    filters: [] as Array<[string, string, unknown]>,
   };
 
   const queryData: Record<string, { data: unknown; error: unknown }> = {
@@ -110,10 +158,14 @@ function makeClient(
       ],
       error: null,
     },
-    pour_events: { data: [], error: null },
+    effective_service_pour_events: {
+      data: options.pours ?? [],
+      error: options.pourError ?? null,
+    },
   };
 
   const from = (table: string) => {
+    fixture.tables.push(table);
     if (table === "background_jobs") {
       return {
         insert: (row: Record<string, unknown>) => ({
@@ -175,7 +227,10 @@ function makeClient(
     const result = queryData[table];
     const chain = {
       select: () => chain,
-      eq: () => chain,
+      eq: (column: string, value: unknown) => {
+        fixture.filters.push([table, column, value]);
+        return chain;
+      },
       order: () => chain,
       range: () => chain,
       then: (
