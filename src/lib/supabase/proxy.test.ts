@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import {
@@ -47,7 +49,6 @@ function requestFor(
     method: init.method,
     headers,
   });
-  Object.defineProperty(request, "headers", { value: headers });
   return request;
 }
 

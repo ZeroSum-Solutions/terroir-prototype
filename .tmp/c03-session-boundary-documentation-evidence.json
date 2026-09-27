@@ -1,0 +1,161 @@
+{
+  "base": "2568bbff3730f30b89259e986855adf9d4e1b9ce",
+  "changed_surfaces": ["behavior", "code_location"],
+  "change_manifest": [
+    {
+      "status": "M",
+      "path": "docs/ARCHITECTURE.md",
+      "surfaces": ["code_location"]
+    },
+    {
+      "status": "M",
+      "path": "docs/plans/2026-09-23-terroir-offline-operation-contract.md",
+      "surfaces": ["behavior"]
+    },
+    {
+      "status": "M",
+      "path": "e2e/offline-session-boundary.test.ts",
+      "surfaces": ["behavior"]
+    },
+    {
+      "status": "?",
+      "path": "e2e/helpers/offline-session-boundary.ts",
+      "surfaces": ["behavior", "code_location"]
+    },
+    {
+      "status": "M",
+      "path": "src/app/(app)/offline-session-boundary.tsx",
+      "surfaces": ["behavior"]
+    },
+    {
+      "status": "M",
+      "path": "src/lib/supabase/proxy.test.ts",
+      "surfaces": ["behavior"]
+    }
+  ],
+  "duplicate_truth": {
+    "status": "single-owner",
+    "owners": [
+      {
+        "surface": "behavior",
+        "canonical_owner": "docs/plans/2026-09-23-terroir-offline-operation-contract.md#Session-boundary browser checkpoint"
+      },
+      {
+        "surface": "code_location",
+        "canonical_owner": "docs/ARCHITECTURE.md#Current Boundaries"
+      }
+    ]
+  },
+  "captured_evidence": {
+    "qa_head": "2568bbff3730f30b89259e986855adf9d4e1b9ce",
+    "checkpoint_commit": "757d272a3db77cd3b02ba81c9fcdc41dd1b2b1df",
+    "runtime_proof": {
+      "summary_sha256": "e5e0ee0d710ab5182bd720d75aa7ccab4dc4ec33cc7d98bf295b3166c9d2d9b4",
+      "screenshot_review_sha256": "3e3140321eee007b958224b61f09f7159308c8c4efa67a1fe7c01f29a8c4aeb3",
+      "manifest_sha256": "a926385a6d419c0b93cc83f0ce8add24412d62a4932689e3e5d2c74859600173"
+    },
+    "source_overlay_sha256": {
+      "e2e/offline-session-boundary.test.ts": "36e1bf37af6d90c15c7cf26b9901035dbaeb3efaf8b1089808f9332eeb4729ed",
+      "e2e/helpers/offline-session-boundary.ts": "fb1e5a97e38e34beb0040e9a5b627e529628956faf0784928117b1910e4fc973",
+      "src/app/(app)/offline-session-boundary.tsx": "995ce49f3aeaad2f0bef15c1c96ac675bf247a23b723d5eb970fd89d34fd5e07",
+      "src/lib/supabase/proxy.test.ts": "eaf395ce4650d090afd0d32939c24de7ddefb2bf55b551a1784d3fda102ceebf"
+    },
+    "documentation_diff_sha256": "d48bd0e875ccd8bf3384211eeaa373e1ecf2fe00ab3094cc6023ca517f6ab74d",
+    "raw_exits": {
+      "verifier_first_pass": 1,
+      "verifier_final": 0,
+      "head_match": 0,
+      "empty_index": 0,
+      "server_closed": 0,
+      "source_hash_match": 0,
+      "checkpoint_path_set": 0,
+      "document_preimage_hash_match": 0,
+      "document_current_hash_match": 0,
+      "docs_diff_check": 0
+    },
+    "verifier_output": {
+      "document_errors": [],
+      "git_diff_manifest": [
+        {"path": "docs/ARCHITECTURE.md", "status": "M"},
+        {"path": "docs/plans/2026-09-23-terroir-offline-operation-contract.md", "status": "M"},
+        {"path": "e2e/helpers/offline-session-boundary.ts", "status": "?"},
+        {"path": "e2e/offline-session-boundary.test.ts", "status": "M"},
+        {"path": "src/app/(app)/offline-session-boundary.tsx", "status": "M"},
+        {"path": "src/lib/supabase/proxy.test.ts", "status": "M"}
+      ],
+      "invalid_shell_blocks": [],
+      "ledger_errors": [],
+      "local_path_errors": [],
+      "markdown_review_errors": [],
+      "secret_value_markers": [],
+      "status": "ok"
+    }
+  },
+  "document_reviews": [
+    {
+      "document": "docs/ARCHITECTURE.md",
+      "preimage": {
+        "kind": "git",
+        "sha256": "4bc321d90a7dd2554a63eeb70ee4e10b628284effeb23bf5561b26de3d6f6c13"
+      },
+      "current_sha256": "0cc0e6b63fd6f1268cf5fb84aed08407a364d4e4b9e43f84b124ccce8527c978",
+      "unchecked_markdown": [],
+      "commands": []
+    },
+    {
+      "document": "docs/plans/2026-09-23-terroir-offline-operation-contract.md",
+      "preimage": {
+        "kind": "git",
+        "sha256": "14ddf38dc1eda2464b0731f507ee0cf980cc534ec60dc9d4ca922ebe8176f125"
+      },
+      "current_sha256": "767eb84a246189384c0f4c3b3db5eb82d93a2c68b640ca9069cafe98b64a1d33",
+      "unchecked_markdown": [
+        {
+          "classification": "non-runnable",
+          "kind": "non-shell-fence",
+          "language": "text",
+          "line": 68,
+          "source_sha256": "a2a76a1f588637adf2d13e33f5d34c0605eb3164341cf9cded4ef0bd4aee4538"
+        }
+      ],
+      "commands": []
+    }
+  ],
+  "entries": [
+    {
+      "surface": "behavior",
+      "source": {
+        "change_paths": [
+          "docs/plans/2026-09-23-terroir-offline-operation-contract.md",
+          "e2e/offline-session-boundary.test.ts",
+          "e2e/helpers/offline-session-boundary.ts",
+          "src/app/(app)/offline-session-boundary.tsx",
+          "src/lib/supabase/proxy.test.ts"
+        ],
+        "canonical_evidence": {
+          "path": "docs/plans/2026-09-23-terroir-offline-operation-contract.md",
+          "heading": "Session-boundary browser checkpoint"
+        }
+      },
+      "disposition": "updated",
+      "canonical_owner": "docs/plans/2026-09-23-terroir-offline-operation-contract.md#Session-boundary browser checkpoint",
+      "document": "docs/plans/2026-09-23-terroir-offline-operation-contract.md"
+    },
+    {
+      "surface": "code_location",
+      "source": {
+        "change_paths": [
+          "docs/ARCHITECTURE.md",
+          "e2e/helpers/offline-session-boundary.ts"
+        ],
+        "canonical_evidence": {
+          "path": "docs/ARCHITECTURE.md",
+          "heading": "Current Boundaries"
+        }
+      },
+      "disposition": "updated",
+      "canonical_owner": "docs/ARCHITECTURE.md#Current Boundaries",
+      "document": "docs/ARCHITECTURE.md"
+    }
+  ]
+}

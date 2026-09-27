@@ -20,7 +20,9 @@ business workflows. Adapter modules own external/provider mechanics.
   bounded local sign-out boundary. It unmounts
   private React content before starting sign-out work, applies the strongest
   recognized raw-cookie denial, and keeps provider cleanup bounded. Real-browser
-  verification and the public offline shell remain incomplete.
+  verification now covers the bounded 17-case
+  [session-boundary browser checkpoint](plans/2026-09-23-terroir-offline-operation-contract.md#session-boundary-browser-checkpoint).
+  The public offline shell and the rest of the offline workflow remain incomplete.
 - `src/domains/integrations/pos/toast`: internal, pure Toast observation
   normalization, strict manual/operator snapshot guards, and versioned canonical
   framing/digests for domains `0x01`, `0x02`, and `0x03`, backed by checked literal vectors.
