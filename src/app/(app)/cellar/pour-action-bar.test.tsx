@@ -386,4 +386,15 @@ describe("PourActionBar", () => {
     expect(pourButton).toBeDefined();
     expect(pourButton.disabled).toBe(true);
   });
+
+  it("does not call a short physical bottle out of stock while sealed stock remains", async () => {
+    await act(async () => root.render(
+      <PourActionBar row={baseRow({ sealed_count: 1, glass_pour_ml: 150 })}
+        contractVersion={2} canPour outOfStock pickerItem={null} busy={false}
+        openBottleBusy={false} lastPour={null} doOpenBottle={vi.fn()}
+        doPour={vi.fn()} doUndo={vi.fn()} onOpenPicker={vi.fn()} />,
+    ));
+    expect(button("Below pour size")?.disabled).toBe(true);
+    expect(button("Out of stock")).toBeUndefined();
+  });
 });

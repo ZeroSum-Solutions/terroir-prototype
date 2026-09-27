@@ -1,6 +1,6 @@
 /**
  * POST /api/import/sessions/[id]/revert — revert every batch in a session
- * as a unit (P3 §3.4), reverse chunk order, per-batch exception isolation.
+ * as one database transaction (P3 §3.4), in reverse chunk order.
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { requireMembership } from "@/lib/api/auth";
@@ -31,10 +31,14 @@ async function postRevert(params: Params) {
   const result = await revertImportSession(supabase, id);
   if (!result.ok) {
     if (result.error.code === "not_found") return Errors.notFound("Import session");
-    if (result.error.code === "physical_bottle_dependency") {
-      return apiError(409, result.error.code, result.error.message, { batches: result.batches });
+    if (result.error.code === "forbidden") return apiError(403, result.error.code, result.error.message);
+    if (
+      result.error.code === "physical_bottle_dependency" ||
+      result.error.code === "import_source_conflict"
+    ) {
+      return apiError(409, result.error.code, result.error.message, { batches: [] });
     }
-    throw new Error(result.error.message);
+    return apiError(500, "internal_error", "Could not revert import session.");
   }
 
   return NextResponse.json({ sessionId: result.sessionId, batches: result.batches });

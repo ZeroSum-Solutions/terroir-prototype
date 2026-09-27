@@ -266,6 +266,10 @@ describe("POST /api/reconcile", () => {
 
     expect(response.status).toBe(409);
     expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("false");
+    expect(await response.json()).toMatchObject({
+      error: { code: "reconciliation_batch_stale" },
+    });
     expect(calls.filter((call) => call.fn === "execute_physical_reconciliation_batch")).toHaveLength(1);
     expect(calls.some((call) => call.fn === "reconcile_open_bottles_batch")).toBe(false);
   });

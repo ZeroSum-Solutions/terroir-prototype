@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import * as Sentry from "@sentry/nextjs";
 import { getAuthContext } from "@/lib/auth-context";
 import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { BarChart3, ScanLine, History, Activity, CheckCircle2 } from "lucide-react";
@@ -115,40 +114,18 @@ export default async function DashboardPage({
   const [drinkWindowAlerts, pricingAlerts, snoozedResult, yieldGroups, pricingRecommendations] = await Promise.all([
     fetchDrinkWindowAlerts(supabase, rid),
     canReadPricing
-      ? fetchPricingAlerts(supabase, rid).catch(function (error) {
-          Sentry.captureException(error, {
-            tags: { surface: "insights-page", phase: "pricing-fetch" },
-            extra: { restaurantId: rid, source: "alerts" },
-          });
-          return null;
-        })
+      ? fetchPricingAlerts(supabase, rid)
       : Promise.resolve(null),
     access.canReadMargin
       ? fetchSnoozedAlerts(supabase, rid)
           .then((rows) => ({ rows, strategyAvailable: true }))
-          .catch(function (error) {
-            Sentry.captureException(error, {
-              tags: { surface: "insights-page", phase: "pricing-snooze-fetch" },
-              extra: { restaurantId: rid },
-            });
-            return fetchDrinkWindowSnoozedAlerts(supabase, rid).then((rows) => ({
-              rows,
-              strategyAvailable: false,
-            }));
-          })
       : fetchDrinkWindowSnoozedAlerts(supabase, rid).then((rows) => ({
           rows,
           strategyAvailable: false,
         })),
     fetchYieldGroups(supabase, rid, rangeSince, rangeUntil),
     canReadPricing
-      ? fetchPricingRecommendations(supabase, rid).catch(function (error) {
-          Sentry.captureException(error, {
-            tags: { surface: "insights-page", phase: "pricing-fetch" },
-            extra: { restaurantId: rid, source: "recommendations" },
-          });
-          return null;
-        })
+      ? fetchPricingRecommendations(supabase, rid)
       : Promise.resolve(null),
   ]);
   const snoozedRows: SnoozedRow[] = snoozedResult.rows;
@@ -159,31 +136,22 @@ export default async function DashboardPage({
   let stockItems: Awaited<ReturnType<typeof fetchInsightsStock>> = [];
   let cellarHealthRows: Awaited<ReturnType<typeof fetchInsightsHealth>> = [];
   if (access.canReadCost) {
-    try {
-      [scans, costItems, cellarHealthRows] = await Promise.all([
-        fetchInsightsScans(supabase, rid, {
-          includeCost: true, since: rangeSince, until: rangeUntil,
-        }),
-        fetchInsightsInventory(supabase, rid),
-        fetchInsightsHealth(supabase, rid),
-      ]);
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { surface: "insights-page", phase: "cost-fetch" },
-        extra: { restaurantId: rid },
-      });
-    }
-  }
-  const costDataAvailable = costItems !== null;
-  if (!costDataAvailable) {
+    [scans, costItems, cellarHealthRows] = await Promise.all([
+      fetchInsightsScans(supabase, rid, {
+        includeCost: true, since: rangeSince, until: rangeUntil,
+      }),
+      fetchInsightsInventory(supabase, rid),
+      fetchInsightsHealth(supabase, rid),
+    ]);
+  } else {
     [scans, stockItems] = await Promise.all([
       fetchInsightsScans(supabase, rid, {
         includeCost: false, since: rangeSince, until: rangeUntil,
       }),
       fetchInsightsStock(supabase, rid),
     ]);
-    cellarHealthRows = [];
   }
+  const costDataAvailable = costItems !== null;
 
   const [
     { count: rawEightysixedCount },

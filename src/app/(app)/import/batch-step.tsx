@@ -8,21 +8,21 @@ import { useCallback, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
 import { ActionDialog } from "@/components/action-dialog";
 import type { BatchDetail, BatchSummary } from "@/domains/import/batch-api-types";
-import { summarizeRevertResult, type RevertResult } from "@/domains/import/revert-summary";
+import { parseRevertResult, summarizeRevertResult, type RevertResult } from "@/domains/import/revert-summary";
 import { loadBatchDetail } from "./load-batch-detail";
 import { SummaryStat } from "./summary-stat";
 
 /** BLOCK 2 (round-13 audit): the SAME confirmation copy BatchStep's own
  * "Revert this import" button uses, shared as a single source rather than
  * duplicated — the conflict-panel Revert button (PreviewStep) is exactly as
- * destructive as BatchStep's, since a conflict candidate can be 'applying'
- * or 'completed' too (revert_import_batch, 0109, accepts any status <>
- * 'reverted'). A one-off dialog/copy for the conflict panel was explicitly
+ * destructive as BatchStep's, since the typed revert operation also accepts
+ * an 'applying' or 'completed' candidate. A one-off dialog/copy for the
+ * conflict panel was explicitly
  * what the finding asked NOT to build. */
 const REVERT_CONFIRMATION = {
   title: "Revert this import?",
   description:
-    "Removes the inventory this import created. Where it can safely confirm it, it also deletes wines only this import added and clears the wine-catalog (LWIN) links it wrote — including a link identical to one that existed before the import. Cleanup is best-effort: it deletes only wines it can confirm are unreferenced at that moment, and reports what it did below.",
+    "Removes the inventory this import created and clears only eligible wine-catalog (LWIN) links it wrote. Wine catalog entries and import history stay in place. The entire revert succeeds together or makes no changes.",
   confirmLabel: "Revert import",
 };
 
@@ -117,11 +117,12 @@ export function BatchStep({
         setActionError(body?.error?.message ?? "Revert failed.");
         return;
       }
-      // Sol audit 2026-08-27 round 4, finding 3: the response is consumed,
-      // not discarded — show a success panel with the actual counts
-      // (revertedCount/orphanWinesDeleted/lwinStampsCleared) and any
-      // partial-cleanup warning, instead of silently navigating away.
-      setRevertResult(body as RevertResult);
+      const parsed = parseRevertResult(body);
+      if (!parsed) {
+        setActionError("Revert finished with an invalid response. Refresh before taking another action.");
+        return;
+      }
+      setRevertResult(parsed);
       setRevertDialogOpen(false);
     } catch {
       setActionError("Revert failed. Check your connection and try again.");
@@ -179,7 +180,7 @@ export function BatchStep({
             {pending.map((row) => (
               <li key={row.id} className="border-b border-rule px-2xs py-sm">
                 <p className="text-control text-ink">
-                  Row {row.row_number}: {row.raw.producer ? `${row.raw.producer} — ` : ""}{row.raw.name}
+                  Row {row.row_number}: {row.producer ? `${row.producer} — ` : ""}{row.name}
                 </p>
                 <p className="mt-2xs text-caption text-grey">
                   {row.lwin_status === "unmatched" ? "No LWIN catalog match. " : ""}

@@ -30,18 +30,14 @@ describe("POST /api/import/sessions/[id]/revert", () => {
     mockRequireMembership.mockResolvedValue({ supabase, restaurantId: "restaurant-a", role: "staff" });
   });
 
-  it("returns 409 with retained child outcomes for a dependency-blocked session", async () => {
-    const batches = [
-      { batchId: "b2", chunkIndex: 2, skipped: true, reason: "physical_bottle_dependency" },
-      { batchId: "b1", chunkIndex: 1, skipped: false, revertedCount: 3 },
-    ];
+  it("returns 409 with no child outcomes for a rolled-back dependency-blocked session", async () => {
     mockRevertImportSession.mockResolvedValue({
       ok: false,
       error: {
         code: "physical_bottle_dependency",
         message: "Import session cannot be fully reverted because physical bottles depend on imported inventory.",
       },
-      batches,
+      batches: [],
     });
 
     const response = await POST(request(), { params: params() });
@@ -51,13 +47,42 @@ describe("POST /api/import/sessions/[id]/revert", () => {
       error: {
         code: "physical_bottle_dependency",
         message: "Import session cannot be fully reverted because physical bottles depend on imported inventory.",
-        details: { batches },
+        details: { batches: [] },
+      },
+    });
+  });
+
+  it("returns a safe 409 with no child outcomes for a rolled-back shared-source conflict", async () => {
+    mockRevertImportSession.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "import_source_conflict",
+        message: "Import inventory is linked to multiple import rows, so this revert was not performed. Wine catalog entries and import history are unchanged. Ask a manager to review the import.",
+      },
+      batches: [],
+    });
+
+    const response = await POST(request(), { params: params() });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "import_source_conflict",
+        message: "Import inventory is linked to multiple import rows, so this revert was not performed. Wine catalog entries and import history are unchanged. Ask a manager to review the import.",
+        details: { batches: [] },
       },
     });
   });
 
   it("keeps successful session reverts at 200", async () => {
-    const batches = [{ batchId: "b1", chunkIndex: 1, skipped: false, revertedCount: 3 }];
+    const batches = [{
+      batchId: "11111111-1111-4111-8111-111111111111",
+      chunkIndex: 1,
+      skipped: false,
+      revertedCount: 3,
+      orphanWinesDeleted: 0,
+      lwinStampsCleared: 1,
+    }];
     mockRevertImportSession.mockResolvedValue({ ok: true, sessionId: SESSION_ID, batches });
     const response = await POST(request(), { params: params() });
     expect(response.status).toBe(200);
@@ -72,9 +97,14 @@ describe("POST /api/import/sessions/[id]/revert", () => {
     const missing = await POST(request(), { params: params() });
     expect(missing.status).toBe(404);
 
-    mockRevertImportSession.mockRejectedValueOnce(new Error("sensitive database detail"));
+    mockRevertImportSession.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "internal_error", message: "Could not revert import session." },
+    });
     const failed = await POST(request(), { params: params() });
     expect(failed.status).toBe(500);
-    expect(await failed.json()).toEqual({ error: { code: "internal_error", message: "Internal server error." } });
+    expect(await failed.json()).toEqual({
+      error: { code: "internal_error", message: "Could not revert import session." },
+    });
   });
 });

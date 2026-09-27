@@ -34,6 +34,7 @@ class Query {
   private filters: Filter[] = [];
   private fields = "*";
   private maxRows: number | null = null;
+  private rangeBounds: { from: number; to: number } | null = null;
   private mutation: { kind: "insert" | "update"; value: Row | Row[] } | null = null;
   private orderBy: { column: string; ascending: boolean } | null = null;
 
@@ -90,15 +91,21 @@ class Query {
     return this;
   }
 
-  order(column: string, options: { ascending: boolean }) {
+  order(column: string, options: { ascending?: boolean } = {}) {
     this.operations[this.table].push(["order", column, options]);
-    this.orderBy = { column, ascending: options.ascending };
+    this.orderBy = { column, ascending: options.ascending ?? true };
     return this;
   }
 
   limit(count: number) {
     this.operations[this.table].push(["limit", count]);
     this.maxRows = count;
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.operations[this.table].push(["range", from, to]);
+    this.rangeBounds = { from, to };
     return this;
   }
 
@@ -132,6 +139,9 @@ class Query {
         const compared = String(a[column]).localeCompare(String(b[column]));
         return ascending ? compared : -compared;
       });
+    }
+    if (this.rangeBounds) {
+      rows = rows.slice(this.rangeBounds.from, this.rangeBounds.to + 1);
     }
     return this.maxRows == null ? rows : rows.slice(0, this.maxRows);
   }

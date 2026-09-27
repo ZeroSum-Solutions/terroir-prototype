@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   resolveHouseProfile: vi.fn(),
   resolveReferenceProfile: vi.fn(),
   resolveCellarContext: vi.fn(),
-  resolveSitePricingAccess: vi.fn(),
+  resolveSitePricingReadAccess: vi.fn(),
   started: [] as string[],
 }));
 
@@ -29,7 +29,7 @@ vi.mock("@/domains/wine-profile/resolve-cellar-context", async (importOriginal) 
   resolveCellarContext: mocks.resolveCellarContext,
 }));
 vi.mock("@/lib/api/site-capability", () => ({
-  resolveSitePricingAccess: mocks.resolveSitePricingAccess,
+  resolveSitePricingReadAccess: mocks.resolveSitePricingReadAccess,
 }));
 vi.mock("./wine-detail-view", () => ({ WineDetailView: () => null }));
 
@@ -122,11 +122,7 @@ beforeEach(() => {
   mocks.resolveHouseProfile.mockImplementation(deferred("house", HOUSE));
   mocks.resolveReferenceProfile.mockImplementation(deferred("reference", REFERENCE));
   mocks.resolveCellarContext.mockImplementation(deferred("cellar", CELLAR));
-  mocks.resolveSitePricingAccess.mockResolvedValue({
-    canReadCost: false,
-    canReadMargin: false,
-    canManagePricing: false,
-  });
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(false);
 });
 
 it("404s a segment that is not a wine id without querying", async () => {
@@ -160,12 +156,11 @@ it("scopes the wine query, and every resolver, to the caller's restaurant", asyn
 
   expect(filters["wines.id"]).toBe(WINE_ID);
   expect(filters["wines.restaurant_id"]).toBe("r-1");
-  expect(mocks.resolveSitePricingAccess).toHaveBeenCalledWith(client, "r-1");
+  expect(mocks.resolveSitePricingReadAccess).toHaveBeenCalledWith(client, "r-1");
   expect(mocks.resolveHouseProfile).toHaveBeenCalledWith(client, "r-1", WINE_ID);
   expect(mocks.resolveCellarContext).toHaveBeenCalledWith(client, "r-1", WINE_ID, 750, {
     canReadCost: false,
     canReadMargin: false,
-    canManagePricing: false,
   });
   expect(mocks.resolveReferenceProfile).toHaveBeenCalledWith(
     client,
@@ -221,31 +216,20 @@ it("does not derive a cost badge without both exact-site read grants", async () 
     weightedUnitCost: 100,
   });
 
-  for (const access of [
-    { canReadCost: false, canReadMargin: false, canManagePricing: false },
-    { canReadCost: true, canReadMargin: false, canManagePricing: false },
-    { canReadCost: false, canReadMargin: true, canManagePricing: false },
-  ]) {
-    mocks.resolveSitePricingAccess.mockResolvedValueOnce(access);
-    const element = await WineDetailPage({
-      params: Promise.resolve({ wineId: WINE_ID }),
-    });
+  mocks.resolveSitePricingReadAccess.mockResolvedValueOnce(false);
+  const element = await WineDetailPage({
+    params: Promise.resolve({ wineId: WINE_ID }),
+  });
 
-    expect(element.props.badges.value.map((badge: { kind: string }) => badge.kind))
-      .not.toContain("below_cost");
-    expect(JSON.stringify(element.props)).not.toContain("weighted average cost");
-  }
+  expect(element.props.badges.value.map((badge: { kind: string }) => badge.kind))
+    .not.toContain("below_cost");
+  expect(JSON.stringify(element.props)).not.toContain("weighted average cost");
 });
 
 it("derives a cost badge only with explicit cost and margin read grants", async () => {
   const { client } = supabaseReturning(WINE);
   mocks.getAuthContext.mockResolvedValue({ supabase: client, restaurantId: "r-1" });
-  const access = {
-    canReadCost: true,
-    canReadMargin: true,
-    canManagePricing: false,
-  };
-  mocks.resolveSitePricingAccess.mockResolvedValue(access);
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(true);
   mocks.resolveCellarContext.mockResolvedValue({
     ...CELLAR,
     publishedBottlePrice: 35,
@@ -259,7 +243,7 @@ it("derives a cost badge only with explicit cost and margin read grants", async 
     "r-1",
     WINE_ID,
     750,
-    access,
+    { canReadCost: true, canReadMargin: true },
   );
   expect(element.props.badges.value.map((badge: { kind: string }) => badge.kind))
     .toContain("below_cost");

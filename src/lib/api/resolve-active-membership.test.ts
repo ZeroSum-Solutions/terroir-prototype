@@ -23,10 +23,14 @@ vi.mock("@/lib/api/shadow-site-access", async (importOriginal) => {
 
 const { resolveActiveMembership } = await import("./resolve-active-membership");
 
+const USER_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const SITE_A = "11111111-1111-4111-8111-111111111111";
+const SITE_B = "22222222-2222-4222-8222-222222222222";
+
 const RESOLVED: ShadowSiteAccessObservation = {
   state: "resolved",
   value: {
-    siteId: "11111111-1111-4111-8111-111111111111",
+    siteId: SITE_A,
     workspaceId: "33333333-3333-4333-8333-333333333333",
     legacyRole: "manager",
     roleKey: "beverage_manager",
@@ -48,18 +52,28 @@ const RESOLVED: ShadowSiteAccessObservation = {
 
 type MembershipRow = {
   restaurant_id: string;
-  role: "owner" | "manager" | "staff" | null;
-  restaurants: { name: string } | null;
+  restaurant_name: string;
+  role: "owner" | "manager" | "staff";
 };
 
-function clientWith(data: MembershipRow[] | null, error: unknown = null) {
-  const finalOrder = vi.fn(() => Promise.resolve({ data, error }));
-  const firstOrder = vi.fn(() => ({ order: finalOrder }));
-  const eq = vi.fn(() => ({ order: firstOrder }));
-  const select = vi.fn(() => ({ eq }));
-  const from = vi.fn(() => ({ select }));
-  const client = { from } as unknown as SupabaseClient<Database>;
-  return { client, from, select, eq, firstOrder, finalOrder };
+function membership(overrides: Partial<MembershipRow> = {}): MembershipRow {
+  return {
+    restaurant_id: SITE_A,
+    restaurant_name: "Osteria Scala",
+    role: "staff",
+    ...overrides,
+  };
+}
+
+function clientWith(data: unknown, error: unknown = null) {
+  const rpc = vi.fn().mockResolvedValue({ data, error });
+  const client = { rpc } as unknown as SupabaseClient<Database>;
+  return { client, rpc };
+}
+
+function expectNoSelectionSideEffects() {
+  expect(mocks.readActiveRestaurantFromCookie).not.toHaveBeenCalled();
+  expect(mocks.observeShadowSiteAccess).not.toHaveBeenCalled();
 }
 
 describe("resolveActiveMembership", () => {
@@ -69,63 +83,73 @@ describe("resolveActiveMembership", () => {
     mocks.observeShadowSiteAccess.mockResolvedValue(RESOLVED);
   });
 
-  it("keeps deterministic fallback selection and observes it once with the same client", async () => {
-    const newest = "11111111-1111-4111-8111-111111111111";
-    const older = "22222222-2222-4222-8222-222222222222";
-    const harness = clientWith([
-      { restaurant_id: newest, role: "manager", restaurants: { name: "Newest" } },
-      { restaurant_id: older, role: "owner", restaurants: { name: "Older" } },
-    ]);
+  it("uses the exact actor RPC and preserves its deterministic fallback order", async () => {
+    const rows = [
+      membership({ restaurant_name: "Newest", role: "manager" }),
+      membership({ restaurant_id: SITE_B, restaurant_name: "Older", role: "owner" }),
+    ];
+    const harness = clientWith(rows);
 
-    const result = await resolveActiveMembership(harness.client, "user-1");
+    const result = await resolveActiveMembership(harness.client, USER_ID);
 
     expect(result).toEqual({
-      restaurantId: newest,
+      restaurantId: SITE_A,
       restaurantName: "Newest",
       role: "manager",
       shadowAccess: RESOLVED,
     });
-    expect(harness.from).toHaveBeenCalledWith("memberships");
-    expect(harness.select).toHaveBeenCalledWith(
-      "restaurant_id, role, restaurants(name)",
+    expect(harness.rpc).toHaveBeenCalledOnce();
+    expect(harness.rpc).toHaveBeenCalledWith(
+      "read_current_operational_memberships",
+      { p_user_id: USER_ID },
     );
-    expect(harness.eq).toHaveBeenCalledWith("user_id", "user-1");
-    expect(harness.firstOrder).toHaveBeenCalledWith("created_at", {
-      ascending: false,
-    });
-    expect(harness.finalOrder).toHaveBeenCalledWith("id", { ascending: false });
-    expect(mocks.readActiveRestaurantFromCookie).toHaveBeenCalledWith([newest, older]);
-    expect(mocks.observeShadowSiteAccess).toHaveBeenCalledTimes(1);
+    expect(mocks.readActiveRestaurantFromCookie).toHaveBeenCalledWith([
+      SITE_A,
+      SITE_B,
+    ]);
+    expect(mocks.observeShadowSiteAccess).toHaveBeenCalledOnce();
     expect(mocks.observeShadowSiteAccess).toHaveBeenCalledWith(
       harness.client,
-      newest,
+      SITE_A,
       "manager",
     );
   });
 
-  it("observes the cookie-selected membership without changing its role or name", async () => {
-    const newest = "11111111-1111-4111-8111-111111111111";
-    const older = "22222222-2222-4222-8222-222222222222";
+  it("selects a signed-cookie site only from the validated current rows", async () => {
     const harness = clientWith([
-      { restaurant_id: newest, role: "manager", restaurants: { name: "Newest" } },
-      { restaurant_id: older, role: "owner", restaurants: { name: "Older" } },
+      membership({ restaurant_name: "Newest", role: "manager" }),
+      membership({ restaurant_id: SITE_B, restaurant_name: "Older", role: "owner" }),
     ]);
-    mocks.readActiveRestaurantFromCookie.mockResolvedValue(older);
+    mocks.readActiveRestaurantFromCookie.mockResolvedValue(SITE_B);
     mocks.observeShadowSiteAccess.mockResolvedValue({ state: "denied" });
 
-    const result = await resolveActiveMembership(harness.client, "user-1");
-
-    expect(result).toEqual({
-      restaurantId: older,
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toEqual({
+      restaurantId: SITE_B,
       restaurantName: "Older",
       role: "owner",
       shadowAccess: { state: "denied" },
     });
     expect(mocks.observeShadowSiteAccess).toHaveBeenCalledWith(
       harness.client,
-      older,
+      SITE_B,
       "owner",
     );
+  });
+
+  it("falls back to the first ordered row when the cookie helper returns no current site", async () => {
+    const harness = clientWith([
+      membership({ restaurant_name: "Newest", role: "manager" }),
+      membership({ restaurant_id: SITE_B, restaurant_name: "Older", role: "owner" }),
+    ]);
+    mocks.readActiveRestaurantFromCookie.mockResolvedValue(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toMatchObject({
+      restaurantId: SITE_A,
+      restaurantName: "Newest",
+      role: "manager",
+    });
   });
 
   it.each([
@@ -139,59 +163,93 @@ describe("resolveActiveMembership", () => {
       state: "invalid result",
       observation: { state: "unavailable", reason: "invalid_result" },
     },
-  ] as const)("preserves legacy selection for $state", async ({ observation }) => {
+  ] as const)("keeps operational selection authoritative when shadow is $state", async ({ observation }) => {
     const harness = clientWith([
-      {
-        restaurant_id: "11111111-1111-4111-8111-111111111111",
-        role: "manager",
-        restaurants: { name: "Legacy authority" },
-      },
+      membership({ restaurant_name: "Operational authority", role: "manager" }),
     ]);
     mocks.observeShadowSiteAccess.mockResolvedValue(observation);
 
-    const result = await resolveActiveMembership(harness.client, "user-1");
-
-    expect(result).toMatchObject({
-      restaurantId: "11111111-1111-4111-8111-111111111111",
-      restaurantName: "Legacy authority",
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toMatchObject({
+      restaurantId: SITE_A,
+      restaurantName: "Operational authority",
       role: "manager",
       shadowAccess: observation,
     });
   });
 
-  it("returns null and skips shadow observation when no membership exists", async () => {
+  it("returns null before cookie or shadow work for a valid empty result", async () => {
     const harness = clientWith([]);
-    await expect(resolveActiveMembership(harness.client, "user-1")).resolves.toBeNull();
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toBeNull();
+    expectNoSelectionSideEffects();
+  });
+
+  it("returns null before cookie or shadow work for an RPC error", async () => {
+    const harness = clientWith([membership()], { message: "membership failed" });
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toBeNull();
+    expectNoSelectionSideEffects();
+  });
+
+  it("fails closed when the RPC promise rejects", async () => {
+    const rpc = vi.fn().mockRejectedValue(new Error("private provider detail"));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(resolveActiveMembership(client, USER_ID)).resolves.toBeNull();
+    expectNoSelectionSideEffects();
+  });
+
+  it("returns null before cookie or shadow work for null RPC data", async () => {
+    const harness = clientWith(null);
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toBeNull();
+    expectNoSelectionSideEffects();
+  });
+
+  it.each([
+    ["a non-array response", {}],
+    ["an extra key", [{ ...membership(), workspace_id: SITE_B }]],
+    ["an unknown role", [{ ...membership(), role: "admin" }]],
+    ["null name and role fallbacks", [{ ...membership(), restaurant_name: null, role: null }]],
+    [
+      "a duplicate site",
+      [membership(), membership({ restaurant_name: "Duplicate", role: "owner" })],
+    ],
+  ])("returns null for %s before cookie or shadow work", async (_case, data) => {
+    const harness = clientWith(data);
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toBeNull();
+    expectNoSelectionSideEffects();
+  });
+
+  it("uses the database name verbatim without inventing a fallback", async () => {
+    const harness = clientWith([membership({ restaurant_name: "" })]);
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toMatchObject({
+      restaurantName: "",
+      role: "staff",
+    });
+  });
+
+  it("propagates cookie-provider failures without running shadow observation", async () => {
+    const harness = clientWith([membership()]);
+    const failure = new Error("cookie secret unavailable");
+    mocks.readActiveRestaurantFromCookie.mockRejectedValue(failure);
+
+    await expect(resolveActiveMembership(harness.client, USER_ID)).rejects.toBe(failure);
     expect(mocks.observeShadowSiteAccess).not.toHaveBeenCalled();
   });
 
-  it("returns null and skips shadow observation on a membership provider error", async () => {
-    const harness = clientWith(null, { message: "membership failed" });
-    await expect(resolveActiveMembership(harness.client, "user-1")).resolves.toBeNull();
-    expect(mocks.observeShadowSiteAccess).not.toHaveBeenCalled();
-  });
-
-  it("preserves the legacy staff and restaurant-name fallbacks", async () => {
-    const harness = clientWith([
-      {
-        restaurant_id: "11111111-1111-4111-8111-111111111111",
-        role: null,
-        restaurants: null,
-      },
-    ]);
+  it("keeps staff operational access independent from pricing capabilities", async () => {
+    const harness = clientWith([membership({ role: "staff" })]);
     mocks.observeShadowSiteAccess.mockResolvedValue({ state: "denied" });
 
-    const result = await resolveActiveMembership(harness.client, "user-1");
-
-    expect(result).toMatchObject({
-      restaurantName: "My Restaurant",
+    await expect(resolveActiveMembership(harness.client, USER_ID)).resolves.toEqual({
+      restaurantId: SITE_A,
+      restaurantName: "Osteria Scala",
       role: "staff",
       shadowAccess: { state: "denied" },
     });
-    expect(mocks.observeShadowSiteAccess).toHaveBeenCalledWith(
-      harness.client,
-      "11111111-1111-4111-8111-111111111111",
-      "staff",
-    );
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
   });
 });

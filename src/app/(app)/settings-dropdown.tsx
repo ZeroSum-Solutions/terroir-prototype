@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { BookOpen, Archive, DollarSign, LogOut, Settings, Upload, Users } from "lucide-react";
+import { BookOpen, Archive, DollarSign, ListOrdered, LogOut, Settings, Upload, Users } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useOfflineSessionBoundary } from "./offline-session-boundary";
 
@@ -111,8 +111,8 @@ export function SettingsDropdown() {
       />
         <div
           ref={menuRef}
-          className="glass fixed z-[var(--z-overlay)] w-[180px] rounded-card"
-          style={{ top: anchor?.top ?? 64, right: anchor?.right ?? 16 }}
+          className="glass fixed z-[var(--z-overlay)] w-[180px] overflow-y-auto rounded-card"
+          style={{ top: anchor?.top ?? 64, right: anchor?.right ?? 16, maxHeight: `calc(100dvh - ${(anchor?.top ?? 64) + 8}px)` }}
           role="menu"
         >
           <div className="flex flex-col py-xs">
@@ -138,11 +138,22 @@ export function SettingsDropdown() {
               <Archive className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
               Bins
             </Link>
+            <Link
+              ref={(el) => { itemsRef.current[2] = el; }}
+              href="/cellar/config"
+              onClick={close}
+              role="menuitem"
+              tabIndex={-1}
+              className="flex min-h-11 items-center gap-sm px-md py-sm text-control text-ink transition-colors hover:text-accent focus-ring"
+            >
+              <ListOrdered className="h-4 w-4 text-grey" strokeWidth={1.75} aria-hidden="true" />
+              Cellar sections
+            </Link>
             {/* Reconcile lives on the dashboard as a live-count CTA; the
                 duplicate menu entry (without the count) is gone
                 (Kimi audit 2026-08-26). */}
             <Link
-              ref={(el) => { itemsRef.current[2] = el; }}
+              ref={(el) => { itemsRef.current[3] = el; }}
               href="/team"
               onClick={close}
               role="menuitem"
@@ -153,7 +164,7 @@ export function SettingsDropdown() {
               Team
             </Link>
             <Link
-              ref={(el) => { itemsRef.current[3] = el; }}
+              ref={(el) => { itemsRef.current[4] = el; }}
               href="/import"
               onClick={close}
               role="menuitem"
@@ -164,7 +175,7 @@ export function SettingsDropdown() {
               Import
             </Link>
             <Link
-              ref={(el) => { itemsRef.current[4] = el; }}
+              ref={(el) => { itemsRef.current[5] = el; }}
               href="/get-started"
               onClick={close}
               role="menuitem"
@@ -188,7 +199,7 @@ export function SettingsDropdown() {
               }}
             >
               <button
-                ref={(el) => { itemsRef.current[5] = el; }}
+                ref={(el) => { itemsRef.current[6] = el; }}
                 type="submit"
                 disabled={sessionBoundary?.signOutInProgress}
                 role="menuitem"

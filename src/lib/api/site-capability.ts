@@ -11,21 +11,17 @@ export const SITE_CAPABILITY_DEADLINE_MS = 750;
 
 type SiteCapability = "cost.read" | "margin.read" | "pricing.manage";
 
-type CapabilityRpcClient = {
-  rpc: (
-    name: "effective_site_capability",
-    args: { p_restaurant_id: string; p_capability_key: SiteCapability },
-  ) => {
-    abortSignal: (
-      signal: AbortSignal,
-    ) => PromiseLike<{ data: unknown; error: unknown }>;
-  };
-};
+export class SiteCapabilityResolutionError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super("Site capability evaluation failed.", options);
+    this.name = "SiteCapabilityResolutionError";
+  }
+}
 
 const DEADLINE = Symbol("site-capability-deadline");
 
 async function hasExactSiteCapability(
-  client: CapabilityRpcClient,
+  client: SupabaseClient<Database>,
   restaurantId: string,
   capability: SiteCapability,
 ): Promise<boolean> {
@@ -44,15 +40,19 @@ async function hasExactSiteCapability(
       p_restaurant_id: restaurantId,
       p_capability_key: capability,
     });
-    const request = Promise.resolve(builder.abortSignal(controller.signal)).catch(
-      () => null,
-    );
+    const request = Promise.resolve(builder.abortSignal(controller.signal));
     const result = await Promise.race([request, deadline]);
-    if (result === DEADLINE || result == null) return false;
+    if (result === DEADLINE) {
+      throw new SiteCapabilityResolutionError();
+    }
     const { data, error } = result;
-    return error == null && data === true;
-  } catch {
-    return false;
+    if (error != null || typeof data !== "boolean") {
+      throw new SiteCapabilityResolutionError({ cause: error });
+    }
+    return data;
+  } catch (error) {
+    if (error instanceof SiteCapabilityResolutionError) throw error;
+    throw new SiteCapabilityResolutionError({ cause: error });
   } finally {
     clearTimeout(handle);
   }
@@ -60,19 +60,47 @@ async function hasExactSiteCapability(
 
 /**
  * Resolves the accepted C04 exact-site pricing authority for this request.
- * The cast is intentionally isolated because migration 0154 has not generated
- * client types yet. An absent RPC, database error, or non-boolean result denies.
+ * A boolean false is an explicit restricted state. Transport, RPC, timeout, and
+ * malformed-result failures remain errors so callers cannot misreport an
+ * authorization outage as an absent grant.
  */
 export async function resolveSitePricingAccess(
   client: SupabaseClient<Database>,
   restaurantId: string,
 ): Promise<SitePricingAccess> {
-  const rpcClient = client as unknown as CapabilityRpcClient;
   const [canReadCost, canReadMargin, canManagePricing] = await Promise.all([
-    hasExactSiteCapability(rpcClient, restaurantId, "cost.read"),
-    hasExactSiteCapability(rpcClient, restaurantId, "margin.read"),
-    hasExactSiteCapability(rpcClient, restaurantId, "pricing.manage"),
+    hasExactSiteCapability(client, restaurantId, "cost.read"),
+    hasExactSiteCapability(client, restaurantId, "margin.read"),
+    hasExactSiteCapability(client, restaurantId, "pricing.manage"),
   ]);
 
   return { canReadCost, canReadMargin, canManagePricing };
+}
+
+/** Resolves only the exact cost.read authority needed by a cost-only route. */
+export function resolveSiteCostReadAccess(
+  client: SupabaseClient<Database>,
+  restaurantId: string,
+): Promise<boolean> {
+  return hasExactSiteCapability(client, restaurantId, "cost.read");
+}
+
+/** Resolves only the exact margin.read authority needed by a margin-only route. */
+export function resolveSiteMarginReadAccess(
+  client: SupabaseClient<Database>,
+  restaurantId: string,
+): Promise<boolean> {
+  return hasExactSiteCapability(client, restaurantId, "margin.read");
+}
+
+/** Resolves the two read grants required by mixed cost-and-margin output. */
+export async function resolveSitePricingReadAccess(
+  client: SupabaseClient<Database>,
+  restaurantId: string,
+): Promise<boolean> {
+  const [canReadCost, canReadMargin] = await Promise.all([
+    hasExactSiteCapability(client, restaurantId, "cost.read"),
+    hasExactSiteCapability(client, restaurantId, "margin.read"),
+  ]);
+  return canReadCost && canReadMargin;
 }

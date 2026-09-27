@@ -42,10 +42,17 @@ export function pickRowChip(
   );
   if (status === "past_peak") return { label: "Past peak", tone: "urgent" };
 
+  const openMl = row.activeOpenMl ?? row.open_remaining_ml;
+  const hasMeasuredStock =
+    row.sealed_count > 0 ||
+    (row.size_ml != null && row.size_ml > 0 && openMl != null && openMl > 0);
+  const bottleEquivalentStock =
+    row.sealed_count +
+    (row.size_ml != null && row.size_ml > 0 ? (openMl ?? 0) / row.size_ml : 0);
   const isLowStock =
     lowStockThreshold != null &&
-    row.sealed_count > 0 &&
-    row.sealed_count < lowStockThreshold;
+    hasMeasuredStock &&
+    bottleEquivalentStock < lowStockThreshold;
   if (isLowStock) return { label: "Low stock", tone: "attention" };
 
   if (status === "drink_now") {
@@ -60,7 +67,6 @@ export function pickRowChip(
     return { label: "Duplicate?", tone: "neutral" };
   }
 
-  const openMl = row.activeOpenMl ?? row.open_remaining_ml;
   const isOpen = openMl !== null && openMl > 0;
   if (isOpen) {
     const oz = (openMl! / ML_PER_OZ).toFixed(1);

@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
 
-const auth = vi.hoisted(() => ({ requireMembership: vi.fn(), requireRole: vi.fn() }));
+const auth = vi.hoisted(() => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/api/auth", () => ({
-  requireMembership: (...args: unknown[]) => auth.requireMembership(...args),
   requireRole: (...args: unknown[]) => auth.requireRole(...args),
 }));
 
@@ -11,6 +10,7 @@ const { PATCH } = await import("./route");
 
 const SCAN_ID = "11111111-1111-4111-8111-111111111111";
 const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
+const UPDATED_AT = "2026-09-26T12:00:00.000Z";
 
 function lineItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -38,50 +38,45 @@ function makeRequest(body: unknown) {
   }) as NextRequest;
 }
 
-function makeSupabase(options: {
-  fetch?: { data: unknown; error: unknown };
-  update?: { error: unknown };
-} = {}) {
-  const fetchFilters: Array<[string, string]> = [];
-  const updateFilters: Array<[string, string]> = [];
-  const update = vi.fn();
-  const fetchBuilder = {
-    select: vi.fn(() => fetchBuilder),
-    eq: vi.fn((column: string, value: string) => {
-      fetchFilters.push([column, value]);
-      return fetchBuilder;
-    }),
-    single: vi.fn(() =>
-      Promise.resolve(
-        options.fetch ?? { data: { id: SCAN_ID }, error: null },
-      ),
-    ),
+function reviewBody(overrides: Record<string, unknown> = {}) {
+  return {
+    expectedUpdatedAt: UPDATED_AT,
+    distributor: "Reliable Distribution",
+    invoiceNumber: "INV-1",
+    invoiceDate: "2026-09-26",
+    items: [lineItem()],
+    edits: {},
+    ...overrides,
   };
-  const updateBuilder = {
-    update: vi.fn((payload: unknown) => {
-      update(payload);
-      return updateBuilder;
+}
+
+function makeReviewSupabase(result: { data: unknown; error: unknown } = {
+  data: { scanId: SCAN_ID, status: "complete", itemCount: 1, updated: true },
+  error: null,
+}) {
+  const rpc = vi.fn(async () => result);
+  const filters = new Map<string, unknown>();
+  const query = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn((column: string, value: unknown) => {
+      filters.set(column, value);
+      return query;
     }),
-    eq: vi.fn((column: string, value: string) => {
-      updateFilters.push([column, value]);
-      return updateBuilder;
-    }),
-    then: (resolve: (value: { error: unknown }) => void) =>
-      Promise.resolve(options.update ?? { error: null }).then(resolve),
+    maybeSingle: vi.fn(async () => ({
+      data: filters.get("restaurant_id") === RESTAURANT_ID ? { id: SCAN_ID } : null,
+      error: null as unknown,
+    })),
   };
-  const from = vi
-    .fn()
-    .mockReturnValueOnce(fetchBuilder)
-    .mockReturnValueOnce(updateBuilder);
-  return { supabase: { from }, from, update, fetchFilters, updateFilters };
+  const from = vi.fn(() => query);
+  return { supabase: { rpc, from }, rpc, from, query };
 }
 
 function authorize(supabase: unknown) {
-  auth.requireMembership.mockResolvedValue({
+  auth.requireRole.mockResolvedValue({
     supabase,
     restaurantId: RESTAURANT_ID,
     user: { id: "33333333-3333-4333-8333-333333333333" },
-    role: "staff",
+    role: "manager",
   });
 }
 
@@ -89,100 +84,139 @@ describe("PATCH /api/scans/[id]", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it.each([
-    ["fractional quantity", lineItem({ qty: 1.5 }), {}],
-    ["fractional vintage", lineItem({ vintage: 2019.5 }), {}],
-    ["out-of-range confidence", lineItem({ confidence: 1.1 }), {}],
-    ["false edit markers", lineItem(), { "line-1:name": false }],
-  ])("rejects %s before database work", async (_name, item, edits) => {
-    const { supabase, from } = makeSupabase();
+    ["fractional quantity", { items: [lineItem({ qty: 1.5 })] }],
+    ["fractional vintage", { items: [lineItem({ vintage: 2019.5 })] }],
+    ["out-of-range confidence", { items: [lineItem({ confidence: 1.1 })] }],
+    ["false edit markers", { edits: { "line-1:name": false } }],
+    ["an invalid displayed revision", { expectedUpdatedAt: "not-a-date" }],
+    ["an extra top-level key", { protectedCost: 95 }],
+    ["an extra line key", { items: [lineItem({ protectedCost: 95 })] }],
+    ["a malformed matched wine identity", { items: [lineItem({ wine_id: "not-a-uuid" })] }],
+    ["too many line items", { items: Array.from({ length: 501 }, () => lineItem()) }],
+    ["an oversized field", { distributor: "x".repeat(501) }],
+  ])("rejects %s before database work", async (_name, overrides) => {
+    const { supabase, rpc } = makeReviewSupabase();
     authorize(supabase);
 
-    const response = await PATCH(makeRequest({ items: [item], edits }), {
+    const response = await PATCH(makeRequest(reviewBody(overrides)), {
       params: Promise.resolve({ id: SCAN_ID }),
     });
 
     expect(response.status).toBe(400);
-    expect(from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("distinguishes a missing scan from a lookup failure", async () => {
-    const missing = makeSupabase({
-      fetch: {
-        data: null,
-        error: { code: "PGRST116", message: "no rows" },
-      },
-    });
-    authorize(missing.supabase);
-    const missingResponse = await PATCH(
-      makeRequest({ items: [lineItem()], edits: {} }),
-      { params: Promise.resolve({ id: SCAN_ID }) },
-    );
-    expect(missingResponse.status).toBe(404);
-
-    const failed = makeSupabase({
-      fetch: {
-        data: null,
-        error: { code: "XX000", message: "secret database detail" },
-      },
-    });
-    authorize(failed.supabase);
-    const failedResponse = await PATCH(
-      makeRequest({ items: [lineItem()], edits: {} }),
-      { params: Promise.resolve({ id: SCAN_ID }) },
-    );
-    expect(failedResponse.status).toBe(500);
-    expect(await failedResponse.json()).toEqual({
-      error: { code: "internal_error", message: "Internal server error." },
-    });
+  it("binds an otherwise authorized review to the selected venue", async () => {
+    const db = makeReviewSupabase();
+    db.query.maybeSingle.mockResolvedValue({ data: null, error: null });
+    authorize(db.supabase);
+    const response = await PATCH(makeRequest(reviewBody()), { params: Promise.resolve({ id: SCAN_ID }) });
+    expect(response.status).toBe(404);
+    expect(db.from).toHaveBeenCalledWith("invoice_scans");
+    expect(db.query.select).toHaveBeenCalledWith("id");
+    expect(db.query.eq).toHaveBeenCalledWith("id", SCAN_ID);
+    expect(db.query.eq).toHaveBeenCalledWith("restaurant_id", RESTAURANT_ID);
+    expect(db.rpc).not.toHaveBeenCalled();
   });
 
-  it("persists canonical low fields and coherent scan metadata", async () => {
-    const db = makeSupabase();
+  it.each(["returned", "thrown"])("does not review after a %s site lookup failure", async (kind) => {
+    const db = makeReviewSupabase();
+    db.query.maybeSingle.mockResolvedValue({ data: null, error: { message: "private lookup" } });
+    if (kind === "thrown") db.query.maybeSingle.mockRejectedValue(new Error("private lookup"));
+    authorize(db.supabase);
+    const response = await PATCH(makeRequest(reviewBody()), { params: Promise.resolve({ id: SCAN_ID }) });
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain("private lookup");
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it("requires manager authorization before the review RPC", async () => {
+    const { rpc } = makeReviewSupabase();
+    auth.requireRole.mockResolvedValue(NextResponse.json({ error: "no" }, { status: 403 }));
+    const response = await PATCH(makeRequest(reviewBody()), {
+      params: Promise.resolve({ id: SCAN_ID }),
+    });
+    expect(response.status).toBe(403);
+    expect(auth.requireRole).toHaveBeenCalledWith(["owner", "manager"]);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends displayed CAS, metadata, line edits, and identities through one closed RPC", async () => {
+    const db = makeReviewSupabase();
     authorize(db.supabase);
 
     const response = await PATCH(
-      makeRequest({
+      makeRequest(reviewBody({
         items: [lineItem()],
         edits: { "line-1:name": true },
-      }),
+      })),
       { params: Promise.resolve({ id: SCAN_ID }) },
     );
 
     expect(response.status).toBe(200);
-    expect(db.fetchFilters).toEqual([
-      ["id", SCAN_ID],
-      ["restaurant_id", RESTAURANT_ID],
-    ]);
-    expect(db.updateFilters).toEqual([
-      ["id", SCAN_ID],
-      ["restaurant_id", RESTAURANT_ID],
-    ]);
-    expect(db.update).toHaveBeenCalledWith(
+    expect(await response.json()).toEqual({
+      scanId: SCAN_ID,
+      status: "complete",
+      itemCount: 1,
+      updated: true,
+    });
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.rpc).toHaveBeenCalledWith("review_invoice_scan", {
+      p_scan_id: SCAN_ID,
+      p_expected_updated_at: UPDATED_AT,
+      p_distributor_name: "Reliable Distribution",
+      p_invoice_number: "INV-1",
+      p_invoice_date: "2026-09-26",
+      p_final_line_items: [lineItem()],
+      p_edits: { "line-1:name": true },
+    });
+  });
+
+  it("preserves a reconciled wine identity through the closed review RPC", async () => {
+    const db = makeReviewSupabase();
+    authorize(db.supabase);
+    const wineId = "33333333-3333-4333-8333-333333333333";
+    const response = await PATCH(makeRequest(reviewBody({
+      items: [lineItem({ wine_id: wineId })],
+    })), { params: Promise.resolve({ id: SCAN_ID }) });
+    expect(response.status).toBe(200);
+    expect(db.rpc).toHaveBeenCalledWith(
+      "review_invoice_scan",
       expect.objectContaining({
-        item_count: 1,
-        accuracy_score: 6 / 7,
-        final_line_items: [
-          expect.objectContaining({
-            lowFields: ["currency", "format"],
-          }),
-        ],
+        p_final_line_items: [lineItem({ wine_id: wineId })],
       }),
     );
   });
 
-  it("redacts update failures", async () => {
-    const db = makeSupabase({
-      update: { error: { message: "sensitive update detail" } },
-    });
+  it.each([
+    ["stale review", { code: "P0001", message: "scan_superseded" }, 409, "scan_superseded"],
+    ["committed review", { code: "P0001", message: "scan_already_committed" }, 409, "scan_already_committed"],
+    ["missing or cross-site cost grant", { code: "42501", message: "forbidden" }, 403, "forbidden"],
+  ])("maps %s to a safe refusal", async (_name, error, status, code) => {
+    const db = makeReviewSupabase({ data: null, error });
     authorize(db.supabase);
+    const response = await PATCH(makeRequest(reviewBody()), {
+      params: Promise.resolve({ id: SCAN_ID }),
+    });
+    expect(response.status).toBe(status);
+    expect((await response.json()).error.code).toBe(code);
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+  });
 
-    const response = await PATCH(
-      makeRequest({ items: [lineItem()], edits: {} }),
-      { params: Promise.resolve({ id: SCAN_ID }) },
-    );
-
+  it.each([
+    { scanId: "33333333-3333-4333-8333-333333333333", status: "complete", itemCount: 1, updated: true },
+    { scanId: SCAN_ID, status: "complete", itemCount: 2, updated: true },
+    { scanId: SCAN_ID, status: "complete", itemCount: 1, updated: true, unitCost: 95 },
+  ])("rejects malformed or mismatched review receipt %#", async (data) => {
+    const db = makeReviewSupabase({ data, error: null });
+    authorize(db.supabase);
+    const response = await PATCH(makeRequest(reviewBody()), {
+      params: Promise.resolve({ id: SCAN_ID }),
+    });
     expect(response.status).toBe(500);
-    expect(JSON.stringify(await response.json())).not.toContain("sensitive");
+    expect(await response.json()).toEqual({
+      error: { code: "internal_error", message: "Internal server error." },
+    });
   });
 });
 

@@ -79,6 +79,7 @@ describe("SettingsDropdown touch targets", () => {
     expect(actions.map((action) => action.textContent?.trim())).toEqual([
       "Pricing",
       "Bins",
+      "Cellar sections",
       "Team",
       "Import",
       "Setup guide",
@@ -115,6 +116,37 @@ describe("SettingsDropdown touch targets", () => {
         /focus(-visible)?:(ring|outline)/,
       );
     }
+  });
+
+  it("makes membership-wide cellar sections reachable and closes on selection", async () => {
+    const container = await mount(<SettingsDropdown />);
+    await openMenu(container);
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/cellar/config"]');
+    expect(link?.textContent?.trim()).toBe("Cellar sections");
+    expect(link?.getAttribute("role")).toBe("menuitem");
+    await act(async () => link?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(container.querySelector('button[aria-label="Settings"]'));
+  });
+
+  it("keeps the added section entry in keyboard order and wraps through sign out", async () => {
+    const container = await mount(<SettingsDropdown />);
+    await openMenu(container);
+    const labels = ["Pricing", "Bins", "Cellar sections", "Team", "Import", "Setup guide", "Sign out", "Pricing"];
+    for (const label of labels) {
+      await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+      expect(document.activeElement?.textContent?.trim()).toBe(label);
+    }
+    await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it("bounds the expanded menu to the viewport instead of clipping later actions", async () => {
+    const container = await mount(<SettingsDropdown />);
+    await openMenu(container);
+    const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.className).toContain("overflow-y-auto");
+    expect(menu.style.maxHeight).toBe("calc(100dvh - 16px)");
   });
 
   it("preserves the native POST form without a JavaScript boundary", async () => {

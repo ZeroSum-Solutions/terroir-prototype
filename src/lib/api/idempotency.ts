@@ -1,262 +1,239 @@
-/**
- * BND-006 / INT-005 — Request-level idempotency for mutating endpoints.
- *
- * Used by the two inventory-save routes so that a client retrying after a
- * network hiccup gets the same response back instead of double-inserting
- * rows. The client generates a UUIDv4 once per "logical save attempt" and
- * sends it in the `Idempotency-Key` header; the same key is reused across
- * network retries but NOT across a successful save (the scanner clears it
- * after the 2xx lands).
- *
- * Storage model (see migration 0011_scan_idempotency.sql):
- *   table scan_idempotency(
- *     key uuid, restaurant_id uuid,
- *     response_status int, response_body jsonb,
- *     created_at timestamptz
- *   )
- *   primary key (key, restaurant_id)
- *
- * Two-phase write so concurrent retries don't collide:
- *   1. INSERT a sentinel row (status/body null). PK = (key, restaurant).
- *      - No conflict → we own the key; run the handler.
- *      - Conflict    → another call already claimed it; look it up.
- *   2. After the handler returns, UPDATE the row with (status, body).
- *      If the handler throws, DELETE the row so the user can retry
- *      cleanly — we never want a server-side exception to permanently
- *      "lock" a key for 24 hours.
- *
- * Scope: the key is scoped to a (key, restaurant_id) pair so a stolen
- * UUID from another tenant cannot replay a response across the boundary.
- * RLS also enforces this server-side — belt and suspenders.
- *
- * NOTE ON TYPING: the `scan_idempotency` table is now in the generated
- * Database type, so `from("scan_idempotency")` returns a fully typed
- * builder. We still downcast the chain to the simplified
- * `LooseQueryBuilder` shape below because Supabase's real
- * `PostgrestQueryBuilder` is deeply generic and would bloat this file
- * without adding meaningful safety — the call sites are all covered
- * by tests in idempotency.test.ts.
- */
-
-import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "@/types/database";
+import {
+  ScanIdempotencyKeySchema,
+  ScanIdempotencyReceiptSchema,
+  decodeScanIdempotencyClaimResult,
+  scanIdempotencyFailureHttpResult,
+  scanIdempotencySuccessStatus,
+  type ScanIdempotencyKind,
+  type ScanIdempotencyReceipt,
+} from "@/lib/api/scan-idempotency-contract";
+import type { Database } from "@/types/database";
 
-/** Default TTL for cached responses. Matches the server-side cleanup window. */
-export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** Result returned to the route handler. */
-export type IdempotencyResult<T> = {
+export type IdempotencyHttpResult = {
   status: number;
-  body: T;
-  /** True when the response came from the cache rather than a fresh handler run. */
+  body: unknown;
   replayed: boolean;
 };
 
-/**
- * Validate a client-supplied Idempotency-Key header.
- *
- * C26 (db audit 2026-08-23): scan_idempotency.key is a `uuid` column
- * (migration 0011). The previous check accepted any opaque
- * [A-Za-z0-9_-]{8,128} string — a non-UUID key made the claim INSERT fail
- * with 22P02 (invalid input syntax for type uuid), which `withIdempotency`
- * treats as "any other error: log and fall through to handler without
- * caching" (a deliberate availability-over-caching choice for genuinely
- * unexpected errors). For this specific, entirely predictable shape
- * mismatch, that meant every retry with a non-UUID key silently ran the
- * handler again with no error ever surfacing to the client — e.g. two
- * `inventory_items` rows inserted for what the caller believed was one
- * save. Every real caller already sends `crypto.randomUUID()` (see
- * src/app/(app)/scan/scanner.tsx), so requiring UUID shape here matches
- * both the column type and actual client behavior; it accepts no fewer
- * real keys than before.
- */
-export function isValidIdempotencyKey(raw: string | null): raw is string {
-  if (typeof raw !== "string") return false;
-  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(raw);
-}
-
-// DEBT-015: replaced `type LooseChain = any` with a precise structural
-// type covering exactly the chain methods this module uses. The real
-// @supabase/postgrest-js builder types are deeply generic and would
-// require propagating Database lookups through every helper; the
-// trade-off below is "just-enough" typing — eq() returns the same
-// builder so chained eq() calls still compose, maybeSingle() ends the
-// chain, and insert/update/delete produce a result promise. No `any`
-// escape hatches in the module.
-
-type IdempRow = {
-  response_status: number | null;
-  response_body: Json | null;
-  created_at: string;
-};
-
-type SupabaseError = { code?: string; message?: string } | null;
-
-interface ChainWithEq<TResult> {
-  eq(column: string, value: string): ChainWithEq<TResult>;
-  then<TOut>(
-    resolve: (v: { data: TResult | null; error: SupabaseError }) => TOut,
-  ): Promise<TOut>;
-  maybeSingle(): Promise<{ data: TResult | null; error: SupabaseError }>;
-}
-
-type LooseQueryBuilder = {
-  insert(
-    row: Partial<IdempRow> & { key: string; restaurant_id: string },
-  ): Promise<{ error: SupabaseError }>;
-  select(cols: string): ChainWithEq<IdempRow>;
-  update(
-    row: Partial<IdempRow>,
-  ): ChainWithEq<never>;
-  delete(): ChainWithEq<never>;
-};
-
-function idempTable(supabase: SupabaseClient<Database>): LooseQueryBuilder {
-  // See NOTE ON TYPING above. Typed `from("scan_idempotency")` now
-  // resolves against the generated Database; only the chain shape is
-  // simplified via LooseQueryBuilder.
-  return supabase.from("scan_idempotency") as unknown as LooseQueryBuilder;
-}
-
-/**
- * Run `handler` under idempotency protection.
- *
- * Behaviour by input:
- *   - `key === null`        → handler runs, no caching (caller opted out).
- *   - first time for a key  → handler runs, response is cached, replayed=false.
- *   - retry of a completed  → cached (status,body) returned, replayed=true.
- *   - retry while in-flight → 409 "request in progress".
- *   - retry after TTL       → 409 "key expired; generate a new one".
- *
- * If the handler THROWS, the claim row is deleted and the error propagates.
- * This keeps genuine server errors retryable.
- */
-export async function withIdempotency<T>(opts: {
-  supabase: SupabaseClient<Database>;
-  restaurantId: string;
-  key: string | null;
-  /** TTL for a cached response. Defaults to 24h — must match the SQL cleanup. */
-  ttlMs?: number;
-  handler: () => Promise<{ status: number; body: T }>;
-  /** Injected clock for tests. */
-  now?: () => number;
-}): Promise<IdempotencyResult<T>> {
-  const {
-    supabase,
-    restaurantId,
-    key,
-    ttlMs = IDEMPOTENCY_TTL_MS,
-    handler,
-    now = Date.now,
-  } = opts;
-
-  if (!key) {
-    const fresh = await handler();
-    return { ...fresh, replayed: false };
-  }
-
-  const tbl = idempTable(supabase);
-
-  // ── 1. Claim ────────────────────────────────────────────────────────
-  const { error: insertError } = await tbl.insert({
-    key,
-    restaurant_id: restaurantId,
-    response_status: null,
-    response_body: null,
-  });
-
-  if (insertError) {
-    // 23505 = unique_violation → key already claimed.
-    if (insertError.code !== "23505") {
-      // Any other error: log and fall through to handler without caching,
-      // so the endpoint doesn't become unavailable if idempotency is broken.
-      console.error("scan_idempotency claim failed:", insertError);
-      Sentry.captureException(insertError, {
-        tags: { surface: "idempotency", phase: "claim" },
-        extra: { code: (insertError as { code?: string }).code },
-      });
-      const fresh = await handler();
-      return { ...fresh, replayed: false };
-    }
-
-    // Look up the existing row.
-    const { data: existing } = await tbl
-      .select("response_status, response_body, created_at")
-      .eq("key", key)
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-
-    if (!existing) {
-      // Race: row was deleted between our failed insert and this select.
-      // Re-run the handler without caching — worst case the client retries.
-      const fresh = await handler();
-      return { ...fresh, replayed: false };
-    }
-
-    const row = existing as {
-      response_status: number | null;
-      response_body: Json | null;
-      created_at: string;
+export type IdempotencyHandlerResult<TReceipt extends ScanIdempotencyReceipt> =
+  | { outcome: "complete"; receipt: TReceipt }
+  | {
+      outcome: "abandon";
+      response: { status: number; body: unknown };
     };
 
-    const age = now() - Date.parse(row.created_at);
-    if (age > ttlMs) {
-      return {
-        status: 409,
-        body: {
-          error: "Idempotency key expired; please generate a new one.",
-        } as unknown as T,
-        replayed: false,
-      };
-    }
+type ReceiptForKind<TKind extends ScanIdempotencyKind> = Extract<
+  ScanIdempotencyReceipt,
+  { kind: TKind }
+>;
 
-    if (row.response_status === null) {
-      return {
-        status: 409,
-        body: {
-          error: "A request with this Idempotency-Key is already in progress.",
-        } as unknown as T,
-        replayed: false,
-      };
-    }
+type RpcError = { code?: string; message?: string } | null;
 
+export function isValidIdempotencyKey(raw: string | null): raw is string {
+  return ScanIdempotencyKeySchema.safeParse(raw).success;
+}
+
+export function invalidIdempotencyKeyResult(): IdempotencyHttpResult {
+  return {
+    status: 400,
+    body: {
+      error: {
+        code: "idempotency_key_required",
+        message: "A valid Idempotency-Key UUID is required.",
+      },
+    },
+    replayed: false,
+  };
+}
+
+function isConflict(error: RpcError): boolean {
+  return (
+    error?.code === "P0001" &&
+    error.message?.trim() === "C04_IDEMPOTENCY_CONFLICT"
+  );
+}
+
+function singletonClaimRow(value: unknown): unknown {
+  if (!Array.isArray(value) || value.length !== 1) {
+    throw new Error("claim_scan_idempotency returned an unexpected result");
+  }
+  return value[0];
+}
+
+function receiptMatches(
+  actual: ScanIdempotencyReceipt,
+  expected: ScanIdempotencyReceipt,
+): boolean {
+  if (actual.kind !== expected.kind) return false;
+  if (actual.version !== 1 || expected.version !== 1) return false;
+  if (actual.status !== expected.status) return false;
+  if (actual.itemCount !== expected.itemCount) return false;
+  if (actual.kind === "invoice_scan_upload") {
+    return (
+      expected.kind === "invoice_scan_upload" &&
+      actual.scanId === expected.scanId
+    );
+  }
+  if (actual.kind === "invoice_inventory_save") {
+    return (
+      expected.kind === "invoice_inventory_save" &&
+      actual.scanId === expected.scanId &&
+      actual.wineCount === expected.wineCount
+    );
+  }
+  return (
+    expected.kind === "bottle_inventory_save" &&
+    actual.wineId === expected.wineId
+  );
+}
+
+function completionArgs(receipt: ScanIdempotencyReceipt) {
+  if (receipt.kind === "invoice_scan_upload") {
     return {
-      status: row.response_status,
-      body: row.response_body as T,
+      p_scan_id: receipt.scanId,
+      p_item_count: 0,
+      p_wine_count: null,
+      p_wine_id: null,
+    };
+  }
+  if (receipt.kind === "invoice_inventory_save") {
+    return {
+      p_scan_id: receipt.scanId,
+      p_item_count: receipt.itemCount,
+      p_wine_count: receipt.wineCount,
+      p_wine_id: null,
+    };
+  }
+  return {
+    p_scan_id: null,
+    p_item_count: 1,
+    p_wine_count: null,
+    p_wine_id: receipt.wineId,
+  };
+}
+
+/**
+ * Execute one of the three scan mutations under the actor/site/kind-bound
+ * 24-hour transport cache.
+ *
+ * The handler explicitly distinguishes a known rolled-back/refused result
+ * (`abandon`) from a successful business receipt (`complete`). An exception
+ * is intentionally not abandoned: a thrown transport error can happen after
+ * the database committed, so clearing the claim would invite an unsafe retry.
+ * Likewise, completion failures leave the claim in progress and return a
+ * fixed error rather than acknowledging an uncached mutation as successful.
+ */
+export async function withIdempotency<
+  TKind extends ScanIdempotencyKind,
+>(opts: {
+  supabase: SupabaseClient<Database>;
+  restaurantId: string;
+  key: string;
+  kind: TKind;
+  handler: () => Promise<IdempotencyHandlerResult<ReceiptForKind<TKind>>>;
+}): Promise<IdempotencyHttpResult> {
+  const { supabase, restaurantId, key, kind, handler } = opts;
+  if (!isValidIdempotencyKey(key)) return invalidIdempotencyKeyResult();
+
+  let claimData: unknown;
+  let claimError: RpcError;
+  try {
+    const claim = await supabase.rpc("claim_scan_idempotency", {
+      p_restaurant_id: restaurantId,
+      p_key: key,
+      p_kind: kind,
+    });
+    claimData = claim.data;
+    claimError = claim.error;
+  } catch {
+    return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+  }
+
+  if (claimError) {
+    return {
+      ...scanIdempotencyFailureHttpResult(
+        isConflict(claimError) ? "conflict" : "error",
+      ),
+      replayed: false,
+    };
+  }
+
+  let claim;
+  try {
+    claim = decodeScanIdempotencyClaimResult(
+      kind,
+      singletonClaimRow(claimData),
+    );
+  } catch {
+    return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+  }
+
+  if (claim.disposition === "replay") {
+    return {
+      status: scanIdempotencySuccessStatus(claim.receipt),
+      body: claim.receipt,
       replayed: true,
     };
   }
+  if (claim.disposition !== "claimed") {
+    return {
+      ...scanIdempotencyFailureHttpResult(claim.disposition),
+      replayed: false,
+    };
+  }
 
-  // ── 2. We own the key. Run the handler. ────────────────────────────
-  let result: { status: number; body: T };
+  // Do not catch handler exceptions. The outcome is uncertain until a caller
+  // explicitly returns `abandon`, so the claim must remain in progress.
+  const result = await handler();
+  if (result.outcome === "abandon") {
+    try {
+      // Supabase 2.103 models scalar RPCs as a filter builder even though
+      // awaiting the request yields the ordinary `{data,error}` envelope.
+      const abandoned = await (supabase.rpc("abandon_scan_idempotency", {
+        p_restaurant_id: restaurantId,
+        p_key: key,
+        p_kind: kind,
+      }) as unknown as PromiseLike<{ data: boolean | null; error: RpcError }>);
+      if (abandoned.error || abandoned.data !== true) {
+        return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+      }
+    } catch {
+      return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+    }
+    return { ...result.response, replayed: false };
+  }
+
+  let expectedReceipt: ReceiptForKind<TKind>;
   try {
-    result = await handler();
-  } catch (err) {
-    // Unclaim so the user can retry without hitting a stale "in progress".
-    await tbl
-      .delete()
-      .eq("key", key)
-      .eq("restaurant_id", restaurantId);
-    throw err;
+    const parsed = ScanIdempotencyReceiptSchema.parse(result.receipt);
+    if (parsed.kind !== kind) throw new Error("receipt kind mismatch");
+    expectedReceipt = parsed as ReceiptForKind<TKind>;
+  } catch {
+    return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
   }
 
-  // ── 3. Cache the response ──────────────────────────────────────────
-  const { error: updateError } = await tbl
-    .update({
-      response_status: result.status,
-      response_body: result.body as unknown as Json,
-    })
-    .eq("key", key)
-    .eq("restaurant_id", restaurantId);
-
-  if (updateError) {
-    // Non-fatal: the response is still correct, just won't be replayed.
-    console.error("scan_idempotency cache update failed:", updateError);
-    Sentry.captureException(updateError, {
-      tags: { surface: "idempotency", phase: "cache-update" },
-    });
+  try {
+    const completed = await supabase.rpc("complete_scan_idempotency", {
+      p_restaurant_id: restaurantId,
+      p_key: key,
+      p_kind: kind,
+      ...completionArgs(expectedReceipt),
+    } as never);
+    if (completed.error) {
+      return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+    }
+    const storedReceipt = ScanIdempotencyReceiptSchema.parse(completed.data);
+    if (!receiptMatches(storedReceipt, expectedReceipt)) {
+      return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
+    }
+  } catch {
+    return { ...scanIdempotencyFailureHttpResult("error"), replayed: false };
   }
 
-  return { ...result, replayed: false };
+  return {
+    status: scanIdempotencySuccessStatus(expectedReceipt),
+    body: expectedReceipt,
+    replayed: false,
+  };
 }

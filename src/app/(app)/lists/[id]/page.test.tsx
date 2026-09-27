@@ -3,9 +3,12 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireMembership: vi.fn(),
-  resolveSitePricingAccess: vi.fn(),
+  resolveSitePricingReadAccess: vi.fn(),
   latestUnitCostByWine: vi.fn(),
   suggestPricesForWine: vi.fn(),
+  readInventoryCosts: vi.fn(),
+  readRestaurantPricingDefaults: vi.fn(),
+  readWinePricingStrategy: vi.fn(),
   redirect: vi.fn(),
   notFound: vi.fn(),
 }));
@@ -14,11 +17,16 @@ vi.mock("@/lib/api/auth", () => ({
   requireMembership: mocks.requireMembership,
 }));
 vi.mock("@/lib/api/site-capability", () => ({
-  resolveSitePricingAccess: mocks.resolveSitePricingAccess,
+  resolveSitePricingReadAccess: mocks.resolveSitePricingReadAccess,
 }));
 vi.mock("@/domains/wine-lists/list-item-pricing", () => ({
   latestUnitCostByWine: mocks.latestUnitCostByWine,
   suggestPricesForWine: mocks.suggestPricesForWine,
+}));
+vi.mock("@/lib/staff-cost/protected-readers", () => ({
+  readInventoryCosts: mocks.readInventoryCosts,
+  readRestaurantPricingDefaults: mocks.readRestaurantPricingDefaults,
+  readWinePricingStrategy: mocks.readWinePricingStrategy,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -86,21 +94,13 @@ const LIST = {
 
 function supabaseReturning(options: {
   inventoryError?: unknown;
-  restaurantError?: unknown;
 } = {}) {
   const selections: Array<{ table: string; columns: string }> = [];
   const tables: Record<string, { data: unknown; error: unknown }> = {
     wine_lists: { data: LIST, error: null },
     brand_kits: { data: null, error: null },
-    restaurants: {
-      data: {
-        default_target_markup_ratio: 2.7,
-        default_target_pour_cost_pct: 0.24,
-      },
-      error: options.restaurantError ?? null,
-    },
     inventory_items: {
-      data: [{ wine_id: "wine-1", unit_cost: 40, added_at: "2026-09-01" }],
+      data: [{ id: "inventory-1", wine_id: "wine-1", added_at: "2026-09-01" }],
       error: options.inventoryError ?? null,
     },
   };
@@ -138,15 +138,27 @@ function editorProps(element: Awaited<ReturnType<typeof WineListEditorPage>>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.resolveSitePricingAccess.mockResolvedValue({
-    canReadCost: false,
-    canReadMargin: false,
-    canManagePricing: false,
-  });
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(false);
   mocks.latestUnitCostByWine.mockReturnValue(new Map([["wine-1", 40]]));
   mocks.suggestPricesForWine.mockReturnValue({
     suggestedGlass: 22,
     suggestedBottle: 175,
+  });
+  mocks.readInventoryCosts.mockResolvedValue([{
+    inventory_item_id: "inventory-1",
+    wine_id: "wine-1",
+    unit_cost: 40,
+    added_at: "2026-09-01",
+  }]);
+  mocks.readWinePricingStrategy.mockResolvedValue([{
+    wine_id: "wine-1",
+    pricing_target_markup_ratio: 2.5,
+    pricing_target_pour_cost_pct: 0.22,
+  }]);
+  mocks.readRestaurantPricingDefaults.mockResolvedValue({
+    restaurant_id: "restaurant-1",
+    default_target_markup_ratio: 2.7,
+    default_target_pour_cost_pct: 0.24,
   });
 });
 
@@ -178,7 +190,7 @@ it("keeps a staff list safe and usable without exact-site cost authority", async
   const item = props.sections[0].wine_list_items[0];
   const serialized = JSON.stringify(props);
 
-  expect(mocks.resolveSitePricingAccess).toHaveBeenCalledWith(client, "restaurant-1");
+  expect(mocks.resolveSitePricingReadAccess).toHaveBeenCalledWith(client, "restaurant-1");
   const wineListProjection = selections.find(
     (selection) => selection.table === "wine_lists",
   )?.columns;
@@ -187,7 +199,6 @@ it("keeps a staff list safe and usable without exact-site cost authority", async
     /rating|retail_median|pricing_target_markup_ratio|pricing_target_pour_cost_pct/,
   );
   expect(wineListProjection).toMatch(/is_eightysixed/);
-  expect(selections.some((selection) => selection.table === "restaurants")).toBe(false);
   expect(selections.some((selection) => selection.table === "inventory_items")).toBe(false);
   expect(mocks.latestUnitCostByWine).not.toHaveBeenCalled();
   expect(mocks.suggestPricesForWine).not.toHaveBeenCalled();
@@ -215,17 +226,12 @@ it("does not turn a legacy manager or one read grant into cost authority", async
     restaurantId: "restaurant-1",
     role: "manager",
   });
-  mocks.resolveSitePricingAccess.mockResolvedValue({
-    canReadCost: true,
-    canReadMargin: false,
-    canManagePricing: true,
-  });
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(false);
 
   const props = editorProps(await WineListEditorPage({
     params: Promise.resolve({ id: "list-1" }),
   }));
 
-  expect(selections.some((selection) => selection.table === "restaurants")).toBe(false);
   expect(selections.some((selection) => selection.table === "inventory_items")).toBe(false);
   expect(mocks.suggestPricesForWine).not.toHaveBeenCalled();
   expect(props.sections[0].wine_list_items[0].suggested_bottle_price).toBeNull();
@@ -239,11 +245,7 @@ it("retains suggestions with both read grants without requiring pricing manage",
     restaurantId: "restaurant-1",
     role: "staff",
   });
-  mocks.resolveSitePricingAccess.mockResolvedValue({
-    canReadCost: true,
-    canReadMargin: true,
-    canManagePricing: false,
-  });
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(true);
 
   const props = editorProps(await WineListEditorPage({
     params: Promise.resolve({ id: "list-1" }),
@@ -251,8 +253,7 @@ it("retains suggestions with both read grants without requiring pricing manage",
   const item = props.sections[0].wine_list_items[0];
 
   expect(selections.find((selection) => selection.table === "wine_lists")?.columns)
-    .toMatch(/pricing_target_markup_ratio, pricing_target_pour_cost_pct/);
-  expect(selections.some((selection) => selection.table === "restaurants")).toBe(true);
+    .not.toMatch(/pricing_target_markup_ratio|pricing_target_pour_cost_pct/);
   expect(selections.some((selection) => selection.table === "inventory_items")).toBe(true);
   expect(mocks.latestUnitCostByWine).toHaveBeenCalledWith([
     { wine_id: "wine-1", unit_cost: 40, added_at: "2026-09-01" },
@@ -262,10 +263,10 @@ it("retains suggestions with both read grants without requiring pricing manage",
       pricing_target_markup_ratio: 2.5,
       pricing_target_pour_cost_pct: 0.22,
     }),
-    {
+    expect.objectContaining({
       default_target_markup_ratio: 2.7,
       default_target_pour_cost_pct: 0.24,
-    },
+    }),
     40,
     150,
     72,
@@ -278,27 +279,19 @@ it("retains suggestions with both read grants without requiring pricing manage",
   expect(props.canManage).toBe(false);
 });
 
-it("does not assess margin when an authorized protected read fails", async () => {
-  const { client } = supabaseReturning({ inventoryError: { message: "permission denied" } });
+it("fails instead of reporting no suggestion when an authorized protected read fails", async () => {
+  const { client } = supabaseReturning();
   mocks.requireMembership.mockResolvedValue({
     supabase: client,
     restaurantId: "restaurant-1",
     role: "owner",
   });
-  mocks.resolveSitePricingAccess.mockResolvedValue({
-    canReadCost: true,
-    canReadMargin: true,
-    canManagePricing: true,
-  });
+  mocks.resolveSitePricingReadAccess.mockResolvedValue(true);
 
-  const props = editorProps(await WineListEditorPage({
+  mocks.readInventoryCosts.mockRejectedValue({ message: "permission denied" });
+
+  await expect(WineListEditorPage({
     params: Promise.resolve({ id: "list-1" }),
-  }));
-  const item = props.sections[0].wine_list_items[0];
-
-  expect(mocks.latestUnitCostByWine).not.toHaveBeenCalled();
+  })).rejects.toEqual({ message: "permission denied" });
   expect(mocks.suggestPricesForWine).not.toHaveBeenCalled();
-  expect(item.suggested_glass_price).toBeNull();
-  expect(item.suggested_bottle_price).toBeNull();
-  expect(props.canManage).toBe(true);
 });

@@ -25,6 +25,7 @@ describe("scan review mobile controls", () => {
           distributor="Reliable Distribution"
           invoiceNumber="INV-1"
           invoiceDate="2026-08-21"
+          expectedUpdatedAt="2026-09-26T12:00:00.000Z"
           accuracy={98}
           itemCount={1}
           createdAt="2026-08-21T00:00:00.000Z"

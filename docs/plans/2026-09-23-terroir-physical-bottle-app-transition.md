@@ -172,6 +172,87 @@ until replay resolves it. Editing or refreshing versions after a definitive non-
 creates a new batch operation; it must never silently
 reuse an unresolved UUID for a different set.
 
+### September 25: retain a stale count while starting a separate count
+
+Bounded C06/C07 implementation detail, pending source review and proof. This
+implements the definitive-non-commit transition above without weakening
+`app_spec.txt`'s requirement to preserve the entire failed draft. It does not add
+server stocktake history or complete the reconciliation journey.
+
+- Only a physical response with HTTP 409, nested error code
+  `reconciliation_batch_stale`, the submitted `Idempotency-Key`, and
+  `Idempotency-Replayed: false` qualifies. Existing SQL checks this conflict before
+  batch effects and rolls the transaction back. Classification also depends on
+  completed-receipt lookup preceding staleness checks (0153's batch RPC): a committed
+  operation must replay even after the underlying bottle changes. Generic conflicts, mismatched or
+  absent headers, network/5xx failures, and invalid receipts remain uncertain;
+  they keep the exact original UUID/payload and the existing retry path.
+- Retain the exact serialized active v2 draft in a separate sessionStorage key
+  scoped by restaurant, authenticated user, and operation UUID. Include the
+  observed stale outcome and observation time. The frozen UUID, canonical payload,
+  all pending entries/notes/expected versions, and original saved time remain
+  byte-preserved in `failedDraftRaw`. Validate identity and payload before retention.
+  An existing different snapshot for the same operation is an error, not an overwrite.
+  Retrying or remounting the same frozen operation must not rewrite its original
+  `savedAt` or serialized draft; preserve an already verified matching active copy
+  and suspend ordinary autosave while it is frozen.
+  The new retained-record helper reads raw bytes directly without calling the
+  destructive active-draft parser. Use the distinct prefix
+  `terroir:reconcile-retained`; the record owns `failedDraftRaw`. Re-observing the
+  same stale operation is an idempotent no-op, including its first observation time.
+- Read back and verify retention before offering a fresh-count transition. Quota,
+  readback, corruption, or removal failures block recovery and leave evidence
+  untouched. Never run ordinary draft TTL expiry or discard helpers on retained
+  keys. Records last for the existing browser-tab session, not across devices or
+  after the tab closes; the UI must state that limitation.
+  Offer retrying the local retention check when storage becomes available. Do not
+  offer destructive eviction or a “continue without evidence” escape: those would
+  violate the approved preservation rule. While storage remains unavailable the
+  fresh-count action is unavailable, with explicit copy; no false liveness claim.
+- A verified stale outcome replaces “Retry prior reconciliation” with the explicit
+  retain-and-fresh-count path. Keep the frozen operation intact until verified slot
+  release, then clear its React state together with pending entries. No server retry
+  is needed for this definitive classification; uncertain outcomes retain that retry.
+- “Start a fresh count” requires explicit confirmation. Cancellation changes no
+  active draft. Record and verify that confirmation separately from the immutable
+  snapshot, then recheck the matching active operation before releasing its active
+  slot. This releases only the slot, not the failed draft. Suspend the normal
+  autosave effect during this handoff using a synchronously set one-way ref read
+  inside the effect; do not rely on a later state render. Readback checks the entire
+  retained record, not only operation ID/payload. A crash before slot release leaves both
+  copies; a crash afterward still leaves the complete retained record.
+- After slot release, keep controls blocked and perform a full navigation to the
+  existing force-dynamic `/cellar/reconcile` page. A call to `router.refresh()` is
+  not proof that fresh bottle versions arrived. If navigation fails, remain blocked
+  and offer another reload, never enable editing against old props. Start with no
+  pending measurements; do not copy stale values into a new count. The next
+  submission gets a new UUID and versions captured from the refreshed rows.
+- On remount, load retained evidence independently of active drafts. Show it even
+  when the original bottle disappeared or no active bottles remain. Render original
+  bottle IDs, versions, measurements, notes, operation UUID, and canonical payload
+  from stored evidence, not the current wine list. Label it “Previous count not
+  applied,” not saved inventory or a committed audit event. An interrupted confirmed
+  handoff may resume only after revalidating the retained and active identities.
+- A later valid success, active-draft discard, or modal discard must leave every
+  retained snapshot unchanged. No prune/delete/export action is part of this leaf.
+
+Interaction reference: [Acctual unsaved-change confirmation](https://refero.design/pages/a5c01677-92fa-4620-8d62-dc0f85cbf847),
+inspected September 25. Borrow its brief consequence statement and explicit paired
+choices, not its discard behavior, red CTA, palette, or fonts. Keep the existing
+DESIGN.md/Authkit/Vivid+Co reference lock: Manrope controls, Bone/Obsidian tokens,
+one primary action, visible focus, >=44px targets. Use an inline confirmation within
+the existing reconciliation surface to avoid nesting dialogs. Read-only evidence is
+collapsed by default, wraps long IDs/payloads, and needs no imagery or new dependency.
+
+Verification must cover exact stale classification and uncertain negative controls;
+completed-receipt replay against changed bottle rows before stale classification;
+byte-preserving multi-record storage and tenant/user isolation; quota/readback/remove
+errors and interruption at handoff boundaries; cancellation/double-click/remount;
+no new edit or submit before a full refresh; fresh UUID/versions with no copied
+counts; missing/closed/all-empty live rows; and unchanged retained records after
+later success or modal discard. Record focused tests and independent TypeScript/
+Opus review separately from real-browser, full-width, and live database evidence.
+
 The discard route does not introduce a `discard` event kind. Its exact-remainder event
 is `spill`; `discard` names only the command, receipt and effect linked to that event.
 

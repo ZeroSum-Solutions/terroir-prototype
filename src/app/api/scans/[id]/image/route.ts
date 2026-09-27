@@ -7,6 +7,7 @@ import {
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
 import { parseParams } from "@/lib/api/validation";
 import { ScanIdParamsSchema } from "@/lib/scanner/request-schemas";
 
@@ -25,6 +26,8 @@ export async function GET(
 
     const parsedParams = await parseParams(params, ScanIdParamsSchema);
     if (!parsedParams.ok) return parsedParams.response;
+    const canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+    if (!canReadCost) return Errors.forbidden("Cost read access required.");
 
     try {
       const url = await getScanImageUrl({

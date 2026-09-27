@@ -1421,11 +1421,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "open_bottles_source_inventory_item_id_fkey"
-            columns: ["source_inventory_item_id"]
+            foreignKeyName: "open_bottles_source_inventory_item_tenant_wine_fkey"
+            columns: ["source_inventory_item_id", "restaurant_id", "wine_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "restaurant_id", "wine_id"]
           },
           {
             foreignKeyName: "open_bottles_wine_id_fkey"
@@ -1808,6 +1808,7 @@ export type Database = {
       }
       scan_idempotency: {
         Row: {
+          claimed_by_user_id: string | null
           created_at: string
           key: string
           response_body: Json | null
@@ -1815,6 +1816,7 @@ export type Database = {
           restaurant_id: string
         }
         Insert: {
+          claimed_by_user_id?: string | null
           created_at?: string
           key: string
           response_body?: Json | null
@@ -1822,6 +1824,7 @@ export type Database = {
           restaurant_id: string
         }
         Update: {
+          claimed_by_user_id?: string | null
           created_at?: string
           key?: string
           response_body?: Json | null
@@ -2841,11 +2844,38 @@ export type Database = {
       }
     }
     Functions: {
+      abandon_scan_idempotency: {
+        Args: { p_key: string; p_kind: string; p_restaurant_id: string }
+        Returns: boolean
+      }
+      accept_reconcile_batch: {
+        Args: {
+          p_actions: Json
+          p_idempotency_key: string
+          p_restaurant_id: string
+        }
+        Returns: Json
+      }
       add_manual_overrides: {
+        Args: { p_fields: string[]; p_wine_id: string }
+        Returns: Json
+      }
+      add_manual_overrides_pre_0157: {
         Args: { p_fields: string[]; p_wine_id: string }
         Returns: undefined
       }
       apply_import_batch_chunk: {
+        Args: { p_batch_id: string; p_limit?: number }
+        Returns: {
+          error_code: string
+          error_message: string
+          inventory_item_id: string
+          outcome: string
+          row_id: string
+          row_number: number
+        }[]
+      }
+      apply_import_batch_chunk_pre_0157: {
         Args: { p_batch_id: string; p_limit?: number }
         Returns: {
           error_message: string
@@ -2855,9 +2885,21 @@ export type Database = {
           row_number: number
         }[]
       }
+      assign_wine_sections_private: {
+        Args: {
+          p_restaurant_id: string
+          p_section: string | null
+          p_wine_ids: string[]
+        }
+        Returns: Json
+      }
       backfill_wine_identity: {
         Args: { p_restaurant_id?: string }
         Returns: number
+      }
+      bulk_resolve_import_batch_rows: {
+        Args: { p_action: string; p_batch_id: string }
+        Returns: Json
       }
       claim_invoice_extract_job: {
         Args: { p_worker_id: string }
@@ -2891,7 +2933,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_scan_idempotency: {
+        Args: { p_key: string; p_kind: string; p_restaurant_id: string }
+        Returns: {
+          disposition: string
+          receipt: Json
+        }[]
+      }
       cleanup_scan_idempotency: { Args: never; Returns: undefined }
+      cleanup_scan_idempotency_pre_0157: { Args: never; Returns: undefined }
       close_open_bottle: {
         Args: {
           p_actual_remaining_ml: number
@@ -2922,7 +2972,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_invoice_scan: { Args: { p_scan_id: string }; Returns: Json }
+      complete_scan_idempotency: {
+        Args: {
+          p_item_count: number
+          p_key: string
+          p_kind: string
+          p_restaurant_id: string
+          p_scan_id: string | null
+          p_wine_count: number | null
+          p_wine_id: string | null
+        }
+        Returns: Json
+      }
       count_import_batch_rows: {
+        Args: { p_batch_id: string }
+        Returns: {
+          applied: number
+          eligible_not_applied: number
+          excluded: number
+          pending: number
+          total: number
+        }[]
+      }
+      count_import_batch_rows_pre_0157: {
         Args: { p_batch_id: string }
         Returns: {
           applied: number
@@ -2947,11 +3020,80 @@ export type Database = {
         }
         Returns: Json
       }
+      create_import_batch_pre_0157: {
+        Args: {
+          p_chunk_index?: number
+          p_chunk_total?: number
+          p_content_sha256?: string
+          p_created_by: string
+          p_filename: string
+          p_restaurant_id: string
+          p_rows: Json
+          p_session_id?: string
+          p_source_sha256?: string
+          p_total_rows: number
+        }
+        Returns: Json
+      }
+      create_inventory_item_private: {
+        Args: {
+          p_added_via?: Database["public"]["Enums"]["added_via"]
+          p_bin_id?: string | null
+          p_bin_location?: string | null
+          p_currency?: string | null
+          p_format?: string | null
+          p_invoice_scan_id?: string | null
+          p_quantity: number
+          p_restaurant_id: string
+          p_section?: string | null
+          p_unit_cost?: number
+          p_wine_id: string
+        }
+        Returns: Json
+      }
+      create_invoice_scan_upload: {
+        Args: {
+          p_distributor_name: string
+          p_invoice_date: string | null
+          p_invoice_number: string | null
+          p_object_name: string
+          p_restaurant_id: string
+          p_scan_id: string
+        }
+        Returns: Json
+      }
       current_inventory_contract_version: { Args: never; Returns: number }
+      current_site_role_at_least: {
+        Args: {
+          p_required: Database["public"]["Enums"]["membership_role"]
+          p_restaurant_id: string
+        }
+        Returns: boolean
+      }
       delete_invoice_scan: { Args: { p_scan_id: string }; Returns: Json }
+      delete_invoice_scan_pre_0156: {
+        Args: { p_scan_id: string }
+        Returns: Json
+      }
+      delete_invoice_scan_pre_0157: {
+        Args: { p_scan_id: string }
+        Returns: Json
+      }
+      delete_wine_private: {
+        Args: {
+          p_expected_updated_at: string
+          p_restaurant_id: string
+          p_wine_id: string
+        }
+        Returns: Json
+      }
       dismiss_pricing_alert: {
         Args: { p_days?: number; p_wine_id: string }
         Returns: string
+      }
+      dismiss_pricing_alert_private: {
+        Args: { p_days?: number; p_wine_id: string }
+        Returns: Json
       }
       effective_site_capability: {
         Args: { p_capability_key: string; p_restaurant_id: string }
@@ -2972,7 +3114,28 @@ export type Database = {
         Args: { p_enrichments: Json; p_restaurant_id: string }
         Returns: number
       }
+      enrich_wines_batch_pre_0157: {
+        Args: { p_enrichments: Json; p_restaurant_id: string }
+        Returns: number
+      }
       execute_inventory_command: {
+        Args: {
+          p_actual_remaining_ml?: number
+          p_command: string
+          p_expected_open_bottle_id?: string
+          p_expected_opened_at?: string
+          p_ml?: number
+          p_note?: string
+          p_operation_id: string
+          p_preservation_method?: string
+          p_reason_code_id?: string
+          p_restaurant_id: string
+          p_wine_id: string
+          p_written_off_ml?: number
+        }
+        Returns: Json
+      }
+      execute_inventory_command_pre_0156: {
         Args: {
           p_actual_remaining_ml?: number
           p_command: string
@@ -3009,12 +3172,44 @@ export type Database = {
         }
         Returns: Json
       }
+      execute_physical_bottle_command_phase_a_0156: {
+        Args: {
+          p_actual_remaining_ml?: number
+          p_command: string
+          p_correction_reason?: string
+          p_ml?: number
+          p_note?: string
+          p_open_bottle_id?: string
+          p_operation_id: string
+          p_operator_confirms_same_bottle_present?: boolean
+          p_predecessor_open_operation_id?: string
+          p_preservation_method?: string
+          p_reason_code_id?: string
+          p_restaurant_id: string
+          p_reversal_of_event_id?: string
+          p_wine_id: string
+          p_written_off_ml?: number
+        }
+        Returns: Json
+      }
       execute_physical_reconciliation_batch: {
         Args: {
           p_entries: Json
           p_operation_id: string
           p_restaurant_id: string
         }
+        Returns: Json
+      }
+      execute_physical_reconciliation_batch_phase_a_0156: {
+        Args: {
+          p_entries: Json
+          p_operation_id: string
+          p_restaurant_id: string
+        }
+        Returns: Json
+      }
+      expire_stalled_invoice_scans: {
+        Args: { p_restaurant_id: string }
         Returns: Json
       }
       find_or_create_wine: {
@@ -3037,6 +3232,17 @@ export type Database = {
       generate_slug: { Args: { input: string }; Returns: string }
       identity_normalize_text: { Args: { raw: string }; Returns: string }
       immutable_unaccent: { Args: { "": string }; Returns: string }
+      invoice_edits_valid: { Args: { p_edits: Json }; Returns: boolean }
+      invoice_image_paths_valid: {
+        Args: {
+          p_extra_image_paths: Json
+          p_raw_image_path: string
+          p_restaurant_id: string
+          p_scan_id: string
+        }
+        Returns: boolean
+      }
+      invoice_line_items_valid: { Args: { p_items: Json }; Returns: boolean }
       is_member: { Args: { r_id: string }; Returns: boolean }
       is_member_with_role: {
         Args: {
@@ -3072,6 +3278,23 @@ export type Database = {
         }[]
       }
       list_open_bottle_items: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          active_bottle_count: number
+          glass_pour_ml: number
+          name: string
+          open_remaining_ml: number
+          opened_at: string
+          pour_size_mode: string
+          producer: string
+          sealed_count: number
+          size_ml: number
+          vintage: number
+          wine_id: string
+          wine_list_item_id: string
+        }[]
+      }
+      list_open_bottle_items_pre_0156: {
         Args: { p_restaurant_id: string }
         Returns: {
           glass_pour_ml: number
@@ -3173,6 +3396,173 @@ export type Database = {
         Args: { p_source_wine_id: string; p_target_wine_id: string }
         Returns: Json
       }
+      merge_wines_pre_0156: {
+        Args: { p_source_wine_id: string; p_target_wine_id: string }
+        Returns: Json
+      }
+      merge_wines_pre_0157: {
+        Args: { p_source_wine_id: string; p_target_wine_id: string }
+        Returns: Json
+      }
+      patch_inventory_item_private: {
+        Args: {
+          p_bin_id: string | null
+          p_bin_location: string | null
+          p_currency: string | null
+          p_expected_updated_at: string
+          p_format: string | null
+          p_inventory_item_id: string
+          p_quantity: number | null
+          p_section: string | null
+          p_set_bin_id: boolean
+          p_set_bin_location: boolean
+          p_set_currency: boolean
+          p_set_format: boolean
+          p_set_quantity: boolean
+          p_set_section: boolean
+          p_set_unit_cost: boolean
+          p_unit_cost: number | null
+        }
+        Returns: Json
+      }
+      read_cellar_health_private: {
+        Args: { p_restaurant_id: string; p_wine_ids?: string[] | null }
+        Returns: {
+          computed_at: string
+          health_id: string
+          reason: string
+          restaurant_id: string
+          segment: string
+          wine_id: string
+        }[]
+      }
+      read_current_operational_memberships: {
+        Args: { p_user_id: string }
+        Returns: {
+          restaurant_id: string
+          restaurant_name: string
+          role: Database["public"]["Enums"]["membership_role"]
+        }[]
+      }
+      read_identity_merge_private: {
+        Args: { p_merge_id: string }
+        Returns: {
+          merge_id: string
+          merge_type: string
+          merged_at: string
+          merged_by: string
+          moved_counts: Json
+          restaurant_id: string
+          source_id: string
+          source_snapshot: Json
+          target_id: string
+        }[]
+      }
+      read_import_batch_cost_rows: {
+        Args: {
+          p_after_row_number?: number
+          p_batch_id: string
+          p_limit?: number
+        }
+        Returns: {
+          applied_inventory_item_id: string
+          applied_wine_id: string
+          apply_attempts: number
+          apply_status: string
+          batch_id: string
+          cost_status: string
+          created_at: string
+          duplicate_reason: Json
+          last_error_message: string
+          lwin_id: string
+          lwin_score: number
+          lwin_status: string
+          manual_unit_cost: number
+          raw: Json
+          resolution: string
+          resolved_at: string
+          resolved_by: string
+          restaurant_id: string
+          row_id: string
+          row_number: number
+          row_state: string
+          updated_at: string
+          validation_errors: Json
+        }[]
+      }
+      read_import_batch_display_rows: {
+        Args: {
+          p_after_row_number?: number
+          p_batch_id: string
+          p_limit?: number
+        }
+        Returns: {
+          batch_id: string
+          name: string
+          producer: string
+          restaurant_id: string
+          row_id: string
+          row_number: number
+        }[]
+      }
+      read_inventory_costs: {
+        Args: { p_restaurant_id: string; p_wine_ids?: string[] | null }
+        Returns: {
+          added_at: string
+          currency: string
+          inventory_item_id: string
+          invoice_scan_id: string
+          unit_cost: number
+          wine_id: string
+        }[]
+      }
+      read_invoice_image_target: {
+        Args: { p_page_index?: number; p_scan_id: string }
+        Returns: {
+          object_name: string
+        }[]
+      }
+      read_invoice_scan_deletion_private: {
+        Args: { p_deletion_id: string }
+        Returns: {
+          bottles_removed: number
+          deleted_at: string
+          deleted_by: string
+          deletion_id: string
+          distributor_name: string
+          final_line_items: Json
+          inventory_rows_deleted: number
+          invoice_number: string
+          invoice_scan_id: string
+          item_count: number
+          restaurant_id: string
+          scan_status: string
+        }[]
+      }
+      read_invoice_scan_private: {
+        Args: { p_scan_id: string }
+        Returns: {
+          accuracy_score: number
+          committed_at: string
+          created_at: string
+          created_by: string
+          distributor_name: string
+          edits: Json
+          final_line_items: Json
+          has_image: boolean
+          image_count: number
+          invoice_date: string
+          invoice_number: string
+          item_count: number
+          ocr_text: Json
+          parsed_line_items: Json
+          restaurant_id: string
+          scan_id: string
+          status: string
+          status_reason: string
+          updated_at: string
+        }[]
+      }
       read_pricing_recommendations: {
         Args: { p_restaurant_id: string }
         Returns: {
@@ -3184,6 +3574,55 @@ export type Database = {
           wine_id: string
           wines: Json
         }[]
+      }
+      read_reconcile_action_private: {
+        Args: { p_batch_id: string }
+        Returns: {
+          action_id: string
+          action_type: string
+          batch_id: string
+          created_at: string
+          new_state: Json
+          ordinal: number
+          prior_state: Json
+          restaurant_id: string
+          subject_id: string
+          subject_table: string
+        }[]
+      }
+      read_restaurant_pricing_defaults: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          default_target_markup_ratio: number
+          default_target_pour_cost_pct: number
+          restaurant_id: string
+        }[]
+      }
+      read_wine_cost_flags: {
+        Args: { p_restaurant_id: string; p_wine_ids?: string[] | null }
+        Returns: {
+          overpaid_flag: boolean
+          wine_id: string
+        }[]
+      }
+      read_wine_pricing_strategy: {
+        Args: { p_restaurant_id: string; p_wine_ids?: string[] | null }
+        Returns: {
+          pricing_dismissed_until: string
+          pricing_target_markup_ratio: number
+          pricing_target_pour_cost_pct: number
+          wine_id: string
+        }[]
+      }
+      receive_bottle_at_location_private: {
+        Args: {
+          p_bin_id: string
+          p_operation_id: string
+          p_restaurant_id: string
+          p_section: string
+          p_wine_id: string
+        }
+        Returns: Json
       }
       reclaim_stuck_invoice_extract_jobs: {
         Args: { p_stuck_after_seconds: number }
@@ -3291,6 +3730,18 @@ export type Database = {
         }
         Returns: string[]
       }
+      request_invoice_scan_reextract: {
+        Args: { p_scan_id: string }
+        Returns: Json
+      }
+      resolve_import_batch_row: {
+        Args: {
+          p_action: string
+          p_manual_unit_cost?: number
+          p_row_id: string
+        }
+        Returns: Json
+      }
       resolve_wine_variants_bulk: {
         Args: { p_restaurant_id: string; p_variants: Json }
         Returns: {
@@ -3312,7 +3763,59 @@ export type Database = {
         Returns: number
       }
       revert_import_batch: { Args: { p_batch_id: string }; Returns: number }
+      revert_import_batch_core_private: {
+        Args: { p_batch_id: string; p_reverting_batch_ids: string[] }
+        Returns: Json
+      }
+      revert_import_batch_pre_0156: {
+        Args: { p_batch_id: string }
+        Returns: number
+      }
+      revert_import_batch_pre_0157: {
+        Args: { p_batch_id: string }
+        Returns: number
+      }
+      revert_import_batch_private: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
       revert_import_session: { Args: { p_session_id: string }; Returns: Json }
+      revert_import_session_pre_0156: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      revert_import_session_pre_0157: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      review_invoice_scan: {
+        Args: {
+          p_distributor_name: string
+          p_edits: Json
+          p_expected_updated_at: string
+          p_final_line_items: Json
+          p_invoice_date: string | null
+          p_invoice_number: string | null
+          p_scan_id: string
+        }
+        Returns: Json
+      }
+      save_bottle_inventory_private: {
+        Args: {
+          p_country: string | null
+          p_format: string | null
+          p_key: string
+          p_name: string
+          p_producer: string
+          p_quantity: number
+          p_region: string
+          p_restaurant_id: string
+          p_unit_cost: number
+          p_varietal: string
+          p_vintage: number | null
+        }
+        Returns: Json
+      }
       search_wines_fuzzy: {
         Args: {
           p_limit?: number
@@ -3328,6 +3831,14 @@ export type Database = {
       seed_reason_codes: {
         Args: { p_restaurant_id: string }
         Returns: undefined
+      }
+      set_restaurant_pricing_defaults: {
+        Args: {
+          p_restaurant_id: string
+          p_target_markup_ratio: number
+          p_target_pour_cost_pct: number
+        }
+        Returns: Json
       }
       set_wine_availability: {
         Args: { p_direction: string; p_note: string; p_wine_id: string }
@@ -3347,6 +3858,19 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_wine_overpaid_flag: {
+        Args: { p_flag: boolean; p_restaurant_id: string; p_wine_id: string }
+        Returns: Json
+      }
+      set_wine_pricing_strategy: {
+        Args: {
+          p_restaurant_id: string
+          p_target_markup_ratio: number | null
+          p_target_pour_cost_pct: number | null
+          p_wine_id: string
+        }
+        Returns: Json
       }
       shadow_effective_site_access: {
         Args: { p_restaurant_id: string }
@@ -3399,6 +3923,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      undo_reconcile_batch: { Args: { p_batch_id: string }; Returns: Json }
+      wine_enrichment_metadata_valid: {
+        Args: { p_value: Json }
+        Returns: boolean
+      }
+      wine_manual_overrides_valid: {
+        Args: { p_value: string[] }
+        Returns: boolean
       }
       wine_published_list_slugs: {
         Args: { p_restaurant_id: string; p_wine_id: string }

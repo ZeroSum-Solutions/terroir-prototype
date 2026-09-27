@@ -1,414 +1,181 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { NextRequest } from "next/server";
-import { INVOICE_EXTRACTION_RETRY } from "@/lib/ai/models";
+import { NextResponse, type NextRequest } from "next/server";
 
-const auth = vi.hoisted(() => ({ requireMembership: vi.fn() }));
-vi.mock("@/lib/api/auth", () => ({
-  requireMembership: (...args: unknown[]) => auth.requireMembership(...args),
+const mocks = vi.hoisted(() => ({
+  requireRole: vi.fn(),
+  readInvoiceScanPrivate: vi.fn(),
 }));
 
-const extraction = vi.hoisted(() => ({ extractFromOcr: vi.fn() }));
-vi.mock("@/lib/scanner/ai-extract", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/scanner/ai-extract")>();
-  return {
-    ...original,
-    extractFromOcr: (...args: unknown[]) => extraction.extractFromOcr(...args),
-  };
-});
+vi.mock("@/lib/api/auth", () => ({
+  requireRole: (...args: unknown[]) => mocks.requireRole(...args),
+}));
+
+vi.mock("@/lib/staff-cost/protected-readers", () => ({
+  readInvoiceScanPrivate: (...args: unknown[]) =>
+    mocks.readInvoiceScanPrivate(...args),
+}));
+
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const { POST } = await import("./route");
-const { AiExtractError } = await import("@/lib/scanner/ai-extract");
+
 const SCAN_ID = "11111111-1111-4111-8111-111111111111";
 const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
 
-const SCAN_UPDATED_AT = "2026-08-23T00:00:00.000Z";
-
-function makeSupabase(options: {
-  fetch?: { data: unknown; error: unknown };
-  /** C14: rows the fenced UPDATE ... .select("id") returns. Default: one row (fence matched). */
-  update?: { data?: unknown; error: unknown };
-  updateThrows?: boolean;
+function makeSupabase(result: {
+  data?: unknown;
+  error?: { code?: string; message: string } | null;
 } = {}) {
-  const filters: Array<[string, string]> = [];
-  const builder = {
-    select: vi.fn(),
-    update: vi.fn(),
-    eq: vi.fn(),
-    single: vi.fn(),
-    then: (resolve: (value: { data?: unknown; error: unknown }) => void) =>
-      Promise.resolve(options.update ?? { data: [{ id: SCAN_ID }], error: null }).then(resolve),
-  };
-  builder.select.mockReturnValue(builder);
-  builder.update.mockImplementation(() => {
-    if (options.updateThrows) throw new Error("update threw");
-    return builder;
+  const rpc = vi.fn().mockResolvedValue({
+    data: result.data ?? { scanId: SCAN_ID, status: "queued" },
+    error: result.error ?? null,
   });
-  builder.eq.mockImplementation((column: string, value: string) => {
-    filters.push([column, value]);
-    return builder;
-  });
-  builder.single.mockResolvedValue(
-    options.fetch ?? {
-      data: {
-        id: SCAN_ID,
-        ocr_text: {
-          rawText: "1 x Barolo magnum EUR 95",
-          tables: [],
-        },
-        updated_at: SCAN_UPDATED_AT,
-      },
-      error: null,
-    },
-  );
+  return { rpc };
+}
 
+function currentScan(overrides: Record<string, unknown> = {}) {
   return {
-    builder,
-    filters,
-    supabase: { from: vi.fn().mockReturnValue(builder) },
+    scan_id: SCAN_ID,
+    restaurant_id: RESTAURANT_ID,
+    committed_at: null,
+    ...overrides,
   };
+}
+
+function call(id = SCAN_ID) {
+  return POST({} as NextRequest, {
+    params: Promise.resolve({ id }),
+  });
 }
 
 describe("POST /api/scans/[id]/re-extract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    extraction.extractFromOcr.mockResolvedValue({
-      distributor: "Test Importer",
-      invoiceNumber: "INV-42",
-      invoiceDate: "2026-07-12",
-      lineItems: [
-        {
-          name: "Barolo",
-          producer: "Test Producer",
-          vintage: 2019,
-          varietal: "Nebbiolo",
-          region: "Piedmont",
-          qty: 1,
-          unitCost: 95,
-          currency: "EUR",
-          format: "1.5L",
-          confidence: 0.98,
-          lowFields: [],
-        },
-      ],
-    });
-  });
-
-  function authorize(supabase: unknown) {
-    auth.requireMembership.mockResolvedValue({
+    const supabase = makeSupabase();
+    mocks.requireRole.mockResolvedValue({
       supabase,
       restaurantId: RESTAURANT_ID,
       user: { id: "33333333-3333-4333-8333-333333333333" },
-      role: "staff",
+      role: "manager",
     });
-  }
+    mocks.readInvoiceScanPrivate.mockResolvedValue(currentScan());
+  });
 
-  function call() {
-    return POST({} as NextRequest, {
-      params: Promise.resolve({ id: SCAN_ID }),
-    });
-  }
-
-  it("preserves currency and bottle format in the response and persisted items", async () => {
-    const { builder, filters, supabase } = makeSupabase();
-    authorize(supabase);
+  it("requires an owner or manager before reading the protected scan", async () => {
+    mocks.requireRole.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
 
     const response = await call();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(401);
+    expect(mocks.requireRole).toHaveBeenCalledWith(["owner", "manager"]);
+    expect(mocks.readInvoiceScanPrivate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid scan id before reading protected data", async () => {
+    const response = await call("not-a-uuid");
+
+    expect(response.status).toBe(400);
+    expect(mocks.readInvoiceScanPrivate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the scan is absent or belongs to another site", async () => {
+    mocks.readInvoiceScanPrivate.mockResolvedValueOnce(null);
+    expect((await call()).status).toBe(403);
+
+    mocks.readInvoiceScanPrivate.mockResolvedValueOnce(
+      currentScan({ restaurant_id: "44444444-4444-4444-8444-444444444444" }),
+    );
+    expect((await call()).status).toBe(403);
+  });
+
+  it("refuses to rewrite a committed scan", async () => {
+    mocks.readInvoiceScanPrivate.mockResolvedValue(
+      currentScan({ committed_at: "2026-09-26T12:00:00.000Z" }),
+    );
+    const auth = await mocks.requireRole();
+
+    const response = await call();
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "scan_already_committed",
+        message: "A committed scan can no longer be re-extracted.",
+      },
+    });
+    expect(auth.supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("queues one exact-site re-extraction and returns the typed receipt", async () => {
+    const auth = await mocks.requireRole();
+
+    const response = await call();
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({
+      scanId: SCAN_ID,
+      status: "queued",
+    });
+    expect(mocks.readInvoiceScanPrivate).toHaveBeenCalledWith(
+      auth.supabase,
+      SCAN_ID,
+    );
+    expect(auth.supabase.rpc).toHaveBeenCalledWith(
+      "request_invoice_scan_reextract",
+      { p_scan_id: SCAN_ID },
+    );
+  });
+
+  it("maps a capability refusal to a fixed 403 without leaking SQL detail", async () => {
+    const supabase = makeSupabase({
+      error: { code: "42501", message: "private capability detail" },
+    });
+    mocks.requireRole.mockResolvedValue({
+      supabase,
+      restaurantId: RESTAURANT_ID,
+      role: "manager",
+    });
+
+    const response = await call();
+
+    expect(response.status).toBe(403);
+    expect(JSON.stringify(await response.json())).not.toContain("private");
+  });
+
+  it("redacts unexpected RPC errors", async () => {
+    const supabase = makeSupabase({
+      error: { code: "XX000", message: "stored protected row detail" },
+    });
+    mocks.requireRole.mockResolvedValue({
+      supabase,
+      restaurantId: RESTAURANT_ID,
+      role: "manager",
+    });
+
+    const response = await call();
+
+    expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body.items[0]).toMatchObject({ currency: "EUR", format: "1.5L" });
-
-    expect(builder.update).toHaveBeenCalledOnce();
-    const update = builder.update.mock.calls[0][0];
-    expect(update.final_line_items[0]).toMatchObject({
-      currency: "EUR",
-      format: "1.5L",
+    expect(body).toEqual({
+      error: { code: "internal_error", message: "Internal server error." },
     });
-    expect(filters).toEqual([
-      ["id", SCAN_ID],
-      ["restaurant_id", RESTAURANT_ID],
-      ["id", SCAN_ID],
-      ["restaurant_id", RESTAURANT_ID],
-      ["updated_at", SCAN_UPDATED_AT],
-    ]);
+    expect(JSON.stringify(body)).not.toContain("protected");
   });
 
-  it("distinguishes a missing scan from a lookup provider failure", async () => {
-    const missing = makeSupabase({
-      fetch: { data: null, error: { code: "PGRST116", message: "no rows" } },
+  it("rejects a malformed or mismatched receipt instead of acknowledging work", async () => {
+    const supabase = makeSupabase({
+      data: { scanId: "44444444-4444-4444-8444-444444444444", status: "queued" },
     });
-    authorize(missing.supabase);
-    expect((await call()).status).toBe(404);
-
-    const failed = makeSupabase({
-      fetch: {
-        data: null,
-        error: { code: "XX000", message: "private database detail" },
-      },
+    mocks.requireRole.mockResolvedValue({
+      supabase,
+      restaurantId: RESTAURANT_ID,
+      role: "manager",
     });
-    authorize(failed.supabase);
-    const response = await call();
-    expect(response.status).toBe(500);
-    expect(JSON.stringify(await response.json())).not.toContain("private");
-  });
-
-  it("redacts malformed stored OCR before calling the provider", async () => {
-    const db = makeSupabase({
-      fetch: {
-        data: { id: SCAN_ID, ocr_text: "{\"rawText\":" },
-        error: null,
-      },
-    });
-    authorize(db.supabase);
 
     const response = await call();
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "internal_error",
-        message: "Internal server error.",
-      },
-    });
-    expect(extraction.extractFromOcr).not.toHaveBeenCalled();
-  });
-
-  it("returns a nested 422 when the scan has no stored OCR", async () => {
-    const db = makeSupabase({
-      fetch: {
-        data: { id: SCAN_ID, ocr_text: null },
-        error: null,
-      },
-    });
-    authorize(db.supabase);
-
-    const response = await call();
-
-    expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "missing_ocr_text",
-        message: "Scan has no stored OCR text to re-extract.",
-      },
-    });
-    expect(extraction.extractFromOcr).not.toHaveBeenCalled();
-  });
-
-  it("keeps raw OCR only in nested details for parse fallback", async () => {
-    const db = makeSupabase();
-    authorize(db.supabase);
-    extraction.extractFromOcr.mockRejectedValue(
-      new AiExtractError("parse_failed", "provider-specific detail"),
-    );
-
-    const response = await call();
-
-    expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "parse_failed",
-        message: "Unable to extract wines from stored OCR.",
-        details: { rawText: "1 x Barolo magnum EUR 95" },
-      },
-    });
-  });
-
-  it("maps provider throttling to a nested redacted 429", async () => {
-    const db = makeSupabase();
-    authorize(db.supabase);
-    extraction.extractFromOcr.mockRejectedValue(
-      new AiExtractError("rate_limited", "provider-specific detail"),
-    );
-
-    const response = await call();
-
-    expect(response.status).toBe(429);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "rate_limited",
-        message: "Extraction provider rate limited.",
-      },
-    });
-  });
-
-  describe("C14: concurrency fence on updated_at", () => {
-    it("returns 409 scan_superseded when the fenced update matches zero rows (another re-extract landed first)", async () => {
-      const db = makeSupabase({ update: { data: [], error: null } });
-      authorize(db.supabase);
-
-      const response = await call();
-
-      expect(response.status).toBe(409);
-      expect(await response.json()).toEqual({
-        error: {
-          code: "scan_superseded",
-          message: "Scan was updated by another request while this re-extraction was running.",
-        },
-      });
-    });
-
-    it("fences the update on the updated_at value read at fetch time", async () => {
-      const { filters, supabase } = makeSupabase();
-      authorize(supabase);
-
-      await call();
-
-      expect(filters).toContainEqual(["updated_at", SCAN_UPDATED_AT]);
-    });
-  });
-
-  it.each([
-    ["returned", { update: { error: { message: "private update detail" } } }],
-    ["thrown", { updateThrows: true }],
-  ])("never returns success when the scan update %s fails", async (_name, options) => {
-    const db = makeSupabase(options);
-    authorize(db.supabase);
-
-    const response = await call();
-
-    expect(response.status).toBe(500);
-    expect(JSON.stringify(await response.json())).not.toContain("private");
-  });
-
-  describe("G1-12 arithmetic retry-then-review gate", () => {
-    function reconciledLine(overrides: Record<string, unknown> = {}) {
-      return {
-        name: "Barolo",
-        producer: "Test Producer",
-        vintage: 2019,
-        varietal: "Nebbiolo",
-        region: "Piedmont",
-        qty: 1,
-        unitCost: 95,
-        lineTotal: 95,
-        currency: "EUR",
-        format: "1.5L",
-        confidence: 0.98,
-        lowFields: [],
-        ...overrides,
-      };
-    }
-
-    it("retries once at higher effort, then marks the scan for review when the retry still fails", async () => {
-      const db = makeSupabase();
-      authorize(db.supabase);
-      // First pass: unit cost misread (95 -> 60) against a correctly-read
-      // line total. Retry returns the same mismatch — never corrects itself.
-      extraction.extractFromOcr.mockReset();
-      extraction.extractFromOcr
-        .mockResolvedValueOnce({
-          distributor: "Test Importer",
-          invoiceNumber: "INV-42",
-          invoiceDate: "2026-07-12",
-          lineItems: [reconciledLine({ unitCost: 60 })],
-        })
-        .mockResolvedValueOnce({
-          distributor: "Test Importer",
-          invoiceNumber: "INV-42",
-          invoiceDate: "2026-07-12",
-          lineItems: [reconciledLine({ unitCost: 60 })],
-        });
-
-      const response = await call();
-
-      expect(extraction.extractFromOcr).toHaveBeenCalledTimes(2);
-      expect(extraction.extractFromOcr.mock.calls[1][1]).toEqual(
-        INVOICE_EXTRACTION_RETRY,
-      );
-
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.arithmetic.ok).toBe(false);
-      expect(body.quality.manualFallbackTriggered).toBe(true);
-      expect(body.quality.reason).toBe("arithmetic_mismatch");
-
-      const update = db.builder.update.mock.calls[0][0];
-      expect(update).toMatchObject({ status: "review", accuracy_score: 0 });
-    });
-
-    it("does not retry when the extraction already reconciles", async () => {
-      const db = makeSupabase();
-      authorize(db.supabase);
-      extraction.extractFromOcr.mockReset();
-      extraction.extractFromOcr.mockResolvedValueOnce({
-        distributor: "Test Importer",
-        invoiceNumber: "INV-42",
-        invoiceDate: "2026-07-12",
-        lineItems: [reconciledLine()],
-      });
-
-      const response = await call();
-
-      expect(extraction.extractFromOcr).toHaveBeenCalledOnce();
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.arithmetic.ok).toBe(true);
-
-      const update = db.builder.update.mock.calls[0][0];
-      expect(update).toMatchObject({ status: "complete" });
-    });
-
-    it("falls back to the first extraction when the retry call throws, without attempting a third call (Grok-5: a transient retry failure must not discard a usable first extraction)", async () => {
-      const db = makeSupabase();
-      authorize(db.supabase);
-      extraction.extractFromOcr.mockReset();
-      extraction.extractFromOcr
-        .mockResolvedValueOnce({
-          distributor: "Test Importer",
-          invoiceNumber: "INV-42",
-          invoiceDate: "2026-07-12",
-          lineItems: [reconciledLine({ unitCost: 60 })],
-        })
-        .mockRejectedValueOnce(
-          new AiExtractError("rate_limited", "provider-specific detail"),
-        );
-
-      const response = await call();
-
-      expect(extraction.extractFromOcr).toHaveBeenCalledTimes(2);
-      // The first extraction's (already-failing) arithmetic routes to
-      // human review — never treated as a request failure.
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.arithmetic.ok).toBe(false);
-
-      const update = db.builder.update.mock.calls[0][0];
-      expect(update).toMatchObject({ status: "review", accuracy_score: 0 });
-      // The first extraction's line items are what gets persisted, never
-      // wiped by the failed retry.
-      expect(update.final_line_items).toHaveLength(1);
-    });
-
-    it("keeps the first extraction when the retry returns no line items (Grok-5: an empty retry must never wipe stored line items with [])", async () => {
-      const db = makeSupabase();
-      authorize(db.supabase);
-      extraction.extractFromOcr.mockReset();
-      extraction.extractFromOcr
-        .mockResolvedValueOnce({
-          distributor: "Test Importer",
-          invoiceNumber: "INV-42",
-          invoiceDate: "2026-07-12",
-          lineItems: [reconciledLine({ unitCost: 60 })],
-        })
-        .mockResolvedValueOnce({
-          distributor: "Test Importer",
-          invoiceNumber: "INV-42",
-          invoiceDate: "2026-07-12",
-          lineItems: [],
-        });
-
-      const response = await call();
-
-      expect(extraction.extractFromOcr).toHaveBeenCalledTimes(2);
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.items).toHaveLength(1);
-      expect(body.arithmetic.ok).toBe(false);
-
-      const update = db.builder.update.mock.calls[0][0];
-      expect(update).toMatchObject({ status: "review", accuracy_score: 0 });
-      expect(update.parsed_line_items).toHaveLength(1);
-      expect(update.final_line_items).toHaveLength(1);
-    });
   });
 });

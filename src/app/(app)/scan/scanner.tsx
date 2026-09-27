@@ -3,6 +3,8 @@
 import { AlertTriangle, Check } from "lucide-react";
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { readApiError } from "@/lib/api/client-error";
+import { InvoiceInventorySaveReceiptSchema, InvoiceScanUploadReceiptSchema, type ScanIdempotencyReceipt } from "@/lib/api/scan-idempotency-contract";
+import { useBottlePendingRecovery } from "@/domains/scanning/use-bottle-pending-recovery";
 import { csvFilename, downloadCsv, toCsv } from "@/lib/scanner/csv";
 import { loadScan, saveScan } from "@/lib/scanner/scan-storage";
 import { SCORED_FIELDS_COUNT } from "@/lib/scanner/scored-fields";
@@ -23,6 +25,7 @@ import { ErrorView } from "./views/error-view";
 import { ConfidenceGateView } from "./views/confidence-gate";
 import { ResultsView } from "./views/results-view";
 import { BottleResultsView } from "./views/bottle-results-view";
+import { BottleRecoveryView } from "./views/bottle-recovery-view";
 import { initialScannerState, scannerReducer, type ScannerAction } from "./scanner-state";
 
 type Feedback = { kind: "success" | "error"; message: string };
@@ -48,6 +51,10 @@ const ALLOWED_INVOICE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "heic", "heif"
 // working" forever — generous ceiling above the ~90s Azure OCR budget
 // plus one Claude extraction retry.
 const SCAN_TIMEOUT_MS = 150_000;
+
+function newIdempotencyKey(): string {
+  return globalThis.crypto.randomUUID();
+}
 
 function fileExtension(name: string): string {
   const idx = name.lastIndexOf(".");
@@ -92,16 +99,16 @@ class ScanError extends Error {
   }
 }
 
-async function postScan(files: File[], signal: AbortSignal, key?: string | null): Promise<Scan> {
-  // Local User Timing measures "prep" and the client-observed "upload"
-  // round trip. scanId remains only as a compatibility argument; these
-  // durations are not aggregated or exported.
+async function postScan(
+  files: File[],
+  signal: AbortSignal,
+  key: string,
+): Promise<Extract<ScanIdempotencyReceipt, { kind: "invoice_scan_upload" }>> {
   const scanId = key ?? "unkeyed";
   markScanStage("prep", "start");
   const body = new FormData();
   files.forEach(function(f) { body.append("file", f); });
-  const headers: Record<string, string> = {};
-  if (key) headers["Idempotency-Key"] = key;
+  const headers: Record<string, string> = { "Idempotency-Key": key };
   markScanStage("prep", "end");
   reportScanStage(scanId, "prep", { fileCount: files.length });
 
@@ -116,20 +123,22 @@ async function postScan(files: File[], signal: AbortSignal, key?: string | null)
     reportScanStage(scanId, "upload", { ok: false, status: res.status });
     throw new ScanError(failure.message, failure.rawText);
   }
-  const result = (await res.json()) as Scan;
+  const result = InvoiceScanUploadReceiptSchema.parse(await res.json());
   markScanStage("upload", "end");
   reportScanStage(scanId, "upload", { ok: true, status: res.status });
   return result;
 }
 
 export function Scanner({
+  userId,
   recentScans = [],
   initialMode = "invoice",
 }: {
+  userId: string | null;
   recentScans?: RecentScan[];
   initialMode?: ScanMode;
 }) {
-  const { restaurantId: _restaurantId } = useRestaurant();
+  const { restaurantId } = useRestaurant();
   const [state, dispatch] = useReducer(scannerReducer, initialScannerState);
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -140,7 +149,6 @@ export function Scanner({
   // closure and both pass the `if (isSaving) return` check, firing two
   // POSTs. A ref is read AND written synchronously, before any render, so
   // the second same-tick call sees the first call's write immediately.
-  // Shared by both save paths below since they share `isSaving` itself.
   const isSavingRef = useRef(false);
   // BND-006: UUIDv4 generated on the first save attempt and reused across
   // retries of the SAME logical save. Cleared on a successful 2xx (or on a
@@ -148,7 +156,6 @@ export function Scanner({
   // across 5xx / network failures so a retry hits the idempotency cache
   // instead of double-inserting inventory rows.
   const saveKeyRef = useRef<string | null>(null);
-  const bottleSaveKeyRef = useRef<string | null>(null);
   // BND-089: scan idempotency key — generated on first scan attempt, reused
   // across retries. Cleared on success or 4xx validation error; held across
   // 5xx / network failures so retry returns cached result.
@@ -197,6 +204,31 @@ export function Scanner({
     bottlePreviewUrlRef.current = url;
     setBottlePreviewUrlState(url);
   }, []);
+
+  const handleBottleSaved = useCallback((wineId: string) => {
+    if (state.lastFile) void keepLabelPhoto(wineId, state.lastFile);
+    setBottlePreview(null);
+    setMode("bottle");
+    dispatch({ type: "bottle-saved" });
+  }, [setBottlePreview, state.lastFile]);
+
+  const handleBottleAbandoned = useCallback(() => {
+    setBottlePreview(null);
+    setMode("bottle");
+    dispatch({ type: "reset" });
+    setFeedback({
+      kind: "error",
+      message: "Recovery data abandoned. The server may already have committed; check inventory before saving this bottle again.",
+    });
+  }, [setBottlePreview]);
+
+  const bottleRecovery = useBottlePendingRecovery({
+    userId,
+    restaurantId,
+    onFeedback: setFeedback,
+    onSaved: handleBottleSaved,
+    onAbandoned: handleBottleAbandoned,
+  });
 
   const clearScanTimeout = useCallback(() => {
     if (scanTimeoutRef.current != null) {
@@ -317,31 +349,23 @@ export function Scanner({
 
     dispatch({ type: "invoice-scan-started", files });
 
-    // BND-089: mint scanIdempotency key on first attempt, reuse on retry.
-    if (!scanKeyRef.current) {
-      scanKeyRef.current =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
-    // Keep the legacy identifier argument stable across a retry. The timing
-    // helper measures and clears local marks without exporting the value.
+    if (!scanKeyRef.current) scanKeyRef.current = newIdempotencyKey();
     const scanTelemetryId = scanKeyRef.current ?? "unkeyed";
     reportScanStage(scanTelemetryId, "capture", { fileCount: files.length });
     try {
-      const fresh = await postScan(files, ac.signal, scanKeyRef.current);
+      const queued = await postScan(files, ac.signal, scanKeyRef.current);
       if (ac.signal.aborted) return;
       markScanStage("render", "start");
       scanKeyRef.current = null; // 2xx → clear for next scan
-      dispatch({ type: "invoice-scan-succeeded", scan: fresh });
-      saveScan(fresh);
+      saveScan(null);
+      router.push(`/scan/${queued.scanId}`);
       // Double rAF: wait for the browser to actually paint the new status
       // before marking "render" done, not just for React to schedule it.
       if (typeof requestAnimationFrame === "function") {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             markScanStage("render", "end");
-            reportScanStage(scanTelemetryId, "render", { itemCount: fresh.items.length });
+            reportScanStage(scanTelemetryId, "render", { itemCount: queued.itemCount });
           });
         });
       }
@@ -363,7 +387,7 @@ export function Scanner({
       clearScanTimeout();
       if (abortRef.current === ac) abortRef.current = null;
     }
-  }, [clearScanTimeout]);
+  }, [clearScanTimeout, router]);
 
   const updateField = useCallback(
     (id: string, field: LineItemField, value: string | number | null) => {
@@ -499,13 +523,7 @@ export function Scanner({
     if (!scan || isSavingRef.current) return;
     isSavingRef.current = true;
     setIsSaving(true);
-    // Reuse an existing key on retry, or mint a new one on first attempt.
-    if (!saveKeyRef.current) {
-      saveKeyRef.current =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
+    if (!saveKeyRef.current) saveKeyRef.current = newIdempotencyKey();
     try {
       const body = new FormData();
       body.append("data", JSON.stringify({ scan, originalItems }));
@@ -529,11 +547,15 @@ export function Scanner({
           ).message,
         );
       }
-      const result = (await res.json()) as {
-        scanId: string;
-        itemCount: number;
-        wineCount: number;
-      };
+      const parsedResult = InvoiceInventorySaveReceiptSchema.safeParse(
+        await res.json().catch(() => null),
+      );
+      if (!parsedResult.success) {
+        throw new Error(
+          "Save outcome is uncertain. Refresh inventory before retrying.",
+        );
+      }
+      const result = parsedResult.data;
       saveKeyRef.current = null; // 2xx → clear so the next save mints a fresh key
       saveScan(null);
       dispatch({ type: "invoice-saved", result });
@@ -633,72 +655,6 @@ export function Scanner({
     }
   }, [state.lastFile, state.lastFiles, mode, startBottleScan, startScan]);
 
-  const saveBottleToInventory = useCallback(
-    async (wine: {
-      name: string;
-      producer: string;
-      vintage: number | null;
-      varietal: string;
-      region: string;
-      country: string | null;
-      format: string | null;
-      qty: number;
-      unitCost: number;
-    }) => {
-      if (isSavingRef.current) return;
-      isSavingRef.current = true;
-      setIsSaving(true);
-      if (!bottleSaveKeyRef.current) {
-        bottleSaveKeyRef.current =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      }
-      try {
-        const res = await fetch("/api/inventory/save-bottle-scan", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": bottleSaveKeyRef.current,
-          },
-          body: JSON.stringify({ wine }),
-        });
-        if (!res.ok) {
-          if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
-            bottleSaveKeyRef.current = null;
-          }
-          throw new Error(
-            readApiError(
-              await res.json().catch(() => null),
-              `Save failed (${res.status})`,
-            ).message,
-          );
-        }
-        const saved = (await res.json().catch(() => null)) as { wineId?: unknown } | null;
-        bottleSaveKeyRef.current = null;
-
-        // The photo that identified this wine becomes its picture, if it has
-        // none. Deliberately after the save and deliberately not awaited: the
-        // bottle is in the cellar either way, and a failed photo must never
-        // read as a failed save.
-        const savedWineId = typeof saved?.wineId === "string" ? saved.wineId : null;
-        if (savedWineId && state.lastFile) {
-          void keepLabelPhoto(savedWineId, state.lastFile);
-        }
-
-        setBottlePreview(null);
-        dispatch({ type: "bottle-saved" });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Save failed.";
-        setFeedback({ kind: "error", message });
-      } finally {
-        isSavingRef.current = false;
-        setIsSaving(false);
-      }
-    },
-    [setBottlePreview, state.lastFile],
-  );
-
   const handleStart = useCallback(
     (files: File[]) => {
       if (mode === "bottle") {
@@ -735,6 +691,16 @@ export function Scanner({
 
   return (
     <>
+      {(bottleRecovery.state.phase === "ready" ||
+        (mode === "bottle" && bottleRecovery.state.phase !== "empty")) ? (
+        <BottleRecoveryView
+          state={bottleRecovery.state}
+          isSaving={bottleRecovery.isSaving}
+          onRetry={() => void bottleRecovery.retry()}
+          onAbandon={() => void bottleRecovery.abandon()}
+        />
+      ) : (
+      <>
       {state.status === "ready" && <ReadyView onStart={handleStart} onSpreadsheet={handleSpreadsheet} mode={mode} onModeChange={handleModeChange} recentScans={recentScans} savedResult={state.savedResult} onDismissSaved={() => dispatch({ type: "saved-result-dismissed" })} />}
       {state.status === "processing" && (
         <ProcessingView
@@ -779,10 +745,12 @@ export function Scanner({
         <BottleResultsView
           result={state.bottleResult}
           previewUrl={bottlePreviewUrl}
-          onSave={saveBottleToInventory}
+          onSave={bottleRecovery.save}
           onScanAnother={startOver}
-          isSaving={isSaving}
+          isSaving={bottleRecovery.isSaving}
         />
+      )}
+      </>
       )}
       {feedback && (
         <div

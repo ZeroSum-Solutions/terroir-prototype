@@ -1,16 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import * as Sentry from "@sentry/nextjs";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMembership } from "@/lib/api/auth";
 import {
+  invalidIdempotencyKeyResult,
   isValidIdempotencyKey,
-  withIdempotency,
 } from "@/lib/api/idempotency";
 import { withApiHandler } from "@/lib/api/handler";
 import { apiResultResponse } from "@/lib/api/result-response";
 import { parseJson } from "@/lib/api/validation";
+import {
+  BottleInventorySaveReceiptSchema,
+  decodeScanIdempotencyClaimResult,
+  scanIdempotencyFailureHttpResult,
+} from "@/lib/api/scan-idempotency-contract";
 import { SaveBottleScanBodySchema } from "@/lib/scanner/request-schemas";
-import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -35,7 +37,24 @@ export async function POST(request: NextRequest) {
 async function postBottleInventorySave(request: NextRequest) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId } = auth;
+  const { supabase, restaurantId, user } = auth;
+
+  if (
+    request.headers.get("X-Expected-User-Id") !== user.id ||
+    request.headers.get("X-Expected-Restaurant-Id") !== restaurantId
+  ) {
+    return NextResponse.json({
+      error: {
+        code: "bottle_context_mismatch",
+        message: "Bottle save context changed. No save was attempted.",
+      },
+    }, { status: 409 });
+  }
+
+  const rawKey = request.headers.get("Idempotency-Key");
+  if (!isValidIdempotencyKey(rawKey)) {
+    return apiResultResponse(invalidIdempotencyKeyResult());
+  }
 
   const parsed = await parseJson(request, SaveBottleScanBodySchema, {
     message: "Invalid body.",
@@ -43,99 +62,67 @@ async function postBottleInventorySave(request: NextRequest) {
   if (!parsed.ok) return parsed.response;
   const body: SaveBottleBody = parsed.data;
 
-  // ── Idempotency (BND-006) ────────────────────────────────────────
-  const rawKey = request.headers.get("Idempotency-Key");
-  const key = isValidIdempotencyKey(rawKey) ? rawKey : null;
-
-  const result = await withIdempotency({
-    supabase,
-    restaurantId,
-    key,
-    handler: async () =>
-      saveBottleOnce({ supabase, restaurantId, wine: body.wine }),
-  });
-
-  return apiResultResponse(result);
-}
-
-async function saveBottleOnce(opts: {
-  supabase: SupabaseClient<Database>;
-  restaurantId: string;
-  wine: SaveBottleBody["wine"];
-}): Promise<{ status: number; body: unknown }> {
-  const { supabase, restaurantId, wine } = opts;
-
-  // Create or find the wine using the existing batch RPC (single-element array)
-  const { data: wineIdArray, error: batchError } = await supabase.rpc(
-    "find_or_create_wines_batch",
-    {
+  let claimResponse;
+  try {
+    claimResponse = await supabase.rpc("claim_scan_idempotency", {
       p_restaurant_id: restaurantId,
-      p_wines: [
-        {
-          name: wine.name,
-          producer: wine.producer,
-          vintage: wine.vintage ?? null,
-          varietal: wine.varietal || null,
-          region: wine.region || null,
-          country: wine.country ?? null,
-          size_ml: 750,
-        },
-      ],
-    },
-  );
-
-  if (batchError || !wineIdArray || (wineIdArray as string[]).length === 0) {
-    console.error("find_or_create_wines_batch failed:", batchError);
-    Sentry.captureException(batchError ?? new Error("wineIdArray empty without error"), {
-      tags: { surface: "save-bottle-scan", phase: "find_or_create_wines_batch" },
-      extra: { restaurantId },
+      p_key: rawKey,
+      p_kind: "bottle_inventory_save",
     });
-    return { status: 500, body: { error: "Failed to save wine." } };
+  } catch {
+    return apiResultResponse(scanIdempotencyFailureHttpResult("error"));
+  }
+  if (claimResponse.error) {
+    const conflict = claimResponse.error.code === "P0001" &&
+      claimResponse.error.message.trim() === "C04_IDEMPOTENCY_CONFLICT";
+    return apiResultResponse(scanIdempotencyFailureHttpResult(
+      conflict ? "conflict" : "error",
+    ));
   }
 
-  const wineId = (wineIdArray as string[])[0];
-
-  // Insert inventory item
-  const { error: inventoryError } = await supabase
-    .from("inventory_items")
-    .insert({
-      wine_id: wineId,
-      restaurant_id: restaurantId,
-      invoice_scan_id: null,
-      quantity: wine.qty,
-      unit_cost: wine.unitCost,
-      format: wine.format ?? null,
-      added_via: "bottle_scan" as const,
-    });
-
-  if (inventoryError) {
-    console.error("inventory_items insert failed:", inventoryError);
-    Sentry.captureException(inventoryError, {
-      tags: { surface: "save-bottle-scan", phase: "inventory_items-insert" },
-      extra: { restaurantId, wineId },
-    });
-    return {
-      status: 500,
-      body: { error: "Failed to save inventory item." },
-    };
+  let claim;
+  try {
+    if (!Array.isArray(claimResponse.data) || claimResponse.data.length !== 1) {
+      throw new Error("Unexpected bottle transport claim");
+    }
+    claim = decodeScanIdempotencyClaimResult(
+      "bottle_inventory_save",
+      claimResponse.data[0],
+    );
+  } catch {
+    return apiResultResponse(scanIdempotencyFailureHttpResult("error"));
+  }
+  if (claim.disposition !== "claimed" && claim.disposition !== "replay") {
+    return apiResultResponse(scanIdempotencyFailureHttpResult(claim.disposition));
   }
 
-  // LWIN matching — fire-and-forget. INT-017: failures were logged
-  // but dropped, so a systemic LWIN outage wouldn't surface in
-  // Sentry. Pipe through captureException with a non-route tag so
-  // the dashboards can separate "inventory save failed" (500 to
-  // user) from "LWIN sidecar degraded" (silent, background).
-  supabase
-    .rpc("match_lwin_batch", { p_wine_ids: [wineId] })
-    .then(({ error: lwinError }) => {
-      if (lwinError) {
-        console.error("LWIN match failed:", lwinError);
-        Sentry.captureException(lwinError, {
-          tags: { surface: "lwin-match", phase: "match_lwin_batch-rpc", path: "save-bottle-scan" },
-          extra: { wineId },
-        });
-      }
-    });
+  const { wine } = body;
+  const saved = await supabase.rpc("save_bottle_inventory_private", {
+    p_restaurant_id: restaurantId,
+    p_key: rawKey,
+    p_name: wine.name,
+    p_producer: wine.producer,
+    p_vintage: wine.vintage,
+    p_varietal: wine.varietal,
+    p_region: wine.region,
+    p_country: wine.country,
+    p_format: wine.format ?? null,
+    p_quantity: wine.qty,
+    p_unit_cost: wine.unitCost,
+  });
+  if (saved.error) {
+    if (
+      saved.error.code === "P0001" &&
+      saved.error.message.trim() === "C04_BOTTLE_OPERATION_CONFLICT"
+    ) {
+      return apiResultResponse(scanIdempotencyFailureHttpResult("conflict"));
+    }
+    throw new Error("Atomic bottle save failed");
+  }
+  const receipt = BottleInventorySaveReceiptSchema.safeParse(saved.data);
+  if (!receipt.success) {
+    throw new Error("Atomic bottle save returned an invalid receipt");
+  }
 
-  return { status: 200, body: { wineId } };
+  return NextResponse.json(receipt.data, { status: 200 });
 }

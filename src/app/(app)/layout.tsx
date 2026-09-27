@@ -62,14 +62,23 @@ export default async function AppLayout({
             what the name needed. The per-page grey eyebrow repeating this
             same string in full is going away with it; see the handoff for
             which routes still carry one outside this file. */}
-        <div className="ml-sm flex min-w-0 flex-1 items-center gap-3xs border-l border-rule-strong pl-sm md:ml-md md:pl-md">
+        <div
+          role="group"
+          aria-label={`Active restaurant: ${restaurantName?.trim() || "Unnamed restaurant"}`}
+          data-active-site-context="true"
+          className="ml-sm flex min-w-0 flex-1 items-center gap-3xs border-l border-rule-strong pl-sm md:ml-md md:pl-md"
+        >
           {/* text-ledger at every width, not text-caption on phones. The
               caption token carries 0.18em of tracking, which is right for the
               uppercase eyebrows it was made for and wrong for a proper noun:
               it spread a 13-character restaurant name over ~112px of a 390px
               header and truncated it. The same name in ledger, one pixel
               larger and untracked, is ~85px and fits whole. */}
-          <span className="min-w-0 truncate text-ledger font-medium text-ink">
+          <span
+            aria-hidden="true"
+            title={restaurantName?.trim() || "Unnamed restaurant"}
+            className="min-w-0 truncate text-ledger font-medium text-ink"
+          >
             {restaurantName?.trim() || "Unnamed restaurant"}
           </span>
           {/* Which database am I looking at? That question used to be answered
@@ -83,6 +92,7 @@ export default async function AppLayout({
           {onLocalStack && (
             <span
               title="Connected to a local Supabase stack, not hosted data"
+              aria-label="Local data environment"
               className="shrink-0 rounded-pill border border-risk-ink/40 px-xs py-2xs text-micro font-medium uppercase tracking-[0.14em] text-risk-ink"
             >
               Local
@@ -91,7 +101,7 @@ export default async function AppLayout({
         </div>
 
         {/* Desktop nav */}
-        <nav className="ml-xl hidden items-center gap-lg md:flex" aria-label="Primary">
+        <nav className="ml-xl hidden items-center gap-lg lg:flex" aria-label="Primary">
           <DesktopNavLinks role={userRole} />
         </nav>
 
@@ -99,16 +109,18 @@ export default async function AppLayout({
             Desktop has room for it inline, in the header's unclaimed middle;
             390px does not, so the phone gets the band below the header
             instead. Both are this same SearchPalette, one per breakpoint. */}
-        <SearchPalette className="mx-lg hidden min-w-0 max-w-[360px] flex-1 md:block" />
+        <SearchPalette className="mx-lg hidden min-w-0 max-w-[360px] flex-1 lg:block" />
 
         <div className="ml-auto flex shrink-0 items-center gap-sm md:gap-md">
-          <span className="hidden text-ledger font-light tabular text-grey md:inline">
+          <span className="hidden text-ledger font-light tabular text-grey xl:inline">
             {user.email}
           </span>
           {/* In the header, not the FAB: the FAB is mobile-only and hidden on
               /scan, /login and /atlas, and the assistant is useful on all of
               them. The header renders on every authenticated page. */}
-          <AssistantPanel />
+          <div className="max-[359px]:hidden">
+            <AssistantPanel />
+          </div>
           <SettingsDropdown />
         </div>
       </header>
@@ -125,28 +137,28 @@ export default async function AppLayout({
           the failure. Sticky rather than fixed: in flow it reserves its own
           height, so nothing downstream has to know its size to clear it. */}
       <div
-        className="glass sticky z-[var(--z-sticky)] rounded-none border-x-0 border-t-0 border-b border-glass-edge px-md py-sm md:hidden"
+        className="glass sticky z-[var(--z-sticky)] rounded-none border-x-0 border-t-0 border-b border-glass-edge px-md py-sm lg:hidden"
         style={{ top: "var(--chrome-header-total)" }}
       >
         <SearchPalette />
       </div>
 
-      {/* Content — mobile bottom padding clears the tab bar AND the FAB,
+      {/* Content — mobile/tablet bottom padding clears the tab bar AND the FAB,
           whose top edge sits ~136px above the viewport bottom (80px offset
           + 56px button). 88px let it cover the last ~48px of every list
           (Kimi audit 2026-08-26). */}
       {/* Content cap ~1160px (Kimi audit D4): the mobile stack stretched
           full-width to 1440px read as an unfinished desktop. */}
-      <main className="mx-auto w-full max-w-[1160px] flex-1 px-md py-lg pb-[calc(var(--chrome-tabbar-total)+var(--chrome-fab)+var(--spacing-2xl))] md:px-lg md:py-xl md:pb-xl">
+      <main className="mx-auto w-full max-w-[1160px] flex-1 px-md py-lg pb-[calc(var(--chrome-tabbar-total)+var(--chrome-fab)+var(--spacing-2xl))] md:px-lg md:pt-xl lg:pb-xl">
         {children}
       </main>
 
-      {/* Bottom nav dock — mobile only, thumb-friendly. A glass pill
+      {/* Bottom nav dock — mobile/tablet, thumb-friendly. A glass pill
           floating above the safe area (DESIGN.md — Components, Nav Dock),
           not a flush bar. Five tabs per the v5 IA redesign
           (.council/specs/2026-04-24-ux-ia-redesign.md) plus D5's Atlas. */}
       <nav
-        className="glass fixed inset-x-md z-[var(--z-chrome)] flex rounded-pill md:hidden"
+        className="glass fixed inset-x-md z-[var(--z-chrome)] flex rounded-pill lg:hidden"
         style={{ bottom: "calc(var(--safe-bottom) + var(--spacing-md))", height: "var(--chrome-tabbar)" }}
         aria-label="Primary mobile"
       >

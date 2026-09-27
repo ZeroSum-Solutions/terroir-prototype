@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
-import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import { fetchDistributorPriceRows } from "@/lib/pricing/price-comparison-data";
+import type { DistributorPriceRow } from "@/lib/pricing/price-comparison-data";
 
 export const runtime = "nodejs";
 
@@ -10,22 +12,17 @@ export async function GET() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
-  const access = await resolveSitePricingAccess(supabase, restaurantId);
-  if (!access.canReadCost) {
+  const canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+  if (!canReadCost) {
     return Errors.forbidden(
       "Cost access is required to compare distributor prices.",
     );
   }
 
-  // Fetch inventory items with wine + invoice scan details
-  const { data: items, error } = await supabase
-    .from("inventory_items")
-    .select(
-      "unit_cost, quantity, wine_id, wines(id, name, producer, vintage, varietal), invoice_scan_id, invoice_scans(distributor_name, invoice_date)",
-    )
-    .eq("restaurant_id", restaurantId);
-
-  if (error) {
+  let items: DistributorPriceRow[];
+  try {
+    items = await fetchDistributorPriceRows(supabase, restaurantId);
+  } catch (error) {
     console.error("price-comparison query failed:", error);
     Sentry.captureException(error, {
       tags: { surface: "wines-price-comparison", phase: "fetch" },
@@ -51,20 +48,8 @@ export async function GET() {
     }
   >();
 
-  for (const item of items ?? []) {
-    const wine = item.wines as {
-      id: string;
-      name: string;
-      producer: string;
-      vintage: number | null;
-      varietal: string | null;
-    } | null;
-    const scan = item.invoice_scans as {
-      distributor_name: string;
-      invoice_date: string | null;
-    } | null;
-
-    if (!wine || !scan) continue;
+  for (const item of items) {
+    const { wine, scan } = item;
 
     let entry = wineMap.get(wine.id);
     if (!entry) {
@@ -74,7 +59,7 @@ export async function GET() {
 
     entry.prices.push({
       distributor: scan.distributor_name,
-      unitCost: item.unit_cost,
+      unitCost: item.unitCost,
       quantity: item.quantity,
       invoiceDate: scan.invoice_date,
     });

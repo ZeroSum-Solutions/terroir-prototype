@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type { BatchCounts } from "./batch-service";
+import { revertImportSessionRpc } from "./import-revert-rpc";
 
 export type CreateSessionResult =
   | { ok: true; sessionId: string }
@@ -182,8 +183,15 @@ export async function getImportSessionProgress(
 }
 
 export type RevertSessionBatchResult =
-  | { batchId: string; chunkIndex: number | null; skipped: false; revertedCount: number }
-  | { batchId: string; chunkIndex: number | null; skipped: true; reason: string };
+  | {
+      batchId: string;
+      chunkIndex: number | null;
+      skipped: false;
+      revertedCount: number;
+      orphanWinesDeleted: 0;
+      lwinStampsCleared: number;
+    }
+  | { batchId: string; chunkIndex: number | null; skipped: true; reason: "already_reverted" };
 
 export type RevertSessionResult =
   | { ok: true; sessionId: string; batches: RevertSessionBatchResult[] }
@@ -195,35 +203,30 @@ export async function revertImportSession(
   supabase: SupabaseClient<Database>,
   sessionId: string,
 ): Promise<RevertSessionResult> {
-  const { data, error } = await supabase.rpc("revert_import_session", {
-    p_session_id: sessionId,
-  } as never);
-
-  if (error) {
-    const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "P0002") {
-      return { ok: false, error: { code: "not_found", message: "Import session not found." } };
-    }
-    throw error;
-  }
-
-  const result = data as { sessionId: string; batches: Array<Record<string, unknown>> };
-  const batches: RevertSessionBatchResult[] = result.batches.map((b) => {
-    const batchId = b.batchId as string;
-    const chunkIndex = (b.chunkIndex as number | null) ?? null;
-    if (b.skipped) {
-      return { batchId, chunkIndex, skipped: true, reason: b.reason as string };
-    }
-    return { batchId, chunkIndex, skipped: false, revertedCount: b.revertedCount as number };
-  });
-
-  if (batches.some((batch) => batch.skipped && batch.reason === "physical_bottle_dependency")) {
+  const result = await revertImportSessionRpc(supabase, sessionId);
+  if (!result.ok) {
+    if (
+      result.error.code !== "physical_bottle_dependency" &&
+      result.error.code !== "import_source_conflict"
+    ) return result;
     return {
       ok: false,
-      error: { code: "physical_bottle_dependency", message: "Import session cannot be fully reverted because physical bottles depend on imported inventory." },
-      batches,
+      error: result.error,
+      batches: [],
     };
   }
 
-  return { ok: true, sessionId: result.sessionId, batches };
+  const batches: RevertSessionBatchResult[] = result.receipt.batches.map((batch) => {
+    if (batch.skipped) return batch;
+    return {
+      batchId: batch.batchId,
+      chunkIndex: batch.chunkIndex,
+      skipped: false,
+      revertedCount: batch.revertedItemCount,
+      orphanWinesDeleted: batch.orphanWinesDeleted,
+      lwinStampsCleared: batch.lwinStampsCleared,
+    };
+  });
+
+  return { ok: true, sessionId: result.receipt.sessionId, batches };
 }

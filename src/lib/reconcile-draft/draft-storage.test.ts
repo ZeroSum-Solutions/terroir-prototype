@@ -3,8 +3,10 @@ import {
   clearReconcileDraft,
   describeReconcileDraft,
   persistPhysicalReconcileDraft,
+  readPhysicalReconcileDraftSnapshot,
   readReconcileDraft,
   reconcileDraftKey,
+  releasePhysicalReconcileDraft,
   writeReconcileDraft,
   type PhysicalReconcileDraft,
   type ReconcileDraftEntries,
@@ -35,6 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("reconcileDraftKey", () => {
@@ -143,6 +146,50 @@ describe("physical reconciliation drafts", () => {
     } });
     expect(persistPhysicalReconcileDraft("r1", "u1", draft)).toBe(false);
     getSpy.mockRestore();
+  });
+
+  it("freezes once without changing savedAt, then preserves the exact verified bytes", () => {
+    const createdAt = Date.parse("2026-09-25T08:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(createdAt);
+    writeReconcileDraft("r1", "u1", { ...draft, frozenOperation: null });
+    vi.setSystemTime(createdAt + 60_000);
+
+    expect(persistPhysicalReconcileDraft("r1", "u1", draft)).toBe(true);
+    const firstRaw = sessionStorage.getItem(reconcileDraftKey("r1", "u1"))!;
+    expect(JSON.parse(firstRaw).savedAt).toBe(createdAt);
+
+    const actual = window.sessionStorage;
+    const setItem = vi.fn((key: string, value: string) => actual.setItem(key, value));
+    const storage = mockSessionStorage({ setItem });
+    vi.setSystemTime(createdAt + 120_000);
+    expect(persistPhysicalReconcileDraft("r1", "u1", draft)).toBe(true);
+    expect(sessionStorage.getItem(reconcileDraftKey("r1", "u1"))).toBe(firstRaw);
+    expect(setItem).not.toHaveBeenCalled();
+    storage.mockRestore();
+  });
+
+  it("reads and releases only the exact frozen raw snapshot", () => {
+    writeReconcileDraft("r1", "u1", draft);
+    const snapshot = readPhysicalReconcileDraftSnapshot(
+      "r1", "u1", draft.frozenOperation!,
+    );
+    expect(snapshot?.draft).toEqual(draft);
+    expect(releasePhysicalReconcileDraft("r1", "u1", `${snapshot!.raw} `)).toBe(false);
+    expect(sessionStorage.getItem(reconcileDraftKey("r1", "u1"))).toBe(snapshot!.raw);
+    expect(releasePhysicalReconcileDraft("r1", "u1", snapshot!.raw)).toBe(true);
+    expect(sessionStorage.getItem(reconcileDraftKey("r1", "u1"))).toBeNull();
+  });
+
+  it("fails closed when exact release cannot remove or verify removal", () => {
+    writeReconcileDraft("r1", "u1", draft);
+    const raw = sessionStorage.getItem(reconcileDraftKey("r1", "u1"))!;
+    const removeSpy = mockSessionStorage({ removeItem: () => {
+      throw new Error("SecurityError");
+    } });
+    expect(releasePhysicalReconcileDraft("r1", "u1", raw)).toBe(false);
+    removeSpy.mockRestore();
+    expect(sessionStorage.getItem(reconcileDraftKey("r1", "u1"))).toBe(raw);
   });
 });
 

@@ -3,6 +3,8 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
+import { resolveSiteMarginReadAccess } from "@/lib/api/site-capability";
+import { fetchSnoozedAlerts } from "@/domains/cellar/snoozed-alerts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,64 +44,18 @@ async function getSnoozedAlerts() {
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
 
-  const nowIso = new Date().toISOString();
+  const canReadMargin = await resolveSiteMarginReadAccess(
+    supabase,
+    restaurantId,
+  );
+  if (!canReadMargin) {
+    return Errors.forbidden(
+      "Margin access is required to view pricing snoozes.",
+    );
+  }
 
   try {
-    // Pull wines that have at least one active snooze. Filter at SQL
-    // layer (efficient) by combining the two columns via .or().
-    const { data: wines, error } = await supabase
-      .from("wines")
-      .select(
-        "id, name, producer, vintage, alert_snoozed_until, pricing_dismissed_until",
-      )
-      .eq("restaurant_id", restaurantId)
-      .or(
-        `alert_snoozed_until.gt.${nowIso},pricing_dismissed_until.gt.${nowIso}`,
-      );
-    if (error) throw error;
-
-    // Filter to active-only (defense — the .or() above should already
-    // filter, but the SQL semantics are subtle around NULL).
-    const rows: SnoozedRow[] = (wines ?? [])
-      .map((w) => {
-        const dw = w.alert_snoozed_until;
-        const pr = w.pricing_dismissed_until;
-        const dwActive = dw && new Date(dw).getTime() > Date.now();
-        const prActive = pr && new Date(pr).getTime() > Date.now();
-        if (!dwActive && !prActive) return null;
-        return {
-          wine_id: w.id,
-          name: w.name,
-          producer: w.producer,
-          vintage: w.vintage,
-          drinkWindowSnoozedUntil: dwActive ? dw : null,
-          pricingDismissedUntil: prActive ? pr : null,
-        };
-      })
-      .filter((r): r is SnoozedRow => r !== null);
-
-    // Sort: soonest-expiring first, then alphabetical.
-    rows.sort((a, b) => {
-      const aSoon = Math.min(
-        a.drinkWindowSnoozedUntil
-          ? new Date(a.drinkWindowSnoozedUntil).getTime()
-          : Infinity,
-        a.pricingDismissedUntil
-          ? new Date(a.pricingDismissedUntil).getTime()
-          : Infinity,
-      );
-      const bSoon = Math.min(
-        b.drinkWindowSnoozedUntil
-          ? new Date(b.drinkWindowSnoozedUntil).getTime()
-          : Infinity,
-        b.pricingDismissedUntil
-          ? new Date(b.pricingDismissedUntil).getTime()
-          : Infinity,
-      );
-      if (aSoon !== bSoon) return aSoon - bSoon;
-      return a.producer.localeCompare(b.producer);
-    });
-
+    const rows = await fetchSnoozedAlerts(supabase, restaurantId);
     return NextResponse.json({ snoozed: rows });
   } catch (err) {
     Sentry.captureException(err, {

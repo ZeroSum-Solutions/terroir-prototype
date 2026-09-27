@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
+import { parseJson } from "@/lib/api/validation";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const ParamsSchema = z.strictObject({ id: z.string().uuid() });
+const BodySchema = z.strictObject({
+  days: z.number().int().min(0).max(365).default(30),
+}).default({ days: 30 });
+const ReceiptSchema = z.strictObject({
+  wineId: z.string().uuid(),
+  updated: z.literal(true),
+});
 
 /**
  * BND-040 — POST /api/wines/[id]/dismiss-pricing-alert
@@ -11,7 +22,7 @@ export const runtime = "nodejs";
  * Dismiss the pricing-review alert for a wine. Default 30 days, mirrors
  * BND-039 snooze pattern.
  *
- * Auth: owner+manager only.
+ * Auth: exact-site pricing.manage, enforced by the database function.
  */
 export async function POST(
   req: Request,
@@ -19,87 +30,58 @@ export async function POST(
 ) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId, role } = auth;
+  const { supabase, restaurantId } = auth;
 
-  if (role !== "owner" && role !== "manager") {
-    return Errors.forbidden("Dismissing pricing alerts requires owner or manager role.");
+  const parsedParams = ParamsSchema.safeParse(await ctx.params);
+  if (!parsedParams.success) {
+    return Errors.validation(parsedParams.error.issues, "Invalid wine id.");
   }
-
-  const { id } = await ctx.params;
-  if (!id) {
-    return Errors.badRequest("wine id required");
-  }
+  const { id } = parsedParams.data;
 
   // Optional body: { days: number }. Default 30, max 365.
   // Audit-finding M2: days=0 is the unsnooze signal — clears
   // pricing_dismissed_until so the alert reappears immediately.
-  let days = 30;
-  let unsnooze = false;
+  const body = await parseJson(req, BodySchema, {
+    allowEmpty: true,
+    message: "Invalid body.",
+  });
+  if (!body.ok) return body.response;
+
   try {
-    const body = await req.json().catch(() => ({}));
-    if (typeof body?.days === "number" && Number.isFinite(body.days)) {
-      if (body.days === 0) {
-        unsnooze = true;
-      } else {
-        days = Math.max(1, Math.min(365, Math.round(body.days)));
-      }
-    }
-  } catch {
-    // No body / non-JSON → default. Not an error.
-  }
-
-  // Tenant-scope check (defense-in-depth alongside RLS).
-  const { data: wine, error: fetchErr } = await supabase
-    .from("wines")
-    .select("id")
-    .eq("id", id)
-    .eq("restaurant_id", restaurantId)
-    .maybeSingle();
-
-  if (fetchErr) {
-    Sentry.captureException(fetchErr, {
-      tags: { surface: "wines-dismiss-pricing", phase: "wine-fetch" },
-      extra: { wineId: id, restaurantId },
-    });
-    return Errors.internal("Lookup failed.");
-  }
-  if (!wine) {
-    return Errors.notFound("Wine");
-  }
-
-  // Unsnooze path — direct UPDATE to NULL.
-  if (unsnooze) {
-    const { error: clearErr } = await supabase
+    const wine = await supabase
       .from("wines")
-      .update({ pricing_dismissed_until: null })
+      .select("id")
       .eq("id", id)
-      .eq("restaurant_id", restaurantId);
-    if (clearErr) {
-      Sentry.captureException(clearErr, {
-        tags: { surface: "wines-dismiss-pricing", phase: "clear" },
-        extra: { wineId: id, restaurantId },
-      });
-      return Errors.internal("Failed to clear dismissal.");
-    }
-    return NextResponse.json({ wineId: id, dismissedUntil: null, days: 0 });
+      .eq("restaurant_id", restaurantId)
+      .maybeSingle();
+    if (wine.error) return Errors.internal("Failed to dismiss alert.");
+    if (!wine.data) return Errors.notFound("Wine");
+  } catch {
+    return Errors.internal("Failed to dismiss alert.");
   }
 
-  const { data: until, error: rpcError } = await supabase.rpc(
-    "dismiss_pricing_alert",
-    { p_wine_id: id, p_days: days },
+  const { data: receiptRaw, error: rpcError } = await supabase.rpc(
+    "dismiss_pricing_alert_private",
+    { p_wine_id: id, p_days: body.data.days },
   );
 
   if (rpcError) {
+    if (rpcError.code === "42501") return Errors.forbidden();
+    if (rpcError.code === "P0002") return Errors.notFound("Wine");
     Sentry.captureException(rpcError, {
       tags: { surface: "wines-dismiss-pricing", phase: "rpc" },
-      extra: { wineId: id, restaurantId, days },
+      extra: { wineId: id, restaurantId, days: body.data.days },
+    });
+    return Errors.internal("Failed to dismiss alert.");
+  }
+  const receipt = ReceiptSchema.safeParse(receiptRaw);
+  if (!receipt.success || receipt.data.wineId !== id) {
+    Sentry.captureException(new Error("Invalid pricing dismissal receipt"), {
+      tags: { surface: "wines-dismiss-pricing", phase: "rpc" },
+      extra: { wineId: id, restaurantId, days: body.data.days },
     });
     return Errors.internal("Failed to dismiss alert.");
   }
 
-  return NextResponse.json({
-    wineId: id,
-    dismissedUntil: until,
-    days,
-  });
+  return NextResponse.json(receipt.data);
 }

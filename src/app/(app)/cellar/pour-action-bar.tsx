@@ -145,7 +145,7 @@ export function PourActionBar({
               )}
             >
               {outOfStock
-                ? "Out of stock"
+                ? physicalMode ? "Below pour size" : "Out of stock"
                 : `Pour ${(row.glass_pour_ml! / ML_PER_OZ).toFixed(1)} oz`}
             </button>
             {row.pour_size_mode === "picker" && pickerItem && (

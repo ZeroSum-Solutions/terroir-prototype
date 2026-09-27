@@ -1,0 +1,20 @@
+# Baseline source hashes before this packet
+8ce40f4c7088aa2c454efd13e3371345dd2efbb4c68140f4db55122e5ec1f89f  src/domains/scanning/bottle-pending-operation.ts
+4165119bf8c1d9ddbc706daff54ece9360e6dae6ad5813dd5b19f87fa0c1b96a  src/domains/scanning/bottle-pending-operation.test.ts
+1f1af83fce46208bf30cbfff9d351a9546c75503371eb7229ff4b67fb649e7e5  src/domains/scanning/use-bottle-pending-recovery.ts
+97883bc6d5ef5255eadea1c8da8eeedce94f2f04e50c5e1db29695968cfc1682  src/app/(app)/scan/bottle-pending-recovery.test.tsx
+d1c09219d754a54302a39ed57aa68c698d5019888d7d23d9344b141d65c3160b  src/app/api/inventory/save-bottle-scan/route.ts
+7ae3ad3eebc5bc758698693e9911fe375dc9866e8f2aff8b412ae9d5ccfa536f  src/app/api/inventory/save-bottle-scan/route.test.ts
+
+# Frozen source hashes after this packet
+91bdd08ff56f8d7be4b6a99a3e1dcc3477ea7ed6d5b2edf2eaa393e92fd7cf8f  src/domains/scanning/bottle-pending-operation.ts
+9cacc618365461597a53b176dfa20c80ccdaadf8e1938487024e7be1c139f7ac  src/domains/scanning/bottle-pending-operation.test.ts
+c8e9b9171b563dc08b7aef60f93af5b9c922ac1f3707dcf37d2ed434c15825af  src/domains/scanning/use-bottle-pending-recovery.ts
+b6c25c60ae91e05ccc44c0d1e48d97b6b614505764d40baf727ff7d25d0ec28d  src/app/(app)/scan/bottle-pending-recovery.test.tsx
+09b3c5e4545f39ff7e9fd096c5a48a4789aedd012026509ce668d5f45d44c398  src/app/api/inventory/save-bottle-scan/route.ts
+50dd9172a142ca37cf840f62cec95bbc6a327b017e9a1ae836a604a4705ac64a  src/app/api/inventory/save-bottle-scan/route.test.ts
+212dd168db8b0e3abf7b981f01839c2ae724b795da0234391f83295e6fed3b96  src/app/api/scan-ingestion-boundaries.test.ts
+
+# Read-only inspected dependencies; unchanged by this packet
+089a06cb8d9930b4390583f436993330d276e641fc2e7704bb73e4ae528e78f1  src/types/database.ts
+333ab3b919a2f5c5de3ce8b5c78cbe4aae7c1bb29be0e9ef82450af4c1723e3b  supabase/migrations/0158_staff_operational_bridge.sql

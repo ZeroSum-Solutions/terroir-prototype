@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getAuthContext } from "@/lib/auth-context";
-import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { resolveSitePricingReadAccess } from "@/lib/api/site-capability";
 import {
   fetchVintageRatings,
   type CorpusRead,
@@ -78,7 +78,7 @@ export default async function WineDetailPage({ params }: { params: Params }) {
   // House and reference start as soon as their inputs are known. Cellar waits
   // only for exact-site capability evaluation so its inventory projection can
   // omit cost unless both reads are explicitly granted.
-  const sitePricingAccessPromise = resolveSitePricingAccess(supabase, restaurantId);
+  const canReadPricingPromise = resolveSitePricingReadAccess(supabase, restaurantId);
   const [
     house,
     cellar,
@@ -86,11 +86,14 @@ export default async function WineDetailPage({ params }: { params: Params }) {
     profile,
     lwin,
     vocabularyResult,
-    sitePricingAccess,
+    canReadPricing,
   ] = await Promise.all([
     resolveHouseProfile(supabase, restaurantId, wineId),
-    sitePricingAccessPromise.then((access) =>
-      resolveCellarContext(supabase, restaurantId, wineId, wine.size_ml, access),
+    canReadPricingPromise.then((canRead) =>
+      resolveCellarContext(supabase, restaurantId, wineId, wine.size_ml, {
+        canReadCost: canRead,
+        canReadMargin: canRead,
+      }),
     ),
     profilePromise.then((read) =>
       resolveReferenceProfile(
@@ -113,7 +116,7 @@ export default async function WineDetailPage({ params }: { params: Params }) {
     // alongside rather than adding a round trip to every wine detail page.
     fetchLwinReference(supabase, wine.lwin_id),
     supabase.from("descriptors").select("slug, label, family").order("sort"),
-    sitePricingAccessPromise,
+    canReadPricingPromise,
   ]);
 
   const facts = resolveWineFacts({
@@ -131,7 +134,7 @@ export default async function WineDetailPage({ params }: { params: Params }) {
 
   const today = new Date().toISOString().slice(0, 10);
   const badgeFacts =
-    sitePricingAccess.canReadCost && sitePricingAccess.canReadMargin
+    canReadPricing
       ? cellar
       : { ...cellar, weightedUnitCost: null };
 

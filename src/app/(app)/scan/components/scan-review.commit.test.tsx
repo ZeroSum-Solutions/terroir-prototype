@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import type { LineItem } from "@/lib/scanner/types";
 
@@ -23,6 +25,7 @@ function markup(items: LineItem[]): string {
       distributor="Reliable Distribution"
       invoiceNumber="INV-1"
       invoiceDate="2026-08-21"
+      expectedUpdatedAt="2026-09-26T12:00:00.000Z"
       accuracy={98}
       itemCount={items.length}
       createdAt="2026-08-21T00:00:00.000Z"
@@ -59,5 +62,60 @@ describe("ScanReview commit affordance", () => {
     // The comparator the inventory named: Export CSV already hid itself for
     // the same condition, and still does.
     expect(html).not.toContain("Export CSV");
+  });
+
+  it("sends the displayed revision and invoice metadata when saving edits", async () => {
+    const matchedItems = [{
+      ...oneItem[0],
+      wine_id: "33333333-3333-4333-8333-333333333333",
+    }];
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      scanId: "11111111-1111-4111-8111-111111111111",
+      status: "complete",
+      itemCount: 1,
+      updated: true,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <ScanReview
+        id="11111111-1111-4111-8111-111111111111"
+        distributor="Reliable Distribution"
+        invoiceNumber="INV-1"
+        invoiceDate="2026-08-21"
+        expectedUpdatedAt="2026-09-26T12:00:00.000Z"
+        accuracy={98}
+        itemCount={1}
+        createdAt="2026-08-21T00:00:00.000Z"
+        items={matchedItems}
+        hasImage={false}
+      />,
+    ));
+    const save = [...container.querySelectorAll("button")]
+      .find((button) => button.textContent?.includes("Save Edits"));
+    await act(async () => save?.click());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/scans/11111111-1111-4111-8111-111111111111",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedUpdatedAt: "2026-09-26T12:00:00.000Z",
+          distributor: "Reliable Distribution",
+          invoiceNumber: "INV-1",
+          invoiceDate: "2026-08-21",
+          items: matchedItems,
+          edits: {},
+        }),
+      }),
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
   });
 });

@@ -11,6 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { readActiveRestaurantFromCookie } from "@/lib/api/active-restaurant";
+import { parseCurrentOperationalMemberships } from "@/lib/auth/current-operational-memberships";
 import {
   observeShadowSiteAccess,
   type ShadowLegacyRole,
@@ -36,21 +37,27 @@ type Client = SupabaseClient<Database>;
  *   2. most recently created membership (deterministic tiebreaker:
  *      id DESC).
  *
- * Always fetches the restaurant name in the same query so server-
- * component callers (AppLayout) don't need a second round trip.
+ * The closed reader applies both membership parents' lifecycle rules and
+ * returns restaurant names in deterministic fallback order.
  */
 export async function resolveActiveMembership(
   supabase: Client,
   userId: string,
 ): Promise<ResolvedMembership | null> {
-  const { data: memberships, error } = await supabase
-    .from("memberships")
-    .select("restaurant_id, role, restaurants(name)")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false });
+  let membershipsData: unknown = null;
+  try {
+    const { data, error } = await supabase.rpc(
+      "read_current_operational_memberships",
+      { p_user_id: userId },
+    );
+    if (error) return null;
+    membershipsData = data;
+  } catch {
+    return null;
+  }
 
-  if (error || !memberships || memberships.length === 0) return null;
+  const memberships = parseCurrentOperationalMemberships(membershipsData);
+  if (!memberships || memberships.length === 0) return null;
 
   const memberIds = memberships.map((m) => m.restaurant_id);
   const activeId = await readActiveRestaurantFromCookie(memberIds);
@@ -59,21 +66,16 @@ export async function resolveActiveMembership(
     (activeId && memberships.find((m) => m.restaurant_id === activeId)) ||
     memberships[0];
 
-  // Restaurants embed is nullable (a deleted restaurant would leave
-  // an orphan membership row). Fall back to a placeholder.
-  const restaurantName =
-    (chosen.restaurants as { name: string } | null)?.name ?? "My Restaurant";
-  const role = (chosen.role ?? "staff") as MembershipRole;
   const shadowAccess = await observeShadowSiteAccess(
     supabase,
     chosen.restaurant_id,
-    role,
+    chosen.role,
   );
 
   return {
     restaurantId: chosen.restaurant_id,
-    restaurantName,
-    role,
+    restaurantName: chosen.restaurant_name,
+    role: chosen.role,
     shadowAccess,
   };
 }

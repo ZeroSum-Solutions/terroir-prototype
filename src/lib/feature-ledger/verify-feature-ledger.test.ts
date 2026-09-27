@@ -144,6 +144,8 @@ describe("metadataForRequirement", () => {
     [320, "TER-050", "pilot-measurement"],
     [321, "TER-014", "authorization"],
     [324, "TER-014", "authorization"],
+    [325, "TER-014", "authorization"],
+    [328, "TER-014", "authorization"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -151,8 +153,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 324", () => {
-    expect(() => metadataForRequirement(325)).toThrow(
+  it("rejects requirements outside the authoritative 328", () => {
+    expect(() => metadataForRequirement(329)).toThrow(
       "no completion metadata",
     );
   });
@@ -195,7 +197,7 @@ describe("createInitialLedger", () => {
         decision: "all_enumerated_features_active",
         approvedBy: "product_owner",
         approvedOn: "2026-07-23",
-        expandedOn: "2026-09-24",
+        expandedOn: "2026-09-26",
       },
       items: [
         {
@@ -372,10 +374,10 @@ describe("verifyFeatureLedger", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 324 as the default approved source count", () => {
+  it("keeps 328 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 324");
+    ).toContain("source feature count must remain 328");
   });
 
   it.each([
@@ -598,8 +600,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 324 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(324);
+  it("accounts for all 328 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(328);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -757,13 +759,13 @@ describe("checked-in feature ledger", () => {
   });
 
   it("appends the accepted C04 authority contract without claiming implementation", () => {
-    expect(ledger.items.slice(320).map((item: { id: string }) => item.id)).toEqual([
+    expect(ledger.items.slice(320, 324).map((item: { id: string }) => item.id)).toEqual([
       "TER-CF-321",
       "TER-CF-322",
       "TER-CF-323",
       "TER-CF-324",
     ]);
-    for (const item of ledger.items.slice(320)) {
+    for (const item of ledger.items.slice(320, 324)) {
       expect(item).toMatchObject({
         domain: "site_capability_authority",
         actor: "System",
@@ -776,6 +778,22 @@ describe("checked-in feature ledger", () => {
     expect(ledger.items[321].sourceText).toContain("plain BEFORE UPDATE triggers use IS DISTINCT FROM");
     expect(ledger.items[322].sourceText).toContain("SQLSTATE 23505");
     expect(ledger.items[323].sourceText).toContain("additive migration A");
+  });
+
+  it("appends the full staff-cost requirements without marking the seal complete", () => {
+    expect(ledger.items.slice(324).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-325", "TER-CF-326", "TER-CF-327", "TER-CF-328",
+    ]);
+    for (const item of ledger.items.slice(324)) {
+      expect(item).toMatchObject({
+        domain: "site_capability_authority", actor: "System", status: "active",
+        completionSpec: "TER-014", evidenceOwner: "authorization",
+      });
+    }
+    expect(ledger.items[324].sourceText).toContain("without the exact current read grant");
+    expect(ledger.items[325].sourceText).toContain("cost-free receipts, atomic replay and stale refusal");
+    expect(ledger.items[326].sourceText).toContain("historical and future shapes are denied or database-constrained");
+    expect(ledger.items[327].sourceText).toContain("one additive database, complete application, and contract-ACL chain");
   });
 
   it("preserves the complete first 317 source and ledger objects from 006330bb", () => {
@@ -802,7 +820,7 @@ describe("checked-in feature ledger", () => {
       "TER-010": 13,
       "TER-012": 6,
       "TER-013": 2,
-      "TER-014": 11,
+      "TER-014": 15,
       "TER-015": 7,
       "TER-020": 49,
       "TER-023": 7,

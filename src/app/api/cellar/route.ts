@@ -18,6 +18,12 @@ const AddWineSchema = z.object({
   unit_cost: z.number().min(0).optional(),
 });
 
+const InventoryCreateReceiptSchema = z.strictObject({
+  inventoryItemId: z.string().uuid(),
+  quantity: z.number().int().min(0),
+  updated: z.literal(true),
+});
+
 function buildEnrichmentMetadata(result: ReturnType<typeof enrichWine>) {
   const fields: string[] = [];
   if (result.drinkWindowStart != null || result.drinkWindowEnd != null) fields.push("drink_window");
@@ -94,23 +100,32 @@ export async function POST(request: NextRequest) {
 
   const wineId = (wineIdArray as string[])[0];
 
-  // Create inventory item
-  const { data: inventoryItem, error: inventoryError } = await supabase
-    .from("inventory_items")
-    .insert({
-      wine_id: wineId,
-      restaurant_id: restaurantId,
-      quantity,
-      unit_cost: unit_cost ?? 0,
-      added_via: "manual" as const,
-    })
-    .select("id, quantity, unit_cost")
-    .single();
+  // The closed definer owns the protected cost-bearing insert. Omission maps
+  // to zero here; AddWineSchema rejects an explicit null before this call.
+  const { data: inventoryReceiptRaw, error: inventoryError } = await supabase.rpc(
+    "create_inventory_item_private",
+    {
+      p_restaurant_id: restaurantId,
+      p_wine_id: wineId,
+      p_quantity: quantity,
+      p_unit_cost: unit_cost ?? 0,
+      p_currency: null,
+      p_bin_id: null,
+      p_bin_location: null,
+      p_section: null,
+      p_format: null,
+      p_invoice_scan_id: null,
+      p_added_via: "manual",
+    },
+  );
+  const inventoryReceipt = InventoryCreateReceiptSchema.safeParse(
+    inventoryReceiptRaw,
+  );
 
-  if (inventoryError || !inventoryItem) {
-    console.error("inventory_items insert failed:", inventoryError);
+  if (inventoryError || !inventoryReceipt.success) {
+    console.error("create_inventory_item_private failed:", inventoryError);
     Sentry.captureException(
-      inventoryError ?? new Error("inventoryItem null without error"),
+      inventoryError ?? new Error("Invalid inventory create receipt"),
       {
         tags: { surface: "cellar", phase: "add-wine-inventory" },
         extra: { restaurantId, wineId },
@@ -159,8 +174,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     wineId,
-    inventoryId: inventoryItem.id,
-    quantity: inventoryItem.quantity,
-    unitCost: inventoryItem.unit_cost,
+    inventoryId: inventoryReceipt.data.inventoryItemId,
+    quantity: inventoryReceipt.data.quantity,
+    updated: true,
   });
 }

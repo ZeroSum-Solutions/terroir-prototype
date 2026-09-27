@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   requireMembership: vi.fn(),
-  resolveSitePricingAccess: vi.fn(),
+  resolveSiteCostReadAccess: vi.fn(),
+  fetchDistributorPriceRows: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -11,8 +12,12 @@ vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mocks.requireMembership(...args),
 }));
 vi.mock("@/lib/api/site-capability", () => ({
-  resolveSitePricingAccess: (...args: unknown[]) =>
-    mocks.resolveSitePricingAccess(...args),
+  resolveSiteCostReadAccess: (...args: unknown[]) =>
+    mocks.resolveSiteCostReadAccess(...args),
+}));
+vi.mock("@/lib/pricing/price-comparison-data", () => ({
+  fetchDistributorPriceRows: (...args: unknown[]) =>
+    mocks.fetchDistributorPriceRows(...args),
 }));
 vi.mock("@sentry/nextjs", () => ({
   captureException: (...args: unknown[]) => mocks.captureException(...args),
@@ -22,19 +27,8 @@ const { GET } = await import("./route");
 
 const RESTAURANT_ID = "11111111-1111-4111-8111-111111111111";
 
-type QueryResult = { data: unknown[] | null; error: unknown };
-
-function makeSupabase(result: QueryResult) {
-  const query = {
-    select: vi.fn(),
-    eq: vi.fn(),
-  };
-  query.select.mockReturnValue(query);
-  query.eq.mockResolvedValue(result);
-  return {
-    from: vi.fn(() => query),
-    query,
-  };
+function makeSupabase() {
+  return { from: vi.fn() };
 }
 
 function allow(supabase: ReturnType<typeof makeSupabase>) {
@@ -49,11 +43,7 @@ function allow(supabase: ReturnType<typeof makeSupabase>) {
 describe("GET /api/wines/price-comparison", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolveSitePricingAccess.mockResolvedValue({
-      canReadCost: true,
-      canReadMargin: false,
-      canManagePricing: false,
-    });
+    mocks.resolveSiteCostReadAccess.mockResolvedValue(true);
   });
 
   it("returns the membership denial before resolving cost authority", async () => {
@@ -64,20 +54,13 @@ describe("GET /api/wines/price-comparison", () => {
     const response = await GET();
 
     expect(response.status).toBe(401);
-    expect(mocks.resolveSitePricingAccess).not.toHaveBeenCalled();
+    expect(mocks.resolveSiteCostReadAccess).not.toHaveBeenCalled();
   });
 
   it("denies a manager without exact-site cost.read before the protected query", async () => {
-    const supabase = makeSupabase({
-      data: [{ unit_cost: 999, wines: { producer: "Secret" } }],
-      error: null,
-    });
+    const supabase = makeSupabase();
     allow(supabase);
-    mocks.resolveSitePricingAccess.mockResolvedValue({
-      canReadCost: false,
-      canReadMargin: true,
-      canManagePricing: true,
-    });
+    mocks.resolveSiteCostReadAccess.mockResolvedValue(false);
 
     const response = await GET();
     const body = await response.json();
@@ -89,53 +72,63 @@ describe("GET /api/wines/price-comparison", () => {
         message: "Cost access is required to compare distributor prices.",
       },
     });
-    expect(mocks.resolveSitePricingAccess).toHaveBeenCalledWith(
+    expect(mocks.resolveSiteCostReadAccess).toHaveBeenCalledWith(
       supabase,
       RESTAURANT_ID,
     );
-    expect(supabase.from).not.toHaveBeenCalled();
+    expect(mocks.fetchDistributorPriceRows).not.toHaveBeenCalled();
     expect(JSON.stringify(body)).not.toContain("999");
     expect(JSON.stringify(body)).not.toContain("Secret");
   });
 
   it("preserves price comparisons for an explicit cost-only grant", async () => {
-    const supabase = makeSupabase({
-      data: [
+    const supabase = makeSupabase();
+    mocks.fetchDistributorPriceRows.mockResolvedValue([
         {
-          unit_cost: 18,
+          inventoryItemId: "inventory-1",
+          unitCost: 18,
           quantity: 2,
-          wine_id: "wine-1",
-          wines: {
+          wine: {
             id: "wine-1",
             name: "Reserve",
             producer: "Producer",
             vintage: 2022,
             varietal: "Cabernet Sauvignon",
+            retail_median: null,
+            retail_min: null,
+            retail_max: null,
+            hero_image_url: null,
+            colour: null,
           },
-          invoice_scans: {
+          scan: {
             distributor_name: "Supplier A",
             invoice_date: "2026-09-01",
           },
+          overpaidFlag: false,
         },
         {
-          unit_cost: 24,
+          inventoryItemId: "inventory-2",
+          unitCost: 24,
           quantity: 1,
-          wine_id: "wine-1",
-          wines: {
+          wine: {
             id: "wine-1",
             name: "Reserve",
             producer: "Producer",
             vintage: 2022,
             varietal: "Cabernet Sauvignon",
+            retail_median: null,
+            retail_min: null,
+            retail_max: null,
+            hero_image_url: null,
+            colour: null,
           },
-          invoice_scans: {
+          scan: {
             distributor_name: "Supplier B",
             invoice_date: "2026-09-15",
           },
+          overpaidFlag: false,
         },
-      ],
-      error: null,
-    });
+      ]);
     allow(supabase);
 
     const response = await GET();
@@ -151,15 +144,16 @@ describe("GET /api/wines/price-comparison", () => {
       }),
     ]);
     expect(body[0].prices).toHaveLength(2);
-    expect(supabase.query.eq).toHaveBeenCalledWith(
-      "restaurant_id",
+    expect(mocks.fetchDistributorPriceRows).toHaveBeenCalledWith(
+      supabase,
       RESTAURANT_ID,
     );
   });
 
   it("returns a redacted error without serializing provider data", async () => {
     const providerError = { message: "unit_cost 777 leaked by provider" };
-    const supabase = makeSupabase({ data: null, error: providerError });
+    const supabase = makeSupabase();
+    mocks.fetchDistributorPriceRows.mockRejectedValue(providerError);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     allow(supabase);
 

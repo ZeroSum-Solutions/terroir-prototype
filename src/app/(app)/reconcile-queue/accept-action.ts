@@ -1,4 +1,5 @@
 import type { ReconcileQueueRow } from "@/lib/reconcile-queue";
+import { ReconcileExpectedLineSchema } from "@/lib/reconcile-ledger";
 import type { AcceptAction } from "./types";
 
 function targetId(row: ReconcileQueueRow): string {
@@ -20,10 +21,11 @@ export function buildAcceptAction(
     };
   }
   const payload = action.payload;
+  const expectedLine = ReconcileExpectedLineSchema.safeParse(payload?.expected_line);
   if (action.type === "match_scan"
     && typeof payload?.line_index === "number"
     && typeof payload.wine_id === "string"
-    && isRecord(payload.expected_line)) {
+    && expectedLine.success) {
     return {
       action_type: "match_scan",
       subject_table: "invoice_scans",
@@ -31,7 +33,7 @@ export function buildAcceptAction(
       patch: {
         line_index: payload.line_index,
         wine_id: payload.wine_id,
-        expected_line: payload.expected_line,
+        expected_line: expectedLine.data,
       },
     };
   }
@@ -52,10 +54,6 @@ export function buildAcceptAction(
     };
   }
   return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function isDismissTable(

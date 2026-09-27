@@ -3,11 +3,11 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
-import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
 import {
   fetchInsightsInventory,
+  fetchInsightsScans,
   fetchInsightsStock,
-  readInsightsPages,
 } from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
@@ -22,28 +22,24 @@ async function getInsights() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
-  const access = await resolveSitePricingAccess(supabase, restaurantId);
+  const canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
 
   try {
-    const scansPromise = readInsightsPages((from, to) => supabase
-        .from("invoice_scans")
-        .select("id, distributor_name, item_count, accuracy_score, created_at")
-        .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: false }).order("id").range(from, to));
-    const costItemsPromise = access.canReadCost
-      ? fetchInsightsInventory(supabase, restaurantId).catch((err) => {
-        Sentry.captureException(err, {
-          tags: { surface: "insights", phase: "cost-fetch" },
-          extra: { restaurantId },
-        });
-        return null;
-      })
+    const scansPromise = fetchInsightsScans(supabase, restaurantId, {
+      includeCost: false,
+      since: null,
+      until: null,
+    });
+    const costItemsPromise = canReadCost
+      ? fetchInsightsInventory(supabase, restaurantId)
       : Promise.resolve(null);
     const [scans, costItems] = await Promise.all([
       scansPromise,
       costItemsPromise,
     ]);
-    const inventoryItems = costItems ?? await fetchInsightsStock(supabase, restaurantId);
+    const inventoryItems = canReadCost
+      ? costItems!
+      : await fetchInsightsStock(supabase, restaurantId);
 
     const allScans = scans ?? [];
     const items = inventoryItems ?? [];

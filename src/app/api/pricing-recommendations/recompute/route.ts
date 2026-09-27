@@ -1,8 +1,9 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireRole } from "@/lib/api/auth";
+import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
 import { runPricingRecommendationsRecompute } from "@/lib/pricing-recommendations/recompute";
 import type { Database } from "@/types/database";
 
@@ -14,8 +15,20 @@ const ServiceConfigSchema = z.object({
 });
 
 export async function POST() {
-  const auth = await requireRole(["owner", "manager"]);
+  const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
+
+  try {
+    const access = await resolveSitePricingAccess(
+      auth.supabase,
+      auth.restaurantId,
+    );
+    if (access.canManagePricing !== true) {
+      return Errors.forbidden("Pricing management access is required.");
+    }
+  } catch {
+    return Errors.forbidden("Pricing management access is required.");
+  }
 
   const config = ServiceConfigSchema.safeParse({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -38,8 +51,8 @@ export async function POST() {
       auth.user.id,
     );
     return NextResponse.json(result);
-  } catch (error) {
-    console.error("pricing recommendations recompute failed", error);
+  } catch {
+    console.error("pricing recommendations recompute failed");
     return Errors.internal("Pricing recommendations recompute failed.");
   }
 }

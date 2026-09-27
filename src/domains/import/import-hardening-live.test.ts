@@ -313,7 +313,7 @@ describe.skipIf(!hasLiveDb)("import hardening 0127/0128 (MANDATORY, live Postgre
 
       // Reverting A releases the file: revert marks A's rows non-applied, so
       // the barrier's `apply_status = 'applied'` predicate no longer matches.
-      const reverted = await revertImportBatch(userClient, restaurantId, batchA, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchA);
       expect(reverted.ok).toBe(true);
 
       const { error } = await directApply(userClient, batchB);

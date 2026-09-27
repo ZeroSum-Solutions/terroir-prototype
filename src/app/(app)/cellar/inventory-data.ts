@@ -4,13 +4,13 @@ import type { Database } from "@/types/database";
 const FETCH_PAGE_SIZE = 1000;
 
 export type CellarInventoryRow = {
+  id: string;
   wine_id: string;
   bin_id: string | null;
   bin_location: string | null;
   quantity: number;
   added_at: string;
   section: string | null;
-  unit_cost?: number | null;
 };
 
 async function fetchAll(
@@ -29,28 +29,14 @@ async function fetchAll(
   }
 }
 
-/** Selects raw invoice cost only after this request proves cost.read. */
 export function fetchCellarInventoryRows(
   supabase: SupabaseClient<Database>,
   restaurantId: string,
-  canReadCost: boolean,
 ): Promise<CellarInventoryRow[]> {
-  if (canReadCost) {
-    return fetchAll((from, to) =>
-      supabase
-        .from("inventory_items")
-        .select("wine_id, bin_id, bin_location, quantity, unit_cost, added_at, section")
-        .eq("restaurant_id", restaurantId)
-        .order("added_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to),
-    );
-  }
-
   return fetchAll((from, to) =>
     supabase
       .from("inventory_items")
-      .select("wine_id, bin_id, bin_location, quantity, added_at, section")
+      .select("id, wine_id, bin_id, bin_location, quantity, added_at, section")
       .eq("restaurant_id", restaurantId)
       .order("added_at", { ascending: false })
       .order("id", { ascending: true })

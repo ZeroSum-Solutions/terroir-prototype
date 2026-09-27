@@ -1,36 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-// Mock the supabase server client. The membership query now uses
-// .select().eq().order().order() → thenable, so the builder returns a
-// promise-like at the end of the chain.
+// Mock the Supabase server client. Operational membership selection is one
+// closed RPC; no direct memberships-table query remains in this boundary.
 const mockGetUser = vi.fn();
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockOrderFinal = vi.fn();
+const mockRpc = vi.fn();
 const mockObserveShadowSiteAccess = vi.fn();
 
 type MembershipsPayload = {
-  data: Array<{ restaurant_id: string; role: string }> | null;
+  data: MembershipRow[] | null;
   error?: unknown;
 };
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockGetUser },
-    from: () => ({
-      select: (...args: unknown[]) => {
-        mockSelect(...args);
-        return {
-          eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
-            // order() resolves via mockOrderFinal; the chain shape is built
-            // fresh on every requireMembership call to keep tests isolated.
-            return mockOrderFinal();
-          },
-        };
-      },
-    }),
+    rpc: (...args: unknown[]) => mockRpc(...args),
   })),
 }));
 
@@ -57,17 +42,32 @@ const { requireAuth, requireMembership, requireOwner, requireRole } = await impo
 );
 const { signActiveRestaurantCookie } = await import("./active-restaurant");
 
-function withMemberships(memberships: Array<{ restaurant_id: string; role: string }>) {
-  mockOrderFinal.mockImplementation(() => {
-    const payload: MembershipsPayload = { data: memberships };
-    // Shape matches supabase's PostgrestFilterBuilder:
-    //   .eq(...).order(...).order(...) → thenable
-    return {
-      order: () => ({
-        order: () => Promise.resolve(payload),
-      }),
-    };
-  });
+const USER_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const SITE_A = "11111111-1111-4111-8111-111111111111";
+const SITE_B = "22222222-2222-4222-8222-222222222222";
+const REMOVED_SITE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+type MembershipRow = {
+  restaurant_id: string;
+  restaurant_name: string;
+  role: "owner" | "manager" | "staff";
+};
+
+function membership(
+  restaurantId: string,
+  role: MembershipRow["role"],
+  restaurantName = restaurantId,
+): MembershipRow {
+  return {
+    restaurant_id: restaurantId,
+    restaurant_name: restaurantName,
+    role,
+  };
+}
+
+function withMemberships(memberships: MembershipRow[]) {
+  const payload: MembershipsPayload = { data: memberships, error: null };
+  mockRpc.mockResolvedValue(payload);
 }
 
 const observations = [
@@ -113,11 +113,11 @@ describe("requireAuth", () => {
 
   it("returns auth result with user when authenticated", async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: "u1", email: "test@test.com" } },
+      data: { user: { id: USER_ID, email: "test@test.com" } },
     });
     const result = await requireAuth();
     expect(result).not.toBeInstanceOf(NextResponse);
-    expect((result as { user: { id: string } }).user.id).toBe("u1");
+    expect((result as { user: { id: string } }).user.id).toBe(USER_ID);
   });
 });
 
@@ -128,7 +128,7 @@ describe("requireMembership", () => {
   });
 
   it("returns 403 when user has no memberships", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
     withMemberships([]);
     const result = await requireMembership();
     expect(result).toBeInstanceOf(NextResponse);
@@ -137,75 +137,77 @@ describe("requireMembership", () => {
   });
 
   it("returns the sole membership when the user belongs to one restaurant", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "manager")]);
     const result = await requireMembership();
     expect(result).not.toBeInstanceOf(NextResponse);
-    expect((result as { restaurantId: string }).restaurantId).toBe("r1");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_A);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "read_current_operational_memberships",
+      { p_user_id: USER_ID },
+    );
   });
 
   it("falls back to most-recently-joined when no cookie is present (multi-restaurant user)", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    // The supabase query is ordered created_at DESC, id DESC — the mock
-    // returns already in that order.
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    // The RPC returns created_at DESC, id DESC order.
     withMemberships([
-      { restaurant_id: "r-newest", role: "manager" },
-      { restaurant_id: "r-older", role: "owner" },
+      membership(SITE_A, "manager", "Newest"),
+      membership(SITE_B, "owner", "Older"),
     ]);
     const result = await requireMembership();
-    expect((result as { restaurantId: string }).restaurantId).toBe("r-newest");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_A);
   });
 
   it("honours the active_restaurant_id cookie when it points to a real membership", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
     withMemberships([
-      { restaurant_id: "r-newest", role: "manager" },
-      { restaurant_id: "r-older", role: "owner" },
+      membership(SITE_A, "manager", "Newest"),
+      membership(SITE_B, "owner", "Older"),
     ]);
     mockCookieGet.mockReturnValue({
-      value: signActiveRestaurantCookie("r-older"),
+      value: signActiveRestaurantCookie(SITE_B),
     });
     const result = await requireMembership();
-    expect((result as { restaurantId: string }).restaurantId).toBe("r-older");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_B);
     expect((result as { role: string }).role).toBe("owner");
   });
 
   it("ignores a cookie for a restaurant the user no longer belongs to", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
     withMemberships([
-      { restaurant_id: "r-newest", role: "manager" },
-      { restaurant_id: "r-older", role: "owner" },
+      membership(SITE_A, "manager", "Newest"),
+      membership(SITE_B, "owner", "Older"),
     ]);
     mockCookieGet.mockReturnValue({
-      value: signActiveRestaurantCookie("r-removed"),
+      value: signActiveRestaurantCookie(REMOVED_SITE),
     });
     const result = await requireMembership();
-    // Falls back to the first ordered membership, never r-removed.
-    expect((result as { restaurantId: string }).restaurantId).toBe("r-newest");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_A);
   });
 
   it("ignores a cookie whose signature does not verify", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
     withMemberships([
-      { restaurant_id: "r-newest", role: "manager" },
-      { restaurant_id: "r-older", role: "owner" },
+      membership(SITE_A, "manager", "Newest"),
+      membership(SITE_B, "owner", "Older"),
     ]);
     // A hand-crafted cookie with a wrong MAC.
-    mockCookieGet.mockReturnValue({ value: "r-older.not-a-real-signature" });
+    mockCookieGet.mockReturnValue({ value: `${SITE_B}.not-a-real-signature` });
     const result = await requireMembership();
-    expect((result as { restaurantId: string }).restaurantId).toBe("r-newest");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_A);
   });
 
   it.each(observations)("relays the $label observation without changing membership", async ({ value }) => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "manager")]);
     mockObserveShadowSiteAccess.mockResolvedValue(value);
 
     const result = await requireMembership();
 
     expect(result).not.toBeInstanceOf(NextResponse);
     expect(result).toMatchObject({
-      restaurantId: "r1",
+      restaurantId: SITE_A,
       role: "manager",
       shadowAccess: value,
     });
@@ -220,24 +222,24 @@ describe("requireOwner", () => {
   });
 
   it("returns 403 for non-owner role", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "staff" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "staff")]);
     const result = await requireOwner();
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(403);
   });
 
   it("returns membership for owner", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "owner" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "owner")]);
     const result = await requireOwner();
     expect(result).not.toBeInstanceOf(NextResponse);
     expect((result as { role: string }).role).toBe("owner");
   });
 
   it.each(observations)("keeps owner authorization unchanged for $label", async ({ value }) => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "owner" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "owner")]);
     mockObserveShadowSiteAccess.mockResolvedValue(value);
 
     const result = await requireOwner();
@@ -261,40 +263,40 @@ describe("requireRole", () => {
   });
 
   it("returns 403 when the caller's role is not in the allowed list (staff vs owner/manager)", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "staff" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "staff")]);
     const result = await requireRole(["owner", "manager"]);
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(403);
   });
 
   it("returns the membership when role is in the allowed list (manager)", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "manager")]);
     const result = await requireRole(["owner", "manager"]);
     expect(result).not.toBeInstanceOf(NextResponse);
     expect((result as { role: string }).role).toBe("manager");
-    expect((result as { restaurantId: string }).restaurantId).toBe("r1");
+    expect((result as { restaurantId: string }).restaurantId).toBe(SITE_A);
   });
 
   it("returns the membership when role is in the allowed list (owner)", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "owner" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "owner")]);
     const result = await requireRole(["owner", "manager"]);
     expect(result).not.toBeInstanceOf(NextResponse);
     expect((result as { role: string }).role).toBe("owner");
   });
 
   it.each(observations)("keeps role authorization unchanged for $label", async ({ value }) => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-    withMemberships([{ restaurant_id: "r1", role: "manager" }]);
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    withMemberships([membership(SITE_A, "manager")]);
     mockObserveShadowSiteAccess.mockResolvedValue(value);
 
     const allowed = await requireRole(["owner", "manager"]);
     expect(allowed).not.toBeInstanceOf(NextResponse);
     expect(allowed).toMatchObject({ role: "manager", shadowAccess: value });
 
-    withMemberships([{ restaurant_id: "r1", role: "staff" }]);
+    withMemberships([membership(SITE_A, "staff")]);
     const denied = await requireRole(["owner", "manager"]);
     expect(denied).toBeInstanceOf(NextResponse);
     expect((denied as NextResponse).status).toBe(403);

@@ -1,50 +1,32 @@
 /**
- * POST /api/scan — invoice photo → structured wine scan (BND-011).
+ * POST /api/scan — store an invoice upload and enqueue extraction.
  *
- * Thin orchestration. Request parsing, auth, rate limits, idempotency, and
- * post-success storage upload live here; OCR, LLM extraction, scoring, and
- * invoice_scan persistence live in the scanning domain service.
- *
- * BND-089: Idempotency via `Idempotency-Key` header. Wraps processing in
- * `withIdempotency` so retries return the cached response without
- * re-running Azure OCR or Claude extraction.
+ * The request-user client uploads the private objects. One closed database
+ * function validates the complete object set, creates the scan, and enqueues
+ * the tenant-filtered worker. No provider or protected scan payload is
+ * returned from this request.
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { assertInvoiceExtractionConfigured } from "@/adapters/llm/anthropic-invoice-extraction";
-import { processInvoiceScanOnce } from "@/domains/scanning/invoice-scan-service";
+import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
-import { rateLimit } from "@/lib/api/rate-limit";
-import { requireMembership } from "@/lib/api/auth";
-import { withIdempotency, isValidIdempotencyKey } from "@/lib/api/idempotency";
-import { apiResultResponse } from "@/lib/api/result-response";
 import {
-  fileField,
-  parseJson,
-  parseMultipart,
-} from "@/lib/api/validation";
+  invalidIdempotencyKeyResult,
+  isValidIdempotencyKey,
+  withIdempotency,
+} from "@/lib/api/idempotency";
+import { rateLimit } from "@/lib/api/rate-limit";
+import { apiResultResponse } from "@/lib/api/result-response";
+import { fileField, parseJson, parseMultipart } from "@/lib/api/validation";
 import { InvoicePathBodySchema } from "@/lib/scanner/request-schemas";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-/** Max scan requests per restaurant per minute. */
 const SCAN_RATE_LIMIT = 10;
-/** Rate-limit window in ms (one minute). */
 const SCAN_RATE_WINDOW_MS = 60 * 1000;
-
-/**
- * Best-effort client-IP extraction. Uses x-forwarded-for or x-real-ip.
- */
-function clientIp(request: NextRequest): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
-}
-
 const MAX_BYTES = 10 * 1024 * 1024;
-/** Max pages (files) accepted in one multi-page invoice batch (BND-081 / TER-CF-032). */
 const MAX_INVOICE_PAGES = 8;
 const MIME_EXTENSIONS = new Map([
   ["image/jpeg", "jpg"],
@@ -54,6 +36,8 @@ const MIME_EXTENSIONS = new Map([
   ["application/pdf", "pdf"],
 ]);
 const ALLOWED_MIME = new Set(MIME_EXTENSIONS.keys());
+const UUID_PATTERN =
+  "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
 const InvoiceFilesSchema = z.object({
   file: z
@@ -61,22 +45,50 @@ const InvoiceFilesSchema = z.object({
     .transform((value) => (Array.isArray(value) ? value : [value])),
 });
 
-function isStorageNotFound(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const value = error as {
-    code?: string;
-    error?: string;
-    status?: number;
-    statusCode?: number | string;
-  };
-  return (
-    value.status === 404 ||
-    value.statusCode === 404 ||
-    value.statusCode === "404" ||
-    value.code === "404" ||
-    value.code === "not_found" ||
-    value.error === "not_found"
+const UploadResultSchema = z.strictObject({
+  scanId: z.string().uuid(),
+  status: z.literal("queued"),
+});
+
+function clientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+function uploadPathParts(
+  objectName: string,
+  restaurantId: string,
+): { scanId: string; extension: string } | null {
+  const match = objectName.match(
+    new RegExp(
+      `^${restaurantId}/(${UUID_PATTERN})(?:_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$`,
+    ),
   );
+  if (!match) return null;
+  return { scanId: match[1], extension: match[2].toLowerCase() };
+}
+
+function completeUploadReceipt(scanId: string) {
+  return {
+    version: 1 as const,
+    kind: "invoice_scan_upload" as const,
+    scanId,
+    status: "queued" as const,
+    itemCount: 0 as const,
+  };
+}
+
+function abandonedInternalError() {
+  return {
+    outcome: "abandon" as const,
+    response: {
+      status: 500,
+      body: {
+        error: { code: "internal_error", message: "Internal server error." },
+      },
+    },
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -84,14 +96,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function postInvoiceScan(request: NextRequest) {
-  // ARCH-001: membership gates paid Azure + Anthropic spend.
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
+  const { supabase, restaurantId } = auth;
 
-  const { supabase, user, restaurantId } = auth;
+  const rawKey = request.headers.get("Idempotency-Key");
+  if (!isValidIdempotencyKey(rawKey)) {
+    return apiResultResponse(invalidIdempotencyKeyResult());
+  }
 
-  // INT-003: rate-limit scans per restaurant to control Azure + Anthropic spend.
-  // Keyed per restaurant so a single restaurant can't burn through the budget.
   const limit = rateLimit(
     `scan:${restaurantId}:${clientIp(request)}`,
     SCAN_RATE_LIMIT,
@@ -104,157 +117,70 @@ async function postInvoiceScan(request: NextRequest) {
     );
   }
 
-  // BND-089: extract idempotency key before any processing.
-  const rawKey = request.headers.get("Idempotency-Key");
-  const idempotencyKey = isValidIdempotencyKey(rawKey) ? rawKey : null;
-
-  // ── JSON body path (BND-083: storage-path based submission) ─────────
-  const reqContentType = request.headers.get("content-type") ?? "";
-  if (
-    reqContentType.includes("application/json") &&
-    !reqContentType.includes("multipart")
-  ) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
     const parsed = await parseJson(request, InvoicePathBodySchema, {
       message: "Invalid body.",
     });
     if (!parsed.ok) return parsed.response;
-    const { imagePath } = parsed.data;
 
-    const ext = imagePath.split(".").pop()?.toLowerCase() ?? "";
-    const allowedExtensions = new Set([
-      "jpg",
-      "jpeg",
-      "png",
-      "heic",
-      "heif",
-      "pdf",
-    ]);
-    if (!allowedExtensions.has(ext)) {
-      return Errors.unsupportedMediaType(
-        "Unsupported file type: ." +
-          (ext || "unknown") +
-          ". Allowed: jpeg, png, heic, pdf.",
-      );
-    }
-    if (!imagePath.startsWith(restaurantId + "/")) {
-      return Errors.notFound("Image");
-    }
-
-    const mimeType =
-      ext === "pdf"
-        ? "application/pdf"
-        : ext === "png"
-          ? "image/png"
-          : ext === "heic"
-            ? "image/heic"
-            : ext === "heif"
-              ? "image/heif"
-              : "image/jpeg";
+    const target = uploadPathParts(parsed.data.imagePath, restaurantId);
+    if (!target) return Errors.notFound("Image");
 
     const result = await withIdempotency({
       supabase,
       restaurantId,
-      key: idempotencyKey,
+      key: rawKey,
+      kind: "invoice_scan_upload",
       handler: async () => {
-        // Avoid storage, database, and OCR work entirely on idempotency replay.
-        assertInvoiceExtractionConfigured();
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from("invoice-images")
-          .download(imagePath);
-        if (downloadError && !isStorageNotFound(downloadError)) {
-          throw downloadError;
+        const { data, error } = await supabase.rpc(
+          "create_invoice_scan_upload",
+          {
+            p_restaurant_id: restaurantId,
+            p_scan_id: target.scanId,
+            p_object_name: parsed.data.imagePath,
+            p_distributor_name: "Unknown",
+            p_invoice_number: null,
+            p_invoice_date: null,
+          } as never,
+        );
+        if (error) return abandonedInternalError();
+        const upload = UploadResultSchema.safeParse(data);
+        if (!upload.success || upload.data.scanId !== target.scanId) {
+          return abandonedInternalError();
         }
-        if (downloadError || !fileData) {
-          return {
-            status: 404,
-            body: {
-              error: { code: "not_found", message: "Image not found." },
-            },
-          };
-        }
-
-        const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-        if (fileBuffer.length > MAX_BYTES) {
-          return {
-            status: 413,
-            body: {
-              error: {
-                code: "too_large",
-                message: "File exceeds 10 MB.",
-              },
-            },
-          };
-        }
-
-        const { data: invoiceScan, error: insertError } = await supabase
-          .from("invoice_scans")
-          .insert({
-            restaurant_id: restaurantId,
-            created_by: user.id,
-            distributor_name: "Unknown",
-            parsed_line_items: [],
-            final_line_items: [],
-            edits: {},
-            item_count: 0,
-            raw_image_path: imagePath,
-            status: "processing",
-          })
-          .select("id")
-          .single();
-        if (insertError || !invoiceScan) {
-          throw insertError ?? new Error("invoice_scans insert returned no row");
-        }
-
-        return processInvoiceScanOnce({
-          supabase,
-          restaurantId,
-          userId: user.id,
-          fileBuffer,
-          mimeType,
-          preCreatedScanId: invoiceScan.id,
-          preUploadedPath: imagePath,
-        });
+        return {
+          outcome: "complete",
+          receipt: completeUploadReceipt(upload.data.scanId),
+        };
       },
     });
-
     return apiResultResponse(result);
   }
 
-  // ── Form-data path ──────────────────────────────────────────────────
   const parsed = await parseMultipart(request, InvoiceFilesSchema, {
     message: "Invalid body.",
   });
   if (!parsed.ok) return parsed.response;
   const files = parsed.data.file;
-  // BND-081 / TER-CF-032: a multi-page invoice can be submitted as several
-  // files in one batch, but an unbounded batch would mean an unbounded
-  // number of paid Azure/Anthropic calls per request. Reject immediately,
-  // before touching either, rather than silently truncating the batch.
+
   if (files.length > MAX_INVOICE_PAGES) {
     return Errors.badRequest(
       `Select up to ${MAX_INVOICE_PAGES} pages per invoice scan. You selected ${files.length}.`,
     );
   }
-  for (const pageFile of files) {
-    if (pageFile.size === 0) return Errors.badRequest("Empty file.");
-    if (pageFile.size > MAX_BYTES) {
-      return Errors.tooLarge("File exceeds 10 MB.");
-    }
-    if (!ALLOWED_MIME.has(pageFile.type)) {
+  for (const file of files) {
+    if (file.size === 0) return Errors.badRequest("Empty file.");
+    if (file.size > MAX_BYTES) return Errors.tooLarge("File exceeds 10 MB.");
+    if (!ALLOWED_MIME.has(file.type)) {
       return Errors.unsupportedMediaType(
-        "Unsupported file type: " + (pageFile.type || "unknown") + ".",
+        `Unsupported file type: ${file.type || "unknown"}.`,
       );
     }
   }
-  // A PDF is already a complete multi-page document, unlike a photo — so
-  // combining one with ANY other file (as the multi-page "several files in
-  // one batch" path above allows for photos) means merging two or more
-  // unrelated documents into one, which garbles OCR text/tables together,
-  // multiplies Azure + Anthropic work, and reliably fails arithmetic
-  // validation. Only two shapes are allowed: exactly one PDF alone, or a
-  // batch of photos with no PDF at all. Enforced here too (not just
-  // client-side) so a direct API caller can't recreate the merge.
-  const pdfCount = files.filter((f) => f.type === "application/pdf").length;
+  const pdfCount = files.filter(
+    (file) => file.type === "application/pdf",
+  ).length;
   if (pdfCount > 0 && files.length > 1) {
     return Errors.badRequest(
       pdfCount > 1
@@ -264,92 +190,63 @@ async function postInvoiceScan(request: NextRequest) {
       "mixed_pdf_batch",
     );
   }
-  const file = files[0];
 
-  // Preflight Anthropic config before Azure processing.
-  assertInvoiceExtractionConfigured();
+  // The transport key is already a UUID and remains stable across retries.
+  // Reusing it as the upload scan id gives partial storage uploads a stable,
+  // tenant-scoped upsert target without another persistence mechanism.
+  const scanId = rawKey;
+  const paths = files.map((file, index) => {
+    const extension = MIME_EXTENSIONS.get(file.type) ?? "jpg";
+    const page = files.length > 1 ? `_page${index + 1}` : "";
+    return `${restaurantId}/${scanId}${page}.${extension}`;
+  });
 
-  const fileBuffer = Buffer.from(new Uint8Array(await file.arrayBuffer()));
-  // BND-081 / TER-CF-032: OCR every additional page too, so a multi-page
-  // invoice submitted as multiple images/PDFs in one batch is extracted
-  // in full instead of only ever reading the first file.
-  const extraFiles =
-    files.length > 1
-      ? await Promise.all(
-          files.slice(1).map(async (pageFile) => ({
-            buffer: Buffer.from(new Uint8Array(await pageFile.arrayBuffer())),
-            mimeType: pageFile.type,
-          })),
-        )
-      : undefined;
-
-  // BND-089: wrap the scan in idempotency so retries return the cached
-  // result without re-running Azure OCR or Claude extraction.
   const result = await withIdempotency({
     supabase,
     restaurantId,
-    key: idempotencyKey,
-    handler: () =>
-      processInvoiceScanOnce({
-        supabase,
-        restaurantId,
-        userId: user.id,
-        fileBuffer,
-        mimeType: file.type,
-        extraFiles,
-      }),
-  });
-
-  // BND-080/BND-081: upload images to Supabase Storage under restaurant
-  // prefix AFTER processing (only on first request, not replay).
-  if (!result.replayed && result.status === 200) {
-    try {
-      const scanId = (result.body as { scanId?: string }).scanId;
-      if (scanId) {
-        const extraPaths: string[] = [];
-        let pageIdx = 0;
-        while (pageIdx !== files.length) {
-          const pageFile = files[pageIdx];
-          pageIdx++;
-          if (!(pageFile instanceof File)) {
-            /* skip non-file entries */
-          } else {
-            const pageExt = MIME_EXTENSIONS.get(pageFile.type) ?? "jpg";
-            const pageTag = files.length !== 1 ? "_page" + pageIdx : "";
-            const pagePath =
-              restaurantId + "/" + scanId + pageTag + "." + pageExt;
-            const pageBuf = Buffer.from(
-              new Uint8Array(await pageFile.arrayBuffer()),
-            );
-            const pageRes = await supabase.storage
-              .from("invoice-images")
-              .upload(pagePath, pageBuf, {
-                contentType: pageFile.type,
-                upsert: true,
-              });
-            if (!pageRes.error) {
-              if (pageIdx === 1) {
-                await supabase
-                  .from("invoice_scans")
-                  .update({ raw_image_path: pagePath })
-                  .eq("id", scanId);
-              } else {
-                extraPaths.push(pagePath);
-              }
-            }
-          }
+    key: rawKey,
+    kind: "invoice_scan_upload",
+    handler: async () => {
+      try {
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          const bytes = Buffer.from(new Uint8Array(await file.arrayBuffer()));
+          const { error } = await supabase.storage
+            .from("invoice-images")
+            .upload(paths[index], bytes, {
+              contentType: file.type,
+              upsert: true,
+            });
+          if (error) return abandonedInternalError();
         }
-        if (extraPaths.length !== 0) {
-          await supabase
-            .from("invoice_scans")
-            .update({ extra_image_paths: extraPaths })
-            .eq("id", scanId);
-        }
+      } catch {
+        // Storage objects use deterministic upsert paths, so a partial upload
+        // is safe to retry after abandoning the database cache claim.
+        return abandonedInternalError();
       }
-    } catch {
-      // Storage enrichment is best-effort after the scan has completed.
-    }
-  }
+
+      const { data, error } = await supabase.rpc(
+        "create_invoice_scan_upload",
+        {
+          p_restaurant_id: restaurantId,
+          p_scan_id: scanId,
+          p_object_name: paths[0],
+          p_distributor_name: "Unknown",
+          p_invoice_number: null,
+          p_invoice_date: null,
+        } as never,
+      );
+      if (error) return abandonedInternalError();
+      const upload = UploadResultSchema.safeParse(data);
+      if (!upload.success || upload.data.scanId !== scanId) {
+        return abandonedInternalError();
+      }
+      return {
+        outcome: "complete",
+        receipt: completeUploadReceipt(upload.data.scanId),
+      };
+    },
+  });
 
   return apiResultResponse(result);
 }

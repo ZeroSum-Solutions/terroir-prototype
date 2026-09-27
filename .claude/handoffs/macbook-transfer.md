@@ -1,33 +1,28 @@
 # Handoff: MacBook transfer
-status: in-progress
-date: 2026-09-25
+status: source-checkpoint-pending-publication
+date: 2026-09-27
 branch: feat/production-readiness-20260923
-last-code-commit: c770248afba3ec531475b1847dbf5794bfd1ae3b
+last-verified-head: fe9ba7c103770f7bf6a932db9175888fe307e0b1
 
 ## Active Task
 
-Transfer saved work through GitHub. The owner has now authorized renewed work
-and a replacement goal is active. Coordinate MacBook work with this branch; do not
-start competing writers against the same files or local database.
-
-September 24 update: the owner now requests a restarted, demo-first production
-goal. Read the new opening directive in the September 23 execution contract before
-continuing. It prioritizes complete staff workflows and preserves all production
-criteria. After the initial refusal, the owner deleted the previous paused goal
-and the replacement goal was successfully created with status active. This new
-owner instruction supersedes the earlier no-development pause, but never authorizes
-unsafe database resets, hosted changes or a main merge.
+The owner requests a safe stopping point, a successful `main` merge, removal of
+stale worktrees, and a mobile-testable release. Merge authorization now exists;
+release prerequisites still apply. At this document's update, the branch has
+uncommitted work after the head above. Publication and merge are not yet claimed.
+Coordinate writers before changing this checkout or its local database.
 
 ## Goal
 
-Continue the restaurant-first production implementation with mobile and team
-workflows. The application is not production-ready. Only T00/T01 were complete
-at pause; T02–T14 remain incomplete.
+Preserve the restaurant-demo work in a reviewed source checkpoint, then complete
+the release gates. The application is not production-ready; the bounded M1–M5
+demo and full production criteria remain incomplete.
 
 ## Decisions
 
-- This transfer authorizes a feature-branch push, not merge or deployment.
-- Main deploys to both Railway environments sharing one hosted database.
+- Main deploys to both Railway environments sharing one hosted database, but
+  does not apply migrations. Do not merge while required hosted schema and
+  cutover checks remain unverified.
 - Migration 0154's exact 22-path source checkpoint, including generated type and
   schema-snapshot artifacts, is saved and pushed at `29b06e78`. Its isolated proof
   does not authorize a hosted apply.
@@ -36,6 +31,72 @@ at pause; T02–T14 remain incomplete.
 - Do not copy production credentials into local testing. Follow AGENTS.md and
   `docs/runbooks/local-stack.md`; start with `scripts/local/dev-local.sh`, never
   bare `pnpm dev`. Use `DEV_BYPASS_EMAIL=owner+local@terroir.test`.
+
+## Current transfer ledger
+
+Current repository: `ZeroSum-Solutions/terroir-prototype`. The Mac mini checkout
+is `/Users/zero/projects/_archive/terroir-prototype`, not a similarly named
+Terroir or rebuild directory. Use the branch named above until a verified merge
+receipt replaces this checkpoint status.
+
+| Surface | Verified result | Remaining boundary |
+|---|---|---|
+| Database 0160–0164 | Local functional, refusal, authorization, concurrency, down/up and conservation evidence; generated types, 136-migration snapshot and TypeScript checks passed. The last eight 0164 schedules have independent runtime review. | Not a hosted apply. Canonical live-database suites still need zero-critical-skip execution. |
+| Restaurant journey | Synthetic owner received two bottles, opened one, poured four 150 ml glasses, reconciled to 120 ml and retained that state after fresh login. Separate staff user poured successfully; reconciliation returned 403 without a receipt. | A guarded continuation recovered the first attempt. No clean uninterrupted final-candidate journey or complete role/site matrix is claimed. |
+| Mobile drawer | 320/390/768/1200 px checks passed; primary actions measured 52 px high. | Responsive-header fixes have source review and five tests, but no fresh browser geometry. Full-page accessibility and mobile QA remain open. |
+| Active-site preflights | Four regressions repaired; 85 focused tests passed. | Request preflights are not an atomic authorization or raw-cost/Storage privacy seal. |
+| Portable demo | Repo-owned launcher, fixture, journey and source checks exist; seven source checks passed. | Execution deliberately refuses until Docker ownership/cleanup admission and independent review pass. No MacBook reproduction. |
+| Hosted release | Coordinator checked production and staging health at 12:08 UTC on 2026-09-27: HTTP 200, release `e31c16494ba49d83fe1304358923bf7bfeabf6c7`. | That is the older deployed release, not this working tree. Hosted 0156–0164 state remains unverified; no apply is claimed. |
+
+The latest full unit run passed 5,589 tests, failed zero and skipped 182; it is not full live-database
+coverage. Bin PATCH, import-revert HTTP callers and stalled-scan housekeeping
+still need final live application-boundary proof. Raw-cost/Storage cutover and
+the final immutable-range security/release checks remain open. Credential access
+for hosted inspection/application was unavailable at this checkpoint; do not
+work around it with `.env.local`, copied secrets or weaker gates.
+
+### Resume safely on another computer
+
+Read [AGENTS.md](../../AGENTS.md), the
+[demo milestone](../../docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md)
+and the [portable demo draft](../../docs/runbooks/restaurant-demo-macbook-handoff.md).
+In a new destination directory, obtain the feature branch and inspect its identity:
+
+```sh
+git clone --branch feat/production-readiness-20260923 --single-branch git@github.com:ZeroSum-Solutions/terroir-prototype.git terroir-prototype
+cd terroir-prototype
+git remote get-url origin
+git status --short --branch
+git rev-parse HEAD
+```
+
+Compare that SHA with the coordinator's final publication receipt. A clone taken
+before publication will not contain the current dirty-tree work. Never overwrite
+an existing checkout to make it match. Dependencies, credentials, retained local
+databases and raw evidence do not travel through GitHub.
+
+Follow the [local-stack runbook](../../docs/runbooks/local-stack.md) for target
+admission. The portable draft's non-mutating source check is available, but its
+`--execute` refusal must remain intact. For release, use the
+[production migration runbook](../../docs/runbooks/production-migrations.md),
+verify the actual hosted migration state and safe old-code compatibility, then
+complete required CI/security gates before merge. Verify deployed SHA and health
+afterwards; an earlier green health response is insufficient.
+
+Remove worktrees only after checking each tree's dirty files, unique commits,
+active processes and retained evidence. Keep unmerged work and database/proof
+directories. The isolated demo's owned services stopped successfully; its two
+synthetic database clones and evidence remain intentionally retained on the mini.
+
+Selected independent reports are preserved in
+[the checkpoint evidence](../../docs/evidence/restaurant-demo-20260927/README.md).
+Raw mini-only evidence lives under the `terroir-restaurant-demo-20260927` goal-state
+proof directory. Key receipts are `0164-physical-races-actual-independent-review.md`,
+`0164-remaining-concurrency-actual-independent-review.md`,
+`independent-browser-0164-recovered-owner-staff-runtime-review.md`,
+`independent-browser-0164-viewport-runtime-review.md`, and
+`independent-responsive-header-source-review.md`. These names aid recovery;
+they are not portable evidence links or proof that GitHub contains raw artifacts.
 
 ## Files
 
@@ -49,7 +110,12 @@ at pause; T02–T14 remain incomplete.
 - `docs/runbooks/local-stack.md`: canonical local startup, port, and conservation
   safety contract.
 
-## Current transfer ledger
+## Historical transfer ledger (through September 25)
+
+The remaining sections preserve earlier checkpoints and their then-current
+limitations. The current transfer ledger above supersedes their runtime, branch,
+authorization and next-action statements; do not treat old local-stack states as
+current targets.
 
 | State | Checkpoint | Evidence and limit |
 |---|---|---|
@@ -72,7 +138,7 @@ artifacts and database contents remain on the mini. A checkout does not provide
 a running preview.
 None of these checkpoints completes C04, D1, C06, or Phase B.
 
-## Evidence
+## Historical evidence
 
 Current partial application checkpoint `74af64f2` requires explicit site capability
 grants before selecting/serializing cellar costs, displaying internal pricing targets
@@ -146,7 +212,7 @@ V6 run superseded it for the bounded 0154 apply and settlement result. V6 did no
 change the retained full local stack or prove a hosted rollout.
 The outgoing 44-commit range passed a redacted Gitleaks scan before transfer.
 
-## Open Questions
+## Historical open questions
 
 The MacBook needs GitHub repository access, dependencies and an isolated local
 Supabase setup before runtime testing. Provider-backed features need separately
@@ -155,7 +221,7 @@ Raw controller evidence and QA worktrees are backed up only on the mini; request
 a separately reviewed transfer if needed. Do not upload database dumps or raw
 archives to GitHub.
 
-## Next Action
+## Historical next action
 
 On the MacBook, read this handoff and AGENTS.md, verify the checked-out branch and
 exact commit, then follow the local-stack runbook. Do not run `dev-stack.sh` against
@@ -189,7 +255,7 @@ canonical pre-cutover gates pass.
 No completed browser-to-database service demo, current positive browser pass, or
 all-width visual-QA pass is claimed.
 
-## Suggested Skills
+## Historical suggested skills
 
 Use goal and fable-mode only when the owner resumes implementation; use the
 database, security and TypeScript reviewers before promoting unfinished work.

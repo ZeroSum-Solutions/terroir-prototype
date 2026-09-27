@@ -49,6 +49,12 @@ export type PhysicalReconcileDraft = {
   frozenOperation: FrozenPhysicalReconcileOperation | null;
 };
 
+export type PhysicalReconcileDraftSnapshot = {
+  raw: string;
+  savedAt: number;
+  draft: PhysicalReconcileDraft;
+};
+
 interface StoredDraft {
   savedAt: number;
   version?: 1 | 2;
@@ -152,16 +158,62 @@ export function persistPhysicalReconcileDraft(
   const storage = getStorage();
   if (!storage) return false;
   try {
-    storage.setItem(reconcileDraftKey(restaurantId, userId), JSON.stringify({
-      savedAt: Date.now(),
-      ...draft,
-    }));
+    const key = reconcileDraftKey(restaurantId, userId);
+    const existingRaw = storage.getItem(key);
+    if (existingRaw) {
+      const existing = parsePhysicalReconcileDraftSnapshot(existingRaw);
+      if (!existing || !physicalEntriesEqual(existing.draft.entries, draft.entries)) return false;
+      if (existing.draft.frozenOperation) {
+        return operationsEqual(existing.draft.frozenOperation, draft.frozenOperation)
+          ? true
+          : false;
+      }
+      const frozenRaw = JSON.stringify({ savedAt: existing.savedAt, ...draft });
+      storage.setItem(key, frozenRaw);
+      return storage.getItem(key) === frozenRaw;
+    }
+    const raw = JSON.stringify({ savedAt: Date.now(), ...draft });
+    storage.setItem(key, raw);
+    return storage.getItem(key) === raw;
+  } catch {
+    return false;
+  }
+}
+
+/** Reads the exact active bytes without invoking TTL expiry or cleanup. */
+export function readPhysicalReconcileDraftSnapshot(
+  restaurantId: string,
+  userId: string,
+  operation: FrozenPhysicalReconcileOperation,
+): PhysicalReconcileDraftSnapshot | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
     const raw = storage.getItem(reconcileDraftKey(restaurantId, userId));
-    if (!raw) return false;
-    const stored = JSON.parse(raw) as Partial<StoredDraft>;
-    const verified = parsePhysicalDraft(stored);
-    return verified?.frozenOperation?.operationId === draft.frozenOperation.operationId &&
-      verified.frozenOperation.payload === draft.frozenOperation.payload;
+    if (!raw) return null;
+    const snapshot = parsePhysicalReconcileDraftSnapshot(raw);
+    return snapshot?.draft.frozenOperation &&
+      operationsEqual(snapshot.draft.frozenOperation, operation)
+      ? snapshot
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Removes only the active slot whose complete serialized bytes still match. */
+export function releasePhysicalReconcileDraft(
+  restaurantId: string,
+  userId: string,
+  expectedRaw: string,
+): boolean {
+  const storage = getStorage();
+  if (!storage) return false;
+  try {
+    const key = reconcileDraftKey(restaurantId, userId);
+    if (storage.getItem(key) !== expectedRaw) return false;
+    storage.removeItem(key);
+    return storage.getItem(key) === null;
   } catch {
     return false;
   }
@@ -237,6 +289,21 @@ function parsePhysicalDraft(parsed: Partial<StoredDraft>): PhysicalReconcileDraf
   return { version: 2, entries: parsed.entries, frozenOperation: frozen };
 }
 
+export function parsePhysicalReconcileDraftSnapshot(
+  raw: string,
+): PhysicalReconcileDraftSnapshot | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredDraft> | null;
+    if (!parsed || typeof parsed.savedAt !== "number" || !Number.isFinite(parsed.savedAt)) {
+      return null;
+    }
+    const draft = parsePhysicalDraft(parsed);
+    return draft ? { raw, savedAt: parsed.savedAt, draft } : null;
+  } catch {
+    return null;
+  }
+}
+
 function isLegacyEntries(entries: unknown): entries is ReconcileDraftEntries {
   return isRecord(entries) && Object.values(entries).every((entry) =>
     isRecord(entry) && typeof entry.newRemainingMl === "number" &&
@@ -275,6 +342,29 @@ function payloadMatchesEntries(
   } catch {
     return false;
   }
+}
+
+function physicalEntriesEqual(
+  left: PhysicalReconcileDraftEntries,
+  right: PhysicalReconcileDraftEntries,
+): boolean {
+  return serializePhysicalEntries(left) === serializePhysicalEntries(right);
+}
+
+function serializePhysicalEntries(entries: PhysicalReconcileDraftEntries): string {
+  return serializePhysicalReconcileRequest(Object.entries(entries).map(([openBottleId, entry]) => ({
+    open_bottle_id: openBottleId,
+    expected_state_version: entry.expectedStateVersion,
+    target_remaining_ml: entry.targetRemainingMl,
+    note: entry.note,
+  })));
+}
+
+function operationsEqual(
+  left: FrozenPhysicalReconcileOperation,
+  right: FrozenPhysicalReconcileOperation,
+): boolean {
+  return left.operationId === right.operationId && left.payload === right.payload;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

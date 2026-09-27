@@ -37,7 +37,13 @@ function formatMoney(value: number): string {
   });
 }
 
-export function ScanInventoryList({ items }: { items: ScanInventoryItem[] }) {
+export function ScanInventoryList({
+  items,
+  costRestricted = false,
+}: {
+  items: ScanInventoryItem[];
+  costRestricted?: boolean;
+}) {
   if (items.length === 0) return null;
   return (
     <div className="mt-lg">
@@ -76,7 +82,11 @@ export function ScanInventoryList({ items }: { items: ScanInventoryItem[] }) {
               </span>
               <span className="tabular mt-2xs block text-ledger text-grey">
                 {item.quantity} ×{" "}
-                {item.unitCost != null ? `$${formatMoney(item.unitCost)}` : "—"}
+                {costRestricted
+                  ? "Cost restricted"
+                  : item.unitCost != null
+                    ? `$${formatMoney(item.unitCost)}`
+                    : "—"}
               </span>
             </span>
           </Link>

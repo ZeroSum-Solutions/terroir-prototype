@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { NoteModal } from "./note-modal";
 import { EditMetadataModal } from "./edit-metadata-modal";
 import { PourPickerModal } from "./pour-picker-modal";
-import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { OpenBottleRow, PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 import type { CellarWineRow } from "./types";
 import type { PreservationMethod } from "@/lib/partial-bottles/math";
 import { PartialBottleCloseout } from "./partial-bottle-closeout";
@@ -177,22 +177,7 @@ export function WineDetailDrawer({
 
   if (!row) return null;
 
-  const pickerItem: OpenBottleRow | null =
-    row.wine_list_item_id && row.glass_pour_ml && row.size_ml
-      ? {
-          wine_id: row.wine_id,
-          name: row.name,
-          producer: row.producer,
-          vintage: row.vintage as number,
-          glass_pour_ml: row.glass_pour_ml,
-          open_remaining_ml: (selectedPhysicalBottle?.remainingMl ?? row.open_remaining_ml) as number,
-          opened_at: row.opened_at as string,
-          pour_size_mode: row.pour_size_mode ?? "fixed",
-          sealed_count: row.sealed_count,
-          size_ml: row.size_ml,
-          wine_list_item_id: row.wine_list_item_id,
-        }
-      : null;
+  const pickerItem = buildDrawerPickerItem(row, selectedPhysicalBottle);
   const totalMl =
     row.size_ml === null
       ? null
@@ -617,4 +602,26 @@ export function WineDetailDrawer({
 
 export function drawerStateKey(row: CellarWineRow | null, version: 1 | 2 = 1) {
   return !row ? "none" : version === 2 ? row.wine_id : `${row.wine_id}:${row.opened_at ?? "sealed"}`;
+}
+
+export function buildDrawerPickerItem(
+  row: CellarWineRow,
+  selectedPhysicalBottle: PhysicalBottleSummary | null,
+): OpenBottleRow | null {
+  return row.wine_list_item_id && row.glass_pour_ml && row.size_ml
+    ? {
+        active_bottle_count: row.activeBottleCount,
+        wine_id: row.wine_id,
+        name: row.name,
+        producer: row.producer,
+        vintage: row.vintage as number,
+        glass_pour_ml: row.glass_pour_ml,
+        open_remaining_ml: (selectedPhysicalBottle?.remainingMl ?? row.open_remaining_ml) as number,
+        opened_at: row.opened_at as string,
+        pour_size_mode: row.pour_size_mode ?? "fixed",
+        sealed_count: row.sealed_count,
+        size_ml: row.size_ml,
+        wine_list_item_id: row.wine_list_item_id,
+      }
+    : null;
 }

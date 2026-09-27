@@ -1,701 +1,307 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
-import { OK_OCR } from "@/test/mocks/azure";
-import { makeParsedInvoice, makeEmptyParsedInvoice } from "@/test/fixtures/invoices/scans";
-
-/**
- * /api/scan route tests.
- *
- * BND-003 / ARCH-001: requireMembership (not requireAuth) gates the
- * endpoint, and an unauthenticated caller receives a 401 without ever
- * triggering the paid Azure OCR or Anthropic calls.
- *
- * BND-010: characterization coverage — happy path, unauth, missing-file,
- * bad mime, Azure 500, Anthropic 500, plus the BND-007 singleton
- * invariant (constructor never invoked from inside the route).
- *
- * The vi.mock factories below run at file-hoist time, BEFORE any imports
- * are initialized — so they cannot reference imported helpers. See
- * `src/test/mocks/anthropic.ts` for the full rationale.
- */
 
 const auth = vi.hoisted(() => ({ requireMembership: vi.fn() }));
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => auth.requireMembership(...args),
 }));
 
-const anthropic = vi.hoisted(() => {
-  class APIError extends Error {}
-  class RateLimitError extends APIError {}
-  class BadRequestError extends APIError {}
-  return {
-    ctor: vi.fn(),
-    parse: vi.fn(),
-    create: vi.fn(),
-    APIError,
-    RateLimitError,
-    BadRequestError,
-  };
-});
-vi.mock("@anthropic-ai/sdk", () => ({
-  default: class Anthropic {
-    messages = { parse: anthropic.parse, create: anthropic.create };
-    static APIError = anthropic.APIError;
-    static RateLimitError = anthropic.RateLimitError;
-    static BadRequestError = anthropic.BadRequestError;
-    constructor(...args: unknown[]) {
-      anthropic.ctor(...args);
-    }
-  },
-}));
-vi.mock("@anthropic-ai/sdk/helpers/zod", () => ({
-  zodOutputFormat: () => ({ type: "json_schema", schema: {} }),
-}));
-
-const azure = vi.hoisted(() => ({ analyzeInvoice: vi.fn() }));
-vi.mock("@/lib/scanner/azure", () => ({
-  analyzeInvoice: (...args: unknown[]) => azure.analyzeInvoice(...args),
-}));
-
-const rateLimitMock = vi.hoisted(() => ({ rateLimit: vi.fn() }));
+const limits = vi.hoisted(() => ({ rateLimit: vi.fn() }));
 vi.mock("@/lib/api/rate-limit", () => ({
-  rateLimit: (...args: unknown[]) => rateLimitMock.rateLimit(...args),
+  rateLimit: (...args: unknown[]) => limits.rateLimit(...args),
 }));
-
-// Grok-2: processInvoiceScanOnce's persist write now chains
-// .eq().eq().select("id") and reads back `data` to detect whether its
-// fence on status='processing' matched. Making the shared mockReturnThis()
-// object itself thenable — resolving with a non-empty row, `error: null`
-// — keeps every existing .eq()-only chain in this file resolving exactly
-// as before while satisfying the new fencing check.
-function makeSupabase() { return { from: vi.fn().mockReturnThis(), insert: vi.fn().mockReturnThis(), select: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { id: "scan-1" }, error: null }), update: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), storage: { from: vi.fn().mockReturnThis(), download: vi.fn().mockRejectedValue(new Error("not found")), upload: vi.fn().mockResolvedValue({ error: null }) }, rpc: vi.fn(), catch: vi.fn().mockReturnThis(), then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => Promise.resolve({ data: [{ id: "scan-1" }], error: null }).then(resolve, reject) }; }
 
 const { POST } = await import("./route");
-// Reset the Anthropic singleton between tests so the env-var missing
-// scenario is order-independent.
-const { __resetAnthropicClientForTests } = await import(
-  "@/lib/ai/anthropic-client"
-);
 
-function makeFormRequest(formData: FormData) {
+const KEY = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+const SITE = "11111111-1111-4111-8111-111111111111";
+
+function receipt(scanId = KEY) {
+  return {
+    version: 1,
+    kind: "invoice_scan_upload",
+    scanId,
+    status: "queued",
+    itemCount: 0,
+  };
+}
+
+function makeSupabase(options: {
+  claim?: { data: unknown; error: unknown };
+  create?: { data: unknown; error: unknown };
+  complete?: { data: unknown; error: unknown };
+  abandon?: { data: unknown; error: unknown };
+  uploadErrorAt?: number;
+} = {}) {
+  const rpcCalls: Array<{ name: string; args: unknown }> = [];
+  const uploadCalls: Array<{ path: string; bytes: Buffer; options: unknown }> = [];
+  let uploadIndex = 0;
+  return {
+    rpcCalls,
+    uploadCalls,
+    rpc: vi.fn(async (name: string, args: unknown) => {
+      rpcCalls.push({ name, args });
+      if (name === "claim_scan_idempotency") {
+        return options.claim ?? {
+          data: [{ disposition: "claimed", receipt: null }],
+          error: null,
+        };
+      }
+      if (name === "create_invoice_scan_upload") {
+        return options.create ?? {
+          data: { scanId: KEY, status: "queued" },
+          error: null,
+        };
+      }
+      if (name === "complete_scan_idempotency") {
+        return options.complete ?? { data: receipt(), error: null };
+      }
+      if (name === "abandon_scan_idempotency") {
+        return options.abandon ?? { data: true, error: null };
+      }
+      throw new Error(`Unexpected RPC ${name}`);
+    }),
+    storage: {
+      from: vi.fn(() => ({
+        upload: vi.fn(async (path: string, bytes: Buffer, uploadOptions: unknown) => {
+          uploadIndex += 1;
+          uploadCalls.push({ path, bytes, options: uploadOptions });
+          return {
+            error:
+              uploadIndex === options.uploadErrorAt
+                ? { message: "private storage detail" }
+                : null,
+          };
+        }),
+      })),
+    },
+  };
+}
+
+function allow(supabase: ReturnType<typeof makeSupabase>) {
+  auth.requireMembership.mockResolvedValue({
+    supabase,
+    user: { id: "22222222-2222-4222-8222-222222222222" },
+    restaurantId: SITE,
+    role: "staff",
+  });
+}
+
+function formRequest(files: File[], key: string | null = KEY): NextRequest {
+  const form = new FormData();
+  for (const file of files) form.append("file", file);
+  const headers = new Headers();
+  if (key) headers.set("Idempotency-Key", key);
   return new Request("http://localhost/api/scan", {
     method: "POST",
-    body: formData,
+    headers,
+    body: form,
   }) as unknown as NextRequest;
 }
 
-function pdfFile() {
-  return new File(["%PDF-1.4 stub"], "invoice.pdf", {
-    type: "application/pdf",
-  });
+function image(name = "invoice.jpg", type = "image/jpeg") {
+  return new File(["invoice bytes"], name, { type });
 }
 
-describe("POST /api/scan", () => {
+describe("POST /api/scan upload/enqueue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    __resetAnthropicClientForTests();
-    process.env.AZURE_DOC_INTELLIGENCE_ENDPOINT = "https://example.invalid";
-    process.env.AZURE_DOC_INTELLIGENCE_KEY = "test-key";
-    process.env.OPENROUTER_API_KEY = "sk-test";
-    rateLimitMock.rateLimit.mockReturnValue({ ok: true });
+    limits.rateLimit.mockReturnValue({ ok: true });
   });
 
-  // ── Auth ──────────────────────────────────────────────────────────────
-
-  it("returns 401 when the caller is unauthenticated — and never calls Azure or Anthropic", async () => {
+  it("returns auth failures before cache or storage work", async () => {
     auth.requireMembership.mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     );
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res).toBeInstanceOf(NextResponse);
-    expect(res.status).toBe(401);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-    // BND-007 invariant: route does not construct its own client.
-    expect(anthropic.ctor).not.toHaveBeenCalled();
+    const response = await POST(formRequest([image()]));
+    expect(response.status).toBe(401);
   });
 
-  it("returns 403 when the user is authed but has no membership", async () => {
-    auth.requireMembership.mockResolvedValue(
-      NextResponse.json(
-        { error: "No restaurant membership found." },
-        { status: 403 },
-      ),
-    );
+  it("requires a valid UUID idempotency key before storage or RPC work", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
 
-    const fd = new FormData();
-    fd.append("file", pdfFile());
+    const response = await POST(formRequest([image()], null));
 
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(403);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  // ── Bad input ─────────────────────────────────────────────────────────
-
-  it("returns 400 when the form has no file under the 'file' field", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "idempotency_key_required" },
     });
-
-    const fd = new FormData(); // no file appended
-
-    const res = await POST(makeFormRequest(fd));
-    expect(res.status).toBe(400);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.uploadCalls).toEqual([]);
   });
 
-  it("returns 415 when the file mime type is not in the allow-list", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
+  it("fails closed on a claim error and performs no upload", async () => {
+    const supabase = makeSupabase({
+      claim: { data: null, error: { code: "XX000", message: "private" } },
     });
-    const fd = new FormData();
-    fd.append(
-      "file",
-      new File(["not an invoice"], "x.txt", { type: "text/plain" }),
-    );
+    allow(supabase);
 
-    const res = await POST(makeFormRequest(fd));
-    expect(res.status).toBe(415);
-    const body415 = await res.json();
-    expect(body415.error.code).toBe("unsupported_media_type");
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
+    const response = await POST(formRequest([image()]));
+
+    expect(response.status).toBe(500);
+    expect(supabase.uploadCalls).toEqual([]);
+    expect(supabase.rpcCalls.map((call) => call.name)).toEqual([
+      "claim_scan_idempotency",
+    ]);
   });
 
-  it("returns 415 when JSON body path has an unsupported file extension", async () => {
-    const s = makeSupabase();
-    s.storage.from("invoice-images").download = vi.fn().mockResolvedValue({
-      data: new Blob(["GIF89a stub"]),
-      error: null,
-    });
-
-    auth.requireMembership.mockResolvedValue({
-      supabase: s,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-
-    const rq = new Request("http://localhost/api/scan", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ imagePath: "restaurant-A/scan-1/image.gif" }),
-    }) as unknown as NextRequest;
-
-    const rs = await POST(rq);
-    expect(rs.status).toBe(415);
-    const bd = await rs.json();
-    expect(bd.error.code).toBe("unsupported_media_type");
-    expect(s.storage.from("invoice-images").download).not.toHaveBeenCalled();
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  it("returns a fixed 404 for a missing stored image", async () => {
-    const s = makeSupabase();
-    s.storage.from("invoice-images").download = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        statusCode: "404",
-        message: "super-secret storage object details",
+  it("returns an exact replay without touching storage or the create RPC", async () => {
+    const supabase = makeSupabase({
+      claim: {
+        data: [{ disposition: "replay", receipt: receipt() }],
+        error: null,
       },
     });
-    auth.requireMembership.mockResolvedValue({
-      supabase: s,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
+    allow(supabase);
 
-    const res = await POST(
+    const response = await POST(formRequest([image()]));
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual(receipt());
+    expect(supabase.uploadCalls).toEqual([]);
+    expect(supabase.rpcCalls.map((call) => call.name)).toEqual([
+      "claim_scan_idempotency",
+    ]);
+  });
+
+  it("uploads one page, atomically creates/enqueues, and completes a typed receipt", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+
+    const response = await POST(formRequest([image()]));
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual(receipt());
+    expect(supabase.uploadCalls).toEqual([
+      expect.objectContaining({
+        path: `${SITE}/${KEY}.jpg`,
+        options: { contentType: "image/jpeg", upsert: true },
+      }),
+    ]);
+    expect(supabase.rpcCalls).toContainEqual({
+      name: "create_invoice_scan_upload",
+      args: {
+        p_restaurant_id: SITE,
+        p_scan_id: KEY,
+        p_object_name: `${SITE}/${KEY}.jpg`,
+        p_distributor_name: "Unknown",
+        p_invoice_number: null,
+        p_invoice_date: null,
+      },
+    });
+    expect(supabase.rpcCalls.at(-1)).toEqual({
+      name: "complete_scan_idempotency",
+      args: expect.objectContaining({
+        p_kind: "invoice_scan_upload",
+        p_scan_id: KEY,
+        p_item_count: 0,
+        p_wine_count: null,
+        p_wine_id: null,
+      }),
+    });
+  });
+
+  it("uploads every page under the admitted deterministic convention", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+
+    const response = await POST(
+      formRequest([image("one.jpg"), image("two.png", "image/png")]),
+    );
+
+    expect(response.status).toBe(202);
+    expect(supabase.uploadCalls.map((call) => call.path)).toEqual([
+      `${SITE}/${KEY}_page1.jpg`,
+      `${SITE}/${KEY}_page2.png`,
+    ]);
+    expect(supabase.rpcCalls).toContainEqual({
+      name: "create_invoice_scan_upload",
+      args: expect.objectContaining({
+        p_object_name: `${SITE}/${KEY}_page1.jpg`,
+      }),
+    });
+  });
+
+  it("abandons a known failed deterministic upload and does not create a scan", async () => {
+    const supabase = makeSupabase({ uploadErrorAt: 2 });
+    allow(supabase);
+
+    const response = await POST(
+      formRequest([image("one.jpg"), image("two.png", "image/png")]),
+    );
+
+    expect(response.status).toBe(500);
+    expect(supabase.rpcCalls.map((call) => call.name)).toEqual([
+      "claim_scan_idempotency",
+      "abandon_scan_idempotency",
+    ]);
+  });
+
+  it("uses the JSON object's exact scan id and never downloads or signs it", async () => {
+    const objectScan = "33333333-3333-4333-8333-333333333333";
+    const supabase = makeSupabase({
+      create: {
+        data: { scanId: objectScan, status: "queued" },
+        error: null,
+      },
+      complete: { data: receipt(objectScan), error: null },
+    });
+    allow(supabase);
+    const response = await POST(
       new Request("http://localhost/api/scan", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          imagePath: "restaurant-A/scan-1/image.jpg",
-        }),
+        headers: {
+          "content-type": "application/json",
+          "Idempotency-Key": KEY,
+        },
+        body: JSON.stringify({ imagePath: `${SITE}/${objectScan}.heic` }),
       }) as unknown as NextRequest,
     );
-    const text = await res.text();
 
-    expect(res.status).toBe(404);
-    expect(JSON.parse(text)).toEqual({
-      error: { code: "not_found", message: "Image not found." },
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual(receipt(objectScan));
+    expect(supabase.uploadCalls).toEqual([]);
+    expect(supabase.rpcCalls).toContainEqual({
+      name: "create_invoice_scan_upload",
+      args: expect.objectContaining({
+        p_scan_id: objectScan,
+        p_object_name: `${SITE}/${objectScan}.heic`,
+      }),
     });
-    expect(text).not.toContain("super-secret");
   });
 
-  it("redacts a stored-image provider failure", async () => {
-    const s = makeSupabase();
-    s.storage.from("invoice-images").download = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        statusCode: "500",
-        message: "super-secret storage outage",
-      },
-    });
-    auth.requireMembership.mockResolvedValue({
-      supabase: s,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-
-    const res = await POST(
+  it("rejects a JSON path outside the exact site/scan convention", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    const response = await POST(
       new Request("http://localhost/api/scan", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          imagePath: "restaurant-A/scan-1/image.jpg",
-        }),
+        headers: {
+          "content-type": "application/json",
+          "Idempotency-Key": KEY,
+        },
+        body: JSON.stringify({ imagePath: `${SITE}/folder/invoice.jpg` }),
       }) as unknown as NextRequest,
     );
-    const text = await res.text();
-
-    expect(res.status).toBe(500);
-    expect(JSON.parse(text)).toEqual({
-      error: {
-        code: "internal_error",
-        message: "Internal server error.",
-      },
-    });
-    expect(text).not.toContain("super-secret");
+    expect(response.status).toBe(404);
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 413 when the file exceeds 10 MB", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-
-    // Create a Buffer whose byte length is > 10 MB so File.size reflects reality
-    const buf = Buffer.alloc(11 * 1024 * 1024, 65); // 11 MB of "A"
-    const bigFile = new File([buf], "big.jpg", { type: "image/jpeg" });
-    const fd = new FormData();
-    fd.append("file", bigFile);
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(413);
-    const body = await res.json();
-    expect(body.error.message).toContain("10 MB");
-    // Azure DI must not be called for oversized uploads
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-  });
-
-    it("returns 400 on an empty file (size === 0)", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    const fd = new FormData();
-    fd.append(
-      "file",
-      new File([], "empty.pdf", { type: "application/pdf" }),
-    );
-
-    const res = await POST(makeFormRequest(fd));
-    expect(res.status).toBe(400);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-  });
-
-  it("returns 500 when OPENROUTER_API_KEY is missing (singleton throws)", async () => {
-    delete process.env.OPENROUTER_API_KEY;
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({
-      error: {
-        code: "internal_error",
-        message: "Internal server error.",
-      },
-    });
-    // Route abandons the request before touching Azure.
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-  });
-
-  // ── Upstream failures ─────────────────────────────────────────────────
-
-  it("Azure OCR throws: extracts from the image instead and succeeds (vision fallback)", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockRejectedValue(new Error("Azure unavailable"));
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    // The model was handed the document itself, not OCR text.
-    const content = anthropic.parse.mock.calls[0][0].messages[0].content;
-    expect(Array.isArray(content)).toBe(true);
-    expect(content[0].type).toBe("document");
-    const body = await res.json();
-    expect(body.rawText).toBe("");
-    expect(JSON.stringify(body)).not.toContain("Azure unavailable");
-  });
-
-  it("returns 502 when Azure OCR throws and the vision fallback is switched off", async () => {
-    process.env.INVOICE_VISION_FALLBACK = "off";
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockRejectedValue(new Error("Azure unavailable"));
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-    delete process.env.INVOICE_VISION_FALLBACK;
-
-    expect(res.status).toBe(502);
-    const body = await res.json();
-    expect(body).toEqual({
-      error: { code: "bad_gateway", message: "Upstream service error." },
-    });
-    expect(JSON.stringify(body)).not.toContain("Azure unavailable");
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  it("maps an Anthropic APIError to a 502 with the raw OCR text for manual fallback", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockRejectedValue(new anthropic.APIError("upstream 500"));
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(502);
-    const body = await res.json();
-    // The route promises a manual-entry fallback — rawText must come back.
-    expect(body.error.details.rawText).toBe(OK_OCR.rawText);
-    expect(body.error.message).toBe("Upstream service error.");
-  });
-
-  // ── Happy path ────────────────────────────────────────────────────────
-
-  it("returns a structured Scan when both upstreams succeed", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.source.distributor).toBe("Test Distributor");
-    expect(body.source.invoiceNo).toBe("INV-1001");
-    expect(body.items).toHaveLength(2);
-    expect(body.items[0].name).toBe("Pinot Noir");
-    expect(body.items[1].producer).toBe("Château Margaux");
-    expect(body.quality.totalItems).toBe(2);
-    // Both items are ≥0.9 confidence and we have ≥3? No — we have 2. The
-    // route flags `tooFew` when totalItems < 3, so the fallback fires.
-    expect(body.quality.manualFallbackTriggered).toBe(true);
-    expect(body.rawText).toBe(OK_OCR.rawText);
-  });
-
-  it("preserves repeated multipart files for multi-page invoices", async () => {
+  it("rejects mixed PDF batches before cache or storage work", async () => {
     const supabase = makeSupabase();
-    auth.requireMembership.mockResolvedValue({
-      supabase,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-    const fd = new FormData();
-    fd.append(
-      "file",
-      new File(["page one"], "page-1.jpg", { type: "image/jpeg" }),
+    allow(supabase);
+    const response = await POST(
+      formRequest([
+        image("invoice.pdf", "application/pdf"),
+        image("page.jpg", "image/jpeg"),
+      ]),
     );
-    fd.append(
-      "file",
-      new File(["page two"], "page-2.png", { type: "image/png" }),
-    );
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    expect(supabase.storage.upload).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "mixed_pdf_batch" },
+    });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.uploadCalls).toEqual([]);
   });
-
-  it("OCRs every page of a multi-page invoice and merges them into one Claude prompt (BND-081 / TER-CF-032)", async () => {
-    const supabase = makeSupabase();
-    auth.requireMembership.mockResolvedValue({
-      supabase,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockImplementation(async (buf: Buffer) =>
-      buf.toString().includes("page one")
-        ? { ...OK_OCR, rawText: "UNIQUE_PAGE_ONE_TEXT" }
-        : { ...OK_OCR, rawText: "UNIQUE_PAGE_TWO_TEXT" },
-    );
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-    const fd = new FormData();
-    fd.append("file", new File(["page one"], "page-1.jpg", { type: "image/jpeg" }));
-    fd.append("file", new File(["page two"], "page-2.png", { type: "image/png" }));
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    expect(azure.analyzeInvoice).toHaveBeenCalledTimes(2);
-    const promptText = JSON.stringify(anthropic.parse.mock.calls[0][0]);
-    expect(promptText).toContain("UNIQUE_PAGE_ONE_TEXT");
-    expect(promptText).toContain("UNIQUE_PAGE_TWO_TEXT");
-  });
-
-  it("rejects more than the page cap immediately, before any Azure/Anthropic work", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    const fd = new FormData();
-    for (let i = 0; i < 9; i++) {
-      fd.append("file", new File([`page ${i}`], `page-${i}.jpg`, { type: "image/jpeg" }));
-    }
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error.message).toMatch(/8 pages/i);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  it("rejects a batch with more than one PDF, before any Azure/Anthropic work (BND-AF01)", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    const fd = new FormData();
-    fd.append("file", new File(["invoice one"], "invoice-1.pdf", { type: "application/pdf" }));
-    fd.append("file", new File(["invoice two"], "invoice-2.pdf", { type: "application/pdf" }));
-    fd.append("file", new File(["invoice three"], "invoice-3.pdf", { type: "application/pdf" }));
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error.code).toBe("mixed_pdf_batch");
-    expect(body.error.message).toMatch(/one PDF per invoice/i);
-    expect(body.error.message).toContain("3 PDFs");
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  it("rejects a single PDF mixed with an image page (BND-AF01 round 2 — a PDF may never be combined with anything else)", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-    fd.append("file", new File(["page two"], "page-2.jpg", { type: "image/jpeg" }));
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error.code).toBe("mixed_pdf_batch");
-    expect(body.error.message).toMatch(/complete invoice on its own/i);
-    expect(azure.analyzeInvoice).not.toHaveBeenCalled();
-    expect(anthropic.parse).not.toHaveBeenCalled();
-  });
-
-  it("stores HEIC pages with their real extension", async () => {
-    const supabase = makeSupabase();
-    auth.requireMembership.mockResolvedValue({
-      supabase,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-    const fd = new FormData();
-    fd.append(
-      "file",
-      new File(["heic"], "invoice.heic", { type: "image/heic" }),
-    );
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    expect(supabase.storage.upload).toHaveBeenCalledWith(
-      expect.stringMatching(/\.heic$/),
-      expect.any(Buffer),
-      expect.objectContaining({ contentType: "image/heic" }),
-    );
-  });
-
-  it("keeps a successful scan successful when best-effort upload rejects", async () => {
-    const supabase = makeSupabase();
-    supabase.storage.upload.mockRejectedValue(
-      new Error("super-secret storage outage"),
-    );
-    auth.requireMembership.mockResolvedValue({
-      supabase,
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({
-      scanId: "scan-1",
-      items: expect.any(Array),
-    });
-  });
-
-  it("returns 422 no_wines_extracted when Claude returns empty line items", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeEmptyParsedInvoice());
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.error.code).toBe("no_wines_extracted");
-    expect(body.error.message).toBeTruthy();
-    expect(body.error.details.rawText).toBe(OK_OCR.rawText);
-  });
-  // ── Rate limiting ──────────────────────────────────────────────────────
-
-  it("returns 429 when the per-minute scan rate limit is exceeded", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    rateLimitMock.rateLimit.mockReturnValue({ ok: false, retryAfterSeconds: 30 });
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(429);
-    const body = await res.json();
-    expect(body).toEqual({
-      error: {
-        code: "rate_limited",
-        message:
-          "Too many scan requests. Please wait before scanning again.",
-      },
-    });
-  });
-
-  it("returns a Retry-After header when returning 429", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    rateLimitMock.rateLimit.mockReturnValue({ ok: false, retryAfterSeconds: 42 });
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(429);
-    expect(res.headers.get("Retry-After")).toBe("42");
-  });
-
-  it("proceeds normally when rate limit is not exceeded", async () => {
-    auth.requireMembership.mockResolvedValue({
-      supabase: makeSupabase(),
-      user: { id: "u1" },
-      restaurantId: "restaurant-A",
-      role: "owner",
-    });
-    rateLimitMock.rateLimit.mockReturnValue({ ok: true });
-    azure.analyzeInvoice.mockResolvedValue(OK_OCR);
-    anthropic.parse.mockResolvedValue(makeParsedInvoice());
-
-    const fd = new FormData();
-    fd.append("file", pdfFile());
-
-    const res = await POST(makeFormRequest(fd));
-
-    expect(res.status).toBe(200);
-  });
-
 });

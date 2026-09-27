@@ -78,7 +78,7 @@ export function SessionPendingRows({
             {allPendingRows.map(({ batchId, chunkIndex, row }) => (
               <li key={row.id} className="border-b border-rule px-2xs py-sm">
                 <p className="text-control text-ink">
-                  Chunk {chunkIndex ?? "—"}, row {row.row_number}: {row.raw.producer ? `${row.raw.producer} — ` : ""}{row.raw.name}
+                  Chunk {chunkIndex ?? "—"}, row {row.row_number}: {row.producer ? `${row.producer} — ` : ""}{row.name}
                 </p>
                 <p className="mt-2xs text-caption text-grey">
                   {row.lwin_status === "unmatched" ? "No LWIN catalog match. " : ""}

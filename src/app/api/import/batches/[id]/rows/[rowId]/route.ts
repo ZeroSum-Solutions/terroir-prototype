@@ -50,9 +50,16 @@ async function patchRow(request: NextRequest, params: Params) {
 
   const result = await resolveImportBatchRow(supabase, restaurantId, user.id, rowId, action, manualUnitCost);
   if (!result.ok) {
-    const status = result.error.code === "not_found" ? 404 : 422;
+    const status = resolutionErrorStatus(result.error.code);
     return apiError(status, result.error.code, result.error.message);
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(result.receipt);
+}
+
+function resolutionErrorStatus(code: string) {
+  if (code === "not_found") return 404;
+  if (code === "forbidden") return 403;
+  if (code === "not_pending" || code === "manual_cost_required") return 422;
+  return 500;
 }

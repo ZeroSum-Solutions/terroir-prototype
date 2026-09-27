@@ -45,7 +45,13 @@ async function render(canManage: boolean): Promise<HTMLElement> {
   document.body.append(container);
   const root = createRoot(container);
   roots.push(root);
-  await act(async () => root.render(<ReconcileQueueClient canManage={canManage} />));
+  await act(async () => root.render(
+    <ReconcileQueueClient
+      canManage={canManage}
+      userId="user-1"
+      restaurantId="restaurant-1"
+    />,
+  ));
   await vi.waitFor(() => {
     expect(container.querySelectorAll("[data-queue-row]").length).toBeGreaterThan(0);
   });

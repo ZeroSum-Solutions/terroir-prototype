@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+const readers = vi.hoisted(() => ({ readWinePricingStrategy: vi.fn() }));
+vi.mock("@/lib/staff-cost/protected-readers", () => readers);
 import {
   fetchDrinkWindowSnoozedAlerts,
   fetchSnoozedAlerts,
@@ -19,16 +21,33 @@ function makeSupabase(wines: WineRow[] | undefined) {
   const select = vi.fn();
   const or = vi.fn(async () => ({ data: wines, error: null }));
   const gt = vi.fn(async () => ({ data: wines, error: null }));
+  readers.readWinePricingStrategy.mockImplementation(
+    async (_client: unknown, _restaurantId: string, wineIds: string[]) =>
+      wineIds.map((wineId) => ({
+        wine_id: wineId,
+        pricing_dismissed_until:
+          wines?.find((wine) => wine.id === wineId)?.pricing_dismissed_until ?? null,
+        pricing_target_pour_cost_pct: null,
+        pricing_target_markup_ratio: null,
+      })),
+  );
   const from = (table: string) => {
     if (table !== "wines") throw new Error(`unexpected table ${table}`);
-    return {
+    const query = {
       select: (projection: string) => {
         select(projection);
-        return {
-          eq: () => ({ or, gt }),
-        };
+        return query;
       },
+      eq: () => query,
+      order: () => query,
+      range: async (from: number, to: number) => ({
+        data: wines?.slice(from, to + 1),
+        error: null,
+      }),
+      or,
+      gt,
     };
+    return query;
   };
   return { client: { from } as never, select, or, gt };
 }

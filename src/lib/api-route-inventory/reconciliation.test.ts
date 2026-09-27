@@ -114,8 +114,8 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 324 requirements active and maps the original, C08 and C03 route assertions once", () => {
-    expect(ledger.items).toHaveLength(324);
+  it("keeps all 328 requirements active and maps the original, C08 and C03 route assertions once", () => {
+    expect(ledger.items).toHaveLength(328);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {
@@ -170,6 +170,28 @@ describe("TER-020Ab active API requirement reconciliation", () => {
       operationId: "api:GET:/api/offline-context",
       classification: "exact",
       concreteRequirementId: "TER-CF-297",
+      semanticAliasContext: [],
+    });
+  });
+
+  it("inventories the C04 capability replacement route without claiming a concrete API requirement", () => {
+    expect(inventory.discoveredOperations).toContainEqual(
+      expect.objectContaining({
+        operationId: "api:PUT:/api/team/members/{param}/capabilities",
+        method: "PUT",
+        path: "/api/team/members/[id]/capabilities",
+      }),
+    );
+    expect(
+      reconciliation.discoveredClassifications.find(
+        (item) =>
+          item.operationId ===
+          "api:PUT:/api/team/members/{param}/capabilities",
+      ),
+    ).toEqual({
+      operationId: "api:PUT:/api/team/members/{param}/capabilities",
+      classification: "extension",
+      concreteRequirementId: null,
       semanticAliasContext: [],
     });
   });

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import { readInventoryCosts } from "@/lib/staff-cost/protected-readers";
+import { isRetailPlausible } from "@/lib/pricing/status";
 import { fetchRetailPrices } from "@/lib/wine-intelligence/wine-searcher";
 
 export const runtime = "nodejs";
@@ -45,6 +48,7 @@ export async function POST() {
       skipped: 0,
       hasMore: false,
       apiKeyConfigured: false,
+      costSanityCheck: "not_applicable",
       message:
         "Wine-Searcher API key is not configured. Set WINE_SEARCHER_API_KEY in Railway environment variables to enable retail-price enrichment.",
     });
@@ -83,23 +87,44 @@ export async function POST() {
       skipped: 0,
       hasMore: false,
       apiKeyConfigured: true,
+      costSanityCheck: "not_applicable",
     });
   }
 
-  // Pull invoice costs for sanity-filter, batched.
   const wineIds = eligible.map((w) => w.id);
-  const { data: invRows } = await supabase
-    .from("inventory_items")
-    .select("wine_id, unit_cost, added_at")
-    .eq("restaurant_id", restaurantId)
-    .in("wine_id", wineIds)
-    .order("added_at", { ascending: false });
+  let canReadCost: boolean;
+  try {
+    canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+  } catch {
+    Sentry.captureMessage("Retail batch cost authorization check failed", {
+      level: "error",
+      tags: { surface: "wines-refresh-batch", phase: "cost-authorization" },
+      extra: { restaurantId },
+    });
+    return Errors.internal("Cost authorization check failed.");
+  }
 
   const costByWine = new Map<string, number>();
-  for (const r of invRows ?? []) {
-    if (!r.wine_id || r.unit_cost == null) continue;
-    if (!costByWine.has(r.wine_id)) costByWine.set(r.wine_id, r.unit_cost);
+  if (canReadCost) {
+    try {
+      const costRows = await readInventoryCosts(supabase, restaurantId, wineIds);
+      // The private reader is stable-ordered by wine, added_at, and id. Later
+      // rows overwrite earlier rows so each wine receives its newest anchor.
+      for (const row of costRows) {
+        costByWine.set(row.wine_id, row.unit_cost);
+      }
+    } catch {
+      Sentry.captureMessage("Retail batch private cost lookup failed", {
+        level: "error",
+        tags: { surface: "wines-refresh-batch", phase: "cost-read" },
+        extra: { restaurantId },
+      });
+      return Errors.internal("Cost lookup failed.");
+    }
   }
+  const costSanityCheck = canReadCost
+    ? "applied_when_available"
+    : "restricted";
 
   // Concurrency-limited fan-out. Each call gracefully nulls on failure
   // (rate-limit, sanity-filter, parse error) — Wine-Searcher client logs
@@ -122,10 +147,25 @@ export async function POST() {
     const slice = eligible.slice(i, i + REFRESH_CONCURRENCY);
     const settled = await Promise.all(
       slice.map(async (wine) => {
-        const result = await fetchRetailPrices({
-          lwinId: wine.lwin_id,
-          invoiceCost: costByWine.get(wine.id),
-        });
+        // Keep acquisition cost out of the provider wrapper and its general
+        // telemetry; apply the optional exact-cost check in this route only.
+        const result = await fetchRetailPrices({ lwinId: wine.lwin_id });
+        const invoiceCost = costByWine.get(wine.id);
+        if (
+          result &&
+          invoiceCost != null &&
+          !isRetailPlausible(result.retailMedian, invoiceCost)
+        ) {
+          Sentry.captureMessage("Wine-Searcher response failed cost sanity filter", {
+            level: "warning",
+            tags: {
+              surface: "wines-refresh-batch",
+              phase: "cost-sanity-filter",
+            },
+            extra: { wineId: wine.id, restaurantId },
+          });
+          return null;
+        }
         // The frozen schema cannot record price basis. Keep average-only
         // values out of retail_median so every persisted consumer sees a
         // true median.
@@ -187,5 +227,6 @@ export async function POST() {
     // Client should re-invoke until hasMore=false to drain stale wines.
     hasMore: eligible.length >= REFRESH_BATCH_LIMIT,
     apiKeyConfigured: true,
+    costSanityCheck,
   });
 }

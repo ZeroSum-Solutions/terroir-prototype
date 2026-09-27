@@ -6,6 +6,7 @@ const mockRequireAuth = vi.fn();
 const mockSetActiveRestaurant = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireOwner: (...args: unknown[]) => mockRequireOwner(...args),
+  requireMembership: (...args: unknown[]) => mockRequireOwner(...args),
   requireAuth: (...args: unknown[]) => mockRequireAuth(...args),
 }));
 vi.mock("@/lib/api/active-restaurant", () => ({
@@ -19,8 +20,13 @@ const { PATCH, GET, PUT, DELETE } = await import("./route");
  */
 function makeSupabase(updateError: unknown = null) {
   const updates: Array<Record<string, unknown>> = [];
+  const rpc = vi.fn().mockResolvedValue({
+    data: { restaurantId: R, updated: true },
+    error: null,
+  });
   return {
     _updates: updates,
+    rpc,
     from: (_t: string) => ({
       update: (row: Record<string, unknown>) => {
         updates.push(row);
@@ -267,6 +273,67 @@ describe("PATCH /api/restaurant/[id]", () => {
       auto_eightysix_from_inventory: true,
       eightysix_ml_threshold: 100,
     });
+  });
+
+  it("routes complete pricing defaults through the closed RPC", async () => {
+    const sup = makeSupabase();
+    mockRequireOwner.mockResolvedValue({
+      supabase: sup,
+      restaurantId: R,
+      user: { id: "u-1" },
+      role: "staff",
+    });
+
+    const res = await PATCH(
+      makeReq({
+        default_target_pour_cost_pct: 23,
+        default_target_markup_ratio: 2.8,
+      }),
+      { params },
+    );
+
+    expect(res.status).toBe(200);
+    expect(sup.rpc).toHaveBeenCalledWith("set_restaurant_pricing_defaults", {
+      p_restaurant_id: R,
+      p_target_pour_cost_pct: 23,
+      p_target_markup_ratio: 2.8,
+    });
+    expect(sup._updates).toEqual([]);
+  });
+
+  it("rejects a partial pricing-default request before mutation", async () => {
+    const sup = makeSupabase();
+    mockRequireOwner.mockResolvedValue({
+      supabase: sup,
+      restaurantId: R,
+      user: { id: "u-1" },
+      role: "owner",
+    });
+
+    const res = await PATCH(
+      makeReq({ default_target_pour_cost_pct: 23 }),
+      { params },
+    );
+
+    expect(res.status).toBe(400);
+    expect(sup.rpc).not.toHaveBeenCalled();
+    expect(sup._updates).toEqual([]);
+  });
+
+  it("does not let pricing.manage authority imply ordinary settings authority", async () => {
+    const sup = makeSupabase();
+    mockRequireOwner.mockResolvedValue({
+      supabase: sup,
+      restaurantId: R,
+      user: { id: "u-1" },
+      role: "staff",
+    });
+
+    const res = await PATCH(makeReq({ name: "Not allowed" }), { params });
+
+    expect(res.status).toBe(403);
+    expect(sup.rpc).not.toHaveBeenCalled();
+    expect(sup._updates).toEqual([]);
   });
 
   it("rejects negative threshold", async () => {

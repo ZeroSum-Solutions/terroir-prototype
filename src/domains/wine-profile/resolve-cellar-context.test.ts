@@ -17,6 +17,9 @@ import {
   type ListRow,
 } from "./resolve-cellar-context";
 
+const WINE_ID = "22222222-2222-4222-8222-222222222222";
+const INVENTORY_ID = "33333333-3333-4333-8333-333333333333";
+
 const lot = (overrides: Partial<InventoryRow> = {}): InventoryRow => ({
   quantity: 6,
   unit_cost: 40,
@@ -51,6 +54,7 @@ function cellarClient(lastPour: { data: unknown; error: unknown } = { data: null
   const responses: Record<string, { data: unknown; error: unknown }> = {
     inventory_items: {
       data: [{
+        id: INVENTORY_ID,
         quantity: 2,
         unit_cost: 100,
         added_at: "2026-08-01T10:00:00.000Z",
@@ -92,6 +96,24 @@ function cellarClient(lastPour: { data: unknown; error: unknown } = { data: null
           Promise.resolve(responses[table]).then(resolve),
       };
       return query;
+    },
+    rpc: (name: string) => {
+      if (name !== "read_inventory_costs") {
+        throw new Error(`Unexpected RPC: ${name}`);
+      }
+      return {
+        range: async () => ({
+          data: [{
+            inventory_item_id: INVENTORY_ID,
+            wine_id: WINE_ID,
+            invoice_scan_id: null,
+            unit_cost: 100,
+            currency: "USD",
+            added_at: "2026-08-01T10:00:00+00:00",
+          }],
+          error: null,
+        }),
+      };
     },
   } as unknown as SupabaseClient<Database>;
   return { client, selected, filters };
@@ -153,7 +175,7 @@ describe("cost query authority", () => {
       { canReadCost: false, canReadMargin: true },
     ]) {
       const { client, selected } = cellarClient();
-      const facts = await resolveCellarContext(client, "restaurant", "wine", 750, access);
+      const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750, access);
 
       expect(selected.inventory_items).not.toContain("unit_cost");
       expect(facts.weightedUnitCost).toBeNull();
@@ -166,12 +188,12 @@ describe("cost query authority", () => {
 
   it("selects and derives cost when both read grants are explicit", async () => {
     const { client, selected } = cellarClient();
-    const facts = await resolveCellarContext(client, "restaurant", "wine", 750, {
+    const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750, {
       canReadCost: true,
       canReadMargin: true,
     });
 
-    expect(selected.inventory_items).toContain("unit_cost");
+    expect(selected.inventory_items).not.toContain("unit_cost");
     expect(facts.weightedUnitCost).toBe(100);
   });
 });
@@ -216,7 +238,7 @@ describe("dates and locations", () => {
       error: null,
     });
 
-    const facts = await resolveCellarContext(client, "restaurant", "wine", 750);
+    const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750);
 
     expect(facts.lastDepletionAt).toBe("2026-09-21");
     expect(selected.effective_service_pour_events).toBe("occurred_at");
@@ -231,7 +253,7 @@ describe("dates and locations", () => {
   it("fails closed when the effective depletion timestamp is unknown", async () => {
     const { client } = cellarClient({ data: { occurred_at: null }, error: null });
 
-    await expect(resolveCellarContext(client, "restaurant", "wine", 750)).rejects.toThrow(
+    await expect(resolveCellarContext(client, "restaurant", WINE_ID, 750)).rejects.toThrow(
       "Invalid effective service event",
     );
   });

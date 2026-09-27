@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import { createInventory, discoverRouteOperations, operationIdFor, validateInventoryShape } from "./generate-api-route-inventory.mjs";
+import { APPROVED_FEATURE_COUNT } from "./verify-feature-ledger.mjs";
 const FILES = {
   inventory: "docs/api-route-inventory.json", inventorySchema: "docs/api-route-inventory.schema.json",
   reconciliation: "docs/api-route-reconciliation.json", reconciliationSchema: "docs/api-route-reconciliation.schema.json",
@@ -153,8 +154,13 @@ export function validateReconciliationSemantics({
     );
   }
   const ledgerById = new Map(ledger.items.map((item) => [item.id, item]));
-  if (ledger.items.length !== 324 || ledger.items.some((item) => item.status !== "active")) {
-    errors.push("all 324 feature-ledger requirements must remain active");
+  if (
+    ledger.items.length !== APPROVED_FEATURE_COUNT ||
+    ledger.items.some((item) => item.status !== "active")
+  ) {
+    errors.push(
+      `all ${APPROVED_FEATURE_COUNT} feature-ledger requirements must remain active`,
+    );
   }
   for (const requirementId of CONCRETE_REQUIREMENT_IDS) {
     const ledgerItem = ledgerById.get(requirementId);

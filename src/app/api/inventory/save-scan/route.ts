@@ -1,49 +1,61 @@
 import { NextResponse, type NextRequest } from "next/server";
-import * as Sentry from "@sentry/nextjs";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { requireMembership } from "@/lib/api/auth";
+import { validateLineItemsArithmetic } from "@/domains/scanning/invoice-arithmetic";
+import { requireRole } from "@/lib/api/auth";
+import { Errors } from "@/lib/api/errors";
+import { withApiHandler } from "@/lib/api/handler";
 import {
+  invalidIdempotencyKeyResult,
   isValidIdempotencyKey,
   withIdempotency,
 } from "@/lib/api/idempotency";
-import { withApiHandler } from "@/lib/api/handler";
 import { apiResultResponse } from "@/lib/api/result-response";
-import {
-  fileField,
-  parseJson,
-  parseMultipart,
-} from "@/lib/api/validation";
-import { validateLineItemsArithmetic } from "@/domains/scanning/invoice-arithmetic";
-import {
-  claimOrCreateInvoiceScanRow,
-  markInvoiceScanSaveFailed,
-} from "@/domains/scanning/invoice-scan-ledger";
+import { fileField, parseJson, parseMultipart } from "@/lib/api/validation";
 import { SaveInvoiceScanBodySchema } from "@/lib/scanner/request-schemas";
-import { SCORED_FIELDS } from "@/lib/scanner/scored-fields";
-import type { LineItem, Scan } from "@/lib/scanner/types";
-import type { Database } from "@/types/database";
+import { readInvoiceScanPrivate } from "@/lib/staff-cost/protected-readers";
 
 export const runtime = "nodejs";
 
 const SaveScanMultipartSchema = z.object({
   data: z.string(),
+  // Retained only so an in-flight old client gets a deterministic migration
+  // path. Images are uploaded by POST /api/scan and are never written here.
   file: fileField.optional(),
 });
 
-/**
- * Compute accuracy as the fraction of scorable fields that were NOT edited.
- *
- * Each item contributes `SCORED_FIELDS.length` total fields.
- * `scan.edits` is a Record<`${itemId}-${field}`, true> — one entry per
- * field the user corrected.
- */
-function computeAccuracy(scan: Scan): number {
-  const totalFields = scan.items.length * SCORED_FIELDS.length;
-  if (totalFields === 0) return 1;
+const ReviewReceiptSchema = z.strictObject({
+  scanId: z.string().uuid(),
+  status: z.literal("complete"),
+  itemCount: z.number().int().min(1).max(500),
+  updated: z.literal(true),
+});
 
-  const editedFields = Object.keys(scan.edits).length;
-  return Math.max(0, (totalFields - editedFields) / totalFields);
+const CommitReceiptSchema = z
+  .strictObject({
+    scanId: z.string().uuid(),
+    itemCount: z.number().int().min(1).max(500),
+    wineCount: z.number().int().min(1).max(500),
+  })
+  .refine(({ itemCount, wineCount }) => wineCount <= itemCount);
+
+function safeAbandon(status: number, body: unknown) {
+  return {
+    outcome: "abandon" as const,
+    response: { status, body },
+  };
+}
+
+function internalFailure() {
+  return safeAbandon(500, {
+    error: { code: "internal_error", message: "Internal server error." },
+  });
+}
+
+function normalizeInvoiceDate(value: string): string | null {
+  if (!value || value === "—" || value === "-") return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
 }
 
 export async function POST(request: NextRequest) {
@@ -51,17 +63,17 @@ export async function POST(request: NextRequest) {
 }
 
 async function postInvoiceInventorySave(request: NextRequest) {
-  // ── Auth ──────────────────────────────────────────────────────────
-  const auth = await requireMembership();
+  const auth = await requireRole(["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
 
-  // ── Parse & validate body (FormData with optional file) ──────────
-  let scan: Scan;
-  let originalItems: LineItem[];
-  let file: File | null = null;
+  const rawKey = request.headers.get("Idempotency-Key");
+  if (!isValidIdempotencyKey(rawKey)) {
+    return apiResultResponse(invalidIdempotencyKeyResult());
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
+  let parsedBody;
   if (contentType.includes("multipart/form-data")) {
     const parsedMultipart = await parseMultipart(
       request,
@@ -69,7 +81,7 @@ async function postInvoiceInventorySave(request: NextRequest) {
       { message: "Invalid body." },
     );
     if (!parsedMultipart.ok) return parsedMultipart.response;
-    const parsedBody = await parseJson(
+    const parsed = await parseJson(
       new Request("http://localhost/api/inventory/save-scan/data", {
         method: "POST",
         body: parsedMultipart.data.data,
@@ -77,245 +89,136 @@ async function postInvoiceInventorySave(request: NextRequest) {
       SaveInvoiceScanBodySchema,
       { message: "Invalid body." },
     );
-    if (!parsedBody.ok) return parsedBody.response;
-    ({ scan, originalItems } = parsedBody.data);
-    const parsedFile = parsedMultipart.data.file;
-    if (parsedFile && parsedFile.size > 0) file = parsedFile;
+    if (!parsed.ok) return parsed.response;
+    parsedBody = parsed.data;
   } else {
-    const parsedBody = await parseJson(request, SaveInvoiceScanBodySchema, {
+    const parsed = await parseJson(request, SaveInvoiceScanBodySchema, {
       message: "Invalid body.",
     });
-    if (!parsedBody.ok) return parsedBody.response;
-    ({ scan, originalItems } = parsedBody.data);
+    if (!parsed.ok) return parsed.response;
+    parsedBody = parsed.data;
   }
 
-  // ── Idempotency (BND-006) ────────────────────────────────────────
-  // The scanner client sends an Idempotency-Key UUID on every save
-  // attempt and reuses it across network retries. A successful save
-  // followed by a retry must return the original response WITHOUT
-  // re-inserting inventory rows.
-  const rawKey = request.headers.get("Idempotency-Key");
-  const key = isValidIdempotencyKey(rawKey) ? rawKey : null;
+  const { scan } = parsedBody;
+  const scanId = scan.scanId;
+  if (!scanId) {
+    return Errors.unprocessable(
+      "scan_upload_required",
+      "Upload this invoice before saving it to inventory.",
+    );
+  }
+
+  const arithmetic = validateLineItemsArithmetic(scan.items);
+  if (!arithmetic.ok) {
+    return Errors.unprocessable(
+      "arithmetic_mismatch",
+      "These numbers don't add up — review and correct the flagged wines before saving.",
+    );
+  }
 
   const result = await withIdempotency({
     supabase,
     restaurantId,
-    key,
-    handler: async () => saveScanOnce({
-      supabase,
-      restaurantId,
-      scan,
-      originalItems,
-      file,
-    }),
+    key: rawKey,
+    kind: "invoice_inventory_save",
+    handler: async () => {
+      let privateScan;
+      try {
+        privateScan = await readInvoiceScanPrivate(supabase, scanId);
+      } catch {
+        return internalFailure();
+      }
+      if (!privateScan || privateScan.restaurant_id !== restaurantId) {
+        return safeAbandon(403, {
+          error: {
+            code: "forbidden",
+            message: "Only a manager with cost access can save this scan.",
+          },
+        });
+      }
+
+      // A different transport key may legitimately retry after the commit
+      // succeeded but cache completion was lost. The business RPC is itself
+      // durable/idempotent, so skip review once committed and replay it.
+      if (privateScan.committed_at === null) {
+        const { data: reviewRaw, error: reviewError } = await supabase.rpc(
+          "review_invoice_scan",
+          {
+            p_scan_id: scanId,
+            p_expected_updated_at: privateScan.updated_at,
+            p_distributor_name: scan.source.distributor,
+            p_invoice_number:
+              scan.source.invoiceNo === "—" ? null : scan.source.invoiceNo,
+            p_invoice_date: normalizeInvoiceDate(scan.source.invoiceDate),
+            p_final_line_items: scan.items,
+            p_edits: scan.edits,
+          } as never,
+        );
+        if (reviewError) {
+          if (reviewError.code === "42501") {
+            return safeAbandon(403, {
+              error: {
+                code: "forbidden",
+                message: "Only a manager with cost access can save this scan.",
+              },
+            });
+          }
+          if (reviewError.message?.trim() === "scan_superseded") {
+            return safeAbandon(409, {
+              error: {
+                code: "scan_superseded",
+                message: "This scan changed before it was saved. Refresh and try again.",
+              },
+            });
+          }
+          return internalFailure();
+        }
+        const review = ReviewReceiptSchema.safeParse(reviewRaw);
+        if (
+          !review.success ||
+          review.data.scanId !== scanId ||
+          review.data.itemCount !== scan.items.length
+        ) {
+          // The review may have committed even though its returned shape is
+          // unusable. Preserve the cache claim rather than authorizing retry.
+          throw new Error("review_invoice_scan returned an unexpected receipt");
+        }
+      }
+
+      const { data: commitRaw, error: commitError } = await supabase.rpc(
+        "commit_invoice_scan",
+        { p_scan_id: scanId },
+      );
+      if (commitError) {
+        if (commitError.code === "42501") {
+          return safeAbandon(403, {
+            error: {
+              code: "forbidden",
+              message: "Only a manager with cost access can save this scan.",
+            },
+          });
+        }
+        return internalFailure();
+      }
+      const commit = CommitReceiptSchema.safeParse(commitRaw);
+      if (!commit.success || commit.data.scanId !== scanId) {
+        // The atomic commit may already be durable. Keep the claim in progress
+        // and surface an uncertain outcome rather than abandoning/retrying.
+        throw new Error("commit_invoice_scan returned an unexpected receipt");
+      }
+      return {
+        outcome: "complete",
+        receipt: {
+          version: 1 as const,
+          kind: "invoice_inventory_save" as const,
+          scanId: commit.data.scanId,
+          status: "committed" as const,
+          itemCount: commit.data.itemCount,
+          wineCount: commit.data.wineCount,
+        },
+      };
+    },
   });
 
   return apiResultResponse(result);
-}
-
-/** The real save work. Extracted so `withIdempotency` can wrap it. */
-async function saveScanOnce(opts: {
-  supabase: SupabaseClient<Database>;
-  restaurantId: string;
-  scan: Scan;
-  originalItems: LineItem[];
-  file: File | null;
-}): Promise<{ status: number; body: unknown }> {
-  const { supabase, restaurantId, scan, originalItems, file } = opts;
-
-  // ── Arithmetic validation (G1-12) ───────────────────────────────
-  // Re-validated server-side, against the items actually about to become
-  // inventory_items rows — a client-supplied "already validated" claim
-  // (e.g. the `arithmetic` field the extraction response carried) is
-  // never trusted on its own. No model should establish financial truth,
-  // and neither should an unverified client payload. See
-  // src/domains/scanning/invoice-arithmetic.ts.
-  const arithmetic = validateLineItemsArithmetic(scan.items);
-  if (!arithmetic.ok) {
-    return {
-      status: 422,
-      body: {
-        code: "arithmetic_mismatch",
-        message:
-          "These numbers don't add up — review and correct the flagged wines before saving.",
-        issues: arithmetic.issues,
-      },
-    };
-  }
-
-  // ── Accuracy score ───────────────────────────────────────────────
-  const accuracyScore = computeAccuracy(scan);
-
-  // ── Claim (or create) the invoice_scans ledger row ───────────────
-  // T2: this used to INSERT unconditionally, producing a second, orphan
-  // row for every scan that came through POST /api/scan — see
-  // src/domains/scanning/invoice-scan-ledger.ts for the full defect.
-  const ledger = await claimOrCreateInvoiceScanRow({
-    supabase,
-    restaurantId,
-    scan,
-    originalItems,
-    accuracyScore,
-  });
-
-  if (!ledger.ok) {
-    if (ledger.status === 500) {
-      const detail = ledger.body as { error: unknown; scanId: string | null };
-      console.error("invoice_scans ledger claim failed:", detail.error);
-      Sentry.captureException(detail.error ?? new Error("invoice_scans claim returned no row"), {
-        tags: { surface: "save-scan", phase: "invoice_scans-claim" },
-        extra: { restaurantId, itemCount: scan.items.length, scanId: detail.scanId },
-      });
-      return { status: 500, body: { error: "Failed to save invoice scan." } };
-    }
-    return { status: ledger.status, body: ledger.body };
-  }
-
-  const scanId = ledger.scanId;
-
-  // ── Upload invoice image to storage (non-blocking) ──────────────
-  if (file) {
-    try {
-      const ext = file.type === "application/pdf" ? "pdf"
-        : file.type === "image/png" ? "png"
-        : "jpg";
-      const storagePath = `${restaurantId}/${scanId}.${ext}`;
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
-      // INT-016: `upsert: true` as defense-in-depth. In the current
-      // retry flow a fresh scanId is generated per handler invocation
-      // (line 177 `const scanId = invoiceScan.id;`), so the storage
-      // path is unique per attempt and collision isn't possible in
-      // practice. This flip is insurance against:
-      //   - A future refactor that reuses scanId across retries
-      //     (e.g. an idempotency RPC that caches the invoice_scans
-      //     row and replays it).
-      //   - Supabase Storage edge cases where a stale object appears
-      //     to occupy a path (CDN / replication lag).
-      // Negligible downside — `storage.objects` INSERT RLS still
-      // gates the path prefix, so cross-tenant overwrite is blocked
-      // regardless of the upsert flag.
-      const { error: uploadError } = await supabase.storage
-        .from("invoice-images")
-        .upload(storagePath, fileBuffer, {
-          contentType: file.type,
-          upsert: true,
-        });
-      if (uploadError) {
-        console.error("Invoice image upload failed:", uploadError);
-        Sentry.captureException(uploadError, {
-          tags: { surface: "save-scan", phase: "storage-upload" },
-          extra: { scanId, contentType: file.type },
-        });
-      } else {
-        await supabase
-          .from("invoice_scans")
-          .update({ raw_image_path: storagePath })
-          .eq("id", scanId);
-      }
-    } catch (err) {
-      console.error("Invoice image upload error:", err);
-    }
-  }
-
-  // ── Create wines + inventory items ───────────────────────────────
-  const winesPayload = scan.items.map((item) => ({
-    name: item.name,
-    producer: item.producer,
-    vintage: item.vintage ?? null,
-    varietal: item.varietal || null,
-    region: item.region || null,
-    country: null,
-    size_ml: 750,
-  }));
-
-  const { data: wineIdArray, error: batchError } = await supabase.rpc(
-    "find_or_create_wines_batch",
-    {
-      p_restaurant_id: restaurantId,
-      p_wines: winesPayload,
-    },
-  );
-
-  if (batchError || !wineIdArray) {
-    console.error("find_or_create_wines_batch failed:", batchError);
-    Sentry.captureException(batchError ?? new Error("wineIdArray null without error"), {
-      tags: { surface: "save-scan", phase: "find_or_create_wines_batch" },
-      extra: { restaurantId, wineCount: winesPayload.length, scanId },
-    });
-    // D6 rule 1: the ledger row STAYS and states why nothing reached
-    // inventory. The delete this replaces was a silent no-op anyway —
-    // invoice_scans had no DELETE policy before 0143.
-    await markInvoiceScanSaveFailed(supabase, restaurantId, scanId);
-    return { status: 500, body: { error: "Failed to save wines." } };
-  }
-
-  const wineIds = new Set<string>(wineIdArray as string[]);
-
-  const inventoryInserts = scan.items.map((item, idx) => ({
-    wine_id: (wineIdArray as string[])[idx],
-    restaurant_id: restaurantId,
-    invoice_scan_id: scanId,
-    quantity: item.qty,
-    unit_cost: item.unitCost,
-    format: item.format ?? null,
-    currency: item.currency ?? null,
-    added_via: "invoice_scan" as const,
-  }));
-
-  // Batch insert all inventory items
-  const { error: inventoryError } = await supabase
-    .from("inventory_items")
-    .insert(inventoryInserts);
-
-  if (inventoryError) {
-    console.error("inventory_items insert failed:", inventoryError);
-    Sentry.captureException(inventoryError, {
-      tags: { surface: "save-scan", phase: "inventory_items-insert" },
-      extra: { restaurantId, scanId, rowCount: inventoryInserts.length },
-    });
-    // Same as above: keep the row, state the reason, release the claim so
-    // the user can retry.
-    await markInvoiceScanSaveFailed(supabase, restaurantId, scanId);
-    return { status: 500, body: { error: "Failed to save inventory items." } };
-  }
-
-  // LWIN matching — fire-and-forget, non-blocking on the response.
-  // INT-017: failures now capture to Sentry so a systemic LWIN outage
-  // surfaces. Still fire-and-forget — the main save has succeeded.
-  const wineIdStrings = wineIdArray as string[];
-  supabase
-    .rpc("match_lwin_batch", { p_wine_ids: wineIdStrings })
-    .then(({ data, error: lwinError }) => {
-      if (lwinError) {
-        console.error("LWIN batch match failed:", lwinError);
-        Sentry.captureException(lwinError, {
-          tags: { surface: "lwin-match", phase: "match_lwin_batch-rpc", path: "save-scan" },
-          extra: { wineIdCount: wineIdStrings.length },
-        });
-      } else if (data) {
-        console.log(`LWIN matched ${data.length} of ${wineIdStrings.length} wines`);
-      }
-    });
-
-  /**
-   * Response count semantics (DEBT-004 / BND-028):
-   * - `itemCount` = number of inventory rows inserted, which equals the
-   *   number of line items on the invoice (scan.items.length). One line
-   *   item → one inventory_items row, regardless of qty.
-   * - `wineCount` = number of DISTINCT wines referenced by those rows,
-   *   i.e. the cardinality of the set of wine_ids returned by
-   *   find_or_create_wines_batch. This count does NOT distinguish
-   *   newly-created wines from wines already in the catalog — it's
-   *   "how many unique SKUs are on this invoice", not "how many new
-   *   wines were added". The UI copy in ready-view.tsx is phrased
-   *   accordingly ("N items to inventory (M distinct wines)").
-   */
-  return {
-    status: 200,
-    body: {
-      scanId,
-      itemCount: scan.items.length,
-      wineCount: wineIds.size,
-    },
-  };
 }

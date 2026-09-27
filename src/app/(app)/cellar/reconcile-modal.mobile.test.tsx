@@ -10,7 +10,7 @@ import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract"
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const RESTAURANT_ID = "restaurant-1";
 const USER_ID = "user-1";
-const item: OpenBottleRow = { wine_id: "wine-1", wine_list_item_id: "item-1", producer: "Producer", name: "Wine", vintage: 2020, size_ml: 750, sealed_count: 2, opened_at: "2026-09-08T12:00:00Z", open_remaining_ml: 500, glass_pour_ml: 150, pour_size_mode: "fixed" };
+const item: OpenBottleRow = { active_bottle_count: 1, wine_id: "wine-1", wine_list_item_id: "item-1", producer: "Producer", name: "Wine", vintage: 2020, size_ml: 750, sealed_count: 2, opened_at: "2026-09-08T12:00:00Z", open_remaining_ml: 500, glass_pour_ml: 150, pour_size_mode: "fixed" };
 let container: HTMLDivElement;
 let root: Root;
 const close = vi.fn();

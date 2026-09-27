@@ -217,29 +217,15 @@ describe("Insights page cost access", () => {
     );
   });
 
-  it("falls back to safe projections when a protected cost read fails", async () => {
+  it("keeps an authorized protected cost-read failure as a real page error", async () => {
     const error = new Error("unit_cost 777 failed");
     setAccess({ canReadCost: true });
     mocks.fetchInsightsInventory.mockRejectedValue(error);
 
-    const container = renderPage(
-      await InsightsPage({ searchParams: Promise.resolve({}) }),
-    );
-
-    expect(container.textContent).toContain(
-      "Cost analytics could not be loaded for this site.",
-    );
-    expect(container.textContent).not.toContain("777");
-    expect(mocks.fetchInsightsStock).toHaveBeenCalled();
-    expect(mocks.fetchInsightsScans).toHaveBeenLastCalledWith(
-      expect.anything(),
-      "restaurant-a",
-      expect.objectContaining({ includeCost: false }),
-    );
-    expect(mocks.captureException).toHaveBeenCalledWith(
-      error,
-      expect.objectContaining({ tags: { surface: "insights-page", phase: "cost-fetch" } }),
-    );
+    await expect(
+      InsightsPage({ searchParams: Promise.resolve({}) }),
+    ).rejects.toBe(error);
+    expect(mocks.fetchInsightsStock).not.toHaveBeenCalled();
   });
 
   it("uses margin.read for strategy snooze timing without treating it as cost access", async () => {
@@ -255,25 +241,17 @@ describe("Insights page cost access", () => {
     expect(container.querySelector('a[href="/api/insights/csv"]')).toBeNull();
   });
 
-  it("does not present failed dual-read pricing data as a healthy empty state", async () => {
+  it("keeps an authorized protected pricing-read failure as a real page error", async () => {
     const error = new Error("pricing provider failed");
     setAccess({ canReadCost: true, canReadMargin: true });
     mocks.fetchPricingAlerts.mockRejectedValue(error);
 
-    const container = renderPage(
-      await InsightsPage({ searchParams: Promise.resolve({}) }),
-    );
+    await expect(
+      InsightsPage({ searchParams: Promise.resolve({}) }),
+    ).rejects.toBe(error);
 
     expect(mocks.fetchPricingAlerts).toHaveBeenCalled();
     expect(mocks.fetchPricingRecommendations).toHaveBeenCalled();
-    expect(container.textContent).toContain(
-      "Pricing insights could not be loaded for this site.",
-    );
-    expect(container.textContent).not.toContain("No pricing plays yet");
-    expect(mocks.captureException).toHaveBeenCalledWith(
-      error,
-      expect.objectContaining({ tags: { surface: "insights-page", phase: "pricing-fetch" } }),
-    );
   });
 
   it("renders successful pricing modules with both reads and pricing.manage", async () => {

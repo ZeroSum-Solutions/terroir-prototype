@@ -2,36 +2,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import {
   BIN_ID,
-  INVENTORY_ID,
-  LINEAGE_ID,
   RESTAURANT_ID,
   SCAN_ID,
   USER_ID,
-  WINE_ID,
   getRequest,
   makeSupabase,
-  postRequest,
   subjectSeed,
 } from "./route.test-helpers";
 
 const mockRequireMembership = vi.fn();
-const mockRequireRole = vi.fn();
-const mockResolveSitePricingAccess = vi.fn();
+const mockResolveSiteCostReadAccess = vi.fn();
+const mockReadInventoryCosts = vi.fn();
+const mockReadInvoiceScanPrivate = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
-  requireRole: (...args: unknown[]) => mockRequireRole(...args),
 }));
 vi.mock("@/lib/api/site-capability", () => ({
-  resolveSitePricingAccess: (...args: unknown[]) =>
-    mockResolveSitePricingAccess(...args),
+  resolveSiteCostReadAccess: (...args: unknown[]) =>
+    mockResolveSiteCostReadAccess(...args),
+}));
+vi.mock("@/lib/staff-cost/protected-readers", () => ({
+  readInventoryCosts: (...args: unknown[]) => mockReadInventoryCosts(...args),
+  readInvoiceScanPrivate: (...args: unknown[]) =>
+    mockReadInvoiceScanPrivate(...args),
 }));
 
 const { GET } = await import("./route");
-const { POST } = await import("./accept/route");
-const { POST: UNDO } = await import("./undo/route");
-
-const OTHER_RESTAURANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const OTHER_WINE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function allow(supabase: ReturnType<typeof makeSupabase>) {
   const auth = {
@@ -41,36 +37,26 @@ function allow(supabase: ReturnType<typeof makeSupabase>) {
     role: "manager",
   };
   mockRequireMembership.mockResolvedValue(auth);
-  mockRequireRole.mockResolvedValue(auth);
+  mockReadInventoryCosts.mockImplementation(async () =>
+    supabase.tables.inventory_items.map((row) => ({
+      inventory_item_id: row.id,
+      unit_cost: row.unit_cost,
+    })),
+  );
+  mockReadInvoiceScanPrivate.mockImplementation(async (_client: unknown, scanId: string) => {
+    const row = supabase.tables.invoice_scans.find((scan) => scan.id === scanId);
+    return row ? {
+      scan_id: row.id,
+      restaurant_id: row.restaurant_id,
+      final_line_items: row.final_line_items,
+    } : null;
+  });
 }
-
-const actions = [
-  {
-    action_type: "place_bin",
-    subject_table: "inventory_items",
-    subject_id: INVENTORY_ID,
-    patch: { bin_id: BIN_ID },
-  },
-  {
-    action_type: "match_scan",
-    subject_table: "invoice_scans",
-    subject_id: SCAN_ID,
-    patch: {
-      line_index: 0,
-      wine_id: WINE_ID,
-      expected_line: { id: "line-1", name: "Before", lwin: "1000001" },
-    },
-  },
-] as const;
 
 describe("reconcile queue routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveSitePricingAccess.mockResolvedValue({
-      canReadCost: true,
-      canReadMargin: false,
-      canManagePricing: false,
-    });
+    mockResolveSiteCostReadAccess.mockResolvedValue(true);
   });
 
   it("GET uses the membership gate and performs no query when denied", async () => {
@@ -83,18 +69,14 @@ describe("reconcile queue routes", () => {
 
     expect(response.status).toBe(401);
     expect(mockRequireMembership).toHaveBeenCalledOnce();
-    expect(mockResolveSitePricingAccess).not.toHaveBeenCalled();
+    expect(mockResolveSiteCostReadAccess).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it("GET denies a manager without exact-site cost.read before protected source queries", async () => {
     const supabase = makeSupabase(subjectSeed());
     allow(supabase);
-    mockResolveSitePricingAccess.mockResolvedValue({
-      canReadCost: false,
-      canReadMargin: true,
-      canManagePricing: true,
-    });
+    mockResolveSiteCostReadAccess.mockResolvedValue(false);
 
     const response = await GET(getRequest());
     const body = await response.json();
@@ -106,7 +88,7 @@ describe("reconcile queue routes", () => {
         message: "Cost access is required to view the reconciliation queue.",
       },
     });
-    expect(mockResolveSitePricingAccess).toHaveBeenCalledWith(
+    expect(mockResolveSiteCostReadAccess).toHaveBeenCalledWith(
       supabase,
       RESTAURANT_ID,
     );
@@ -164,10 +146,25 @@ describe("reconcile queue routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockResolveSitePricingAccess).toHaveBeenCalledWith(
+    expect(mockResolveSiteCostReadAccess).toHaveBeenCalledWith(
       supabase,
       RESTAURANT_ID,
     );
+    expect(supabase.operations.inventory_items).toContainEqual([
+      "select",
+      "id, wine_id, invoice_scan_id, bin_id, quantity, format, added_at",
+    ]);
+    expect(supabase.operations.invoice_scans).toContainEqual([
+      "select",
+      "id, distributor_name",
+    ]);
+    expect(supabase.operations.wines).toContainEqual([
+      "select",
+      "id, lineage_id, producer, name, vintage, size_ml, lwin_id",
+    ]);
+    expect(JSON.stringify(supabase.operations)).not.toContain('["select","*"]');
+    expect(mockReadInventoryCosts).toHaveBeenCalledWith(supabase, RESTAURANT_ID);
+    expect(mockReadInvoiceScanPrivate).toHaveBeenCalled();
     expect(body.issues.map((issue: { kind: string }) => issue.kind).sort()).toEqual([
       "ambiguous_lineage",
       "duplicate_suspect",
@@ -246,467 +243,4 @@ describe("reconcile queue routes", () => {
       issue.action.payload.expected_line)).toEqual(duplicateLines);
   });
 
-  it("POST rejects mismatched action/table/patch shapes before database access", async () => {
-    const supabase = makeSupabase({});
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [{
-      action_type: "place_bin",
-      subject_table: "wines",
-      subject_id: WINE_ID,
-      patch: { lineage_id: LINEAGE_ID },
-    }]));
-
-    expect(response.status).toBe(400);
-    expect(supabase.from).not.toHaveBeenCalled();
-  });
-
-  it("POST rejects a lineage target outside the active restaurant", async () => {
-    const seed = subjectSeed();
-    const supabase = makeSupabase({
-      ...seed,
-      wine_lineages: [{
-        id: LINEAGE_ID,
-        restaurant_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      }],
-    });
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [{
-      action_type: "link_lineage",
-      subject_table: "wines",
-      subject_id: WINE_ID,
-      patch: { lineage_id: LINEAGE_ID },
-    }]));
-
-    expect(response.status).toBe(404);
-    expect(supabase.tables.wines[0].lineage_id).toBeNull();
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-  });
-
-  it("POST refuses a manual lineage relink that the derivation trigger would overwrite", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [{
-      action_type: "link_lineage",
-      subject_table: "wines",
-      subject_id: WINE_ID,
-      patch: { lineage_id: LINEAGE_ID },
-    }]));
-
-    expect(response.status).toBe(409);
-    expect(supabase.tables.wines[0].lineage_id).toBeNull();
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-  });
-
-  it("rejects a cross-restaurant wine uuid before applying a scan match", async () => {
-    const seed = subjectSeed();
-    seed.wines.push({
-      ...seed.wines[0],
-      id: OTHER_WINE_ID,
-      restaurant_id: OTHER_RESTAURANT_ID,
-    });
-    const supabase = makeSupabase(seed);
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [{
-      ...actions[1],
-      patch: { ...actions[1].patch, wine_id: OTHER_WINE_ID },
-    }]));
-
-    expect(response.status).toBe(404);
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual(
-      seed.invoice_scans[0].final_line_items,
-    );
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-  });
-
-  it("rejects a wine that is not the current scan line's exact identity match", async () => {
-    const seed = subjectSeed();
-    seed.wines[0].lwin_id = "different-lwin";
-    const supabase = makeSupabase(seed);
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[1]]));
-
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.code).toBe("identity_mismatch");
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual(
-      seed.invoice_scans[0].final_line_items,
-    );
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-  });
-
-  it("accepts a restaurant-scoped wine that exactly matches the current scan identity", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[1]]));
-
-    expect(response.status).toBe(201);
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual([
-      { id: "line-1", name: "Before", lwin: "1000001", wine_id: WINE_ID },
-    ]);
-  });
-
-  it("EV-5.4: records projected snapshots and restores only the patched fields", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const before = {
-      inventory: structuredClone(supabase.tables.inventory_items[0]),
-      scan: structuredClone(supabase.tables.invoice_scans[0]),
-      wine: structuredClone(supabase.tables.wines[0]),
-    };
-
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    expect(accepted.status).toBe(201);
-    const { batch } = await accepted.json();
-    expect(supabase.tables.inventory_items[0]).toMatchObject({
-      bin_id: BIN_ID,
-      bin_location: "A-01",
-    });
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual([
-      { id: "line-1", name: "Before", lwin: "1000001", wine_id: WINE_ID },
-    ]);
-    expect(supabase.tables.reconcile_actions).toHaveLength(2);
-    expect(supabase.tables.reconcile_actions[0]).toMatchObject({
-      ordinal: 0,
-      prior_state: { bin_id: null, bin_location: null },
-      new_state: { bin_id: BIN_ID, bin_location: "A-01" },
-    });
-    expect(supabase.tables.reconcile_actions[1]).toMatchObject({
-      ordinal: 1,
-      prior_state: { final_line_items: before.scan.final_line_items },
-      new_state: {
-        final_line_items: [
-          { id: "line-1", name: "Before", lwin: "1000001", wine_id: WINE_ID },
-        ],
-      },
-    });
-    supabase.tables.inventory_items[0].updated_at = "trigger-noise";
-    supabase.tables.invoice_scans[0].status = "concurrent-unpatched-noise";
-
-    const undone = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-
-    expect(undone.status).toBe(200);
-    expect({
-      bin_id: supabase.tables.inventory_items[0].bin_id,
-      bin_location: supabase.tables.inventory_items[0].bin_location,
-    }).toEqual({ bin_id: before.inventory.bin_id, bin_location: before.inventory.bin_location });
-    expect({
-      final_line_items: supabase.tables.invoice_scans[0].final_line_items,
-    }).toEqual({ final_line_items: before.scan.final_line_items });
-    expect(supabase.tables.inventory_items[0].updated_at).toBe("trigger-noise");
-    expect(supabase.tables.invoice_scans[0].status).toBe("concurrent-unpatched-noise");
-    expect(supabase.tables.wines[0]).toEqual(before.wine);
-    expect(supabase.tables.reconcile_batches[0]).toMatchObject({
-      undone_by: USER_ID,
-    });
-    expect(supabase.tables.reconcile_batches[0].undone_at).toEqual(
-      expect.any(String),
-    );
-  });
-
-  it("bulk accept applies multiple unmatched lines from one scan and undo reverses them", async () => {
-    const seed = subjectSeed();
-    seed.invoice_scans[0].final_line_items = [
-      { id: "line-1", name: "First", lwin: "1000001" },
-      { id: "line-2", name: "Second", lwin: "1000001" },
-    ];
-    const supabase = makeSupabase(seed);
-    allow(supabase);
-    const before = structuredClone(supabase.tables.invoice_scans[0]);
-    const scanActions = [0, 1].map((lineIndex) => ({
-      action_type: "match_scan" as const,
-      subject_table: "invoice_scans" as const,
-      subject_id: SCAN_ID,
-      patch: {
-        line_index: lineIndex,
-        wine_id: WINE_ID,
-        expected_line: seed.invoice_scans[0].final_line_items[lineIndex],
-      },
-    }));
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", scanActions));
-
-    expect(response.status).toBe(201);
-    const { batch } = await response.json();
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual([
-      { id: "line-1", name: "First", lwin: "1000001", wine_id: WINE_ID },
-      { id: "line-2", name: "Second", lwin: "1000001", wine_id: WINE_ID },
-    ]);
-    expect(supabase.tables.reconcile_actions).toHaveLength(2);
-    supabase.tables.reconcile_actions[0].created_at = "2026-08-19T13:00:00.000Z";
-    supabase.tables.reconcile_actions[1].created_at = "2026-08-19T11:00:00.000Z";
-
-    const undone = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-    expect(undone.status).toBe(200);
-    expect(supabase.tables.invoice_scans[0]).toEqual(before);
-  });
-
-  it("match accept refuses a scan line that changed after the queue loaded", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const stale = {
-      ...actions[1],
-      patch: { ...actions[1].patch, expected_line: { id: "line-1", name: "Stale" } },
-    };
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [stale]));
-
-    expect(response.status).toBe(409);
-    expect(supabase.tables.invoice_scans[0].final_line_items).toEqual([
-      { id: "line-1", name: "Before", lwin: "1000001" },
-    ]);
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-  });
-
-  it("creates no ledger or subject mutation when batch creation fails", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const before = structuredClone(supabase.tables.inventory_items[0]);
-    supabase.failNext("reconcile_batches", "insert");
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[0]]));
-
-    expect(response.status).toBe(500);
-    expect(supabase.tables.inventory_items[0]).toEqual(before);
-    expect(supabase.tables.reconcile_batches).toHaveLength(0);
-    expect(supabase.tables.reconcile_actions).toHaveLength(0);
-  });
-
-  it("does not mutate a subject when the action insert fails", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const before = structuredClone(supabase.tables.inventory_items[0]);
-    supabase.failNext("reconcile_actions", "insert");
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[0]]));
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error.details).toMatchObject({ applied: [] });
-    expect(supabase.tables.inventory_items[0]).toEqual(before);
-    expect(supabase.tables.reconcile_batches[0].action_count).toBe(0);
-    expect(supabase.tables.reconcile_actions).toHaveLength(0);
-  });
-
-  it("restores the subject when its update mutates and then reports an error", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const before = structuredClone(supabase.tables.inventory_items[0]);
-    supabase.failNext("inventory_items", "update", { after: true });
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[0]]));
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error.details).toMatchObject({ applied: [] });
-    expect(supabase.tables.inventory_items[0]).toEqual(before);
-    expect(supabase.tables.reconcile_batches[0].action_count).toBe(0);
-    expect(supabase.tables.reconcile_actions).toHaveLength(1);
-  });
-
-  it("stops a failed batch at the applied prefix and leaves every mutation ledgered", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const beforeScan = structuredClone(supabase.tables.invoice_scans[0]);
-    supabase.failNext("invoice_scans", "update", { after: true });
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error.details).toMatchObject({
-      applied: [{ ordinal: 0, subject_id: INVENTORY_ID }],
-      failed: { ordinal: 1, subject_id: SCAN_ID },
-    });
-    expect(supabase.tables.inventory_items[0]).toMatchObject({
-      bin_id: BIN_ID,
-      bin_location: "A-01",
-    });
-    expect(supabase.tables.invoice_scans[0]).toEqual(beforeScan);
-    expect(supabase.tables.reconcile_batches[0].action_count).toBe(1);
-    expect(supabase.tables.reconcile_actions).toHaveLength(2);
-
-    const undone = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: supabase.tables.reconcile_batches[0].id,
-    }));
-    expect(undone.status).toBe(200);
-    expect(supabase.tables.inventory_items[0]).toMatchObject({
-      bin_id: null,
-      bin_location: null,
-    });
-    expect(supabase.tables.invoice_scans[0]).toEqual(beforeScan);
-  });
-
-  it("reports final batch-count failure without leaving an unledgered mutation", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    supabase.failNext("reconcile_batches", "update");
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[0]]));
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error.details).toMatchObject({
-      applied: [{ ordinal: 0, subject_id: INVENTORY_ID }],
-    });
-    expect(supabase.tables.inventory_items[0].bin_id).toBe(BIN_ID);
-    expect(supabase.tables.reconcile_actions).toHaveLength(1);
-    expect(supabase.tables.reconcile_batches[0].action_count).toBe(0);
-  });
-
-  it("surfaces concurrent bin placement as a conflict without overwriting it", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    supabase.beforeNext("inventory_items", "update", (tables) => {
-      Object.assign(tables.inventory_items[0], {
-        bin_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        bin_location: "Z-99",
-      });
-    });
-
-    const response = await POST(postRequest("/api/reconcile-queue/accept", [actions[0]]));
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body.error.details).toMatchObject({ applied: [] });
-    expect(supabase.tables.inventory_items[0]).toMatchObject({
-      bin_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      bin_location: "Z-99",
-    });
-    expect(supabase.tables.reconcile_batches[0].action_count).toBe(0);
-    expect(supabase.tables.reconcile_actions).toHaveLength(1);
-  });
-
-  it("undo preflights all subjects and reports conflicts without partial restoration", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const { batch } = await accepted.json();
-    const acceptedInventory = structuredClone(supabase.tables.inventory_items[0]);
-    supabase.tables.invoice_scans[0].final_line_items = [{ id: "concurrent" }];
-
-    const response = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-
-    expect(response.status).toBe(409);
-    expect((await response.json()).error.details).toEqual({
-      conflicts: [{ subject_table: "invoice_scans", subject_id: SCAN_ID }],
-    });
-    expect(supabase.tables.inventory_items[0]).toEqual(acceptedInventory);
-    expect(supabase.tables.reconcile_batches[0].undone_at).toBeNull();
-  });
-
-  it("compensates an uncertain first restoration failure back to the accepted state", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const { batch } = await accepted.json();
-    const acceptedInventory = structuredClone(supabase.tables.inventory_items[0]);
-    const acceptedScan = structuredClone(supabase.tables.invoice_scans[0]);
-    supabase.failNext("invoice_scans", "update", { after: true });
-
-    const response = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-
-    expect(response.status).toBe(500);
-    expect(supabase.tables.inventory_items[0]).toEqual(acceptedInventory);
-    expect(supabase.tables.invoice_scans[0]).toEqual(acceptedScan);
-    expect(supabase.tables.reconcile_batches[0].undone_at).toBeNull();
-  });
-
-  it("compensates earlier restorations when a later restoration fails", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const { batch } = await accepted.json();
-    const acceptedInventory = structuredClone(supabase.tables.inventory_items[0]);
-    const acceptedScan = structuredClone(supabase.tables.invoice_scans[0]);
-    supabase.failNext("inventory_items", "update", { after: true });
-
-    const response = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-
-    expect(response.status).toBe(500);
-    expect(supabase.tables.inventory_items[0]).toEqual(acceptedInventory);
-    expect(supabase.tables.invoice_scans[0]).toEqual(acceptedScan);
-    expect(supabase.tables.reconcile_batches[0].undone_at).toBeNull();
-  });
-
-  it("rolls every restored subject forward when the batch-close write fails", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const { batch } = await accepted.json();
-    const acceptedInventory = structuredClone(supabase.tables.inventory_items[0]);
-    const acceptedScan = structuredClone(supabase.tables.invoice_scans[0]);
-    supabase.failNext("reconcile_batches", "update", { after: true });
-
-    const response = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-
-    expect(response.status).toBe(500);
-    expect(supabase.tables.inventory_items[0]).toEqual(acceptedInventory);
-    expect(supabase.tables.invoice_scans[0]).toEqual(acceptedScan);
-    expect(supabase.tables.reconcile_batches[0].undone_at).toBeNull();
-  });
-
-  it("detects a restore TOCTOU conflict and compensates prior restorations", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-    const accepted = await POST(postRequest("/api/reconcile-queue/accept", actions));
-    const { batch } = await accepted.json();
-    const acceptedScan = structuredClone(supabase.tables.invoice_scans[0]);
-    supabase.beforeNext("inventory_items", "update", (tables) => {
-      Object.assign(tables.inventory_items[0], {
-        bin_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        bin_location: "Z-99",
-      });
-    });
-
-    const response = await UNDO(postRequest("/api/reconcile-queue/undo", {
-      batch_id: batch.id,
-    }));
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body.error.details).toMatchObject({
-      conflicts: [{ subject_table: "inventory_items", subject_id: INVENTORY_ID }],
-    });
-    expect(supabase.tables.inventory_items[0]).toMatchObject({
-      bin_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      bin_location: "Z-99",
-    });
-    expect(supabase.tables.invoice_scans[0]).toEqual(acceptedScan);
-    expect(supabase.tables.reconcile_batches[0].undone_at).toBeNull();
-  });
-
-  it("all subject and ledger queries carry the active restaurant scope", async () => {
-    const supabase = makeSupabase(subjectSeed());
-    allow(supabase);
-
-    await POST(postRequest("/api/reconcile-queue/accept", actions));
-
-    for (const table of ["bins", "inventory_items", "invoice_scans"]) {
-      expect(supabase.operations[table]).toContainEqual([
-        "eq",
-        "restaurant_id",
-        RESTAURANT_ID,
-      ]);
-    }
-    for (const table of ["reconcile_batches", "reconcile_actions"]) {
-      expect(JSON.stringify(supabase.operations[table])).toContain(RESTAURANT_ID);
-    }
-  });
 });

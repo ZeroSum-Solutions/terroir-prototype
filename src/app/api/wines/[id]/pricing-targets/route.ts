@@ -13,23 +13,30 @@ export const runtime = "nodejs";
  * Allocation wines (Krug, DRC) typically need lower markup than the
  * house default, and this endpoint is the only way to set that.
  *
- * Body: { pour_cost_pct?: number | null, markup_ratio?: number | null }
+ * Body: { pour_cost_pct: number | null, markup_ratio: number | null }
  *   • Numbers: set the override.
  *   • null:     clear the override (revert to restaurant default).
- *   • Omitted:  leave that column unchanged.
+ * Both values are required so pricing.manage never needs margin.read to
+ * discover and preserve an omitted protected value.
  *
  * Range mirrors the DB CHECK constraints from migration 0026:
  *   pour_cost_pct: > 0 AND < 100
  *   markup_ratio:  >= 1 AND <= 10
  *
- * Auth: owner+manager only. Mirrors snooze-alert + enrich endpoints.
+ * Auth: exact-site pricing.manage, enforced by the database function.
  */
 const PatchSchema = z
   .object({
-    pour_cost_pct: z.number().gt(0).lt(100).nullable().optional(),
-    markup_ratio: z.number().gte(1).lte(10).nullable().optional(),
+    pour_cost_pct: z.number().gt(0).lt(100).nullable(),
+    markup_ratio: z.number().gte(1).lte(10).nullable(),
   })
   .strict();
+
+const ParamsSchema = z.strictObject({ id: z.string().uuid() });
+const ReceiptSchema = z.strictObject({
+  wineId: z.string().uuid(),
+  updated: z.literal(true),
+});
 
 export async function PATCH(
   req: Request,
@@ -37,16 +44,13 @@ export async function PATCH(
 ) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId, role } = auth;
+  const { supabase, restaurantId } = auth;
 
-  if (role !== "owner" && role !== "manager") {
-    return Errors.forbidden("Setting pricing targets requires owner or manager role.");
+  const parsedParams = ParamsSchema.safeParse(await ctx.params);
+  if (!parsedParams.success) {
+    return Errors.validation(parsedParams.error.issues, "Invalid wine id.");
   }
-
-  const { id } = await ctx.params;
-  if (!id) {
-    return Errors.badRequest("wine id required");
-  }
+  const { id } = parsedParams.data;
 
   let raw: unknown;
   try {
@@ -60,47 +64,35 @@ export async function PATCH(
     return Errors.validation(parsed.error.issues, "Invalid body.");
   }
 
-  if (Object.keys(parsed.data).length === 0) {
-    return Errors.badRequest("No valid fields.");
-  }
-
-  // Build update payload — only include fields that were sent.
-  const update: {
-    pricing_target_pour_cost_pct?: number | null;
-    pricing_target_markup_ratio?: number | null;
-  } = {};
-  if ("pour_cost_pct" in parsed.data) {
-    update.pricing_target_pour_cost_pct = parsed.data.pour_cost_pct ?? null;
-  }
-  if ("markup_ratio" in parsed.data) {
-    update.pricing_target_markup_ratio = parsed.data.markup_ratio ?? null;
-  }
-
-  // Tenant-scope check (defense-in-depth alongside RLS).
-  const { error: updateErr, data } = await supabase
-    .from("wines")
-    .update(update)
-    .eq("id", id)
-    .eq("restaurant_id", restaurantId)
-    .select(
-      "id, pricing_target_pour_cost_pct, pricing_target_markup_ratio",
-    )
-    .maybeSingle();
+  // Both values are explicit because pricing.manage does not grant the
+  // margin.read capability needed to discover and preserve a hidden peer.
+  const { error: updateErr, data: receiptRaw } = await supabase.rpc(
+    "set_wine_pricing_strategy",
+    {
+      p_restaurant_id: restaurantId,
+      p_wine_id: id,
+      p_target_pour_cost_pct: parsed.data.pour_cost_pct,
+      p_target_markup_ratio: parsed.data.markup_ratio,
+    },
+  );
 
   if (updateErr) {
+    if (updateErr.code === "42501") return Errors.forbidden();
+    if (updateErr.code === "P0002") return Errors.notFound("Wine");
     Sentry.captureException(updateErr, {
       tags: { surface: "wines-pricing-targets", phase: "update" },
       extra: { wineId: id, restaurantId },
     });
     return Errors.internal("Update failed.");
   }
-  if (!data) {
-    return Errors.notFound("Wine");
+  const receipt = ReceiptSchema.safeParse(receiptRaw);
+  if (!receipt.success || receipt.data.wineId !== id) {
+    Sentry.captureException(new Error("Invalid pricing strategy receipt"), {
+      tags: { surface: "wines-pricing-targets", phase: "update" },
+      extra: { wineId: id, restaurantId },
+    });
+    return Errors.internal("Update failed.");
   }
 
-  return NextResponse.json({
-    wineId: data.id,
-    pour_cost_pct: data.pricing_target_pour_cost_pct,
-    markup_ratio: data.pricing_target_markup_ratio,
-  });
+  return NextResponse.json(receipt.data);
 }

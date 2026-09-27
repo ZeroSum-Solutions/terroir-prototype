@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
-import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { resolveSitePricingReadAccess } from "@/lib/api/site-capability";
 import {
   isGlassPricePlausible,
   resolveMarkupTarget,
@@ -11,6 +11,12 @@ import {
   suggestGlassPrice,
 } from "@/lib/pricing/status";
 import { getCategoryMidpointMarkup } from "@/lib/pricing/category-bands";
+import {
+  readInventoryCosts,
+  readRestaurantPricingDefaults,
+  readWineCostFlags,
+  readWinePricingStrategy,
+} from "@/lib/staff-cost/protected-readers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,8 +53,8 @@ export async function GET(
     return Errors.badRequest("wine id required");
   }
 
-  const access = await resolveSitePricingAccess(supabase, restaurantId);
-  if (!access.canReadCost || !access.canReadMargin) {
+  const canReadPricing = await resolveSitePricingReadAccess(supabase, restaurantId);
+  if (!canReadPricing) {
     return Errors.forbidden("Pricing suggestions require cost and margin access.");
   }
 
@@ -60,11 +66,12 @@ export async function GET(
       : DEFAULT_GLASS_POUR_ML;
 
   try {
-    // Pull wine + its targets + retail cache.
+    // Public market observations remain on the safe wine projection. House
+    // strategy and acquisition cost cross only their capability-gated RPCs.
     const { data: wine, error: wineErr } = await supabase
       .from("wines")
       .select(
-        "id, varietal, region, rating, retail_median, retail_min, retail_max, retail_retailer_count, retail_refreshed_at, pricing_target_pour_cost_pct, pricing_target_markup_ratio, size_ml",
+        "id, varietal, region, rating, retail_median, retail_min, retail_max, retail_retailer_count, retail_refreshed_at, size_ml",
       )
       .eq("id", id)
       .eq("restaurant_id", restaurantId)
@@ -73,37 +80,34 @@ export async function GET(
       return Errors.notFound("Wine");
     }
 
-    // Pull restaurant defaults.
-    const { data: restaurant } = await supabase
-      .from("restaurants")
-      .select(
-        "default_target_pour_cost_pct, default_target_markup_ratio",
-      )
-      .eq("id", restaurantId)
-      .single();
-
-    // Pull most-recent invoice cost.
-    const { data: invRow } = await supabase
-      .from("inventory_items")
-      .select("unit_cost")
-      .eq("restaurant_id", restaurantId)
-      .eq("wine_id", id)
-      .order("added_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const invoiceCost = invRow?.unit_cost ?? null;
+    const [restaurant, strategyRows, costRows, flagRows] = await Promise.all([
+      readRestaurantPricingDefaults(supabase, restaurantId),
+      readWinePricingStrategy(supabase, restaurantId, [id]),
+      readInventoryCosts(supabase, restaurantId, [id]),
+      readWineCostFlags(supabase, restaurantId, [id]),
+    ]);
+    const strategy = strategyRows[0];
+    if (
+      restaurant?.restaurant_id !== restaurantId ||
+      strategyRows.length !== 1 || strategy?.wine_id !== id ||
+      flagRows.length !== 1 || flagRows[0]?.wine_id !== id ||
+      costRows.some((row) => row.wine_id !== id)
+    ) {
+      throw new Error("Pricing suggestion protected read was incomplete.");
+    }
+    const invoiceCost = costRows.at(-1)?.unit_cost ?? null;
 
     // Resolve targets — per-wine > restaurant > category band > built-in.
     // Markup specifically prefers the category band when no overrides set
     // (more accurate than house default for category-specific wines).
     const categoryMarkup = getCategoryMidpointMarkup(wine);
     const targetMarkup = resolveMarkupTarget(
-      wine.pricing_target_markup_ratio,
-      restaurant?.default_target_markup_ratio ?? categoryMarkup,
+      strategy.pricing_target_markup_ratio,
+      restaurant.default_target_markup_ratio ?? categoryMarkup,
     );
     const targetPourCostPct = resolvePourCostTarget(
-      wine.pricing_target_pour_cost_pct,
-      restaurant?.default_target_pour_cost_pct,
+      strategy.pricing_target_pour_cost_pct,
+      restaurant.default_target_pour_cost_pct,
     );
 
     // Suggested bottle price uses retail × markup.

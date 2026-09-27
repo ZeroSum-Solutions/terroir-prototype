@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 
+const protectedReaders = vi.hoisted(() => ({
+  readInventoryCosts: vi.fn(),
+  readRestaurantPricingDefaults: vi.fn(),
+  readWineCostFlags: vi.fn(),
+  readWinePricingStrategy: vi.fn(),
+}));
 const { requireMembership, captureException } = vi.hoisted(() => ({
   requireMembership: vi.fn(),
   captureException: vi.fn(),
 }));
 vi.mock("@/lib/api/auth", () => ({ requireMembership }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
+vi.mock("@/lib/staff-cost/protected-readers", () => protectedReaders);
 
 const { GET } = await import("./route");
 const restaurantId = "11111111-1111-4111-8111-111111111111";
@@ -20,10 +27,7 @@ function fixture(grants: string[] = []) {
       id: wineId, varietal: null, region: null, rating: null, size_ml: 750,
       retail_median: 50, retail_min: 45, retail_max: 55,
       retail_retailer_count: 3, retail_refreshed_at: null,
-      pricing_target_pour_cost_pct: 25, pricing_target_markup_ratio: 2,
     },
-    restaurants: { default_target_pour_cost_pct: 25, default_target_markup_ratio: 2 },
-    inventory_items: { unit_cost: 30 },
   };
   const client = {
     rpc: vi.fn((_name: string, args: { p_capability_key: string }) => ({
@@ -58,7 +62,28 @@ function request(id = wineId) {
 }
 
 describe("GET pricing suggestion capability boundary", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    protectedReaders.readRestaurantPricingDefaults.mockResolvedValue({
+      restaurant_id: restaurantId,
+      default_target_pour_cost_pct: 25,
+      default_target_markup_ratio: 2,
+    });
+    protectedReaders.readWinePricingStrategy.mockResolvedValue([{
+      wine_id: wineId,
+      pricing_target_pour_cost_pct: 25,
+      pricing_target_markup_ratio: 2,
+    }]);
+    protectedReaders.readInventoryCosts.mockResolvedValue([{
+      inventory_item_id: "33333333-3333-4333-8333-333333333333",
+      wine_id: wineId,
+      unit_cost: 30,
+    }]);
+    protectedReaders.readWineCostFlags.mockResolvedValue([{
+      wine_id: wineId,
+      overpaid_flag: false,
+    }]);
+  });
 
   it.each([401, 403])("preserves authentication/membership rejection %s", async (status) => {
     requireMembership.mockResolvedValue(NextResponse.json({ error: "Denied" }, { status }));
@@ -82,20 +107,18 @@ describe("GET pricing suggestion capability boundary", () => {
     },
   );
 
-  it("denies an unavailable authority before reading private data", async () => {
+  it("fails instead of reporting an absent grant when authority is unavailable", async () => {
     const { client, authority } = fixture();
     authority.error = { code: "PGRST202" };
-    expect((await request()).status).toBe(403);
+    await expect(request()).rejects.toThrow("Site capability evaluation failed");
     expect(client.from).not.toHaveBeenCalled();
   });
 
-  it("denies a rejected authority request without leaking its error", async () => {
+  it("fails a rejected authority request before reading private data", async () => {
     const { client, authority } = fixture();
     authority.thrown = new Error("private authority error");
-    const response = await request();
-    expect(response.status).toBe(403);
+    await expect(request()).rejects.toThrow("Site capability evaluation failed");
     expect(client.from).not.toHaveBeenCalled();
-    expect(await response.text()).not.toContain("private authority error");
   });
 
   it("permits an explicit site delegate and scopes every protected query", async () => {
@@ -107,11 +130,11 @@ describe("GET pricing suggestion capability boundary", () => {
         p_restaurant_id: restaurantId, p_capability_key: capability,
       });
     }
-    for (const query of queries) {
-      expect(query.eq).toHaveBeenCalledWith(
-        query.table === "restaurants" ? "id" : "restaurant_id", restaurantId,
-      );
-    }
+    expect(client.rpc).not.toHaveBeenCalledWith("effective_site_capability", {
+      p_restaurant_id: restaurantId, p_capability_key: "pricing.manage",
+    });
+    expect(queries).toHaveLength(1);
+    expect(queries[0].eq).toHaveBeenCalledWith("restaurant_id", restaurantId);
     expect(queries.find(query => query.table === "wines")?.eq).toHaveBeenCalledWith("id", wineId);
     expect(await response.json()).toMatchObject({ wineId, glassPourMl: 150, hasRetailData: true });
   });

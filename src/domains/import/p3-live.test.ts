@@ -207,7 +207,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const applied = await applyAll(batchId);
       expect(applied.status).toBe("completed");
 
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, revertedCount: 5 });
 
       // Calling apply again on the now-REVERTED batch must be a hard
@@ -614,7 +614,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       expect(afterApply).toMatchObject({ lwin_id: "C2CONTRACT-LWIN", lwin_match_score: 0.9 });
       expect(afterApply.updated_at).not.toBe(preApplyUpdatedAt);
 
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, lwinStampsCleared: 1 });
 
       const { data: wineAfterRevert } = await admin
@@ -659,7 +659,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       expect(applied.status).toBe("applying"); // 3 applied, 2 still pending — never reaches 'completed'
 
       // Pre-fix (0076's original guard), this would fail with P0001.
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, revertedCount: 3 });
 
       const { data: batchRow } = await admin.from("import_batches").select("status").eq("id", batchId).single();

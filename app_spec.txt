@@ -466,9 +466,47 @@
       - System lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace
       - System reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome
       - System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents
+      - System denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result
+      - System preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture
+      - System treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection
+      - System admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed
     </site_capability_authority>
 
   </core_features>
+
+  <accepted_contracts>
+    <import_revert_cleanup status="accepted_for_implementation_unimplemented_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-import-revert-cleanup.md
+      Existing batch and session revert become one current-site staff-authorized, retained-catalog database transaction: exact imported inventory, eligible exact LWIN pairs, and status changes commit together; sessions are all-or-nothing with globally ordered wine and inventory lock unions; every wine and history row remains; and compatible receipts report orphanWinesDeleted as literal zero. This repair changes no core feature count and claims no completion.
+    </import_revert_cleanup>
+    <stalled_scan_expiry status="accepted_for_implementation_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-stalled-scan-expiry.md
+      Existing scan-history housekeeping moves to one current-site staff-authorized database RPC with a strict count receipt, ordered scan locking, a fresh READ COMMITTED active-job check and visible recoverable caller failure. This repair changes no core feature count and claims no completion.
+    </stalled_scan_expiry>
+    <bin_code_mirror status="accepted_for_implementation_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md#accepted-bin-code-mirror-repair
+      Existing bin/location behavior gains an atomic database-owned mirror for the exact site and bin ID; authorization and immutable receipt/history semantics remain unchanged. This repair does not add a core feature or claim completion.
+    </bin_code_mirror>
+    <bottle_location_receiving status="accepted_for_implementation_unimplemented_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-bottle-location-receiving.md
+      This contract refines the existing bottle_scanning assertions and does not change the approved feature count.
+
+      - POST /api/scan-bottle/confirm receives exactly one previously uncounted sealed bottle of one already selected current-site wine into one explicitly selected active current-site bin; it is not relocation, opening, pouring, counting, reconciliation, identity matching, or bin creation
+      - The exact database boundary is public.receive_bottle_at_location_private(p_restaurant_id uuid, p_operation_id uuid, p_wine_id uuid, p_section text, p_bin_id uuid) returns jsonb with no defaults or overloads, PL/pgSQL SECURITY DEFINER, postgres owner, empty search_path, fully qualified objects, and EXECUTE granted only to authenticated after revoking PUBLIC, anon, authenticated, and service_role
+      - Current auth.uid() and staff-or-higher current-site authority are required for first execution and replay; removed, expired, revoked, foreign-site, and non-current actors fail without a receipt or item
+      - Inputs are five non-null values; section is btrim-normalized, non-empty, and at most 200 characters; wine and active bin must belong to the exact site; typed bin text may filter choices but cannot become an ID, create a bin, or infer placement
+      - The durable receipt extends command version 3 with exact type bottle_location_receive, single_wine scope, non-null relational wine_id, null batch count, immutable exact request and ten-key result JSON, and the site-scoped primary key (restaurant_id, operation_id); an equal UUID at another authorized site is an independent key
+      - Completed exact replay locks and validates the receipt before consulting mutable wine or bin state; a new operation locks wine FOR NO KEY UPDATE, claims the receipt, resolves a competing exact receipt, locks the active bin FOR SHARE, inserts one quantity-1 inventory row, and completes the receipt atomically
+      - The first inventory row uses unit_cost 0, null currency, format, and invoice_scan_id, the normalized section, selected bin_id, locked canonical bin code, and added_via bottle_scan; replay adds nothing and the command creates no open-bottle, pour, closeout, bottle-effect, stock-adjustment, or cost-history mutation
+      - The route authenticates before parsing, requires Idempotency-Key plus expected-user and expected-site UUID headers, accepts only wine_id, section, and bin_id, calls only the RPC with five arguments, performs no direct table DML, and returns the same strict cost-free HTTP 201 body for first execution and replay with Idempotency-Replayed as the only replay signal
+      - SQLSTATE 42501 maps to the safe authority envelope; P05V1 is redacted contract drift; P05W1 is non-oracular wine_not_found; only strict P05B1 maps to 409 bin_unavailable and proves zero effect; P05C1 is a same-site operation conflict; P05I1 is an uncertain malformed-receipt failure; mappings never inspect raw messages
+      - Before fetch, the client persists and read-back verifies the exact user, site, operation UUID, send state, and payload under an exclusive browser lock; reload and uncertain outcomes replay the same operation only in the original context, while context, lock, storage, or read-back failure sends nothing
+      - Only strict P05B1 may resolve the rolled-back attempt, clear the invalid bin, require explicit active-bin reselection, and persist and verify a fresh UUID and payload before another fetch; P05C1, P05I1, generic 409, unknown 5xx, network ambiguity, and malformed responses retain the original operation
+      - A future paired down refuses any durable version-3 bottle_location_receive history, deletes nothing, uses no CASCADE, and restores exact prior constraints and ACLs only after refusal passes; no migration number, hosted database action, or deployment is authorized by this accepted contract
+      - Acceptance requires authorization, validation, exact sequential and real concurrent replay, same-site conflict, cross-site same-UUID independence, bin rename and retirement serialization, merge replay, receipt-family compatibility, strict HTTP and client recovery, physical and cost conservation, catalog and ACL checks, and empty plus populated down/up proof
+      - This receive/place leaf does not waive the unplaced queue, hierarchical placement, per-lot or per-bottle placement, movement history, transfer, return, credit, count, reconciliation, sealed-unit tagging, cost entry, or full C06 requirements
+    </bottle_location_receiving>
+  </accepted_contracts>
 
   <database_schema>
     <tables>

@@ -6,6 +6,13 @@ const mockCaptureException = vi.fn();
 const mockFetchDrinkWindowAlerts = vi.fn();
 const mockFetchPricingAlerts = vi.fn();
 const mockResolveSitePricingAccess = vi.fn();
+const mockResolveSiteCostReadAccess = vi.fn();
+const mockResolveSitePricingReadAccess = vi.fn();
+const mockResolveSiteMarginReadAccess = vi.fn();
+const mockFetchSnoozedAlerts = vi.fn();
+const mockFetchInsightsScans = vi.fn();
+const mockFetchInsightsInventory = vi.fn();
+const mockFetchInsightsStock = vi.fn();
 
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
@@ -23,6 +30,21 @@ vi.mock("@/lib/pricing/alerts", () => ({
 vi.mock("@/lib/api/site-capability", () => ({
   resolveSitePricingAccess: (...args: unknown[]) =>
     mockResolveSitePricingAccess(...args),
+  resolveSiteCostReadAccess: (...args: unknown[]) =>
+    mockResolveSiteCostReadAccess(...args),
+  resolveSitePricingReadAccess: (...args: unknown[]) =>
+    mockResolveSitePricingReadAccess(...args),
+  resolveSiteMarginReadAccess: (...args: unknown[]) =>
+    mockResolveSiteMarginReadAccess(...args),
+}));
+vi.mock("@/domains/cellar/snoozed-alerts", () => ({
+  fetchSnoozedAlerts: (...args: unknown[]) => mockFetchSnoozedAlerts(...args),
+}));
+vi.mock("@/lib/insights/snapshot-data", () => ({
+  fetchInsightsScans: (...args: unknown[]) => mockFetchInsightsScans(...args),
+  fetchInsightsInventory: (...args: unknown[]) =>
+    mockFetchInsightsInventory(...args),
+  fetchInsightsStock: (...args: unknown[]) => mockFetchInsightsStock(...args),
 }));
 
 const { GET: getInsights } = await import("./route");
@@ -129,6 +151,13 @@ beforeEach(() => {
     canReadMargin: false,
     canManagePricing: false,
   });
+  mockResolveSiteCostReadAccess.mockResolvedValue(true);
+  mockFetchInsightsScans.mockResolvedValue([]);
+  mockFetchInsightsInventory.mockResolvedValue([]);
+  mockFetchInsightsStock.mockResolvedValue([]);
+  mockResolveSitePricingReadAccess.mockResolvedValue(true);
+  mockResolveSiteMarginReadAccess.mockResolvedValue(true);
+  mockFetchSnoozedAlerts.mockResolvedValue([]);
 });
 
 describe("insights and Toast route-family boundaries", () => {
@@ -172,28 +201,20 @@ describe("insights and Toast route-family boundaries", () => {
 describe("GET /api/insights", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("preserves safe staff metrics without selecting or serializing cost when cost.read is unavailable", async () => {
-    const supabase = allow(makeSupabase({
-      invoice_scans: {
-        data: [{
-          id: "scan-safe",
-          distributor_name: "Safe Distributor",
-          item_count: 3,
-          accuracy_score: 0.8,
-          created_at: new Date().toISOString(),
-        }],
-        error: null,
-      },
-      inventory_items: {
-        data: [{ quantity: 7, wine_id: "wine-safe", unit_cost: 999 }],
-        error: null,
-      },
-    }));
-    mockResolveSitePricingAccess.mockResolvedValue({
-      canReadCost: false,
-      canReadMargin: true,
-      canManagePricing: true,
-    });
+  it("preserves safe staff metrics without requesting cost when cost.read is unavailable", async () => {
+    const supabase = allow();
+    mockFetchInsightsScans.mockResolvedValue([{
+      id: "scan-safe",
+      distributor_name: "Safe Distributor",
+      item_count: 3,
+      accuracy_score: 0.8,
+      created_at: new Date().toISOString(),
+      final_line_items: null,
+    }]);
+    mockFetchInsightsStock.mockResolvedValue([
+      { quantity: 7, wine_id: "wine-safe" },
+    ]);
+    mockResolveSiteCostReadAccess.mockResolvedValue(false);
 
     const response = await getInsights();
     const text = await response.text();
@@ -207,58 +228,45 @@ describe("GET /api/insights", () => {
       totalBottles: 7,
       totalScans: 1,
     });
-    expect(text).not.toContain("999");
-    expect(
-      supabase.calls.filter((call) => call.method === "select"),
-    ).toContainEqual({
-      table: "inventory_items",
-      method: "select",
-      args: ["quantity, wine_id"],
-    });
-    expect(
-      supabase.calls.filter((call) => call.method === "select")
-        .flatMap((call) => call.args)
-        .join(" "),
-    ).not.toContain("unit_cost");
+    expect(mockFetchInsightsScans).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+      {
+        includeCost: false,
+        since: null,
+        until: null,
+      },
+    );
+    expect(mockFetchInsightsStock).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
+    expect(mockFetchInsightsInventory).not.toHaveBeenCalled();
+    expect(mockResolveSiteCostReadAccess).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
+    expect(mockResolveSitePricingAccess).not.toHaveBeenCalled();
   });
 
-  it("falls back to safe stock when an authorized protected read fails", async () => {
-    const supabase = allow(makeSupabase({
-      inventory_items: [
-        { data: null, error: { message: "unit_cost 777 provider failure" } },
-        { data: [{ quantity: 5, wine_id: "wine-safe" }], error: null },
-      ],
-    }));
+  it("keeps an authorized protected-read failure as a redacted route error", async () => {
+    allow();
+    mockFetchInsightsInventory.mockRejectedValue(
+      new Error("unit_cost 777 provider failure"),
+    );
 
     const response = await getInsights();
-    const text = await response.text();
+    const text = await response.clone().text();
 
-    expect(response.status).toBe(200);
-    expect(JSON.parse(text)).toMatchObject({
-      costDataAvailable: false,
-      inventoryValue: null,
-      varietalBreakdown: null,
-      totalBottles: 5,
-    });
+    await expectNested500(response, "Failed to load insights data.");
     expect(text).not.toContain("777");
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "unit_cost 777 provider failure" }),
-      expect.objectContaining({ tags: { surface: "insights", phase: "cost-fetch" } }),
-    );
-    expect(
-      supabase.calls.filter(
-        (call) => call.table === "inventory_items" && call.method === "select",
-      ).map((call) => call.args[0]),
-    ).toEqual([
-      "quantity, unit_cost, wine_id, wines(varietal)",
-      "quantity, wine_id",
-    ]);
+    expect(mockFetchInsightsStock).not.toHaveBeenCalled();
   });
 
   it("attaches the scan rejection handler while the cost read is still pending", async () => {
     const scanError = new Error("super-secret scan failure");
-    let resolveCost!: (result: QueryResult) => void;
-    const costPending = new Promise<QueryResult>((resolve) => {
+    let resolveCost!: (rows: unknown[]) => void;
+    const costPending = new Promise<unknown[]>((resolve) => {
       resolveCost = resolve;
     });
     const unhandled: unknown[] = [];
@@ -268,74 +276,63 @@ describe("GET /api/insights", () => {
     process.on("unhandledRejection", onUnhandled);
 
     try {
-      allow(makeSupabase({
-        invoice_scans: { data: null, error: scanError },
-        inventory_items: costPending,
-      }));
+      allow();
+      mockFetchInsightsScans.mockRejectedValue(scanError);
+      mockFetchInsightsInventory.mockReturnValue(costPending);
 
       const responsePromise = getInsights();
       await new Promise<void>((resolve) => setImmediate(resolve));
 
       expect(unhandled).toEqual([]);
-      resolveCost({ data: [], error: null });
+      resolveCost([]);
       await expectNested500(await responsePromise, "Failed to load insights data.");
     } finally {
       process.off("unhandledRejection", onUnhandled);
-      resolveCost?.({ data: [], error: null });
+      resolveCost?.([]);
     }
   });
 
-  it("counts inventory beyond the database's first 1,000 rows", async () => {
-    const supabase = allow(makeSupabase({
-      inventory_items: [
-        { data: Array.from({ length: 1000 }, () => ({ quantity: 1, unit_cost: 2, wines: { varietal: "Merlot" } })), error: null },
-        { data: [{ quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } }], error: null },
-      ],
-    }));
+  it("aggregates the complete protected inventory snapshot", async () => {
+    allow();
+    mockFetchInsightsInventory.mockResolvedValue([
+      ...Array.from({ length: 1000 }, () => ({
+        quantity: 1,
+        unit_cost: 2,
+        wines: { varietal: "Merlot" },
+      })),
+      { quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } },
+    ]);
     const response = await getInsights();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ totalBottles: 1017, inventoryValue: 2527 });
-    expect(supabase.calls.filter(call => call.table === "inventory_items" && call.method === "range").map(call => call.args)).toEqual([[0, 999], [1000, 1999]]);
   });
 
-  it("does not turn a safe invoice_scans query error into empty metrics", async () => {
-    allow(makeSupabase({
-      invoice_scans: { data: [], error: { message: "super-secret query failure" } },
-      inventory_items: { data: [], error: null },
-    }));
+  it("does not turn a safe scan read error into empty metrics", async () => {
+    allow();
+    mockFetchInsightsScans.mockRejectedValue(
+      new Error("super-secret query failure"),
+    );
 
     await expectNested500(await getInsights(), "Failed to load insights data.");
   });
 
-  it("preserves staff access, tenant predicates, and response fields", async () => {
+  it("preserves staff access, helper arguments, and response fields", async () => {
     const createdAt = new Date().toISOString();
-    const supabase = allow(
-      makeSupabase({
-        invoice_scans: {
-          data: [
-            {
-              id: "scan-a",
-              distributor_name: "Acme",
-              item_count: 2,
-              accuracy_score: 0.9,
-              created_at: createdAt,
-            },
-          ],
-          error: null,
-        },
-        inventory_items: {
-          data: [
-            {
-              quantity: 2,
-              unit_cost: 30,
-              wine_id: "wine-a",
-              wines: { varietal: "Cabernet" },
-            },
-          ],
-          error: null,
-        },
-      }),
-    );
+    const supabase = allow();
+    mockFetchInsightsScans.mockResolvedValue([{
+      id: "scan-a",
+      distributor_name: "Acme",
+      item_count: 2,
+      accuracy_score: 0.9,
+      created_at: createdAt,
+      final_line_items: null,
+    }]);
+    mockFetchInsightsInventory.mockResolvedValue([{
+      quantity: 2,
+      unit_cost: 30,
+      wine_id: "wine-a",
+      wines: { varietal: "Cabernet" },
+    }]);
 
     const response = await getInsights();
 
@@ -358,14 +355,10 @@ describe("GET /api/insights", () => {
         },
       ],
     });
-    expect(
-      supabase.calls.filter(
-        (call) =>
-          call.method === "eq" &&
-          call.args[0] === "restaurant_id" &&
-          call.args[1] === "restaurant-a",
-      ),
-    ).toHaveLength(2);
+    expect(mockFetchInsightsInventory).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
   });
 });
 
@@ -373,15 +366,8 @@ describe("GET /api/insights/csv", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("denies before every cost-bearing CSV query without cost.read", async () => {
-    const supabase = allow(makeSupabase({
-      invoice_scans: { data: [{ final_line_items: [{ unitCost: 999 }] }], error: null },
-      inventory_items: { data: [{ unit_cost: 999 }], error: null },
-    }));
-    mockResolveSitePricingAccess.mockResolvedValue({
-      canReadCost: false,
-      canReadMargin: true,
-      canManagePricing: true,
-    });
+    const supabase = allow();
+    mockResolveSiteCostReadAccess.mockResolvedValue(false);
 
     const response = await getInsightsCsv();
     const text = await response.text();
@@ -394,55 +380,46 @@ describe("GET /api/insights/csv", () => {
       },
     });
     expect(supabase.from).not.toHaveBeenCalled();
+    expect(mockFetchInsightsScans).not.toHaveBeenCalled();
+    expect(mockFetchInsightsInventory).not.toHaveBeenCalled();
+    expect(mockResolveSiteCostReadAccess).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
+    expect(mockResolveSitePricingAccess).not.toHaveBeenCalled();
     expect(text).not.toContain("999");
   });
 
   it("exports all inventory and keeps thousands separators in one CSV cell", async () => {
-    allow(makeSupabase({ inventory_items: [
-      { data: Array.from({ length: 1000 }, () => ({ quantity: 1, unit_cost: 2, wines: { varietal: "Merlot" } })), error: null },
-      { data: [], error: null },
-      { data: [{ quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } }], error: null },
-    ] }));
+    allow();
+    mockFetchInsightsInventory.mockResolvedValue([
+      ...Array.from({ length: 1000 }, () => ({ quantity: 1, unit_cost: 2, wines: { varietal: "Merlot" } })),
+      { quantity: 17, unit_cost: 31, wines: { varietal: "Merlot" } },
+    ]);
     const response = await getInsightsCsv();
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('Merlot,"$2,527",100%');
   });
 
   it("neutralizes formula-leading names and quotes carriage returns", async () => {
-    allow(makeSupabase({ inventory_items: { data: [
+    allow();
+    mockFetchInsightsInventory.mockResolvedValue([
       { quantity: 1, unit_cost: 2, wines: { varietal: "=1+1" } },
       { quantity: 1, unit_cost: 2, wines: { varietal: "Red\rBlend" } },
-    ], error: null } }));
+    ]);
     const response = await getInsightsCsv();
     const csv = await response.text();
     expect(csv).toContain("'=1+1,$2,50%");
     expect(csv).toContain('"Red\rBlend",$2,50%');
   });
 
-  it.each([
-    { table: "invoice_scans", occurrence: 0 },
-    { table: "inventory_items", occurrence: 0 },
-    { table: "inventory_items", occurrence: 1 },
-  ])(
-    "does not turn $table query occurrence $occurrence into an empty export",
-    async ({ table, occurrence }) => {
-      const error = { message: "super-secret CSV query failure" };
-      const inventoryResults: QueryResult[] = [
-        { data: [], error: null },
-        { data: [], error: null },
-      ];
-      if (table === "inventory_items") {
-        inventoryResults[occurrence] = { data: [], error };
-      }
-      allow(
-        makeSupabase({
-          invoice_scans: {
-            data: [],
-            error: table === "invoice_scans" ? error : null,
-          },
-          inventory_items: inventoryResults,
-        }),
-      );
+  it.each(["scans", "inventory"])(
+    "does not turn a protected $s read failure into an empty export",
+    async (source) => {
+      const error = new Error("super-secret CSV query failure");
+      allow();
+      if (source === "scans") mockFetchInsightsScans.mockRejectedValue(error);
+      if (source === "inventory") mockFetchInsightsInventory.mockRejectedValue(error);
 
       await expectNested500(
         await getInsightsCsv(),
@@ -451,48 +428,23 @@ describe("GET /api/insights/csv", () => {
     },
   );
 
-  it("preserves the exact CSV sections, filename, and tenant filters", async () => {
-    const supabase = allow(
-      makeSupabase({
-        invoice_scans: {
-          data: [
-            {
-              id: "scan-a",
-              distributor_name: "Acme",
-              item_count: 2,
-              accuracy_score: 0.9,
-              created_at: "2026-01-02T00:00:00.000Z",
-              final_line_items: [{ qty: 2, unitCost: 10 }],
-            },
-          ],
-          error: null,
-        },
-        inventory_items: [
-          {
-            data: [
-              {
-                quantity: 2,
-                unit_cost: 15,
-                wine_id: "wine-a",
-                wines: { varietal: "Cabernet" },
-              },
-            ],
-            error: null,
-          },
-          {
-            data: [
-              {
-                quantity: 2,
-                unit_cost: 15,
-                invoice_scan_id: "scan-a",
-                invoice_scans: { distributor_name: "Acme" },
-              },
-            ],
-            error: null,
-          },
-        ],
-      }),
-    );
+  it("preserves the exact CSV sections, filename, and protected helper arguments", async () => {
+    const supabase = allow();
+    mockFetchInsightsScans.mockResolvedValue([{
+      id: "scan-a",
+      distributor_name: "Acme",
+      item_count: 2,
+      accuracy_score: 0.9,
+      created_at: "2026-01-02T00:00:00.000Z",
+      final_line_items: [{ qty: 2, unitCost: 10 }],
+    }]);
+    mockFetchInsightsInventory.mockResolvedValue([{
+      quantity: 2,
+      unit_cost: 15,
+      wine_id: "wine-a",
+      invoice_scan_id: "scan-a",
+      wines: { varietal: "Cabernet" },
+    }]);
 
     const response = await getInsightsCsv();
 
@@ -516,19 +468,40 @@ describe("GET /api/insights/csv", () => {
         "Cabernet,$30,100%",
       ].join("\n"),
     );
-    expect(
-      supabase.calls.filter(
-        (call) =>
-          call.method === "eq" &&
-          call.args[0] === "restaurant_id" &&
-          call.args[1] === "restaurant-a",
-      ),
-    ).toHaveLength(3);
+    expect(mockFetchInsightsScans).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+      { includeCost: true, since: null, until: null },
+    );
+    expect(mockFetchInsightsInventory).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
   });
 });
 
 describe("alert insight routes", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("denies pricing review before its helper without both protected reads", async () => {
+    const supabase = allow();
+    mockResolveSitePricingReadAccess.mockResolvedValue(false);
+
+    const response = await getPricingReview();
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "forbidden",
+        message: "Cost and margin access are required to view pricing alerts.",
+      },
+    });
+    expect(mockResolveSitePricingReadAccess).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
+    expect(mockFetchPricingAlerts).not.toHaveBeenCalled();
+  });
 
   it.each([
     {
@@ -586,14 +559,30 @@ describe("alert insight routes", () => {
 describe("GET /api/insights/snoozed", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns a nested redacted database failure", async () => {
-    allow(
-      makeSupabase({
-        wines: {
-          data: null,
-          error: { message: "super-secret snoozed failure" },
-        },
-      }),
+  it("denies before the protected helper without margin.read", async () => {
+    const supabase = allow();
+    mockResolveSiteMarginReadAccess.mockResolvedValue(false);
+
+    const response = await getSnoozed();
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "forbidden",
+        message: "Margin access is required to view pricing snoozes.",
+      },
+    });
+    expect(mockResolveSiteMarginReadAccess).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
+    expect(mockFetchSnoozedAlerts).not.toHaveBeenCalled();
+  });
+
+  it("returns a nested redacted protected-reader failure", async () => {
+    allow();
+    mockFetchSnoozedAlerts.mockRejectedValue(
+      new Error("super-secret snoozed failure"),
     );
 
     await expectNested500(
@@ -603,31 +592,25 @@ describe("GET /api/insights/snoozed", () => {
   });
 
   it("preserves active-only ordering and the snoozed envelope", async () => {
-    const supabase = allow(
-      makeSupabase({
-        wines: {
-          data: [
-            {
-              id: "wine-later",
-              name: "Later",
-              producer: "Beta",
-              vintage: 2020,
-              alert_snoozed_until: "2999-02-01T00:00:00.000Z",
-              pricing_dismissed_until: null,
-            },
-            {
-              id: "wine-sooner",
-              name: "Sooner",
-              producer: "Alpha",
-              vintage: null,
-              alert_snoozed_until: null,
-              pricing_dismissed_until: "2999-01-01T00:00:00.000Z",
-            },
-          ],
-          error: null,
-        },
-      }),
-    );
+    const supabase = allow();
+    mockFetchSnoozedAlerts.mockResolvedValue([
+      {
+        wine_id: "wine-sooner",
+        name: "Sooner",
+        producer: "Alpha",
+        vintage: null,
+        drinkWindowSnoozedUntil: null,
+        pricingDismissedUntil: "2999-01-01T00:00:00.000Z",
+      },
+      {
+        wine_id: "wine-later",
+        name: "Later",
+        producer: "Beta",
+        vintage: 2020,
+        drinkWindowSnoozedUntil: "2999-02-01T00:00:00.000Z",
+        pricingDismissedUntil: null,
+      },
+    ]);
 
     const response = await getSnoozed();
 
@@ -652,11 +635,10 @@ describe("GET /api/insights/snoozed", () => {
         },
       ],
     });
-    expect(supabase.calls).toContainEqual({
-      table: "wines",
-      method: "eq",
-      args: ["restaurant_id", "restaurant-a"],
-    });
+    expect(mockFetchSnoozedAlerts).toHaveBeenCalledWith(
+      supabase,
+      "restaurant-a",
+    );
   });
 });
 

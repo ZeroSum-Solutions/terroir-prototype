@@ -9,6 +9,7 @@ const mockWithIdempotency = vi.fn();
 
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
+  requireRole: (...args: unknown[]) => mockRequireMembership(...args),
 }));
 vi.mock("@/lib/api/rate-limit", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
@@ -22,7 +23,17 @@ vi.mock("@/domains/scanning/invoice-scan-service", () => ({
     mockProcessInvoiceScanOnce(...args),
 }));
 vi.mock("@/lib/api/idempotency", () => ({
-  isValidIdempotencyKey: () => false,
+  invalidIdempotencyKeyResult: () => ({
+    status: 400,
+    body: {
+      error: {
+        code: "idempotency_key_required",
+        message: "A valid Idempotency-Key UUID is required.",
+      },
+    },
+    replayed: false,
+  }),
+  isValidIdempotencyKey: () => true,
   withIdempotency: (...args: unknown[]) => mockWithIdempotency(...args),
 }));
 vi.mock("@/lib/ai/anthropic-client", () => ({
@@ -41,7 +52,12 @@ const { POST: saveBottleScan } = await import(
 function jsonRequest(path: string, body: string): NextRequest {
   return new Request("http://localhost" + path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "Idempotency-Key": "11111111-1111-4111-8111-111111111111",
+      "X-Expected-User-Id": "user-a",
+      "X-Expected-Restaurant-Id": "restaurant-a",
+    },
     body,
   }) as unknown as NextRequest;
 }
@@ -79,8 +95,16 @@ describe("scan ingestion API boundaries", () => {
     mockRateLimit.mockReturnValue({ ok: true });
     mockWithIdempotency.mockImplementation(
       async (options: {
-        handler: () => Promise<{ status: number; body: unknown }>;
-      }) => ({ ...(await options.handler()), replayed: false }),
+        handler: () => Promise<
+          | { outcome: "complete"; receipt: unknown }
+          | { outcome: "abandon"; response: { status: number; body: unknown } }
+        >;
+      }) => {
+        const result = await options.handler();
+        return result.outcome === "complete"
+          ? { status: 200, body: result.receipt, replayed: false }
+          : { ...result.response, replayed: false };
+      },
     );
   });
 
@@ -191,8 +215,14 @@ describe("scan ingestion API boundaries", () => {
       role: "owner",
     });
     mockWithIdempotency.mockResolvedValue({
-      status: 200,
-      body: { scanId: "cached-scan" },
+      status: 202,
+      body: {
+        version: 1,
+        kind: "invoice_scan_upload",
+        scanId: "11111111-1111-4111-8111-111111111111",
+        status: "queued",
+        itemCount: 0,
+      },
       replayed: true,
     });
 
@@ -200,13 +230,20 @@ describe("scan ingestion API boundaries", () => {
       jsonRequest(
         "/api/scan",
         JSON.stringify({
-          imagePath: "restaurant-a/cached-scan/invoice.jpg",
+          imagePath:
+            "restaurant-a/11111111-1111-4111-8111-111111111111.jpg",
         }),
       ),
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ scanId: "cached-scan" });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      version: 1,
+      kind: "invoice_scan_upload",
+      scanId: "11111111-1111-4111-8111-111111111111",
+      status: "queued",
+      itemCount: 0,
+    });
     expect(download).not.toHaveBeenCalled();
     expect(from).not.toHaveBeenCalled();
     expect(mockAssertInvoiceExtractionConfigured).not.toHaveBeenCalled();
@@ -230,7 +267,8 @@ describe("scan ingestion API boundaries", () => {
       jsonRequest(
         "/api/scan",
         JSON.stringify({
-          imagePath: "restaurant-b/scan-a/invoice.jpg",
+          imagePath:
+            "restaurant-b/11111111-1111-4111-8111-111111111111.jpg",
         }),
       ),
     );

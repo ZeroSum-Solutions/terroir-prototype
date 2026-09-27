@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generatorVersion": 1,
   "sourceRoot": "src/app/api",
-  "routeFileCount": 100,
-  "discoveredOperationCount": 116,
+  "routeFileCount": 101,
+  "discoveredOperationCount": 117,
   "discoveredOperations": [
     {
       "operationId": "api:GET:/api/assistant",
@@ -849,6 +849,17 @@
         "file": "src/app/api/team/members/[id]/route.ts",
         "exportKind": "function-declaration",
         "localName": "DELETE",
+        "moduleSpecifier": null
+      }
+    },
+    {
+      "operationId": "api:PUT:/api/team/members/{param}/capabilities",
+      "method": "PUT",
+      "path": "/api/team/members/[id]/capabilities",
+      "source": {
+        "file": "src/app/api/team/members/[id]/capabilities/route.ts",
+        "exportKind": "function-declaration",
+        "localName": "PUT",
         "moduleSpecifier": null
       }
     },

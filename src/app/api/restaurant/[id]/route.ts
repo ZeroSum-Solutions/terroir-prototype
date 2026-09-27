@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireOwner } from "@/lib/api/auth";
+import { requireAuth, requireMembership, requireOwner } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
 import { parseJson, parseParams } from "@/lib/api/validation";
@@ -80,14 +80,19 @@ const PatchSchema = z
   })
   .strict();
 
+const PricingDefaultsReceiptSchema = z.strictObject({
+  restaurantId: z.string().uuid(),
+  updated: z.literal(true),
+});
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Params },
 ) {
   return withApiHandler(async () => {
-    const auth = await requireOwner();
+    const auth = await requireMembership();
     if (auth instanceof NextResponse) return auth;
-    const { supabase, restaurantId } = auth;
+    const { supabase, restaurantId, role } = auth;
     const parsedParams = await parseParams(params, ParamsSchema);
     if (!parsedParams.ok) return parsedParams.response;
     const { id } = parsedParams.data;
@@ -104,9 +109,64 @@ export async function PATCH(
       return Errors.badRequest("No valid fields.");
     }
 
+    const hasPricingPour = Object.prototype.hasOwnProperty.call(
+      parsed.data,
+      "default_target_pour_cost_pct",
+    );
+    const hasPricingMarkup = Object.prototype.hasOwnProperty.call(
+      parsed.data,
+      "default_target_markup_ratio",
+    );
+    const hasPricing = hasPricingPour || hasPricingMarkup;
+    const safeFields = {
+      ...(parsed.data.name === undefined ? {} : { name: parsed.data.name }),
+      ...(parsed.data.auto_eightysix_from_inventory === undefined
+        ? {}
+        : { auto_eightysix_from_inventory: parsed.data.auto_eightysix_from_inventory }),
+      ...(parsed.data.eightysix_ml_threshold === undefined
+        ? {}
+        : { eightysix_ml_threshold: parsed.data.eightysix_ml_threshold }),
+      ...(parsed.data.eightysix_strategy === undefined
+        ? {}
+        : { eightysix_strategy: parsed.data.eightysix_strategy }),
+    };
+
+    if (hasPricing && Object.keys(safeFields).length > 0) {
+      return Errors.badRequest("Pricing defaults must be updated separately.");
+    }
+
+    if (hasPricing) {
+      if (parsed.data.default_target_pour_cost_pct === undefined ||
+          parsed.data.default_target_markup_ratio === undefined) {
+        return Errors.badRequest("Both pricing defaults are required.");
+      }
+      const { data: receiptRaw, error } = await supabase.rpc(
+        "set_restaurant_pricing_defaults",
+        {
+          p_restaurant_id: restaurantId,
+          p_target_pour_cost_pct: parsed.data.default_target_pour_cost_pct,
+          p_target_markup_ratio: parsed.data.default_target_markup_ratio,
+        },
+      );
+      if (error) {
+        if (error.code === "42501") return Errors.forbidden();
+        if (error.code === "P0002") return Errors.notFound("Restaurant");
+        throw error;
+      }
+      const receipt = PricingDefaultsReceiptSchema.safeParse(receiptRaw);
+      if (!receipt.success || receipt.data.restaurantId !== restaurantId) {
+        throw new Error("Invalid restaurant pricing defaults receipt");
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (role !== "owner") {
+      return Errors.forbidden("Updating restaurant settings requires owner role.");
+    }
+
     const { error } = await supabase
       .from("restaurants")
-      .update(parsed.data)
+      .update(safeFields)
       .eq("id", id);
     if (error) throw error;
 

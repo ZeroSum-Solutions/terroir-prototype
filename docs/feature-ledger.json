@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "sourceFile": "app_spec.txt",
-  "featureCount": 324,
+  "featureCount": 328,
   "budgetResolution": {
     "previousMaximum": 200,
     "decision": "all_enumerated_features_active",
     "approvedBy": "product_owner",
     "approvedOn": "2026-07-23",
-    "expandedOn": "2026-09-24",
-    "approvedActiveCount": 324
+    "expandedOn": "2026-09-26",
+    "approvedActiveCount": 328
   },
   "items": [
     {
@@ -4219,6 +4219,58 @@
       "action": "cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
       "observableOutcome": "System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
       "negativeCase": "Assertion is not observed: System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-325",
+      "domain": "site_capability_authority",
+      "sourceOrder": 325,
+      "sourceText": "System denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result",
+      "actor": "System",
+      "action": "denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result",
+      "observableOutcome": "System denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result",
+      "negativeCase": "Assertion is not observed: System denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-326",
+      "domain": "site_capability_authority",
+      "sourceOrder": 326,
+      "sourceText": "System preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture",
+      "actor": "System",
+      "action": "preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture",
+      "observableOutcome": "System preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture",
+      "negativeCase": "Assertion is not observed: System preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-327",
+      "domain": "site_capability_authority",
+      "sourceOrder": 327,
+      "sourceText": "System treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection",
+      "actor": "System",
+      "action": "treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection",
+      "observableOutcome": "System treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection",
+      "negativeCase": "Assertion is not observed: System treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection",
+      "status": "active",
+      "completionSpec": "TER-014",
+      "evidenceOwner": "authorization"
+    },
+    {
+      "id": "TER-CF-328",
+      "domain": "site_capability_authority",
+      "sourceOrder": 328,
+      "sourceText": "System admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed",
+      "actor": "System",
+      "action": "admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed",
+      "observableOutcome": "System admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed",
+      "negativeCase": "Assertion is not observed: System admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed",
       "status": "active",
       "completionSpec": "TER-014",
       "evidenceOwner": "authorization"

@@ -12,15 +12,6 @@ vi.mock("@/domains/import/batch-service", () => ({
   confirmImportBatch: (...args: unknown[]) => mockConfirmImportBatch(...args),
 }));
 
-// Stubbed so the assertion below pins the WIRING (the route hands the service
-// client it built to confirmImportBatch) rather than whichever value the
-// ambient environment happens to produce: unset service-role env vars resolve
-// to null locally, but CI exports a real local-Supabase service key.
-const serviceClientStub = { __serviceRoleStub: true };
-vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: () => serviceClientStub,
-}));
-
 const { GET, POST } = await import("./route");
 
 function multipartRequest(file: File, extraFields?: Record<string, string>) {
@@ -113,11 +104,6 @@ describe("POST /api/import/batches", () => {
         chunkTotal: undefined,
         sourceSha256: undefined,
         rowOverrides: undefined,
-        // Pins the wiring: whatever createServiceRoleClient() returns is what
-        // confirmImportBatch receives, so revert-time orphan cleanup keeps its
-        // service-role reads. Stubbed above because the real factory's result
-        // depends on env vars that differ between local runs and CI.
-        serviceClient: serviceClientStub,
       },
     );
   });

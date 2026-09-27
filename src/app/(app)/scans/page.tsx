@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { getAuthContext } from "@/lib/auth-context";
 import { ArrowLeft, ChevronLeft, ChevronRight, ScanLine } from "lucide-react";
 import { RouteDataEmpty } from "@/components/route-data-state";
@@ -50,9 +51,13 @@ export default async function ScansPage({
   if (!auth) return null;
   const { supabase, restaurantId } = auth;
 
-  // A row left in "processing" by a request that never finished would spin
-  // here forever; settle it as failed/stalled before listing (best effort).
-  await expireStalledScans({ supabase, restaurantId });
+  let housekeepingFailed = false;
+  try {
+    await expireStalledScans({ supabase, restaurantId });
+  } catch (error) {
+    housekeepingFailed = true;
+    Sentry.captureException(error, { tags: { surface: "scans", phase: "expire-stalled" } });
+  }
 
   let query = supabase
     .from("invoice_scans")
@@ -140,6 +145,15 @@ export default async function ScansPage({
         <ExportCsvButton rows={rows} />
       </div>
       {statusFilter}
+      {housekeepingFailed && (
+        <div role="alert" className="mt-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink">
+          <p>We couldn&apos;t check for stalled scans. Scan history is still available. Reload to try again.</p>
+          <a href={`/scans${buildQuery({ page, status })}`}
+            className="mt-xs inline-flex min-h-11 items-center text-control font-semibold underline underline-offset-4 focus-ring">
+            Reload scan history
+          </a>
+        </div>
+      )}
     </header>
   );
 

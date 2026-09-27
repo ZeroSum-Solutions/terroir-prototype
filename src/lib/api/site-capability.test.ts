@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { Database } from "@/types/database";
 import {
   resolveSitePricingAccess,
+  resolveSiteCostReadAccess,
+  resolveSiteMarginReadAccess,
+  resolveSitePricingReadAccess,
   SITE_CAPABILITY_DEADLINE_MS,
+  SiteCapabilityResolutionError,
 } from "./site-capability";
 
 const RESTAURANT_ID = "00000000-0000-4000-8000-000000000001";
@@ -21,6 +25,43 @@ function rpcResult(
 }
 
 describe("resolveSitePricingAccess", () => {
+  it("can resolve a cost-only route without requesting unrelated authority", async () => {
+    const rpc = rpcResult(() => ({ data: true, error: null }));
+
+    await expect(resolveSiteCostReadAccess(clientWith(rpc), RESTAURANT_ID)).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith("effective_site_capability", {
+      p_restaurant_id: RESTAURANT_ID,
+      p_capability_key: "cost.read",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests only margin.read for a margin-only route", async () => {
+    const rpc = rpcResult(() => ({ data: false, error: null }));
+
+    await expect(resolveSiteMarginReadAccess(clientWith(rpc), RESTAURANT_ID))
+      .resolves.toBe(false);
+    expect(rpc).toHaveBeenCalledWith("effective_site_capability", {
+      p_restaurant_id: RESTAURANT_ID,
+      p_capability_key: "margin.read",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests both reads but not pricing.manage for mixed protected output", async () => {
+    const rpc = rpcResult((capability) => ({
+      data: capability !== "margin.read",
+      error: null,
+    }));
+
+    await expect(resolveSitePricingReadAccess(clientWith(rpc), RESTAURANT_ID))
+      .resolves.toBe(false);
+    expect(rpc.mock.calls.map(([, args]) => args.p_capability_key)).toEqual([
+      "cost.read",
+      "margin.read",
+    ]);
+  });
+
   it("resolves each exact-site capability independently", async () => {
     const rpc = rpcResult((capability) => ({
       data: capability !== "margin.read",
@@ -39,27 +80,48 @@ describe("resolveSitePricingAccess", () => {
     ]);
   });
 
-  it("fails closed when the authority RPC is absent, errors, or returns a non-boolean value", async () => {
-    const rpc = vi.fn((_name: string, args: { p_capability_key: string }) => ({
-      abortSignal: vi.fn(async () => {
-        if (args.p_capability_key === "cost.read") {
-          return { data: true, error: { message: "function does not exist" } };
-        }
-        if (args.p_capability_key === "margin.read") {
-          return { data: null, error: null };
-        }
-        throw new Error("RPC unavailable");
-      }),
+  it("keeps an explicit absence distinct from an evaluator failure", async () => {
+    const rpc = rpcResult((capability) => ({
+      data: capability === "pricing.manage",
+      error: null,
     }));
 
     await expect(resolveSitePricingAccess(clientWith(rpc), RESTAURANT_ID)).resolves.toEqual({
       canReadCost: false,
       canReadMargin: false,
-      canManagePricing: false,
+      canManagePricing: true,
     });
   });
 
-  it("aborts and denies when the authority RPC misses the request deadline", async () => {
+  it.each([
+    {
+      label: "provider error",
+      result: { data: true, error: { message: "function does not exist" } },
+    },
+    { label: "non-boolean result", result: { data: null, error: null } },
+  ])("rejects a $label instead of reporting an absent grant", async ({ result }) => {
+    const rpc = vi.fn(() => ({
+      abortSignal: vi.fn(async () => result),
+    }));
+
+    await expect(
+      resolveSitePricingAccess(clientWith(rpc), RESTAURANT_ID),
+    ).rejects.toBeInstanceOf(SiteCapabilityResolutionError);
+  });
+
+  it("rejects a thrown evaluator failure instead of reporting an absent grant", async () => {
+    const rpc = vi.fn(() => ({
+      abortSignal: vi.fn(async () => {
+        throw new Error("RPC unavailable");
+      }),
+    }));
+
+    await expect(
+      resolveSitePricingAccess(clientWith(rpc), RESTAURANT_ID),
+    ).rejects.toBeInstanceOf(SiteCapabilityResolutionError);
+  });
+
+  it("aborts and rejects when the authority RPC misses the request deadline", async () => {
     vi.useFakeTimers();
     try {
       const signals: AbortSignal[] = [];
@@ -71,13 +133,12 @@ describe("resolveSitePricingAccess", () => {
       }));
 
       const access = resolveSitePricingAccess(clientWith(rpc), RESTAURANT_ID);
+      const rejection = expect(access).rejects.toBeInstanceOf(
+        SiteCapabilityResolutionError,
+      );
       await vi.advanceTimersByTimeAsync(SITE_CAPABILITY_DEADLINE_MS);
 
-      await expect(access).resolves.toEqual({
-        canReadCost: false,
-        canReadMargin: false,
-        canManagePricing: false,
-      });
+      await rejection;
       expect(signals).toHaveLength(3);
       expect(signals.every((signal) => signal.aborted)).toBe(true);
     } finally {

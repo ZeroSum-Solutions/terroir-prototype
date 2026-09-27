@@ -42,12 +42,16 @@ async function postResolveAll(request: NextRequest, params: Params) {
     parsedBody.data.action,
   );
   if (!result.ok) {
-    const status = result.error.code === "not_found" ? 404 : 422;
+    const status = resolutionErrorStatus(result.error.code);
     return apiError(status, result.error.code, result.error.message);
   }
 
-  return NextResponse.json({
-    resolved: result.resolved,
-    remainingPending: result.remainingPending,
-  });
+  return NextResponse.json(result.receipt);
+}
+
+function resolutionErrorStatus(code: string) {
+  if (code === "not_found") return 404;
+  if (code === "forbidden") return 403;
+  if (code === "reverted") return 422;
+  return 500;
 }

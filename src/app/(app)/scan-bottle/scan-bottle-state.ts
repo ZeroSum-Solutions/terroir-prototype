@@ -9,7 +9,9 @@ export type MatchedWine = {
 };
 
 export type SessionScan = {
-  wine: MatchedWine;
+  wine: MatchedWine | null;
+  wineId: string;
+  operationId: string;
   section: string;
   binLocation: string;
 };
@@ -29,6 +31,7 @@ export interface BottleScanState {
   phase: Phase;
   error: string | null;
   wine: MatchedWine | null;
+  receivingWineId: string | null;
   payload: string | null;
   manualCode: string;
   searchQuery: string;
@@ -43,6 +46,7 @@ export interface BottleScanState {
   locationError: string | null;
   section: string;
   binLocation: string;
+  binId: string;
   confirming: boolean;
   // BND-112: batch scanning session state
   session: SessionScan[];
@@ -52,6 +56,7 @@ export const initialBottleScanState: BottleScanState = {
   phase: "scanning",
   error: null,
   wine: null,
+  receivingWineId: null,
   payload: null,
   manualCode: "",
   searchQuery: "",
@@ -61,6 +66,7 @@ export const initialBottleScanState: BottleScanState = {
   locationError: null,
   section: "",
   binLocation: "",
+  binId: "",
   confirming: false,
   session: [],
 };
@@ -81,6 +87,9 @@ export type BottleScanAction =
   | { type: "location-entry-started" }
   | { type: "section-changed"; value: string }
   | { type: "bin-location-changed"; value: string }
+  | { type: "bin-selected"; id: string }
+  | { type: "bin-reselection-required"; wineId: string; section: string; message: string }
+  | { type: "wine-reselection-required"; section: string }
   | { type: "location-confirm-started" }
   | { type: "location-confirmed"; scan: SessionScan }
   | { type: "location-confirm-failed"; message: string }
@@ -108,7 +117,7 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
       return { ...state, payload: action.payload };
 
     case "lookup-succeeded":
-      return { ...state, wine: action.wine, phase: "matched", error: null };
+      return { ...state, wine: action.wine, receivingWineId: action.wine.id, phase: "matched", error: null };
 
     case "lookup-failed":
       return { ...state, error: action.message, phase: "error" };
@@ -131,7 +140,7 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
       return { ...state, searchResults: [], searching: false, searchError: action.message };
 
     case "correct-wine-selected":
-      return { ...state, wine: action.wine, phase: "matched", error: null };
+      return { ...state, wine: action.wine, receivingWineId: action.wine.id, phase: "matched", error: null };
 
     case "correction-started":
       return { ...state, phase: "correcting", searchQuery: "", searchResults: [], searchError: null };
@@ -140,7 +149,7 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
       return { ...state, phase: "matched" };
 
     case "location-entry-started":
-      return { ...state, phase: "location", section: "", binLocation: "", locationError: null };
+      return { ...state, phase: "location", binId: "", binLocation: "", locationError: null };
 
     case "section-changed":
       return { ...state, section: action.value, locationError: null };
@@ -148,14 +157,32 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
     case "bin-location-changed":
       return { ...state, binLocation: action.value, locationError: null };
 
+    case "bin-selected":
+      return { ...state, binId: action.id, locationError: null };
+
+    case "bin-reselection-required":
+      return { ...state, phase: "location", receivingWineId: action.wineId,
+        wine: state.wine?.id.toLowerCase() === action.wineId.toLowerCase() ? state.wine : null,
+        section: action.section, binId: "", binLocation: "", confirming: false, locationError: action.message };
+
+    case "wine-reselection-required":
+      return { ...state, phase: "correcting", wine: null, receivingWineId: null,
+        section: action.section, binId: "", binLocation: "", confirming: false, locationError: null,
+        searchQuery: "", searchResults: [], searching: false,
+        searchError: "That wine is no longer available here. Nothing was received. Search for the correct wine, then choose its bin." };
+
     case "location-confirm-started":
       return { ...state, confirming: true };
 
     case "location-confirmed":
       return {
         ...state,
-        session: [...state.session, action.scan],
-        phase: "confirmed",
+        session: state.session.some((scan) => scan.operationId.toLowerCase() === action.scan.operationId.toLowerCase())
+          ? state.session : [...state.session, action.scan],
+        phase: action.scan.wine ? "confirmed" : "summary",
+        wine: action.scan.wine,
+        section: action.scan.section,
+        binLocation: action.scan.binLocation,
         confirming: false,
         locationError: null,
       };
@@ -169,10 +196,12 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
         phase: "scanning",
         error: null,
         wine: null,
+        receivingWineId: null,
         payload: null,
         manualCode: "",
         section: "",
         binLocation: "",
+        binId: "",
         confirming: false,
         locationError: null,
       };
@@ -187,10 +216,12 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
         phase: "scanning",
         error: null,
         wine: null,
+        receivingWineId: null,
         payload: null,
         manualCode: "",
         section: "",
         binLocation: "",
+        binId: "",
         confirming: false,
         locationError: null,
       };

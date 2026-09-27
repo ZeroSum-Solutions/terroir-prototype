@@ -5,11 +5,11 @@
   "featureLedger": "docs/feature-ledger.json",
   "completionPlan": "docs/plans/2026-07-20-terroir-completion-spec.md",
   "summary": {
-    "activeRequirementCount": 324,
+    "activeRequirementCount": 328,
     "concreteRequirementCount": 36,
     "exactDiscoveredCount": 18,
     "plannedPromiseCount": 18,
-    "extensionDiscoveredCount": 98,
+    "extensionDiscoveredCount": 99,
     "crossCuttingRequirementCount": 6,
     "ter020LeafCount": 8
   },
@@ -847,6 +847,12 @@
           "note": "Revokes membership at an alternate path but does not implement DELETE /api/team/[membership_id]."
         }
       ]
+    },
+    {
+      "operationId": "api:PUT:/api/team/members/{param}/capabilities",
+      "classification": "extension",
+      "concreteRequirementId": null,
+      "semanticAliasContext": []
     },
     {
       "operationId": "api:POST:/api/wine-list-items",

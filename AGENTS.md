@@ -106,7 +106,7 @@ recorded. The required critical subset fails on any skip.
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
 | Local stack startup and conservation safety | `docs/runbooks/local-stack.md` (canonical) |
 | Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
-| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 324 assertions |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 328 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
@@ -114,7 +114,7 @@ recorded. The required critical subset fails on any skip.
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
 **Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
-current machine-read source for 324 requirement identities, but the generated
+current machine-read source for 328 requirement identities, but the generated
 `docs/feature-ledger.json` owns their completion metadata and status. Active means the
 assertion is in contract scope, not that the whole workflow is complete.
 

@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
 }));
 
-const { drawerStateKey, WineDetailDrawer } = await import("./wine-detail-drawer");
+const { buildDrawerPickerItem, drawerStateKey, WineDetailDrawer } = await import("./wine-detail-drawer");
 
 const reactTestEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
@@ -31,6 +31,36 @@ describe("WineDetailDrawer bottle state", () => {
     document.body.innerHTML = "";
     document.body.style.overflow = "";
     refresh.mockClear();
+  });
+
+  it("keeps the picker count on the exact bottle snapshot", () => {
+    const bottleA = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const bottleB = physicalBottle("77777777-7777-4777-8777-777777777777", 300);
+    const siblings = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+      activeBottleCount: 2,
+      activeOpenMl: 900,
+      activeBottles: [bottleA, bottleB],
+    });
+    const emptyExactSnapshot = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+      activeBottleCount: 0,
+      activeOpenMl: 0,
+      activeBottles: [],
+      // Compatibility fields can lag the exact reader during cutover.
+      open_bottle_id: "legacy-slot",
+      open_remaining_ml: 500,
+    });
+    const legacy = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+    });
+
+    expect(buildDrawerPickerItem(siblings, bottleA)?.active_bottle_count).toBe(2);
+    expect(buildDrawerPickerItem(emptyExactSnapshot, null)?.active_bottle_count).toBe(0);
+    expect(buildDrawerPickerItem(legacy, legacy.activeBottles[0]!)?.active_bottle_count).toBe(1);
   });
 
   it("fails closed when contract-2 exact bottle state is missing", async () => {

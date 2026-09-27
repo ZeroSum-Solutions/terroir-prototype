@@ -3,8 +3,11 @@ import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
-import { resolveSitePricingAccess } from "@/lib/api/site-capability";
-import { fetchInsightsInventory, readInsightsPages } from "@/lib/insights/snapshot-data";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import {
+  fetchInsightsInventory,
+  fetchInsightsScans,
+} from "@/lib/insights/snapshot-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,32 +39,20 @@ async function getInsightsCsv() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
-  const access = await resolveSitePricingAccess(supabase, restaurantId);
-  if (!access.canReadCost) {
+  const canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+  if (!canReadCost) {
     return Errors.forbidden("Cost access is required to export insights.");
   }
 
   try {
     // Fetch the same data as the insights page
-    const [
-      scans,
-      inventoryItems,
-      scanItems,
-    ] = await Promise.all([
-      readInsightsPages((from, to) => supabase
-        .from("invoice_scans")
-        .select(
-          "id, distributor_name, item_count, accuracy_score, created_at, final_line_items",
-        )
-        .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: false }).order("id").range(from, to)),
+    const [scans, inventoryItems] = await Promise.all([
+      fetchInsightsScans(supabase, restaurantId, {
+        includeCost: true,
+        since: null,
+        until: null,
+      }),
       fetchInsightsInventory(supabase, restaurantId),
-      readInsightsPages((from, to) => supabase
-        .from("inventory_items")
-        .select(
-          "quantity, unit_cost, invoice_scan_id, invoice_scans!inner(distributor_name)",
-        )
-        .eq("restaurant_id", restaurantId).order("id").range(from, to)),
     ]);
 
     const allScans = scans ?? [];
@@ -109,10 +100,13 @@ async function getInsightsCsv() {
       existing.scans += 1;
       distMap.set(scan.distributor_name, existing);
     }
-    for (const item of scanItems ?? []) {
-      const distName = (
-        item.invoice_scans as { distributor_name: string }
-      )?.distributor_name;
+    const distributorByScan = new Map(
+      allScans.map((scan) => [scan.id, scan.distributor_name]),
+    );
+    for (const item of items) {
+      const distName = item.invoice_scan_id
+        ? distributorByScan.get(item.invoice_scan_id)
+        : undefined;
       if (!distName) continue;
       const existing = distMap.get(distName) ?? { scans: 0, spend: 0 };
       existing.spend += item.quantity * item.unit_cost;

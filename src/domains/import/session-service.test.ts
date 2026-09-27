@@ -121,45 +121,95 @@ describe("getImportSessionProgress — derived status", () => {
 });
 
 describe("revertImportSession", () => {
+  const BATCH_ID = "11111111-1111-4111-8111-111111111111";
+  const receipt = {
+    version: 1,
+    sessionId: SESSION_ID,
+    status: "reverted",
+    batches: [{
+      batchId: BATCH_ID,
+      chunkIndex: 1,
+      skipped: false,
+      status: "reverted",
+      revertedItemCount: 3,
+      orphanWinesDeleted: 0,
+      lwinStampsCleared: 1,
+    }],
+    revertedBatchCount: 1,
+    blockedBatchCount: 0,
+    revertedItemCount: 3,
+  } as const;
+
   function makeRevertSupabase(data: unknown, error: unknown = null) {
     return { rpc: vi.fn().mockResolvedValue({ data, error }) };
   }
 
-  it("returns the parsed child outcomes when every child reverted", async () => {
-    const data = {
+  it("maps the exact database children to the compatible session envelope", async () => {
+    const result = await revertImportSession(
+      makeRevertSupabase(receipt) as never,
+      SESSION_ID,
+    );
+    expect(result).toEqual({
+      ok: true,
       sessionId: SESSION_ID,
-      batches: [{ batchId: "b2", chunkIndex: 2, skipped: false, revertedCount: 4 }],
-    };
-    const result = await revertImportSession(makeRevertSupabase(data) as never, SESSION_ID);
-    expect(result).toEqual({ ok: true, ...data });
+      batches: [{
+        batchId: BATCH_ID,
+        chunkIndex: 1,
+        skipped: false,
+        revertedCount: 3,
+        orphanWinesDeleted: 0,
+        lwinStampsCleared: 1,
+      }],
+    });
   });
 
-  it("returns a dependency conflict with every parsed outcome when one skipped child has the exact reason", async () => {
-    const batches = [
-      { batchId: "b2", chunkIndex: 2, skipped: true, reason: "physical_bottle_dependency" },
-      { batchId: "b1", chunkIndex: 1, skipped: false, revertedCount: 3 },
-    ];
-    const result = await revertImportSession(makeRevertSupabase({ sessionId: SESSION_ID, batches }) as never, SESSION_ID);
+  it("returns the rolled-back physical conflict with no committed child outcomes", async () => {
+    const result = await revertImportSession(makeRevertSupabase(null, {
+      code: "P04D3",
+      message: "physical_bottle_dependency",
+    }) as never, SESSION_ID);
     expect(result).toEqual({
       ok: false,
       error: {
         code: "physical_bottle_dependency",
-        message: "Import session cannot be fully reverted because physical bottles depend on imported inventory.",
+        message: "Import session cannot be reverted because physical bottles depend on imported inventory.",
       },
-      batches,
+      batches: [],
     });
   });
 
-  it("keeps a near-match skipped reason in the existing successful result", async () => {
-    const batches = [{ batchId: "b1", chunkIndex: 1, skipped: true, reason: "physical_bottle_dependency: detail" }];
-    const result = await revertImportSession(makeRevertSupabase({ sessionId: SESSION_ID, batches }) as never, SESSION_ID);
-    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, batches });
+  it("returns the rolled-back shared-source conflict with no committed child outcomes", async () => {
+    const result = await revertImportSession(makeRevertSupabase(null, {
+      code: "P04I2",
+      message: "import_source_conflict",
+    }) as never, SESSION_ID);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "import_source_conflict",
+        message: "Import inventory is linked to multiple import rows, so this revert was not performed. Wine catalog entries and import history are unchanged. Ask a manager to review the import.",
+      },
+      batches: [],
+    });
   });
 
-  it("keeps not-found and unknown RPC errors distinct", async () => {
-    const missing = await revertImportSession(makeRevertSupabase(null, { code: "P0002", message: "raw missing" }) as never, SESSION_ID);
-    expect(missing).toEqual({ ok: false, error: { code: "not_found", message: "Import session not found." } });
-    const unknown = { code: "P0001", message: "other failure" };
-    await expect(revertImportSession(makeRevertSupabase(null, unknown) as never, SESSION_ID)).rejects.toBe(unknown);
+  it("keeps not-found and malformed results fixed and redacted", async () => {
+    const missing = await revertImportSession(makeRevertSupabase(null, {
+      code: "P0002",
+      message: "import_session_not_found",
+    }) as never, SESSION_ID);
+    expect(missing).toEqual({
+      ok: false,
+      error: { code: "not_found", message: "Import session not found." },
+    });
+
+    const malformed = await revertImportSession(
+      makeRevertSupabase({ ...receipt, blockedBatchCount: 1 }) as never,
+      SESSION_ID,
+    );
+    expect(malformed).toEqual({
+      ok: false,
+      error: { code: "internal_error", message: "Could not revert import session." },
+    });
   });
 });

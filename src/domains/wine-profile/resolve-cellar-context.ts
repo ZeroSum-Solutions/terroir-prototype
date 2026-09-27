@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { DEFAULT_HEALTH_THRESHOLDS } from "@/lib/cellar-health/classify";
 import type { Sourced } from "@/lib/provenance/sourced";
+import { readInventoryCosts } from "@/lib/staff-cost/protected-readers";
 import { computeBadges, type Badge } from "./badges";
 import type { DrinkWindow } from "./resolve-reference-profile";
 
@@ -176,19 +177,15 @@ export async function resolveCellarContext(
 ): Promise<CellarFacts> {
   const canCompareMargin =
     costAccess?.canReadCost === true && costAccess.canReadMargin === true;
-  const inventoryQuery = canCompareMargin
-    ? supabase
-        .from("inventory_items")
-        .select("quantity, unit_cost, added_at, bin_location, section, format")
-        .eq("wine_id", wineId)
-        .eq("restaurant_id", restaurantId)
-    : supabase
-        .from("inventory_items")
-        .select("quantity, added_at, bin_location, section, format")
-        .eq("wine_id", wineId)
-        .eq("restaurant_id", restaurantId);
-  const [inventory, lastPour, lists, config] = await Promise.all([
-    inventoryQuery,
+  const [inventory, inventoryCosts, lastPour, lists, config] = await Promise.all([
+    supabase
+      .from("inventory_items")
+      .select("id, quantity, added_at, bin_location, section, format")
+      .eq("wine_id", wineId)
+      .eq("restaurant_id", restaurantId),
+    canCompareMargin
+      ? readInventoryCosts(supabase, restaurantId, [wineId])
+      : Promise.resolve([]),
     // 'pour' is the one depleting kind. spill is waste, reconcile is an
     // adjustment, new_bottle/finish_bottle are lifecycle — none of them is a
     // sale, and a badge cleared by a spill is the noise the audit named.
@@ -223,15 +220,25 @@ export async function resolveCellarContext(
     throw new Error("Invalid effective service event.");
   }
 
-  const rawInventory = (inventory.data ?? []) as InventoryRow[];
-  const inventoryRows: InventoryRow[] = rawInventory.map((lot) => ({
+  const inventoryCostById = new Map(
+    inventoryCosts.map((row) => [row.inventory_item_id, row.unit_cost]),
+  );
+  if (
+    canCompareMargin &&
+    (inventoryCostById.size !== inventoryCosts.length ||
+      (inventory.data ?? []).some((lot) => !inventoryCostById.has(lot.id)))
+  ) {
+    throw new Error("Inventory cost protected read was incomplete.");
+  }
+
+  const inventoryRows: InventoryRow[] = (inventory.data ?? []).map((lot) => ({
     quantity: lot.quantity,
     added_at: lot.added_at,
     bin_location: lot.bin_location,
     section: lot.section,
     format: lot.format,
     ...(canCompareMargin
-      ? { unit_cost: lot.unit_cost }
+      ? { unit_cost: inventoryCostById.get(lot.id) }
       : {}),
   }));
 

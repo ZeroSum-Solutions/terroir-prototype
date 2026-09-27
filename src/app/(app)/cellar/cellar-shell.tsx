@@ -278,9 +278,9 @@ export function CellarShell({
         onSelectFilter={selectCounter}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
-        openBottleCount={alerts.openCount}
+        openBottleCount={rows.reduce((n, row) => n + (row.activeBottleCount ?? ((row.open_remaining_ml ?? 0) > 0 ? 1 : 0)), 0)}
         reconcileCount={
-          view === "list" && canManage && inventoryContractVersion === 1
+          view === "list" && canManage
             ? reconcileItems.length
             : 0
         }

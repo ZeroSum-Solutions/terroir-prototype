@@ -16,5 +16,13 @@ export const metadata: Metadata = { title: "Reconciliation queue" };
 export default async function ReconciliationQueuePage() {
   const auth = (await getAuthContext())!; // AppLayout redirects when null
   const canManage = auth.userRole === "owner" || auth.userRole === "manager";
-  return <section><ReconcileQueueClient canManage={canManage} /></section>;
+  return (
+    <section>
+      <ReconcileQueueClient
+        canManage={canManage}
+        userId={auth.user.id}
+        restaurantId={auth.restaurantId}
+      />
+    </section>
+  );
 }
