@@ -120,12 +120,13 @@ test.describe("mobile demo critical journeys", () => {
     const save = page.getByRole("button", { name: "Save Edits" });
     expect(await controlHeight(save)).toBeGreaterThanOrEqual(44);
     await save.click();
-    await expect(page.getByRole("alert")).toContainText("Edits saved.");
+    await expect(page.getByText("Edits saved.", { exact: true })).toBeVisible();
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Commit to Inventory" }).click();
-    await expect(page.getByRole("alert")).toContainText(
+    await expect(page.getByText(
       "4 items committed to inventory (4 distinct wines).",
-    );
+      { exact: true },
+    )).toBeVisible();
     expect(scanRequests).toBe(1);
     expect(saveRequests).toBe(1);
     expect(commitRequests).toBe(1);
