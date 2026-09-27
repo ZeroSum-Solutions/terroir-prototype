@@ -110,16 +110,11 @@ jobs:
 
       - name: Start local Supabase
         # supabase/config.toml is committed since the 2026-08-24 integration
-        # (573xx ports, terroir-vw-local project id — see
-        # docs/runbooks/local-stack.md); `init` is only a fallback for a
-        # tree without one. `start` applies every file in
-        # supabase/migrations/ into a fresh Postgres + PostgREST + GoTrue
-        # stack that lives only for this job — not a shared database.
-        run: |
-          if [ ! -f supabase/config.toml ]; then
-            supabase init --with-vscode-settings=false --with-intellij-settings=false
-          fi
-          supabase start
+        # The CLI executes migration statements separately; 0152 deliberately
+        # starts with LOCK TABLE and therefore requires an outer transaction.
+        # This CI-only launcher starts an empty disposable stack, then applies
+        # each exact migration plus its ledger row in one transaction.
+        run: scripts/local/ci-start-supabase.sh
 
       - name: Export local Supabase env for tests and E2E
         run: |

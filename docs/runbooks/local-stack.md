@@ -19,7 +19,10 @@ It will:
 1. Create `.env.local` from `.env.local.example` with mode `0600` if it is missing.
 2. Refuse to continue if the configured Supabase URL isn't local
    (`scripts/local/assert-local-db.sh`).
-3. `supabase start` (no-op if already running).
+3. `supabase start` (no-op if already running). CI instead uses
+   `scripts/local/ci-start-supabase.sh`: migration 0152 starts with `LOCK TABLE`,
+   so a disposable CI database applies every migration and its ledger row inside
+   one transaction rather than relying on the CLI's statement-by-statement runner.
 4. `supabase db reset`, which drops and recreates the retained local DB and applies every
    migration in `supabase/migrations/` from scratch.
 5. Wait for the API to actually be ready (see "Post-reset readiness"
