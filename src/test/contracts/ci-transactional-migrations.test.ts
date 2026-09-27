@@ -5,6 +5,7 @@ const read = (path: string) => readFileSync(path, "utf8");
 
 describe("transactional CI migration bootstrap", () => {
   const script = read("scripts/local/ci-start-supabase.sh");
+  const seed = read("scripts/seed-local-supabase.mjs");
 
   it("is the only Supabase startup used by both database CI workflows", () => {
     for (const workflow of [
@@ -30,5 +31,16 @@ describe("transactional CI migration bootstrap", () => {
     expect(script).toContain("terroir-vw-local");
     expect(script).toContain("unexpected project id");
     expect(script).not.toContain(".env.local");
+  });
+
+  it("keeps the production-shaped seed inside the 0157 metadata allowlist", () => {
+    expect(seed).toContain('source: "rule_engine"');
+    expect(seed).toContain(
+      'fields_enriched: ["drink_window", "serving_temp"]',
+    );
+    expect(seed).not.toContain('source: "local_seed"');
+    expect(seed).not.toContain(
+      'fields_enriched: ["drink_window", "serving_temp", "retail"]',
+    );
   });
 });

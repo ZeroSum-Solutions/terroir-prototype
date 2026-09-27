@@ -284,8 +284,8 @@ function buildRows(userIds = DRY_USER_IDS) {
       pricing_dismissed_until: i % 61 === 0 ? dayOffset(-14) : null,
       alert_snoozed_until: i % 67 === 0 ? dayOffset(-7) : null,
       enrichment_metadata: {
-        source: "local_seed",
-        fields_enriched: ["drink_window", "serving_temp", "retail"],
+        source: "rule_engine",
+        fields_enriched: ["drink_window", "serving_temp"],
         enriched_at: dayOffset(i % 30),
       },
       manual_overrides: i % 29 === 0 ? ["drink_window"] : [],
