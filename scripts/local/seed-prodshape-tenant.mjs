@@ -223,7 +223,7 @@ function buildWines(heroUrl) {
       pricing_target_markup_ratio: null,
       pricing_target_pour_cost_pct: null,
       overpaid_flag: false,
-      enrichment_metadata: {},
+      enrichment_metadata: null,
       manual_overrides: [],
       is_eightysixed: i % 61 === 0,
       eightysixed_at: i % 61 === 0 ? dayOffset(i % 14) : null,
