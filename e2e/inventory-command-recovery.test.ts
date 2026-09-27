@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { ML_PER_OZ } from "@/lib/units";
+import { cleanupLocalSealedFixtures } from "@/test/local-sealed-fixtures";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -104,23 +105,8 @@ test.describe("inventory command recovery", () => {
 
   test.afterAll(async () => {
     const admin = adminClient();
-    if (restaurantId && wineId) {
-      await checkedDelete(
-        admin.from("inventory_command_receipts").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("bottle_closeouts").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("pour_events").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("open_bottles").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
+    if (supabaseUrl && wineId) {
+      await cleanupLocalSealedFixtures({ apiUrl: supabaseUrl, wineIds: [wineId] });
     }
     if (listItemId) {
       await checkedDelete(admin.from("wine_list_items").delete().eq("id", listItemId));
@@ -172,6 +158,15 @@ test.describe("inventory command recovery", () => {
     );
 
     await login(page);
+    const openResponse = await page.request.post("/api/open-bottles", {
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      data: { wine_id: wineId, preservation_method: "none" },
+    });
+    expect(openResponse.status(), await openResponse.text()).toBe(201);
+    const openBody = asRecord(await openResponse.json());
+    const openBottle = asRecord(openBody?.open_bottle);
+    expect(openBottle?.id).toEqual(expect.any(String));
+    const openBottleId = openBottle!.id as string;
     await page.goto("/cellar");
     await page.evaluate(() => localStorage.setItem("terroir-theme", "light"));
     await page.reload();
@@ -211,7 +206,7 @@ test.describe("inventory command recovery", () => {
         wine_id: wineId,
         ml: CUSTOM_ML,
         kind: "pour",
-        preservation_method: "none",
+        open_bottle_id: openBottleId,
       },
     });
     expect(attempts[0].operationId).toMatch(/^[0-9a-f-]{36}$/i);
@@ -221,7 +216,7 @@ test.describe("inventory command recovery", () => {
       remainingMl: 750 - CUSTOM_ML,
       receiptCount: 1,
       receiptMl: CUSTOM_ML,
-      eventCount: 2,
+      eventCount: 1,
       pouredMl: CUSTOM_ML,
     });
 
@@ -235,7 +230,7 @@ test.describe("inventory command recovery", () => {
       "replayed pour action",
     );
     await expectTouchTarget(
-      drawer.getByRole("button", { name: "Bottle already open" }),
+      drawer.getByRole("button", { name: "Open another bottle" }),
       "replayed open action",
     );
     await attachScreenshot(page, testInfo, "390px-pour-replayed");

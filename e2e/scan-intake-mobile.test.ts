@@ -1,5 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { makeScan } from "../src/test/fixtures/invoices/scans";
+
+const SEEDED_SCAN_ID = "de100004-0000-4000-8000-000000000001";
+const queuedReceipt = {
+  version: 1,
+  kind: "invoice_scan_upload",
+  scanId: SEEDED_SCAN_ID,
+  status: "queued",
+  itemCount: 0,
+};
 
 /**
  * Regression coverage for the M0-1 mobile scan intake fix.
@@ -39,9 +47,12 @@ test.describe("mobile scan intake regression (M0-1)", () => {
   });
 
   test("a camera-captured JPEG reaches a reviewable result", async ({ page }) => {
-    const scan = makeScan();
     await page.route("**/api/scan", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(scan) });
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify(queuedReceipt),
+      });
     });
     await gotoFreshScanPage(page);
 
@@ -64,16 +75,20 @@ test.describe("mobile scan intake regression (M0-1)", () => {
       ),
     });
 
-    await expect(page.getByRole("heading", { name: "Invoice scan results" })).toBeVisible();
+    await expect(page).toHaveURL(`/scan/${SEEDED_SCAN_ID}`);
+    await expect(page.getByRole("heading", { name: "Review scan" })).toBeVisible();
   });
 
   test("a single-page PDF upload reaches a reviewable result", async ({ page }) => {
-    const scan = makeScan();
     let requestBody: string[] = [];
     await page.route("**/api/scan", async (route) => {
       const request = route.request();
       requestBody = [request.headers()["content-type"] ?? ""];
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(scan) });
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify(queuedReceipt),
+      });
     });
     await gotoFreshScanPage(page);
 
@@ -82,7 +97,8 @@ test.describe("mobile scan intake regression (M0-1)", () => {
     const chooser = await fileChooserPromise;
     await chooser.setFiles({ name: "invoice.pdf", mimeType: "application/pdf", buffer: fakePdf("single page") });
 
-    await expect(page.getByRole("heading", { name: "Invoice scan results" })).toBeVisible();
+    await expect(page).toHaveURL(`/scan/${SEEDED_SCAN_ID}`);
+    await expect(page.getByRole("heading", { name: "Review scan" })).toBeVisible();
     expect(requestBody[0]).toContain("multipart/form-data");
   });
 
@@ -91,12 +107,15 @@ test.describe("mobile scan intake regression (M0-1)", () => {
     // more than one together is rejected client-side (see the "three PDFs"
     // test below) — this multi-file batch path is for photographing
     // several pages of ONE physical invoice, hence images here, not PDFs.
-    const scan = makeScan();
     let fileFieldCount = 0;
     await page.route("**/api/scan", async (route) => {
       const body = route.request().postDataBuffer();
       fileFieldCount = body ? body.toString("latin1").split('name="file"').length - 1 : 0;
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(scan) });
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify(queuedReceipt),
+      });
     });
     await gotoFreshScanPage(page);
 
@@ -109,7 +128,8 @@ test.describe("mobile scan intake regression (M0-1)", () => {
       { name: "page-2.jpg", mimeType: "image/jpeg", buffer: Buffer.from("page two") },
     ]);
 
-    await expect(page.getByRole("heading", { name: "Invoice scan results" })).toBeVisible();
+    await expect(page).toHaveURL(`/scan/${SEEDED_SCAN_ID}`);
+    await expect(page.getByRole("heading", { name: "Review scan" })).toBeVisible();
     expect(fileFieldCount).toBe(2);
   });
 

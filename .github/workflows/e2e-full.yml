@@ -106,8 +106,8 @@ jobs:
         run: PRODSHAPE_LEGACY_PHYSICAL_FIXTURE=1 pnpm run prodshape:seed
 
       - name: Bootstrap owner capabilities
-        # Match ci.yml: promote the named local owner before the cutover so
-        # capability enforcement is exercised with an explicit manifest.
+        # Match ci.yml: promote the named local owner's demo and prodshape
+        # memberships so both sites exercise an explicit capability manifest.
         run: scripts/local/ci-bootstrap-owner-capabilities.sh
 
       - name: Apply physical and operational cutover migrations

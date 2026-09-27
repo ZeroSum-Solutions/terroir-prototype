@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { cleanupLocalSealedFixtures } from "@/test/local-sealed-fixtures";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -21,7 +22,6 @@ test.describe("discard command mobile recovery", () => {
   let wineId = "";
   let inventoryId = "";
   let bottleId = "";
-  let openedAt = "";
 
   test.beforeAll(async () => {
     restaurantId = await resolveRestaurantId();
@@ -61,23 +61,8 @@ test.describe("discard command mobile recovery", () => {
 
   test.afterAll(async () => {
     const admin = adminClient();
-    if (restaurantId && wineId) {
-      await checkedDelete(
-        admin.from("inventory_command_receipts").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("bottle_closeouts").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("pour_events").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
-      await checkedDelete(
-        admin.from("open_bottles").delete()
-          .eq("restaurant_id", restaurantId).eq("wine_id", wineId),
-      );
+    if (supabaseUrl && wineId) {
+      await cleanupLocalSealedFixtures({ apiUrl: supabaseUrl, wineIds: [wineId] });
     }
     if (inventoryId) {
       await checkedDelete(admin.from("inventory_items").delete().eq("id", inventoryId));
@@ -103,7 +88,6 @@ test.describe("discard command mobile recovery", () => {
     expect(openBottle?.id).toEqual(expect.any(String));
     expect(openBottle?.opened_at).toEqual(expect.any(String));
     bottleId = openBottle!.id as string;
-    openedAt = openBottle!.opened_at as string;
 
     const attempts: Array<{
       operationId: string | undefined;
@@ -198,7 +182,7 @@ test.describe("discard command mobile recovery", () => {
     expect(attempts[0]).toMatchObject({
       status: 200,
       replayed: "false",
-      body: { expected_opened_at: openedAt },
+      body: { wine_id: wineId },
     });
     expect(attempts[0].operationId).toMatch(/^[0-9a-f-]{36}$/i);
     const committed = await discardSnapshot(attempts[0].operationId!);

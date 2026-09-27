@@ -48,12 +48,18 @@ export async function cleanupLocalSealedFixtures({
   apiUrl,
   restaurantIds = [],
   membershipIds = [],
+  wineIds = [],
 }: {
   apiUrl: string;
   restaurantIds?: string[];
   membershipIds?: string[];
+  wineIds?: string[];
 }): Promise<void> {
-  if (restaurantIds.length === 0 && membershipIds.length === 0) return;
+  if (
+    restaurantIds.length === 0 &&
+    membershipIds.length === 0 &&
+    wineIds.length === 0
+  ) return;
   const statements = ["begin;"];
   if (membershipIds.length > 0) {
     const members = uuidArray(membershipIds);
@@ -71,6 +77,16 @@ export async function cleanupLocalSealedFixtures({
       `delete from public.bottle_closeouts where restaurant_id = any(array[${restaurants}]::uuid[]);`,
       `delete from public.open_bottles where restaurant_id = any(array[${restaurants}]::uuid[]);`,
       `delete from public.inventory_command_receipts where restaurant_id = any(array[${restaurants}]::uuid[]);`,
+    );
+  }
+  if (wineIds.length > 0) {
+    const wines = uuidArray(wineIds);
+    statements.push(
+      `delete from public.inventory_command_bottle_effects where wine_id = any(array[${wines}]::uuid[]);`,
+      `delete from public.pour_events where wine_id = any(array[${wines}]::uuid[]);`,
+      `delete from public.bottle_closeouts where wine_id = any(array[${wines}]::uuid[]);`,
+      `delete from public.open_bottles where wine_id = any(array[${wines}]::uuid[]);`,
+      `delete from public.inventory_command_receipts where wine_id = any(array[${wines}]::uuid[]);`,
     );
   }
   statements.push("commit;");

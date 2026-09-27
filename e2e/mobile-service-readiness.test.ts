@@ -287,7 +287,7 @@ async function assertServiceSurface(
   await expect(drawer).toContainText("C07 Fixture");
   await expect(drawer).toContainText("Willamette Valley");
   await expect(openBottle).toBeVisible();
-  await expect(pour).toBeVisible();
+  await expect(pour).toHaveCount(0);
 
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
@@ -301,7 +301,6 @@ async function assertServiceSurface(
   for (const [label, control] of [
     ["drawer close", close],
     ["open bottle", openBottle],
-    ["pour", pour],
   ] as const) {
     await expectTouchTarget(control, label, viewportWidth);
     await expectInsideViewport(control, label, viewportWidth);

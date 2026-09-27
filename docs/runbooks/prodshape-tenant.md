@@ -65,8 +65,10 @@ On the current schema, a normal refresh intentionally omits direct
 and physical activity must go through the application RPCs. The full-E2E
 workflow alone enables `PRODSHAPE_LEGACY_PHYSICAL_FIXTURE=1` while its disposable
 database is held at migration 0155, then applies migrations 0156–0164 and their
-production preflight/postflight assertions before Playwright starts. Do not use
-that flag against a current-schema stack.
+production preflight/postflight assertions before Playwright starts. Before the
+cutover, CI also bootstraps the named owner's demo and prodshape memberships from
+an exact capability manifest. Do not use the legacy fixture flag against a
+current-schema stack.
 
 Teardown removes the restaurant (everything tenant-scoped cascades), both storage
 prefixes, and the identity-spine rows the fixture created — but only the
