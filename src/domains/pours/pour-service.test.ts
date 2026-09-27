@@ -216,6 +216,12 @@ describe("inventory command services", () => {
 
   it.each([
     ["non-object result", "invalid"],
+    ["invalid result envelope", {
+      operation_id: 42,
+      command: "pour",
+      pour_event_ids: [],
+      replayed: false,
+    }],
     ["non-object bottle", {
       ...commandResult("pour"),
       open_bottle: [],
@@ -919,6 +925,21 @@ describe("closeOpenBottle", () => {
       }),
       error: null,
     });
+
+    await expect(closeOpenBottle({
+      ...closeInput(supabase),
+      contractVersion: 2,
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a contract-2 legacy close replay with a non-string lifecycle", async () => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    const replay = completedLegacyReplay("close", {
+      wineId: HISTORICAL_WINE_ID,
+    });
+    replay.open_bottle.opened_at = null as never;
+    supabase.rpc.mockResolvedValueOnce({ data: replay, error: null });
 
     await expect(closeOpenBottle({
       ...closeInput(supabase),
