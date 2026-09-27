@@ -46,6 +46,10 @@ function csvBuffer() {
   return Buffer.from("producer,name,vintage,quantity,unit_cost\nCross Tenant Producer,Cross Tenant Wine,2020,6,24.50\n");
 }
 
+function bar4CsvBuffer() {
+  return Buffer.from("producer,name,vintage,quantity,unit_cost\nBar 4 Producer,Bar 4 Wine,2021,6,24.50\n");
+}
+
 /**
  * A client authenticated as a fixed user, built from a raw access token
  * rather than a GoTrueClient-managed session. supabase-js itself warns
@@ -131,10 +135,17 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
       producer: "Cross Tenant Producer",
     } as never);
     if (lwinError) throw lwinError;
+
+    const { error: bar4LwinError } = await admin.from("lwin_catalog").insert({
+      lwin_id: "G14-BAR-4-TEST",
+      display_name: "Bar 4 Wine",
+      producer: "Bar 4 Producer",
+    } as never);
+    if (bar4LwinError) throw bar4LwinError;
   });
 
   afterAll(async () => {
-    await admin.from("lwin_catalog").delete().eq("lwin_id", "G14-TENANT-TEST");
+    await admin.from("lwin_catalog").delete().in("lwin_id", ["G14-TENANT-TEST", "G14-BAR-4-TEST"]);
     // Cascades: import_batches, import_batch_rows, memberships, and
     // inventory_items/wines this suite created all FK restaurant_id ON
     // DELETE CASCADE.
@@ -205,8 +216,10 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
 
     // User A can revert their own batch, which actually removes the
     // inventory row it created while retaining the catalog wine and history.
+    // The final revert contract also clears the exact LWIN stamp this batch
+    // wrote, so the retained wine returns to its pre-import identity state.
     const revertAsA = await revertImportBatch(userAClient, restaurantA, batchId);
-    expect(revertAsA).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 0, lwinStampsCleared: 0 });
+    expect(revertAsA).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 0, lwinStampsCleared: 1 });
 
     const { data: inventoryAfterRevert } = await admin
       .from("inventory_items")
@@ -224,9 +237,9 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
       .from("wines")
       .insert({
         restaurant_id: restaurantA,
-        producer: "Cross Tenant Producer",
-        name: "Cross Tenant Wine",
-        vintage: 2020,
+        producer: "Bar 4 Producer",
+        name: "Bar 4 Wine",
+        vintage: 2021,
         size_ml: 750,
       } as never)
       .select("id")
@@ -247,7 +260,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     if (invError || !preExisting) throw invError ?? new Error("failed to insert pre-existing inventory");
     const preExistingId = (preExisting as { id: string }).id;
 
-    const confirmed = await confirmImportBatch(userAClient, restaurantA, userAId, "second-import.csv", csvBuffer());
+    const confirmed = await confirmImportBatch(userAClient, restaurantA, userAId, "second-import.csv", bar4CsvBuffer());
     expect(confirmed.ok).toBe(true);
     if (!confirmed.ok || confirmed.alreadyExists) return;
 
@@ -291,7 +304,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const reverted = await revertImportBatch(userAClient, restaurantA, confirmed.batchId);
     // The wine is spared twice over: the pre-existing inventory row still
     // references it, AND it predates this batch (created_at guard). Its
-    // LWIN stamp, however, IS cleared: the local seed's G14-TENANT-TEST
+    // LWIN stamp, however, IS cleared: the local seed's G14-BAR-4-TEST
     // catalog entry exact-matches this fixture (score 1.0), so the
     // batch's apply stamped the pre-existing wine (its lwin was null),
     // and revert must undo exactly that write in the same transaction.

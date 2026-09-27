@@ -1,30 +1,34 @@
 # Handoff: MacBook transfer
-status: source-checkpoint-published-release-held
+status: release-candidate-gates-in-progress
 date: 2026-09-27
 branch: feat/production-readiness-20260923
-published-source-checkpoint: e970cc8bde19a53e08be55345daeaf0bf7fa6a2e
+published-release-candidate: e8d0af313bd7e01f622b27c4abb638d43c8b96fd
+pull-request: https://github.com/ZeroSum-Solutions/terroir-prototype/pull/229
 
 ## Active Task
 
-The owner requests a safe stopping point, a successful `main` merge, removal of
-stale worktrees, and a mobile-testable release. Merge authorization now exists;
-release prerequisites still apply. The source checkpoint above is committed,
-pushed, and verified against GitHub. The five stale worktrees are removed after
-preserving their exact histories on remote archive branches. `main` has NOT been
-updated and the new application is NOT deployed. Coordinate writers before
-changing this checkout or its local database.
+The owner authorized the production migration, protected `main` merge and
+mobile-testable release once the recorded gates pass. PR #229 is the active
+release vehicle. The published candidate above contains the 0151–0164 migration
+engine, final physical/authority cutover, and explicit capability bootstrap; a
+small CI-fixture follow-up may advance the branch HEAD. Do not infer the final
+release SHA from this snapshot: verify PR #229, `origin/main`, both Railway
+deployments and `/api/health` before declaring release complete. The five stale
+worktrees were removed after preserving their exact histories on remote archive
+branches. Coordinate writers before changing this checkout or its local database.
 
 ## Goal
 
-Preserve the restaurant-demo work in a reviewed source checkpoint, then complete
-the release gates. The application is not production-ready; the bounded M1–M5
-demo and full production criteria remain incomplete.
+Complete the final CI/security gates, refresh backup freshness, drain both web
+environments, apply and verify production migrations 0151–0164, merge PR #229
+through protected `main`, verify exact-SHA Railway deployments, and smoke-test
+the production restaurant flow at phone size.
 
 ## Decisions
 
 - Main deploys to both Railway environments sharing one hosted database, but
-  does not apply migrations. Do not merge while required hosted schema and
-  cutover checks remain unverified.
+  does not apply migrations. Apply and verify the migration cutover during the
+  drained maintenance window before merging the code that requires it.
 - Migration 0154's exact 22-path source checkpoint, including generated type and
   schema-snapshot artifacts, is saved and pushed at `29b06e78`. Its isolated proof
   does not authorize a hosted apply.
@@ -43,12 +47,13 @@ receipt replaces this checkpoint status.
 
 | Surface | Verified result | Remaining boundary |
 |---|---|---|
-| Database 0160–0164 | Local functional, refusal, authorization, concurrency, down/up and conservation evidence; generated types, 136-migration snapshot and TypeScript checks passed. The last eight 0164 schedules have independent runtime review. | Not a hosted apply. Canonical live-database suites still need zero-critical-skip execution. |
+| Database 0151–0164 | Transactional CI migration runner, legacy/current phase split, production pre/postflights, exact 0157 remediation and explicit owner-capability bootstrap are published. | Await final green required CI and security certificate before the hosted apply. |
 | Restaurant journey | Synthetic owner received two bottles, opened one, poured four 150 ml glasses, reconciled to 120 ml and retained that state after fresh login. Separate staff user poured successfully; reconciliation returned 403 without a receipt. | A guarded continuation recovered the first attempt. No clean uninterrupted final-candidate journey or complete role/site matrix is claimed. |
 | Mobile drawer | 320/390/768/1200 px checks passed; primary actions measured 52 px high. | Responsive-header fixes have source review and five tests, but no fresh browser geometry. Full-page accessibility and mobile QA remain open. |
 | Active-site preflights | Four regressions repaired; 85 focused tests passed. | Request preflights are not an atomic authorization or raw-cost/Storage privacy seal. |
 | Portable demo | Repo-owned launcher, fixture, journey and source checks exist; seven source checks passed. | Execution deliberately refuses until Docker ownership/cleanup admission and independent review pass. No MacBook reproduction. |
-| Hosted release | Coordinator checked production and staging health at 12:08 UTC on 2026-09-27: HTTP 200, release `e31c16494ba49d83fe1304358923bf7bfeabf6c7`. | That is the older deployed release, not this working tree. Hosted 0156–0164 state remains unverified; no apply is claimed. |
+| Backups | Latest GitHub logical backup artifact `10930418367` restored in isolation: 82 tables, 2 sequences, the ten largest-table checksums and ledger 0150 matched. Supabase reported healthy physical backups and WAL-G enabled; PITR is not enabled. | Refresh physical/logical backup freshness immediately before the hosted apply. |
+| Hosted release | Production and staging still serve older release `e31c16494ba49d83fe1304358923bf7bfeabf6c7`; both web deployments were healthy at the last check. | Neither 0151–0164 nor PR #229 is released yet. Verify final main/deploy SHA and health after merge. |
 
 The latest full unit run passed 5,589 tests, failed zero and skipped 182; it is not full live-database
 coverage. Bin PATCH, import-revert HTTP callers and stalled-scan housekeeping
@@ -73,9 +78,9 @@ git status --short --branch
 git rev-parse HEAD
 ```
 
-The branch contains source checkpoint `e970cc8b`; later commits may synchronize
-upstream workflows or update this handoff. Verify the checkpoint is an ancestor
-with `git merge-base --is-ancestor e970cc8b HEAD`. Never overwrite
+The branch contains release candidate `e8d0af31`; later commits may repair final
+CI fixtures or update this handoff. Verify the candidate is an ancestor with
+`git merge-base --is-ancestor e8d0af31 HEAD`. Never overwrite
 an existing checkout to make it match. Dependencies, credentials, retained local
 databases and raw evidence do not travel through GitHub.
 
@@ -123,16 +128,17 @@ was verified. The portable local demo remains deliberately execution-disabled.
 
 ### Exact release continuation
 
-1. Unlock ZS Vault. It was still locked at the cleanup checkpoint. Do not source
-   production `.env.local` or bypass the credential boundary.
-2. Inspect the hosted migration ledger and objects using the production migration
-   runbook. Establish backup/restore evidence and old-code compatibility before
-   applying any required migrations; do not blindly apply the whole range.
-3. Complete raw-table/Storage staff-cost protection and atomic site-authority
-   checks. Clear final live HTTP gaps and canonical zero-critical-skip database,
-   browser, build, CI and full-branch security gates.
-4. Merge through protected `main` only after those gates pass, then verify both
-   deployed SHAs, health and an authenticated phone-sized restaurant journey.
+1. Resolve the required CI run for the final branch HEAD and validate the exact
+   final-HEAD security report. Do not source production `.env.local`.
+2. Refresh backup freshness and recheck the production ledger/preimage. Drain
+   production and staging web replicas, then apply 0151–0164 with the reviewed
+   production runner and verify the contiguous ledger, capability grants and
+   remediation postimage before resuming writers.
+3. Merge PR #229 through protected `main`; wait for both Railway environments to
+   deploy the exact merged SHA, restore replicas, and verify connected health.
+4. Run a fresh authenticated restaurant smoke test at phone size and an
+   independent release verification. Record any failure as a held release, not
+   as a partial success.
 
 Do not enable automatic merge while these gates are outstanding. The native goal
 remains blocked; this cleanup does not mark the application or demo complete.

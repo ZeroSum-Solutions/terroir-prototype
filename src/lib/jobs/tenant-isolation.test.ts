@@ -357,7 +357,7 @@ describe.skipIf(!hasLiveDb)(
       await supabase.from("background_jobs").delete().eq("id", first.jobId);
     });
 
-    it("a job whose subject already persisted a result does not re-invoke the extraction service (no double Anthropic call)", async () => {
+    it("a recovered job whose subject already persisted a result does not re-invoke the extraction service (no double Anthropic call)", async () => {
       const scanId = randomUUID();
       const { data: scan, error } = await supabase
         .from("invoice_scans")
@@ -378,6 +378,14 @@ describe.skipIf(!hasLiveDb)(
 
       const staffA = await staffSession(supabase, restaurantA, identities);
       const enqueueResult = await enqueueInvoiceExtractJob({ supabase: staffA.client, restaurantId: restaurantA, scanId });
+      // A recovered initial attempt has attempt_count > 0. Attempt 0 on an
+      // uncommitted complete scan is intentionally reserved for a deliberate
+      // re-extraction request and would correctly invoke the provider again.
+      const { error: recoveredAttemptError } = await supabase
+        .from("background_jobs")
+        .update({ attempt_count: 1 } as never)
+        .eq("id", enqueueResult.jobId);
+      if (recoveredAttemptError) throw recoveredAttemptError;
       const result = await processOneInvoiceExtractJob(supabase, "test-worker-retry");
 
       expect(result.processed).toBe(true);
