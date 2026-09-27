@@ -3,6 +3,7 @@ import {
   canonicalizePhysicalReconcileEntries,
   buildPhysicalReconcileItems,
   comparePostgresUuids,
+  isPhysicalReconcileResponse,
   serializePhysicalReconcileRequest,
   validateNewPhysicalReconcileRequest,
 } from "./reconcile-contract";
@@ -92,5 +93,56 @@ describe("PostgreSQL UUID reconciliation ordering", () => {
       ...entry,
       open_bottle_id: `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`,
     })), [item])).toMatchObject({ ok: false });
+  });
+
+  it("rejects invalid, duplicate, and unverifiable bottle identities", () => {
+    const wineId = "11111111-1111-4111-8111-111111111111";
+    const item = {
+      openBottleId: `${BASE}0f`,
+      wineId,
+      producer: "Producer",
+      name: "Wine",
+      vintage: 2022,
+      nominalCapacityMl: 750,
+      remainingMl: 300,
+      openedAt: "2026-09-24T12:00:00.000Z",
+      preservationMethod: "none" as const,
+      sourceProvenance: "known" as const,
+      sourceBinLocation: null,
+      stateVersion: 4,
+    };
+    const entry = {
+      open_bottle_id: item.openBottleId,
+      expected_state_version: item.stateVersion,
+      target_remaining_ml: 100,
+      note: null,
+    };
+
+    expect(validateNewPhysicalReconcileRequest([
+      { ...entry, open_bottle_id: "not-a-uuid" },
+    ], [item])).toEqual({ ok: false, message: "A bottle identity could not be verified." });
+    expect(validateNewPhysicalReconcileRequest([entry, entry], [item])).toEqual({
+      ok: false,
+      message: "A bottle appears more than once in this reconciliation.",
+    });
+    expect(validateNewPhysicalReconcileRequest([entry], [
+      { ...item, wineId: "not-a-uuid" },
+    ])).toEqual({ ok: false, message: "A bottle identity could not be verified." });
+    expect(validateNewPhysicalReconcileRequest([entry], [
+      { ...item, nominalCapacityMl: 0 },
+    ])).toEqual({ ok: false, message: "Bottle state could not be verified. Refresh and try again." });
+  });
+
+  it("rejects a physical response whose entries field is not an array", () => {
+    expect(isPhysicalReconcileResponse({
+      operation_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      command: "reconcile_batch",
+      entries: {},
+    }, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", [{
+      open_bottle_id: `${BASE}0f`,
+      expected_state_version: 4,
+      target_remaining_ml: 100,
+      note: null,
+    }])).toBe(false);
   });
 });

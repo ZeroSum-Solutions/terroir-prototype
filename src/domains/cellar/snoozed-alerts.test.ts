@@ -113,6 +113,24 @@ describe("fetchSnoozedAlerts", () => {
     );
   });
 
+  it("fails closed when the synchronized protected read omits a wine", async () => {
+    const supabase = makeSupabase([
+      {
+        id: "w1",
+        name: "Wine A",
+        producer: "Producer A",
+        vintage: 2010,
+        alert_snoozed_until: FUTURE,
+        pricing_dismissed_until: null,
+      },
+    ]);
+    readers.readWinePricingStrategy.mockResolvedValueOnce([]);
+
+    await expect(fetchSnoozedAlerts(supabase.client, RESTAURANT_ID)).rejects.toThrow(
+      "Wine pricing strategy protected read was incomplete.",
+    );
+  });
+
   it("sorts by soonest-expiring snooze, then alphabetically by producer", async () => {
     const soon = new Date(Date.now() + 1000 * 60).toISOString();
     const later = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();

@@ -146,6 +146,58 @@ describe("physical bottle database adapters", () => {
     })).rejects.toMatchObject({ message: "invalid_physical_command_result" });
   });
 
+  it("rejects a native bottle result without its source inventory identity", async () => {
+    const result = physicalCommandResult();
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        ...result,
+        open_bottle: {
+          ...result.open_bottle,
+          source_inventory_item_id: null,
+        },
+      },
+      error: null,
+    });
+
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      command: "pour",
+      wineId: WINE_ID,
+      openBottleId: BOTTLE_ID,
+      ml: 150,
+    })).rejects.toMatchObject({ message: "invalid_physical_command_result" });
+  });
+
+  it("rejects a physical mutation without a bottle selector before the RPC", async () => {
+    const rpc = vi.fn();
+
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      command: "pour",
+      wineId: WINE_ID,
+      ml: 150,
+    })).rejects.toMatchObject({ message: "legacy_inventory_command_retired" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects irrelevant physical command fields before the RPC", async () => {
+    const rpc = vi.fn();
+
+    await expect(executePhysicalBottleCommand({
+      supabase: { rpc } as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      command: "open",
+      wineId: WINE_ID,
+      ml: 150,
+    })).rejects.toMatchObject({ message: "invalid_physical_command" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects a valid-shaped response for a different bottle", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {

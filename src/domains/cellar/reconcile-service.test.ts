@@ -155,4 +155,35 @@ describe("reconcilePhysicalBottles", () => {
     expect(mockRevalidate).not.toHaveBeenCalled();
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
+
+  it("rejects a native result without an exact source inventory identity", async () => {
+    const entry = resultEntry(0, bottleA, wineA, 100, 4);
+    entry.open_bottle.identity_origin = "native";
+    const supabase = makeSupabase({ data: {
+      operation_id: operationId,
+      command: "reconcile_batch",
+      entries: [entry],
+      replayed: false,
+    }, error: null });
+
+    await expect(reconcilePhysicalBottles({
+      supabase: supabase as never,
+      operationId,
+      restaurantId: RESTAURANT_ID,
+      entries: [inputEntries[1]],
+    })).rejects.toThrow("invalid_physical_reconciliation_result");
+    expect(mockRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate bottle identities before calling the RPC", async () => {
+    const supabase = makeSupabase({ data: null, error: null });
+
+    await expect(reconcilePhysicalBottles({
+      supabase: supabase as never,
+      operationId,
+      restaurantId: RESTAURANT_ID,
+      entries: [inputEntries[0], { ...inputEntries[0] }],
+    })).rejects.toThrow("invalid_reconciliation_batch");
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
 });

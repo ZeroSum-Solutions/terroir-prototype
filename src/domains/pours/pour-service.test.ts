@@ -205,6 +205,26 @@ describe("inventory command services", () => {
     expect(mockRevalidate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["non-object result", "invalid"],
+    ["non-object bottle", {
+      ...commandResult("pour"),
+      open_bottle: [],
+    }],
+  ])("rejects a malformed inventory RPC %s", async (_label, data) => {
+    const supabase = makeRpcSupabase({ data, error: null });
+
+    await expect(recordPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      ml: 150,
+      kind: "pour",
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
+  });
+
   it("dispatches a contract-2 pour to the selected bottle without legacy preservation", async () => {
     const supabase = makeRpcSupabase({
       data: physicalCommandResult("pour"),
@@ -297,6 +317,22 @@ describe("inventory command services", () => {
       "execute_physical_bottle_command",
       expect.anything(),
     );
+  });
+
+  it("rejects an open result without an open bottle", async () => {
+    const supabase = makeRpcSupabase({
+      data: { ...commandResult("open"), open_bottle: null },
+      error: null,
+    });
+
+    await expect(openBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      preservationMethod: "coravin",
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -492,6 +528,23 @@ describe("undoLastPour", () => {
     );
   });
 
+  it("requires all physical reversal receipt identifiers", async () => {
+    const supabase = makeRpcSupabase({ data: null, error: null }, 2);
+
+    await expect(undoLastPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      contractVersion: 2,
+      expectedOpenBottleId: BOTTLE_ID,
+    })).rejects.toMatchObject({ message: "invalid_physical_command" });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
   it("does not export a raw database error or wine identity", async () => {
     const databaseError = { code: "XX000", message: "private customer note" };
     const supabase = makeRpcSupabase({ data: null, error: databaseError });
@@ -568,6 +621,22 @@ describe("undoLastPour", () => {
       restaurantId: RESTAURANT_ID,
       wineId: WINE_ID,
     })).rejects.toBeInstanceOf(PourForbiddenError);
+  });
+
+  it("maps a non-reversible inventory command to the manager-safe error", async () => {
+    const supabase = makeRpcSupabase({
+      data: null,
+      error: { message: "undo_inventory_command_not_reversible" },
+    });
+
+    await expect(undoLastPour({
+      supabase: supabase as never,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+    })).rejects.toMatchObject({
+      name: "PourNotReversibleError",
+      message: "Cannot safely undo this pour; ask a manager to reconcile.",
+    });
   });
 });
 
@@ -649,6 +718,19 @@ describe("closeOpenBottle", () => {
     expect(mockRevalidate).toHaveBeenCalledWith("/insights");
     expect(supabase.eq).toHaveBeenCalledWith("id", BOTTLE_ID);
     expect(supabase.eq).toHaveBeenCalledWith("restaurant_id", RESTAURANT_ID);
+  });
+
+  it("rejects a legacy close result without a closeout", async () => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    supabase.rpc.mockResolvedValueOnce({
+      data: { ...commandResult("close"), closeout: null },
+      error: null,
+    });
+
+    await expect(closeOpenBottle(closeInput(supabase))).rejects.toMatchObject({
+      message: "invalid_inventory_command_result",
+    });
+    expect(mockRevalidate).not.toHaveBeenCalled();
   });
 
   it("fails closed for missing or cross-tenant rows", async () => {
@@ -826,6 +908,23 @@ describe("discardOpenBottle", () => {
       }),
     );
     expect(supabase.eq).toHaveBeenCalledWith("restaurant_id", RESTAURANT_ID);
+  });
+
+  it("rejects a legacy discard result without an open bottle", async () => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+    supabase.rpc.mockResolvedValueOnce({
+      data: { ...commandResult("discard"), open_bottle: null },
+      error: null,
+    });
+
+    await expect(discardOpenBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      bottleId: BOTTLE_ID,
+      expectedOpenedAt: OPENED_AT,
+    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+    expect(mockRevalidate).not.toHaveBeenCalled();
   });
 
   it("uses receipt-first physical discard without reading mutable bottle authority", async () => {
