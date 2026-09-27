@@ -191,6 +191,50 @@ Generic migration runners are not approved for production 0152 unless their per-
 transaction boundary has been demonstrated. The local/disposable path uses `psql -1`;
 the repository production path uses `psql --single-transaction`.
 
+### 4c. Physical and operational cutover: 0153 through 0164
+
+Migrations `0153`–`0155` are additive preparation. Migration `0156` retires fresh
+version-1 inventory commands and seals direct writes to the physical-event tables;
+`0158` retires the old two-write bottle receiving path. This is therefore one
+maintenance window, not a series of live rolling changes.
+
+1. Keep both Railway web environments and every worker that can write this database
+   at zero replicas. Confirm in-flight sessions have drained. The same Supabase project
+   serves staging and production, so pausing only one environment is insufficient.
+2. Run the `0153`, `0154`, and `0156` preflights immediately before their matching
+   migrations. Apply `0153`, `0154`, and `0155` one at a time using the atomic
+   migration-plus-ledger-row procedure in step 4.
+3. Apply `0156`, then run `scripts/0156-production-postflight.sql`. Do not restore the
+   old application: fresh calls to `execute_inventory_command` now refuse with
+   `legacy_inventory_command_retired` by design.
+4. Before `0157`, every committed invoice line must name a valid same-tenant wine.
+   If the reviewed preflight identifies the one known historical scan, run
+   `scripts/0157-production-remediation.sql` in its own transaction with the exact
+   reviewed scan id, line count, and preimage MD5. The script locks its target,
+   requires a one-to-one inventory match, changes only missing `wine_id` fields, and
+   refuses any preimage drift. Never generalize or bypass those guards during release.
+5. Run the `0157` preflight, apply `0157`, and run its postflight. Then acknowledge the
+   still-drained bottle route explicitly when running the `0158` preflight:
+
+   ```bash
+   psql "$DB_URL" -X -v ON_ERROR_STOP=1 -v bottle_route_drained=1 \
+     -f scripts/0158-production-preflight.sql
+   ```
+
+6. Apply `0158`, run its postflight, then apply `0159` through `0164` individually.
+   Keep the route drained until the application containing the exact physical-bottle
+   and receiving RPC callers is deployed successfully.
+7. Verify a contiguous hosted ledger through `0164`, physical inventory contract
+   version 2, the remediated scan postimage, and the object/capability assertions in
+   the postflights. Only then merge/deploy the application. Resume web replicas after
+   both Railway environments report the merged release SHA and `/api/health` confirms
+   database connectivity.
+
+The CI lifecycle intentionally mirrors this boundary: legacy live suites execute at
+`0155`, then the repository cutover helper applies and verifies `0156`–`0164` before
+current-schema E2E. A green local cutover is necessary but does not replace the hosted
+backup, maintenance-window, preflight, or postflight evidence above.
+
 ### 5. Verify the effect, not the record
 
 Assert the thing the migration was for. A `schema_migrations` row proves only that an

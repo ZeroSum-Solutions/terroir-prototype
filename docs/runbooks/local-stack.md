@@ -21,8 +21,14 @@ It will:
    (`scripts/local/assert-local-db.sh`).
 3. `supabase start` (no-op if already running). CI instead uses
    `scripts/local/ci-start-supabase.sh`: migration 0152 starts with `LOCK TABLE`,
-   so a disposable CI database applies every migration and its ledger row inside
+   so a disposable CI database applies each migration and its ledger row inside
    one transaction rather than relying on the CLI's statement-by-statement runner.
+   The primary CI job deliberately stops at additive schema `0155` while it runs
+   the mandatory legacy-contract live suites, then
+   `scripts/local/ci-apply-cutover-migrations.sh` runs the `0156`–`0164`
+   preflights, migrations, and postflights before current-schema build and E2E.
+   This is a cutover proof, not permission to use either CI script outside the
+   exact disposable `terroir-vw-local` project.
 4. `supabase db reset`, which drops and recreates the retained local DB and applies every
    migration in `supabase/migrations/` from scratch.
 5. Wait for the API to actually be ready (see "Post-reset readiness"
