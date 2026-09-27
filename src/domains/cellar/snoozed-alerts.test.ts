@@ -17,10 +17,13 @@ type WineRow = {
   pricing_dismissed_until: string | null;
 };
 
-function makeSupabase(wines: WineRow[] | undefined) {
+function makeSupabase(
+  wines: WineRow[] | undefined,
+  errors: { range?: Error; gt?: Error } = {},
+) {
   const select = vi.fn();
   const or = vi.fn(async () => ({ data: wines, error: null }));
-  const gt = vi.fn(async () => ({ data: wines, error: null }));
+  const gt = vi.fn(async () => ({ data: wines, error: errors.gt ?? null }));
   readers.readWinePricingStrategy.mockImplementation(
     async (_client: unknown, _restaurantId: string, wineIds: string[]) =>
       wineIds.map((wineId) => ({
@@ -42,7 +45,7 @@ function makeSupabase(wines: WineRow[] | undefined) {
       order: () => query,
       range: async (from: number, to: number) => ({
         data: wines?.slice(from, to + 1),
-        error: null,
+        error: errors.range ?? null,
       }),
       or,
       gt,
@@ -56,6 +59,15 @@ const FUTURE = new Date(Date.now() + 1000 * 60 * 60).toISOString();
 const PAST = new Date(Date.now() - 1000 * 60 * 60).toISOString();
 
 describe("fetchSnoozedAlerts", () => {
+  it("surfaces a paged wine query failure", async () => {
+    const queryError = new Error("wine query failed");
+    const supabase = makeSupabase([], { range: queryError });
+
+    await expect(fetchSnoozedAlerts(supabase.client, RESTAURANT_ID)).rejects.toBe(
+      queryError,
+    );
+  });
+
   it("returns an empty array when the query yields no rows", async () => {
     const supabase = makeSupabase(undefined);
     await expect(fetchSnoozedAlerts(supabase.client, RESTAURANT_ID)).resolves.toEqual([]);
@@ -247,5 +259,14 @@ describe("fetchSnoozedAlerts", () => {
         pricingDismissedUntil: null,
       },
     ]);
+  });
+
+  it("surfaces a drink-window query failure", async () => {
+    const queryError = new Error("drink-window query failed");
+    const supabase = makeSupabase([], { gt: queryError });
+
+    await expect(
+      fetchDrinkWindowSnoozedAlerts(supabase.client, RESTAURANT_ID),
+    ).rejects.toBe(queryError);
   });
 });

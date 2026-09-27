@@ -12,6 +12,7 @@ vi.mock("@/lib/api/auto-eightysix-revalidation", () => ({
 
 const {
   PourForbiddenError,
+  PourNoInventoryError,
   PourNotFoundError,
   closeOpenBottle,
   discardOpenBottle,
@@ -121,6 +122,13 @@ function makeRpcSupabase(result: {
 
 describe("inventory command services", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("exposes a stable no-inventory domain error", () => {
+    expect(new PourNoInventoryError()).toMatchObject({
+      name: "PourNoInventoryError",
+      message: "No inventory available.",
+    });
+  });
 
   it("opens through execute_inventory_command and preserves replay state", async () => {
     const supabase = makeRpcSupabase({ data: commandResult("open"), error: null });
@@ -408,6 +416,27 @@ describe("inventory command services", () => {
     );
     expect(supabase.rpc).not.toHaveBeenCalledWith(
       "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("rejects a bottle selector under the legacy contract before writing", async () => {
+    const supabase = makeRpcSupabase({
+      data: commandResult("pour"),
+      error: null,
+    });
+
+    await expect(recordPour({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      wineId: WINE_ID,
+      openBottleId: BOTTLE_ID,
+      ml: 150,
+      kind: "pour",
+    })).rejects.toMatchObject({ message: "invalid_inventory_command" });
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_inventory_command",
       expect.anything(),
     );
   });
