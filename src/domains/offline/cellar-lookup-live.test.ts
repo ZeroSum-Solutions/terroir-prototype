@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadOfflineCellarRows } from "./cellar-lookup";
 import { executePhysicalBottleCommand } from "@/domains/pours/physical-bottle-command";
-import { cleanupLocalPhysicalCommandFixtures } from "@/test/local-physical-command-fixtures";
+import { cleanupLocalSealedFixtures } from "@/test/local-sealed-fixtures";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
 import type { Database } from "@/types/database";
 
@@ -221,22 +221,33 @@ describe.skipIf(!hasLiveDb)(
 
     afterAll(async () => {
       if (!admin) return;
-      await cleanupLocalPhysicalCommandFixtures(supabaseUrl!, [...restaurantIds]);
+      const failures: string[] = [];
+      try {
+        await cleanupLocalSealedFixtures({
+          apiUrl: supabaseUrl!,
+          restaurantIds: [...restaurantIds],
+        });
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : String(error));
+      }
       if (restaurantIds.size > 0) {
         const { error } = await admin.from("restaurants").delete()
           .in("id", [...restaurantIds]);
-        if (error) throw error;
+        if (error) failures.push(`delete restaurants: ${error.message}`);
       }
       for (const actorId of actorIds) {
         const { error } = await admin.auth.admin.deleteUser(actorId);
-        if (error) throw error;
+        if (error) failures.push(`delete user ${actorId}: ${error.message}`);
       }
       if (workspaceIds.size > 0) {
-        await admin.from("workspace_memberships").delete()
+        const { error: membershipError } = await admin.from("workspace_memberships").delete()
           .in("workspace_id", [...workspaceIds]);
+        if (membershipError) {
+          failures.push(`delete workspace memberships: ${membershipError.message}`);
+        }
         const { error } = await admin.from("workspaces").delete()
           .in("id", [...workspaceIds]);
-        if (error) throw error;
+        if (error) failures.push(`delete workspaces: ${error.message}`);
       }
 
       const checks = await Promise.all([
@@ -249,8 +260,11 @@ describe.skipIf(!hasLiveDb)(
         admin.from("restaurants").select("id").in("id", [...restaurantIds]),
       ]);
       for (const check of checks) {
-        expect(check.error).toBeNull();
-        expect(check.data).toEqual([]);
+        if (check.error) failures.push(`verify cleanup: ${check.error.message}`);
+        else if ((check.data?.length ?? 0) > 0) failures.push("verify cleanup: fixture rows remain");
+      }
+      if (failures.length > 0) {
+        throw new Error(`offline cellar fixture cleanup failed:\n- ${failures.join("\n- ")}`);
       }
     });
 

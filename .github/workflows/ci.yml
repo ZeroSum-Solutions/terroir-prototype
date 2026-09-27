@@ -146,6 +146,13 @@ jobs:
       - name: Seed local Supabase for tests and E2E
         run: LOCAL_SEED_PHYSICAL_CONTRACT=1 pnpm run supabase:seed:local:apply
 
+      - name: Bootstrap explicit seed-owner capabilities
+        # Exercises the exact one-time production bootstrap against the
+        # disposable local database. The local wrapper resolves only the
+        # deterministic seed owner; production requires an owner-reviewed
+        # explicit manifest and never discovers recipients by role.
+        run: scripts/local/ci-bootstrap-owner-capabilities.sh
+
 
       - name: Legacy-contract live tests
         # These suites prove the exact contract that 0156 intentionally

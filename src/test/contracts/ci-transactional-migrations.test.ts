@@ -6,6 +6,8 @@ const read = (path: string) => readFileSync(path, "utf8");
 describe("transactional CI migration bootstrap", () => {
   const script = read("scripts/local/ci-start-supabase.sh");
   const cutover = read("scripts/local/ci-apply-cutover-migrations.sh");
+  const capabilityBootstrap = read("scripts/0154-production-capability-bootstrap.sql");
+  const ciCapabilityBootstrap = read("scripts/local/ci-bootstrap-owner-capabilities.sh");
   const seed = read("scripts/seed-local-supabase.mjs");
 
   it("is the only Supabase startup used by both database CI workflows", () => {
@@ -34,12 +36,16 @@ describe("transactional CI migration bootstrap", () => {
 
   it("proves retired contracts before cutover and the current app afterward", () => {
     const workflow = read(".github/workflows/ci.yml");
+    const bootstrapStep = workflow.indexOf(
+      "name: Bootstrap explicit seed-owner capabilities",
+    );
     const legacyStep = workflow.indexOf("name: Legacy-contract live tests");
     const cutoverStep = workflow.indexOf(
       "name: Apply physical and operational cutover migrations",
     );
     const currentStep = workflow.indexOf("name: Test", cutoverStep);
-    expect(legacyStep).toBeGreaterThan(-1);
+    expect(bootstrapStep).toBeGreaterThan(-1);
+    expect(legacyStep).toBeGreaterThan(bootstrapStep);
     expect(cutoverStep).toBeGreaterThan(legacyStep);
     expect(currentStep).toBeGreaterThan(cutoverStep);
     expect(workflow).toContain(
@@ -48,6 +54,17 @@ describe("transactional CI migration bootstrap", () => {
     expect(workflow).toContain(
       "src/domains/pours/physical-bottle-phase-a-live.test.ts",
     );
+  });
+
+  it("exercises the production capability bootstrap with an exact local seed owner", () => {
+    expect(capabilityBootstrap).toContain(":'capability_manifest'::jsonb");
+    expect(capabilityBootstrap).toContain("C04_0154_BOOTSTRAP_REQUIRES_EMPTY_HISTORY");
+    expect(capabilityBootstrap).toContain("public.replace_member_site_capabilities");
+    expect(capabilityBootstrap).toContain("C04_0154_CAPABILITY_BOOTSTRAP_PASS");
+    expect(capabilityBootstrap).not.toContain("jsonb_build_object(");
+    expect(ciCapabilityBootstrap).toContain("refusing non-loopback database");
+    expect(ciCapabilityBootstrap).toContain("owner+local@terroir.test");
+    expect(ciCapabilityBootstrap).toContain("expected_entry_count=1");
   });
 
   it("is restricted to the disposable CI project", () => {

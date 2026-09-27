@@ -16,7 +16,8 @@ import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
 import { resolveCellarContext } from "./resolve-cellar-context";
 import { executePhysicalBottleCommand } from "@/domains/pours/physical-bottle-command";
-import { cleanupLocalPhysicalCommandFixtures } from "@/test/local-physical-command-fixtures";
+import { cleanupLocalSealedFixtures } from "@/test/local-sealed-fixtures";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const COST_AND_MARGIN_READ = { canReadCost: true, canReadMargin: true } as const;
 
@@ -36,11 +37,12 @@ if (!hasLiveDb && process.env.CI) {
 describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { timeout: 60_000 }, () => {
   let admin: SupabaseClient<Database>;
   let owner: SupabaseClient<Database>;
-  let ownerId: string;
   let restaurantId: string;
+  let ownerMembershipId: string;
   let wineId: string;
   let bareWineId: string;
   let lastPourDate: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, {
@@ -50,26 +52,13 @@ describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { ti
     const run = `${Date.now()}-${randomUUID()}`;
     const email = `cellar-context-${run}@terroir.test`;
     const password = "Cellar-Context-Live-123!";
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
+    const created = await identities.createUser(admin, {
       email,
       password,
       email_confirm: true,
       user_metadata: { restaurant_name: `Cellar Context Home ${run}` },
     });
-    if (createError || !created.user) {
-      throw createError ?? new Error("failed to create cellar context owner");
-    }
-    ownerId = created.user.id;
-    const { data: membership, error: membershipError } = await admin
-      .from("memberships")
-      .select("restaurant_id")
-      .eq("user_id", ownerId)
-      .eq("role", "owner")
-      .single();
-    if (membershipError || !membership) {
-      throw membershipError ?? new Error("failed to resolve cellar context restaurant");
-    }
-    restaurantId = membership.restaurant_id;
+    restaurantId = created.signupRestaurantId;
 
     const signIn = createClient<Database>(supabaseUrl!, publishableKey!, {
       auth: { persistSession: false, storageKey: `cellar-context-signin-${run}` },
@@ -90,6 +79,26 @@ describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { ti
       },
       global: { headers: { Authorization: `Bearer ${session.session.access_token}` } },
     });
+    const { data: ownerMembership, error: ownerMembershipError } = await admin
+      .from("memberships")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("user_id", created.user.id)
+      .single();
+    if (ownerMembershipError || !ownerMembership) {
+      throw ownerMembershipError ?? new Error("failed to resolve owner membership");
+    }
+    ownerMembershipId = ownerMembership.id;
+    const { error: capabilityError } = await owner.rpc(
+      "replace_member_site_capabilities",
+      {
+        p_membership_id: ownerMembership.id,
+        p_capability_keys: ["cost.read", "margin.read", "pricing.manage"],
+        p_expires_at: null as never,
+        p_grant_reason: "Live cellar resolver fixture",
+      },
+    );
+    if (capabilityError) throw capabilityError;
 
     const { error: cErr } = await admin
       .from("cellar_config")
@@ -200,10 +209,24 @@ describe.skipIf(!hasLiveDb)("resolveCellarContext against a real database", { ti
   });
 
   afterAll(async () => {
-    // Everything hangs off the restaurant by cascade.
-    await cleanupLocalPhysicalCommandFixtures(supabaseUrl!, [restaurantId]);
-    await admin.from("restaurants").delete().eq("id", restaurantId);
-    await admin.auth.admin.deleteUser(ownerId);
+    const failures: string[] = [];
+    try {
+      await cleanupLocalSealedFixtures({
+        apiUrl: supabaseUrl!,
+        restaurantIds: [restaurantId],
+        membershipIds: [ownerMembershipId],
+      });
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+    try {
+      await identities.cleanup(admin, { restaurantIds: [restaurantId] });
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+    if (failures.length > 0) {
+      throw new Error(`cellar context fixture cleanup failed:\n- ${failures.join("\n- ")}`);
+    }
   });
 
   it("counts the selling format apart from magnums and weights cost across lots", async () => {

@@ -191,6 +191,12 @@ Generic migration runners are not approved for production 0152 unless their per-
 transaction boundary has been demonstrated. The local/disposable path uses `psql -1`;
 the repository production path uses `psql --single-transaction`.
 
+The first-line `DRAFT ONLY` comment in `0152_workspace_access_foundation.sql` is a
+sealed historical marker, not the current release decision. Do not edit it: the
+admission tests pin that migration's exact SHA-256. Production approval lives in this
+runbook, the current preflight, the verified backup/restore evidence, and the explicit
+maintenance-window execution record.
+
 ### 4c. Physical and operational cutover: 0153 through 0164
 
 Migrations `0153`–`0155` are additive preparation. Migration `0156` retires fresh
@@ -204,6 +210,15 @@ maintenance window, not a series of live rolling changes.
 2. Run the `0153`, `0154`, and `0156` preflights immediately before their matching
    migrations. Apply `0153`, `0154`, and `0155` one at a time using the atomic
    migration-plus-ledger-row procedure in step 4.
+   Immediately after `0154`, run `scripts/0154-production-capability-bootstrap.sql`
+   in one transaction with an owner-reviewed JSON manifest of exact
+   `membership_id`/`actor_user_id` pairs and the exact expected entry count. The
+   bootstrap refuses role-derived discovery, non-owner or stale identities,
+   pre-existing grant history, duplicate memberships, or partial results. It calls
+   the same governed replacement function as the application and grants the three
+   accepted owner capabilities (`cost.read`, `margin.read`, `pricing.manage`). Do not
+   proceed to `0157` until its `C04_0154_CAPABILITY_BOOTSTRAP_PASS` receipt reports
+   three active grants for every manifest membership.
 3. Apply `0156`, then run `scripts/0156-production-postflight.sql`. Do not restore the
    old application: fresh calls to `execute_inventory_command` now refuse with
    `legacy_inventory_command_retired` by design.
