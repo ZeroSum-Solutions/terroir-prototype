@@ -205,6 +205,12 @@ test.describe("discard command mobile recovery", () => {
       .toHaveCount(0);
     await expect(page.getByText("Couldn't close the bottle", { exact: false }))
       .toHaveCount(0);
+    const confirmDiscard = fixtureRow.getByRole("button", {
+      name: "Discard was correct",
+    });
+    await expect(confirmDiscard).toBeVisible();
+    await expectTouchTarget(confirmDiscard, "confirm recorded discard");
+    await confirmDiscard.click();
     await expect(fixtureRow).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await attachScreenshot(page, testInfo, "390px-discard-replayed");

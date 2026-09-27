@@ -294,12 +294,17 @@ function buildRows(heroUrl, userIds) {
     const scanId = uuid(UUID_PREFIX.scan, i);
     const lineItems = Array.from({ length: 5 }, (_, j) => {
       const wine = wines[(idx * 5 + j) % wines.length];
+      const qty = 1 + ((i + j) % 5);
       return {
+        id: `prodshape-${i}-${j + 1}`,
         producer: wine.producer,
         name: wine.name,
         vintage: wine.vintage,
-        qty: 1 + ((i + j) % 5),
+        varietal: wine.varietal ?? "",
+        region: wine.region ?? "",
+        qty,
         unitCost: wine.__cost,
+        lineTotal: cents(qty * wine.__cost),
         currency: "USD",
         format: wine.size_ml === 1500 ? "magnum" : wine.size_ml === 375 ? "half" : "750ml",
         confidence: 0.79 + ((i + j) % 18) / 100,
