@@ -194,6 +194,25 @@ async function applyDerivedFilter(
   filter: "open" | "low",
   candidates: SearchWine[],
 ): Promise<{ ok: true; rows: SearchWine[] } | { ok: false; error: PostgrestError }> {
+  if (filter === "open") {
+    const { data: aggregateRows, error: aggregateError } = await supabase.rpc(
+      "list_open_bottle_aggregates",
+      { p_restaurant_id: restaurantId },
+    );
+    if (aggregateError) return { ok: false, error: aggregateError };
+    const activeWineIds = new Set(
+      (aggregateRows ?? [])
+        .filter((row) => row.active_bottle_count > 0)
+        .map((row) => row.wine_id),
+    );
+    return {
+      ok: true,
+      rows: candidates
+        .filter((wine) => activeWineIds.has(wine.id))
+        .slice(0, 20),
+    };
+  }
+
   const { data: openRows, error: openError } = await supabase.rpc(
     "list_open_bottle_items",
     { p_restaurant_id: restaurantId },
@@ -202,18 +221,6 @@ async function applyDerivedFilter(
   const openByWine = new Map(
     (openRows ?? []).map((row) => [row.wine_id, row]),
   );
-
-  if (filter === "open") {
-    return {
-      ok: true,
-      rows: candidates
-        .filter((wine) => {
-          const open = openByWine.get(wine.id);
-          return open?.open_remaining_ml != null && open.open_remaining_ml > 0;
-        })
-        .slice(0, 20),
-    };
-  }
 
   const { data: inventoryRows, error: inventoryError } = await supabase
     .from("inventory_items")

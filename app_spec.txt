@@ -6,15 +6,12 @@
   </overview>
 
   <feature_budget>
-    Implement all 269 features enumerated in the core_features section below. The product owner approved this count on 2026-07-23, superseding the previous maximum of 200. Treat each "User can…", "System displays…", or "API returns…" assertion as one feature — do NOT split a single assertion into multiple sub-features, and do NOT add features beyond what is enumerated. This approved count OVERRIDES any complexity-tier table you would otherwise apply.
+    Implement all 324 features enumerated in the core_features section below. The product owner approved the original 269 on 2026-07-23, then four C02 operation-integrity additions, eight C04 workspace/site shadow-access additions, nine C08 fixture/manual POS-corroboration additions, seven C03 offline-lookup foundation additions, and eighteen C06 physical-bottle additions on 2026-09-23, followed by two C09 CSV identity-review additions, three C14 pilot-measurement capability additions, and four C04 site-capability authority and pricing-cutover additions on 2026-09-24 under approved Q6, Q7, Q9, Q10, Q11, Q13, CAP-21, and the accepted C04 and C14 contracts, superseding the previous maximum of 200. Treat each source assertion as one feature; do not split one assertion into sub-features or add features beyond the enumerated contract. This approved count overrides any complexity-tier table.
   </feature_budget>
 
   <initializer_guidance>
-    - Call `feature_create_bulk` directly. Do NOT write a code generator script to emit features.
-    - If you need to initialize all 269 features, call `feature_create_bulk` in batches of approximately 45–50. That is the intended pattern.
-    - `depends_on_indices` is batch-local. Use `feature_add_dependency` (with returned `feature_id` values) for cross-batch dependencies after all batches are written.
-    - Do NOT run small probe batches to test dependency semantics.
-    - If a Bash command is blocked by the allowlist (e.g., `sqlite3`), use the MCP `feature_*` tools instead — never write workaround scripts.
+    - Run `pnpm generate:feature-ledger` after changing an approved assertion; never hand-edit `docs/feature-ledger.json`.
+    - Existing assertion IDs and reviewed provenance remain stable. Source replacements require an explicit ID-bound mapping in the generator; approved additions are append-only and receive new IDs.
   </initializer_guidance>
 
   <critical_constraints>
@@ -237,32 +234,33 @@
 
     <pour_and_open_bottles>
       - Staff can record a pour from /cellar against a specific bottle
-      - System opens a new bottle if none is currently open for the wine + format
-      - System decrements the open bottle's remaining ounces by the pour amount
+      - Opening is an explicit command that consumes one identified same-site source-lot unit and returns a new immutable bottle ID; an active bottle never triggers or blocks an implicit replacement
+      - A pour decrements only the selected physical bottle's integer remaining mL; it never spills into another bottle
       - System closes a bottle automatically when remaining drops below a threshold
       - System creates a pour_events row for every pour
-      - System maintains the open_bottles table via pour_events_maintain_open_bottle trigger
-      - User can cancel/undo the most recent pour
-      - User can view all currently open bottles at /cellar/open
+      - Contract-2 events mutate by exact bottle ID with site/wine containment; no event trigger updates every open bottle of a wine
+      - Undo appends one linked version-2 compensation against an exact eligible event; it never deletes evidence or targets “latest for wine”
+      - /cellar/open shows every active physical bottle as a distinct stable identity using its captured capacity and provenance state
       - User can manually open a bottle without recording a pour (e.g., for tasting)
-      - User can manually close an open bottle and discard remaining
-      - System exposes record_pour DB function as the only write path for pours
-      - System rejects pours when no inventory remains
-      - User can configure default pour sizes per format (e.g., 5oz red glass)
+      - Measured close and discard act only on the selected immutable bottle ID; discard records its exact remainder as spill and is not a measured closeout
+      - Fresh physical open, pour, spill, close, discard, and undo writes use execute_physical_bottle_command; completed version-1 receipts remain replay-only
+      <compatibility_note>record_pour is retained only as additive legacy compatibility and is not an authorized write path for new callers.</compatibility_note>
+      - Insufficient selected-bottle volume is non-mutating and never auto-opens, splits, or substitutes another bottle
+      - Venue-managed presets are positive integer-mL snapshots and include tasting sizes; editing a preset cannot change an in-flight service action
       - User can record a pour in a custom amount
       - User can attach a note to a pour event
     </pour_and_open_bottles>
 
     <reconciliation>
       - Manager can run end-of-shift reconciliation at /cellar/reconcile
-      - System lists every open bottle with its tracked remaining volume
+      - Reconciliation lists exact active bottle IDs with remaining mL, captured capacity, and the state version frozen into the draft
       - User can enter the actual remaining volume for each open bottle
-      - System computes variance and persists adjustments via reconcile_open_bottle
-      - User can reconcile all open bottles in one batch via reconcile_open_bottles_batch
-      - System logs each reconciliation as an availability_event with the manager's user ID
+      - Reconciliation variance is written as an exact-bottle version-2 event/effect under one batch receipt, not through the retired scalar wine-only RPC
+      - Every reconciliation, including one bottle, uses one all-or-none execute_physical_reconciliation_batch call and one immutable operation UUID/payload
+      - Each committed reconciliation entry has exact bottle/wine event and effect evidence; no availability event is allowed to stand in for physical identity
       - System highlights variances exceeding a configurable threshold
       - User can view reconciliation history with variance trends
-      - System enforces manager-or-owner role for reconciliation writes
+      - The database revalidates current manager/owner authority for execution and exact replay; route UI state is not the authority
     </reconciliation>
 
     <price_comparison>
@@ -299,8 +297,8 @@
       - GET /api/scans/[id] returns a single scan with line items
       - POST /api/scan-bottle decodes a QR code and resolves the wine
       - GET /api/inventory returns aggregate inventory data
-      - POST /api/pour records a pour event
-      - POST /api/reconcile reconciles one or more open bottles
+      - POST /api/pour requires an operation UUID and exactly one exact-bottle or predecessor-opening selector in physical mode, with no implicit open/split/substitution
+      - POST /api/reconcile accepts one exact-bottle batch with frozen expected versions and replays only the same canonical payload
       - GET /api/wine-lists returns lists for the restaurant
       - POST /api/wine-lists creates a new list
       - PATCH /api/wine-lists/[id] updates a list
@@ -357,8 +355,8 @@
       - match_lwin and match_lwin_batch enrich wines from LWIN catalog
       - lwin_search exposes Postgres full-text search over the catalog
       - cleanup_scan_idempotency periodically clears stale idempotency keys
-      - record_pour is the canonical pour-write entry point
-      - reconcile_open_bottle and reconcile_open_bottles_batch settle inventory
+      - Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired
+      - execute_physical_reconciliation_batch is the only physical reconciliation writer, including for a one-entry batch
       - auto_eightysix_on_low_inventory flips availability when stock hits zero
       - enrich_wines_batch performs AI enrichment in a single DB-coordinated batch
       - All RLS policies route through is_member or is_member_with_role
@@ -382,7 +380,7 @@
       - Vitest tests cover Zod schemas for OCR-extraction validation
       - Vitest tests cover LWIN matching and slug generation
       - Playwright covers the invoice-scan happy path end-to-end
-      - Playwright covers the pour + reconcile end-to-end
+      - Browser coverage exercises distinct bottle selection, interrupted exact-payload retry, atomic reconciliation, and readable ambiguity/errors at 320px and 390px
       - Playwright covers wine-list publish + public-view end-to-end
       - Playwright covers team invite + accept end-to-end
       - ESLint 9 flat config enforces lint cleanliness
@@ -391,20 +389,148 @@
       - pnpm snapshot:check verifies schema snapshot is in sync
     </testing_quality>
 
+    <inventory_operation_integrity>
+      - API requires a caller-generated stable operation UUID before acknowledging a retryable inventory mutation and revalidates current authority on every execution or replay
+      - API returns the original receipt when an operation UUID replays the exact payload without applying a second stock change
+      - API rejects reuse of an operation UUID with a mismatched payload
+      - Fresh opens and closes target immutable physical bottle IDs; row ID plus opened_at remains only a version-1 historical receipt shape
+    </inventory_operation_integrity>
+
+    <workspace_site_access_foundation>
+      - System models restaurant and personal workspaces while allowing a personal workspace to exist without a restaurant or restaurant capabilities
+      - System preserves every existing restaurant ID as one site assigned to exactly one restaurant workspace
+      - System keeps memberships as the sole explicit site-access grants and grants no site access from workspace membership alone
+      - System rejects a site-membership link when its user or workspace does not match the referenced workspace membership and site
+      - Migrations backfill existing restaurants and memberships into the workspace foundation without changing their IDs, roles, or effective legacy access
+      - System computes effective site access in shadow mode while legacy membership helpers remain authoritative
+      - System shadow effective-site access denies revoked or expired site or workspace membership
+      - System maps legacy owner, manager, and staff roles to fixed shadow capabilities without exposing new role assignment authority
+    </workspace_site_access_foundation>
+
+    <toast_pos_corroboration>
+      - System treats POS observations as corroboration only and never lets fixture, manual import, mapping, conflict resolution, void, comp, refund, or delete write pour_events, open_bottles, inventory_items, bottle_closeouts, stock_adjustments, or inventory_command_receipts
+      - System keeps Toast Slice A fixture/manual-only with live activation and any public webhook route disabled until provider evidence gates pass
+      - System verifies preserved Toast event bytes before site binding and accepts only the signed restaurant GUID through the selected connection's approved site allowlist
+      - System stores exact POS event replays idempotently, records changed-body conflicts separately, and prevents older or contradictory snapshots from replacing accepted interpretations
+      - System abstains from automated POS mapping when selection identity, quantity, unit, occurrence time, or reviewed conversion is missing and keeps operator corrections as linked interpretation versions
+      - Staff can view site-scoped POS synchronization age, coverage gaps, mapping uncertainty, mismatches, and connection state without fixture or manual imports appearing live
+      - POST /api/integrations/pos/toast/imports accepts privileged authenticated fixture or manual observation imports with explicit non-live provenance
+      - GET /api/integrations/pos/toast/reconciliation returns site-scoped observations, review states, and connector truth
+      - POST /api/integrations/pos/toast/observations/[id]/interpretations creates an authorized linked interpretation without mutating the source receipt or physical inventory
+    </toast_pos_corroboration>
+
+    <offline_lookup_foundation>
+      - System stores only an explicit cost-free cellar lookup projection and a local display context, without cached roles, capabilities, notes, prices, staff data, or arbitrary API and RSC payloads
+      - System fails closed on expired local display leases, detected clock rollback, corrupt or ambiguous partitions, and storage denial without treating the at-most-twelve-hour display lease as server authorization or trusted hardware security
+      - System atomically provisions the current server-derived actor and site partition while locking every other partition, using only replaceable contexts and projections in IndexedDB version one
+      - System reports the public offline shell ready only after credentialless direct-success caching of its exact same-build assets and public icons, never caching private HTML, API responses, RSC, uploads, redirects, or mutations
+      - System immediately blanks private UI on sign-out and distinguishes verified local locks, failed local persistence, and pending or completed server sign-out without claiming secure erasure or durable locking when both local writes fail
+      - Staff can search the cached cellar with all authorized placements, inventory quantities and projection age visible, without cached lookup implying real-time stock or offline mutation support
+      - GET /api/offline-context returns only the explicit lookup allowlist and a bounded display context after current session and active-site membership checks, ignoring client-claimed identities and returning no-store responses
+    </offline_lookup_foundation>
+
+    <physical_bottle_inventory>
+      - Each contract-2 open bottle has an immutable ID, captured positive nominal capacity, exact site/wine containment, state version, opening operation, and known same-site source lot; promoted legacy bottles keep explicit unknown provenance
+      - Multiple physical bottles of one wine may be active, and every service mutation selects one exact bottle without defaulting to first, newest, fullest, or remembered
+      - Every contract-2 pour, spill, reconcile, close, discard, and undo event/effect is receipt-linked and bottle-exact; one command increments the selected bottle version once
+      - Exact-bottle reconciliation is one canonical UUID-sorted, wine-before-bottle locked, all-or-none batch whose changed-payload UUID reuse conflicts and whose exact replay returns stored ordered results
+      - Phase C switches the normative inventory contract from 1 to 2 as the final statement of the writer/trigger/ACL transaction; fresh version-1 or wine-only writes then fail while completed version-1 receipts remain byte-stable and replayable
+      - Discard records one exact-remainder spill plus a distinct discard receipt/effect, closes only that bottle, creates no measured closeout/replacement, and increments its version once
+      - Undo is an append-only linked compensation with a fixed 15-minute window; correcting discard requires mistaken_report and confirmation that the same bottle remains, while actual discard, uncertainty, later activity, or a version-1 target is non-mutating review/error
+      - Exact-bottle readers are tenant-constrained security-invoker projections without raw opener IDs or lot cost; aggregate/effective readers sum duplicate bottles and exclude reversals from sales without deleting history
+      - Physical source-lot provenance blocks import, invoice, and direct lot deletion; wine merge repoints relational dependencies without changing receipt JSON bytes
+      - Venue-managed pour and tasting presets preserve positive integer-mL line snapshots and permission checks through execution and retry
+      - Flight and split-pour lines retain wine, physical bottle, amount, operation-line identity, and explicit recorded/pending/failed status without silent substitution
+      - Bottle/table holds reserve an identified sealed unit or open bottle with audited reserve/release/consume/expire transitions and server-authoritative exclusivity
+      - Optional sealed tags attach one-to-one to an existing lot unit without increasing lot quantity, preserving provenance and duplicate-scan/retag audit
+      - POST /api/open-bottles performs an idempotent explicit open and returns the exact new bottle; another active bottle does not block the operation
+      - POST /api/open-bottles/close performs an idempotent measured close on one exact bottle with actual volume, write-off, and reason
+      - POST /api/open-bottles/[id]/close performs an idempotent discard on the path's exact bottle and returns its linked spill/discard evidence
+      - POST /api/pour/undo requires an operation UUID and exact reversal event, enforces compensation/review rules, and returns the exact bottle and reversal event
+      - POST /api/reconcile preserves the entire failed or uncertain batch draft and clears it only after validated atomic success or exact replay
+    </physical_bottle_inventory>
+
+    <csv_identity_review>
+      - User can preview CSV rows and deterministic LWIN candidates before any write, see apply-eligible candidates with scores and reject or undo in incremental batches, keep below-threshold candidates unlinked, and have confirm re-parse and re-match content and veto an apply-eligible link when the supplied reviewed candidate set, including an empty set, omits or disagrees with the current candidate
+      - System may, after an explicit operator request for one currently displayed apply-eligible candidate, rederive the global candidate from bounded producer/cuvee text and return an optional display-only supported, review-recommended, or unavailable advisory bound to the current row/candidate view; the advisory never creates or promotes a candidate, changes approval, rejection, or import writes, or blocks deterministic preview, confirm, or apply when unavailable
+    </csv_identity_review>
+
+    <pilot_measurement_capability>
+      - System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds
+      - System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result
+      - System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private
+    </pilot_measurement_capability>
+
+    <site_capability_authority>
+      - System authorizes only cost.read, margin.read, and pricing.manage on an exact site when one current unexpired grant, both current membership parents, both database-owned lifecycle generations, and every stored subject, site, workspace-link, and workspace snapshot equal the live auth.uid() identity chain; workspace governance, legacy role, active-site cookie, and shadow observation alone never authorize
+      - System lets only a current workspace_owner or group_admin replace site capabilities through a sealed non-FK append-history ledger with immutable grant and expiry evidence, one final retirement, and one shared membership_id, capability_key, id child-lock order; plain BEFORE UPDATE triggers use IS DISTINCT FROM for every lifecycle and identity field, and the site trigger runs after memberships_link_workspace
+      - System reads materialized pricing recommendations only with both cost.read and margin.read through the exact restaurant and wine tenant join while preserving class, computed_at, wine_id order and 1,000-row paging parity; pricing.manage gates service-client construction, and contract cutover preserves recompute, import-reference, and public.merge_wines trusted paths including the existing same-target-row SQLSTATE 23505 outcome
+      - System cuts authority over through additive migration A, a compatible application release, and contract migration B only after operator-receipt and preflight gates; rollback restores legacy pricing SELECT through B down before application rollback while A history remains and A down refuses history or dependents
+      - System denies unauthenticated users and authenticated actors without the exact current read grant any direct, wildcard, embedded, filtered, ordered, returned, cached, historical, derived, or invoice-image acquisition-cost and pricing-strategy value, while narrow exact-site readers expose only their declared typed result
+      - System preserves current receiving, manual inventory, invoice, import, reconciliation, merge, and deletion authority as closed database-owned operations with current site and workspace identity and lifecycle checks, cost-free receipts, atomic replay and stale refusal, and omission-preserving hidden-value patches that never make cost visibility or pricing.manage a prerequisite for authorized cost capture
+      - System treats validated wine provenance timestamps and field-name enums, manual-override categories, actor-bound closed invoice retry receipts, invoice and import JSON, reconciliation history, merge snapshots, and derived health output as transitive stores whose historical and future shapes are denied or database-constrained before they enter any staff-safe projection
+      - System admits the full staff-cost seal only as one additive database, complete application, and contract-ACL chain with immutable caller and operator receipts, real JWT Data API and storage proof, exact down/up conservation, and quiesced rollback that never represents a restored legacy exposure window as sealed
+    </site_capability_authority>
+
   </core_features>
+
+  <accepted_contracts>
+    <import_revert_cleanup status="accepted_for_implementation_unimplemented_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-import-revert-cleanup.md
+      Existing batch and session revert become one current-site staff-authorized, retained-catalog database transaction: exact imported inventory, eligible exact LWIN pairs, and status changes commit together; sessions are all-or-nothing with globally ordered wine and inventory lock unions; every wine and history row remains; and compatible receipts report orphanWinesDeleted as literal zero. This repair changes no core feature count and claims no completion.
+    </import_revert_cleanup>
+    <stalled_scan_expiry status="accepted_for_implementation_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-stalled-scan-expiry.md
+      Existing scan-history housekeeping moves to one current-site staff-authorized database RPC with a strict count receipt, ordered scan locking, a fresh READ COMMITTED active-job check and visible recoverable caller failure. This repair changes no core feature count and claims no completion.
+    </stalled_scan_expiry>
+    <bin_code_mirror status="accepted_for_implementation_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md#accepted-bin-code-mirror-repair
+      Existing bin/location behavior gains an atomic database-owned mirror for the exact site and bin ID; authorization and immutable receipt/history semantics remain unchanged. This repair does not add a core feature or claim completion.
+    </bin_code_mirror>
+    <bottle_location_receiving status="accepted_for_implementation_unimplemented_unverified">
+      Canonical detail: docs/plans/2026-09-27-terroir-bottle-location-receiving.md
+      This contract refines the existing bottle_scanning assertions and does not change the approved feature count.
+
+      - POST /api/scan-bottle/confirm receives exactly one previously uncounted sealed bottle of one already selected current-site wine into one explicitly selected active current-site bin; it is not relocation, opening, pouring, counting, reconciliation, identity matching, or bin creation
+      - The exact database boundary is public.receive_bottle_at_location_private(p_restaurant_id uuid, p_operation_id uuid, p_wine_id uuid, p_section text, p_bin_id uuid) returns jsonb with no defaults or overloads, PL/pgSQL SECURITY DEFINER, postgres owner, empty search_path, fully qualified objects, and EXECUTE granted only to authenticated after revoking PUBLIC, anon, authenticated, and service_role
+      - Current auth.uid() and staff-or-higher current-site authority are required for first execution and replay; removed, expired, revoked, foreign-site, and non-current actors fail without a receipt or item
+      - Inputs are five non-null values; section is btrim-normalized, non-empty, and at most 200 characters; wine and active bin must belong to the exact site; typed bin text may filter choices but cannot become an ID, create a bin, or infer placement
+      - The durable receipt extends command version 3 with exact type bottle_location_receive, single_wine scope, non-null relational wine_id, null batch count, immutable exact request and ten-key result JSON, and the site-scoped primary key (restaurant_id, operation_id); an equal UUID at another authorized site is an independent key
+      - Completed exact replay locks and validates the receipt before consulting mutable wine or bin state; a new operation locks wine FOR NO KEY UPDATE, claims the receipt, resolves a competing exact receipt, locks the active bin FOR SHARE, inserts one quantity-1 inventory row, and completes the receipt atomically
+      - The first inventory row uses unit_cost 0, null currency, format, and invoice_scan_id, the normalized section, selected bin_id, locked canonical bin code, and added_via bottle_scan; replay adds nothing and the command creates no open-bottle, pour, closeout, bottle-effect, stock-adjustment, or cost-history mutation
+      - The route authenticates before parsing, requires Idempotency-Key plus expected-user and expected-site UUID headers, accepts only wine_id, section, and bin_id, calls only the RPC with five arguments, performs no direct table DML, and returns the same strict cost-free HTTP 201 body for first execution and replay with Idempotency-Replayed as the only replay signal
+      - SQLSTATE 42501 maps to the safe authority envelope; P05V1 is redacted contract drift; P05W1 is non-oracular wine_not_found; only strict P05B1 maps to 409 bin_unavailable and proves zero effect; P05C1 is a same-site operation conflict; P05I1 is an uncertain malformed-receipt failure; mappings never inspect raw messages
+      - Before fetch, the client persists and read-back verifies the exact user, site, operation UUID, send state, and payload under an exclusive browser lock; reload and uncertain outcomes replay the same operation only in the original context, while context, lock, storage, or read-back failure sends nothing
+      - Only strict P05B1 may resolve the rolled-back attempt, clear the invalid bin, require explicit active-bin reselection, and persist and verify a fresh UUID and payload before another fetch; P05C1, P05I1, generic 409, unknown 5xx, network ambiguity, and malformed responses retain the original operation
+      - A future paired down refuses any durable version-3 bottle_location_receive history, deletes nothing, uses no CASCADE, and restores exact prior constraints and ACLs only after refusal passes; no migration number, hosted database action, or deployment is authorized by this accepted contract
+      - Acceptance requires authorization, validation, exact sequential and real concurrent replay, same-site conflict, cross-site same-UUID independence, bin rename and retirement serialization, merge replay, receipt-family compatibility, strict HTTP and client recovery, physical and cost conservation, catalog and ACL checks, and empty plus populated down/up proof
+      - This receive/place leaf does not waive the unplaced queue, hierarchical placement, per-lot or per-bottle placement, movement history, transfer, return, credit, count, reconciliation, sealed-unit tagging, cost entry, or full C06 requirements
+    </bottle_location_receiving>
+  </accepted_contracts>
 
   <database_schema>
     <tables>
+      <workspaces>
+        - id (uuid, PK), kind (restaurant or personal), name
+        - created_at
+      </workspaces>
+      <workspace_memberships>
+        - id (uuid, PK), workspace_id (FK workspaces), user_id (FK auth.users)
+        - governance_role (workspace_owner or group_admin, nullable), status, expires_at, revoked_at, created_by
+        - Workspace membership alone grants no site access
+      </workspace_memberships>
       <restaurants>
-        - id (uuid, PK)
+        - id (uuid, PK), workspace_id (FK workspaces; exactly one restaurant workspace per site)
         - name, slug, logo_url
         - created_at, updated_at
       </restaurants>
       <memberships>
         - user_id (FK auth.users)
         - restaurant_id (FK restaurants)
+        - workspace_membership_id (FK workspace_memberships; same user and workspace as the restaurant)
         - role (enum: owner, manager, staff)
-        - created_at
+        - status, expires_at, revoked_at, granted_by, created_at
+        - Sole explicit site-access grant; workspace membership alone is insufficient
       </memberships>
       <invitations>
         - id, restaurant_id, email, token (unique), role, expires_at, accepted_at
@@ -420,7 +546,7 @@
         - supplier, delivery_date, status, created_by, created_at
       </invoice_scans>
       <inventory_items>
-        - id, restaurant_id, wine_id, scan_id (nullable), format, qty, unit_cost, currency
+        - id, restaurant_id, wine_id, scan_id (nullable), format, qty, unit_cost, currency; serves as the sealed source lot until physical identity is required
       </inventory_items>
       <wine_lists>
         - id, restaurant_id, name, slug (unique per restaurant), description, published, archived
@@ -445,11 +571,17 @@
         - delta, reason, actor_id, created_at
       </availability_events>
       <open_bottles>
-        - id, wine_id, restaurant_id, format, opened_at, remaining_oz, closed_at
+        - immutable id, wine_id, restaurant_id, source_inventory_item_id or explicit legacy-unknown provenance, captured capacity_ml, remaining_ml, state_version, opening_operation_id, opened_at, closed_at
       </open_bottles>
       <pour_events>
-        - id, open_bottle_id, wine_id, restaurant_id, oz, note, actor_id, created_at
+        - id, exact open_bottle_id, wine_id, restaurant_id, integer ml, event kind, receipt link, reversal link, note, actor_id, created_at
       </pour_events>
+      <inventory_command_bottle_effects>
+        - receipt_id, entry ordinal, exact open_bottle_id, wine_id, event_id, before/after state version and remaining mL
+      </inventory_command_bottle_effects>
+      <inventory_command_receipts>
+        - restaurant_id, operation_id, actor_id, command, nullable wine_id for exact-bottle batches, canonical request/result, contract version, created_at
+      </inventory_command_receipts>
     </tables>
   </database_schema>
 
@@ -465,7 +597,11 @@
       - GET / POST /api/scans, GET /api/scans/[id]
       - POST /api/scan, POST /api/scan-bottle
       - GET /api/inventory
+      - POST /api/open-bottles
+      - POST /api/open-bottles/close
+      - POST /api/open-bottles/[id]/close
       - POST /api/pour
+      - POST /api/pour/undo
       - POST /api/reconcile
       - GET / POST /api/wine-lists, PATCH / DELETE /api/wine-lists/[id]
       - GET / POST /api/wine-list-sections, PATCH /api/wine-list-sections/[id]
@@ -531,11 +667,11 @@
       10. User confirms or edits, then commits to inventory
     </invoice_scan_flow>
     <pour_flow>
-      1. Staff opens cellar, taps a wine, selects pour
-      2. Client POSTs to /api/pour with oz amount
-      3. record_pour DB function opens a new bottle if none open
-      4. record_pour decrements remaining_oz on the open bottle
-      5. UI updates inventory and open-bottle indicators optimistically
+      1. Staff opens the cellar, selects one physical bottle or explicitly opens a new one from an identified sealed lot, then chooses an integer-mL amount
+      2. Client stores one operation UUID and immutable exact-bottle or predecessor-opening payload before POSTing to /api/pour
+      3. The physical command revalidates site, wine, bottle, source-lot, authority, and expected version before one atomic mutation
+      4. An uncertain response keeps the same UUID and payload for retry; exact replay returns the stored bottle and event without another stock change
+      5. Only a validated success or exact replay clears the pending action and refreshes inventory and bottle indicators
     </pour_flow>
     <publish_list_flow>
       1. User edits sections and items in /lists/[id]
@@ -545,10 +681,11 @@
     </publish_list_flow>
     <reconcile_flow>
       1. Manager opens /cellar/reconcile at end of shift
-      2. UI lists every open bottle with tracked remaining oz
-      3. Manager enters actual remaining for each
-      4. Client POSTs to /api/reconcile (single or batch)
-      5. reconcile_open_bottles_batch persists deltas as availability_events
+      2. UI lists every active physical bottle with exact ID, remaining mL, captured capacity, and frozen state version
+      3. Manager enters target remaining mL while the client retains one UUID and the complete canonical batch draft
+      4. Client POSTs the all-or-none exact-bottle batch to /api/reconcile, including a one-bottle batch
+      5. The server locks and revalidates the complete sorted set, then commits one receipt and ordered bottle/event/effect results or rolls back every entry
+      6. Failure or uncertainty preserves the entire draft and original UUID; validated success or exact replay clears it
     </reconcile_flow>
   </key_interactions>
 
@@ -590,9 +727,10 @@
     <step number="5">
       <title>Pour + Reconcile</title>
       <tasks>
-        - record_pour wired to UI with optimistic updates
-        - Open bottles view
-        - Reconcile UI driven by reconcile_open_bottles_batch
+        - Version-aware physical command adapter wired to exact-bottle controls with caller-stable operation IDs and confirmed-result refresh
+        - Open bottles view preserves distinct bottle identity, capacity, provenance, state version, and ambiguity handling
+        - Reconcile UI retains one exact canonical all-or-none batch through confirmed success or replay
+        - The first physical-bottle slice is independently shippable only after Phase C accepts contract version 2; it does not complete C06 or the required follow-on service slices
       </tasks>
     </step>
     <step number="6">

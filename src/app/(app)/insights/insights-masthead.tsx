@@ -14,9 +14,11 @@ import { Download } from "lucide-react";
 export function InsightsMasthead({
   tenant,
   rangeLabel,
+  costCsvAvailable,
 }: {
   tenant?: string;
   rangeLabel: string;
+  costCsvAvailable: boolean;
 }) {
   const eyebrow = [tenant?.trim(), rangeLabel].filter(Boolean).join(" · ");
   return (
@@ -30,14 +32,21 @@ export function InsightsMasthead({
             Insights
           </h1>
         </div>
-        <a
-          href="/api/insights/csv"
-          download="insights-export.csv"
-          className="inline-flex min-h-11 shrink-0 items-center gap-xs self-start rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
-        >
-          <Download className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-          Export CSV
-        </a>
+        {costCsvAvailable ? (
+          <a
+            href="/api/insights/csv"
+            download="insights-export.csv"
+            className="inline-flex min-h-11 shrink-0 items-center gap-xs self-start rounded-pill border border-rule-strong bg-transparent px-md text-control font-medium text-ink transition-colors hover:bg-surface-raised focus-ring"
+          >
+            <Download className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            Export CSV
+          </a>
+        ) : (
+          <span className="inline-flex min-h-11 shrink-0 items-center gap-xs self-start rounded-pill border border-rule bg-transparent px-md text-control text-grey">
+            <Download className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            Cost CSV unavailable
+          </span>
+        )}
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
 
-const auth = vi.hoisted(() => ({ requireMembership: vi.fn() }));
+const auth = vi.hoisted(() => ({ requireMembership: vi.fn(), requireRole: vi.fn() }));
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => auth.requireMembership(...args),
+  requireRole: (...args: unknown[]) => auth.requireRole(...args),
 }));
 
 const images = vi.hoisted(() => ({ getScanImageUrl: vi.fn() }));
@@ -72,6 +73,7 @@ describe("scan-record API boundaries", () => {
         { status: 401 },
       );
       auth.requireMembership.mockResolvedValue(denial);
+      auth.requireRole.mockResolvedValue(denial);
       const watched = watchedParams();
 
       const response = await operation.call(watched.params);
@@ -84,12 +86,14 @@ describe("scan-record API boundaries", () => {
       const from = vi.fn(() => {
         throw new Error("database must not run");
       });
-      auth.requireMembership.mockResolvedValue({
+      const authorized = {
         supabase: { from, rpc: vi.fn() },
         restaurantId: "22222222-2222-4222-8222-222222222222",
         user: { id: "33333333-3333-4333-8333-333333333333" },
         role: "staff",
-      });
+      };
+      auth.requireMembership.mockResolvedValue(authorized);
+      auth.requireRole.mockResolvedValue(authorized);
 
       const response = await operation.call(Promise.resolve({ id: "not-a-uuid" }));
 

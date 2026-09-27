@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { requireRole } from "@/lib/api/auth";
 import { z } from "zod";
 import { Errors } from "@/lib/api/errors";
+import { withApiHandler } from "@/lib/api/handler";
+import { parseWineSectionAssignmentReceipt } from "@/lib/staff-cost/wine-section-assignment";
 
 export const runtime = "nodejs";
 
@@ -19,58 +20,61 @@ const BatchSectionSchema = z.object({
  * BND-064 — bulk-assign wines to a section.
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireRole(["owner", "manager"]);
-  if (auth instanceof NextResponse) return auth;
-  const { supabase, restaurantId } = auth;
+  return withApiHandler(async () => {
+    const auth = await requireRole(["owner", "manager"]);
+    if (auth instanceof NextResponse) return auth;
+    const { supabase, restaurantId } = auth;
 
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return Errors.badRequest("Invalid JSON.");
-  }
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return Errors.badRequest("Invalid JSON.");
+    }
 
-  const parsed = BatchSectionSchema.safeParse(raw);
-  if (!parsed.success) {
-    return Errors.validation(parsed.error.issues, "Invalid input.");
-  }
+    const parsed = BatchSectionSchema.safeParse(raw);
+    if (!parsed.success) {
+      return Errors.validation(parsed.error.issues, "Invalid input.");
+    }
 
-  const { wine_ids, section } = parsed.data;
+    const { wine_ids, section } = parsed.data;
 
-  // Verify all wines belong to this restaurant
-  const { data: wines, error: wineErr } = await supabase
-    .from("wines")
-    .select("id")
-    .eq("restaurant_id", restaurantId)
-    .in("id", wine_ids);
+    let result;
+    try {
+      result = await supabase.rpc("assign_wine_sections_private", {
+        p_restaurant_id: restaurantId,
+        p_wine_ids: wine_ids,
+        p_section: section,
+      });
+    } catch {
+      throw new Error("Batch wine section assignment call failed.");
+    }
+    const { data, error } = result;
 
-  if (wineErr) {
-    console.error("wines batch verify failed:", wineErr);
-    return Errors.internal("Failed to verify wines.");
-  }
+    if (error) {
+      if (error.code === "P04W1") {
+        return Errors.badRequest(
+          "One or more wines not found in your restaurant.",
+        );
+      }
+      if (error.code === "42501") return Errors.forbidden();
+      throw new Error("Batch wine section assignment failed.");
+    }
 
-  if (!wines || wines.length !== wine_ids.length) {
-    return Errors.badRequest("One or more wines not found in your restaurant.");
-  }
+    const receipt = parseWineSectionAssignmentReceipt(
+      data,
+      wine_ids.length,
+      section,
+    );
+    if (!receipt) {
+      throw new Error(
+        "Batch wine section assignment returned an invalid receipt.",
+      );
+    }
 
-  // Batch update all inventory_items for these wines
-  const { error } = await supabase
-    .from("inventory_items")
-    .update({ section })
-    .eq("restaurant_id", restaurantId)
-    .in("wine_id", wine_ids);
-
-  if (error) {
-    console.error("inventory_items batch section update failed:", error);
-    Sentry.captureException(error, {
-      tags: { surface: "cellar", phase: "batch-section" },
-      extra: { restaurantId, count: wine_ids.length, section },
+    return NextResponse.json({
+      updated: receipt.requestedWineCount,
+      section: receipt.section,
     });
-    return Errors.internal("Failed to update sections.");
-  }
-
-  return NextResponse.json({
-    updated: wine_ids.length,
-    section,
   });
 }

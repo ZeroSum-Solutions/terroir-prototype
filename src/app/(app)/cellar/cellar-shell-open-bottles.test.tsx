@@ -3,10 +3,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/lib/toast";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 import type { CellarWineRow } from "./types";
 
+const navigation = vi.hoisted(() => ({ search: "" }));
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navigation.search),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -51,6 +53,21 @@ const openRow: CellarWineRow = {
   preservation_method: "none",
   opened_by: null,
   theoretical_remaining_ml: null,
+  activeBottleCount: 1,
+  activeOpenMl: 300,
+  activeBottles: [{
+    id: "open-bottle-1",
+    wineId: "wine-1",
+    remainingMl: 300,
+    nominalCapacityMl: null,
+    openedAt: "2026-08-20T12:00:00.000Z",
+    preservationMethod: "none",
+    sourceProvenance: "legacy_unknown",
+    sourceBinLocation: null,
+    identityContract: 1,
+    identityOrigin: "legacy_slot",
+    stateVersion: 0,
+  }],
   closeout_reason_codes: [],
   stock_adjustment_reason_codes: [],
   drink_window_start: null,
@@ -95,9 +112,13 @@ const secondRow: CellarWineRow = {
   open_remaining_ml: null,
   opened_at: null,
   open_bottle_id: null,
+  activeBottleCount: 0,
+  activeOpenMl: 0,
+  activeBottles: [],
   sealed_count: 12,
 };
 const reconcileRow: OpenBottleRow = {
+  active_bottle_count: 1,
   wine_id: "wine-1",
   wine_list_item_id: "item-1",
   producer: "Test Producer",
@@ -110,11 +131,29 @@ const reconcileRow: OpenBottleRow = {
   glass_pour_ml: 148,
   pour_size_mode: "fixed",
 };
+const physicalReconcileItems: PhysicalReconcileItem[] = [
+  "00000000-0000-4000-8000-00000000000f",
+  "00000000-0000-4000-8000-000000000010",
+].map((openBottleId, index) => ({
+  openBottleId,
+  wineId: "11111111-1111-4111-8111-111111111111",
+  producer: "Test Producer",
+  name: "Test Wine",
+  vintage: 2022,
+  nominalCapacityMl: 750,
+  remainingMl: 300 - index * 100,
+  openedAt: "2026-09-24T12:00:00.000Z",
+  preservationMethod: "none",
+  sourceProvenance: "known",
+  sourceBinLocation: "DEMO-A1",
+  stateVersion: index + 4,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  navigation.search = "";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -126,12 +165,61 @@ afterEach(() => {
 });
 
 describe("CellarShell open bottles route", () => {
+  it("reaches the invalid bottle alert when activeBottles is absent", () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    navigation.search = `wine=${wineId}`;
+    act(() => root.render(
+      <ToastProvider>
+        <CellarShell
+          rows={[{
+            ...openRow,
+            wine_id: wineId,
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottles: undefined as never,
+          }]}
+          reconcileItems={[]}
+          cellarConfig={null}
+          gridData={{}}
+          restaurantName="Test Restaurant"
+          restaurantId="restaurant-1"
+          userId="user-1"
+          autoEightysixEnabled={false}
+          autoEightysixThresholdMl={148}
+          eightysixStrategy="hide"
+          defaultTargetPourCostPct={null}
+          defaultTargetMarkupRatio={null}
+          // eslint-disable-next-line jsx-a11y/aria-role -- CellarShell's RBAC prop, not a DOM role.
+          role="staff"
+          inventoryContractVersion={2}
+        />
+      </ToastProvider>,
+    ));
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+  });
+
   it("keeps the open bottles route reachable without reconciliation items", () => {
+    const twoOpenBottleRow: CellarWineRow = {
+      ...openRow,
+      activeBottleCount: 2,
+      activeOpenMl: 700,
+      open_remaining_ml: 700,
+      activeBottles: [
+        openRow.activeBottles[0]!,
+        {
+          ...openRow.activeBottles[0]!,
+          id: "open-bottle-2",
+          remainingMl: 400,
+        },
+      ],
+    };
     act(() => {
       root.render(
         <ToastProvider>
           <CellarShell
-            rows={[openRow, secondRow]}
+            rows={[twoOpenBottleRow, secondRow]}
             reconcileItems={[reconcileRow]}
             cellarConfig={{
               id: "cellar-1",
@@ -152,6 +240,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="owner"
+            inventoryContractVersion={1}
             cellarSections={[{ id: "section-1", name: "Main cellar" }]}
           />
         </ToastProvider>,
@@ -160,7 +249,9 @@ describe("CellarShell open bottles route", () => {
 
     const link = getByRole(container, "link", { name: /open bottles/i });
     expect(link.getAttribute("href")).toBe("/cellar/open");
-    expect(link.textContent).toMatch(/1/);
+    // app_spec <physical_bottle_inventory>: multiple physical bottles of one
+    // wine may be active. This bottle-labelled link counts both identities.
+    expect(link.textContent).toContain("Open bottles 2");
     expect(link.className).toMatch(/(?:^|\s)(?:h-11|min-h-11)(?:\s|$)/);
 
     expect(container.querySelector("section")?.className).toContain(
@@ -185,6 +276,11 @@ describe("CellarShell open bottles route", () => {
     )!;
     expect(scope).not.toBeNull();
     expect(scope.className).toContain("h-11");
+    // The cellar filter still selects wine rows, so its Open counter remains
+    // one wine even though the dedicated route contains two bottles.
+    expect(
+      [...scope.options].find((option) => option.value === "open")?.textContent,
+    ).toBe("Open · 1");
     expect(controlRow.querySelector('[role="tablist"]')).toBeNull();
 
     // Nothing in the row scrolls sideways — a row that scrolls is the same
@@ -247,6 +343,91 @@ describe("CellarShell open bottles route", () => {
       ),
     ).toBe(false);
     expect(container.querySelector('[aria-label="Drag to reorder"]')).not.toBeNull();
+
+    const reconcile = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent?.trim() === "Reconcile 1 open bottle →",
+    )!;
+    act(() => reconcile.click());
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain(
+      "Reconcile open bottles",
+    );
+  });
+
+  it.each(["owner", "manager"] as const)(
+    "opens the exact-bottle reconciliation modal for a contract-2 %s",
+    (role) => {
+      act(() => {
+        root.render(
+          <ToastProvider>
+            <CellarShell
+              rows={[openRow]}
+              reconcileItems={physicalReconcileItems}
+              cellarConfig={null}
+              gridData={{}}
+              restaurantName="Test Restaurant"
+              restaurantId="restaurant-1"
+              userId="user-1"
+              autoEightysixEnabled={false}
+              autoEightysixThresholdMl={148}
+              eightysixStrategy="hide"
+              defaultTargetPourCostPct={null}
+              defaultTargetMarkupRatio={null}
+              role={role}
+              inventoryContractVersion={2}
+            />
+          </ToastProvider>,
+        );
+      });
+
+      const reconcile = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+        (button) => button.textContent?.trim() === "Reconcile 2 open bottles →",
+      );
+      expect(reconcile).not.toBeUndefined();
+      act(() => reconcile!.click());
+
+      const dialog = container.querySelector('[role="dialog"]');
+      expect(dialog?.textContent).toContain("Reconcile open bottles");
+      expect(dialog?.querySelectorAll("[data-physical-bottle-id]")).toHaveLength(2);
+      expect(
+        [...dialog!.querySelectorAll<HTMLElement>("[data-physical-bottle-id]")].map(
+          (element) => element.dataset.physicalBottleId,
+        ),
+      ).toEqual(physicalReconcileItems.map((item) => item.openBottleId));
+    },
+  );
+
+  it("does not expose contract-2 reconciliation to staff", () => {
+    act(() => {
+      root.render(
+        <ToastProvider>
+          <CellarShell
+            rows={[openRow]}
+            reconcileItems={physicalReconcileItems}
+            cellarConfig={null}
+            gridData={{}}
+            restaurantName="Test Restaurant"
+            restaurantId="restaurant-1"
+            userId="user-1"
+            autoEightysixEnabled={false}
+            autoEightysixThresholdMl={148}
+            eightysixStrategy="hide"
+            defaultTargetPourCostPct={null}
+            defaultTargetMarkupRatio={null}
+            // eslint-disable-next-line jsx-a11y/aria-role -- CellarShell RBAC prop.
+            role="staff"
+            inventoryContractVersion={2}
+          />
+        </ToastProvider>,
+      );
+    });
+
+    expect(container.textContent).not.toContain("Reconcile 2 open bottles");
+    const more = container.querySelector<HTMLButtonElement>(
+      '[aria-label="More cellar actions"]',
+    );
+    expect(more).not.toBeNull();
+    act(() => more!.click());
+    expect(container.textContent).not.toContain("Reconcile 2 open bottles");
   });
 
   it("starts multi-vintage lineages collapsed and expands them on demand", () => {
@@ -278,6 +459,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="staff"
+            inventoryContractVersion={1}
           />
         </ToastProvider>,
       );
@@ -321,6 +503,7 @@ describe("CellarShell open bottles route", () => {
             defaultTargetMarkupRatio={null}
             // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is CellarShell's own RBAC prop ("owner"/"staff"/"admin"), not a DOM ARIA role.
             role="staff"
+            inventoryContractVersion={1}
             cellarSections={[{ id: "section-1", name: "Main cellar" }]}
           />
         </ToastProvider>,

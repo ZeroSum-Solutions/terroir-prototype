@@ -72,13 +72,19 @@ const VALID_ID = "a1b2c3d4-e5f6-4789-8abc-def012345678";
 function request(path: string, body: string): NextRequest {
   return new NextRequest(`http://localhost${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "Idempotency-Key": VALID_ID,
+    },
     body,
   });
 }
 
 function allow() {
-  const supabase = { from: vi.fn() };
+  const supabase = {
+    from: vi.fn(),
+    rpc: vi.fn().mockResolvedValue({ data: 1, error: null }),
+  };
   const auth = {
     supabase,
     restaurantId: "restaurant-a",
@@ -240,7 +246,10 @@ describe("pour/open/PDF shared boundaries", () => {
   it("rejects an invalid bottle UUID before the close service", async () => {
     allow();
 
-    const response = await closeBottle({} as NextRequest, {
+    const response = await closeBottle(request(
+      "/api/open-bottles/not-a-uuid/close",
+      JSON.stringify({ expected_opened_at: "2026-09-23T12:00:00.000Z" }),
+    ), {
       params: Promise.resolve({ id: "not-a-uuid" }),
     });
 

@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
 
 const mockRequireMembership = vi.fn();
+const mockResolveSiteCostReadAccess = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
+}));
+vi.mock("@/lib/api/site-capability", () => ({
+  resolveSiteCostReadAccess: (...args: unknown[]) => mockResolveSiteCostReadAccess(...args),
 }));
 
 vi.mock("@sentry/nextjs", () => ({
@@ -28,24 +32,18 @@ function makeSupabase(opts: {
     }),
   );
   const storageFrom = vi.fn(() => ({ createSignedUrl }));
-  const from = vi.fn((table: string) => {
-    const filters: Array<[string, string]> = [];
-    const chain = {
-      select: () => chain,
-      eq: (col: string, val: string) => {
-        filters.push([col, val]);
-        return chain;
-      },
-      single: () =>
-        Promise.resolve({
-          data: table === "invoice_scans" ? opts.scan : null,
-          error: opts.fetchError ?? null,
-        }),
+  const rpc = vi.fn(() => {
+    const response = {
+      data: opts.scan?.raw_image_path
+        ? [{ object_name: opts.scan.raw_image_path }]
+        : [],
+      error: opts.fetchError ?? null,
     };
-    return chain;
+    const resolved = Promise.resolve(response);
+    return { then: resolved.then.bind(resolved) };
   });
   return {
-    supabase: { from, storage: { from: storageFrom } },
+    supabase: { rpc, storage: { from: storageFrom } },
     createSignedUrl,
     storageFrom,
   };
@@ -56,7 +54,10 @@ function makeContext(id = SCAN_ID) {
 }
 
 describe("GET /api/scans/[id]/image", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveSiteCostReadAccess.mockResolvedValue(true);
+  });
 
   it("401s when unauthenticated", async () => {
     mockRequireMembership.mockResolvedValue(
@@ -87,7 +88,26 @@ describe("GET /api/scans/[id]/image", () => {
       url: "https://signed.example/scan-1",
     });
     expect(storageFrom).toHaveBeenCalledWith("invoice-images");
-    expect(createSignedUrl).toHaveBeenCalledWith(`r-A/${SCAN_ID}.png`, 3600);
+    expect(createSignedUrl).toHaveBeenCalledWith(`r-A/${SCAN_ID}.png`, 60);
+  });
+
+  it("403s without an exact cost.read grant and never resolves an image target", async () => {
+    const { supabase, createSignedUrl } = makeSupabase({
+      scan: { raw_image_path: `r-A/${SCAN_ID}.png` },
+    });
+    mockResolveSiteCostReadAccess.mockResolvedValue(false);
+    mockRequireMembership.mockResolvedValue({
+      supabase,
+      restaurantId: "r-A",
+      user: { id: "u-1" },
+      role: "staff",
+    });
+
+    const res = await GET({} as NextRequest, makeContext());
+
+    expect(res.status).toBe(403);
+    expect(createSignedUrl).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
   it("404s when the scan has no image path", async () => {

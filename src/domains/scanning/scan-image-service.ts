@@ -4,10 +4,11 @@ import {
   createSupabaseSignedUrl,
   SupabaseStorageError,
 } from "@/adapters/storage";
+import { readInvoiceImageTarget } from "@/lib/staff-cost/protected-readers";
 import type { Database } from "@/types/database";
 
 const INVOICE_IMAGE_BUCKET = "invoice-images";
-const SIGNED_URL_TTL_SECONDS = 3600;
+const SIGNED_URL_TTL_SECONDS = 60;
 
 export class ScanImageNotFoundError extends Error {
   constructor() {
@@ -28,27 +29,15 @@ export type GetScanImageUrlInput = {
   supabase: SupabaseClient<Database>;
   restaurantId: string;
   scanId: string;
+  pageIndex?: number;
 };
 
 export async function getScanImageUrl(
   input: GetScanImageUrlInput,
 ): Promise<string> {
-  const { supabase, restaurantId, scanId } = input;
-
-  const { data: scan, error: fetchError } = await supabase
-    .from("invoice_scans")
-    .select("raw_image_path")
-    .eq("id", scanId)
-    .eq("restaurant_id", restaurantId)
-    .single();
-
-  if (fetchError && (fetchError as { code?: string }).code !== "PGRST116") {
-    throw fetchError;
-  }
-  if (
-    !scan?.raw_image_path ||
-    !scan.raw_image_path.startsWith(`${restaurantId}/`)
-  ) {
+  const { supabase, restaurantId, scanId, pageIndex = 0 } = input;
+  const target = await readInvoiceImageTarget(supabase, scanId, pageIndex);
+  if (!target || !target.object_name.startsWith(`${restaurantId}/${scanId}`)) {
     throw new ScanImageNotFoundError();
   }
 
@@ -56,7 +45,7 @@ export async function getScanImageUrl(
     return await createSupabaseSignedUrl({
       supabase,
       bucket: INVOICE_IMAGE_BUCKET,
-      path: scan.raw_image_path,
+      path: target.object_name,
       expiresInSeconds: SIGNED_URL_TTL_SECONDS,
     });
   } catch (error) {

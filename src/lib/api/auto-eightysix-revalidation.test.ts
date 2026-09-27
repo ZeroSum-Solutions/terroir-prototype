@@ -96,6 +96,65 @@ describe("revalidateAutoEightysixedWines", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/list/wine-c-slug");
   });
 
+  it("keeps the event read tenant/touched-wine scoped and dedupes physical triggers", async () => {
+    const queryCall = vi.fn();
+    const chain = {
+      select: (...args: unknown[]) => {
+        queryCall("select", ...args);
+        return chain;
+      },
+      eq: (...args: unknown[]) => {
+        queryCall("eq", ...args);
+        return chain;
+      },
+      is: (...args: unknown[]) => {
+        queryCall("is", ...args);
+        return chain;
+      },
+      gte: (...args: unknown[]) => {
+        queryCall("gte", ...args);
+        return chain;
+      },
+      in: (...args: unknown[]) => {
+        queryCall("in", ...args);
+        return Promise.resolve({
+          data: [
+            { wine_id: "wine-a" },
+            { wine_id: "wine-a" },
+            { wine_id: "wine-b" },
+          ],
+          error: null,
+        });
+      },
+    };
+    const supabase = {
+      from: vi.fn(() => chain),
+      rpc: vi.fn((_name: string, args: { p_wine_id: string }) =>
+        Promise.resolve({ data: [{ slug: `${args.p_wine_id}-slug` }], error: null }),
+      ),
+    };
+
+    await revalidateAutoEightysixedWines({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase: supabase as any,
+      restaurantId: "restaurant-1",
+      touchedWineIds: ["wine-a", "wine-b"],
+      sinceTs: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(queryCall).toHaveBeenCalledWith("eq", "restaurant_id", "restaurant-1");
+    expect(queryCall).toHaveBeenCalledWith("in", "wine_id", ["wine-a", "wine-b"]);
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
+    expect(supabase.rpc).toHaveBeenCalledWith("wine_published_list_slugs", {
+      p_wine_id: "wine-a",
+      p_restaurant_id: "restaurant-1",
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith("wine_published_list_slugs", {
+      p_wine_id: "wine-b",
+      p_restaurant_id: "restaurant-1",
+    });
+  });
+
   it("keeps revalidating the other wines when one slug lookup errors", async () => {
     const wineIds = ["wine-a", "wine-b"];
     const supabase = {

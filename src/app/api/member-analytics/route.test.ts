@@ -8,22 +8,24 @@ vi.mock("@/lib/api/auth", () => ({
 
 const { GET } = await import("./route");
 
-type Table = "memberships" | "pour_events" | "stock_adjustments" | "bottle_closeouts";
+type Table = "memberships" | "effective_service_pour_events" | "stock_adjustments" | "bottle_closeouts";
 
-function makeSupabase(rows: Record<Table, unknown[]>) {
+function makeSupabase(rows: Record<Table, unknown[]>, failedTable?: Table) {
+  const filters: Array<[Table, string, unknown]> = [];
   const ranges: Record<Table, Array<[number, number]>> = {
     memberships: [],
-    pour_events: [],
+    effective_service_pour_events: [],
     stock_adjustments: [],
     bottle_closeouts: [],
   };
   const selects: Record<Table, string[]> = {
     memberships: [],
-    pour_events: [],
+    effective_service_pour_events: [],
     stock_adjustments: [],
     bottle_closeouts: [],
   };
   return {
+    filters,
     ranges,
     selects,
     from(table: Table) {
@@ -32,7 +34,8 @@ function makeSupabase(rows: Record<Table, unknown[]>) {
           selects[table].push(columns);
           return query;
         },
-        eq() {
+        eq(column: string, value: unknown) {
+          filters.push([table, column, value]);
           return query;
         },
         order() {
@@ -40,7 +43,10 @@ function makeSupabase(rows: Record<Table, unknown[]>) {
         },
         async range(from: number, to: number) {
           ranges[table].push([from, to]);
-          return { data: rows[table].slice(from, to + 1), error: null };
+          return {
+            data: rows[table].slice(from, to + 1),
+            error: table === failedTable ? { message: "reader interrupted" } : null,
+          };
         },
       };
       return query;
@@ -68,8 +74,8 @@ describe("GET /api/member-analytics", () => {
         { id: "m-a", user_id: "u-a", role: "manager" },
         { id: "m-b", user_id: "u-b", role: "staff" },
       ],
-      pour_events: [
-        { actor_user_id: "u-a", ml_delta: 150, kind: "pour" },
+      effective_service_pour_events: [
+        { actor_user_id: "u-a", ml_delta: 150, kind: "pour", event_contract: 1 },
         { actor_user_id: "u-a", ml_delta: 125, kind: "pour" },
       ],
       stock_adjustments: [
@@ -107,7 +113,12 @@ describe("GET /api/member-analytics", () => {
         closeoutVarianceMl: -30,
       }),
     ]);
-    expect(supabase.selects.pour_events[0]).toContain("actor_user_id");
+    expect(supabase.selects.effective_service_pour_events[0]).toContain("actor_user_id");
+    expect(supabase.filters).toContainEqual([
+      "effective_service_pour_events",
+      "restaurant_id",
+      "restaurant-a",
+    ]);
     expect(supabase.selects.stock_adjustments[0]).toContain("acting_user_id");
     expect(supabase.selects.bottle_closeouts[0]).toContain("closed_by");
   });
@@ -120,7 +131,7 @@ describe("GET /api/member-analytics", () => {
     }));
     const supabase = makeSupabase({
       memberships: [{ id: "m-a", user_id: "u-a", role: "owner" }],
-      pour_events: pours,
+      effective_service_pour_events: pours,
       stock_adjustments: [],
       bottle_closeouts: [],
     });
@@ -137,6 +148,40 @@ describe("GET /api/member-analytics", () => {
       pourCount: 1_001,
       pourMl: 1_001,
     }));
-    expect(supabase.ranges.pour_events).toEqual([[0, 999], [1000, 1999]]);
+    expect(supabase.ranges.effective_service_pour_events).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it("fails instead of reporting zero when the effective reader is interrupted", async () => {
+    const supabase = makeSupabase({
+      memberships: [],
+      effective_service_pour_events: [],
+      stock_adjustments: [],
+      bottle_closeouts: [],
+    }, "effective_service_pour_events");
+    mockRequireRole.mockResolvedValue({
+      supabase,
+      restaurantId: "restaurant-a",
+      user: { id: "u-a" },
+      role: "owner",
+    });
+
+    expect((await GET()).status).toBe(500);
+  });
+
+  it("fails closed when an effective row has unknown required data", async () => {
+    const supabase = makeSupabase({
+      memberships: [{ id: "m-a", user_id: "u-a", role: "owner" }],
+      effective_service_pour_events: [{ actor_user_id: "u-a", ml_delta: null, kind: "pour" }],
+      stock_adjustments: [],
+      bottle_closeouts: [],
+    });
+    mockRequireRole.mockResolvedValue({
+      supabase,
+      restaurantId: "restaurant-a",
+      user: { id: "u-a" },
+      role: "owner",
+    });
+
+    expect((await GET()).status).toBe(500);
   });
 });

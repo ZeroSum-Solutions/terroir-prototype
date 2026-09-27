@@ -4,6 +4,7 @@ import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
 import { fetchPricingAlerts } from "@/lib/pricing/alerts";
+import { resolveSitePricingReadAccess } from "@/lib/api/site-capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,15 @@ async function getPricingReview() {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
   const { supabase, restaurantId } = auth;
+  const canReadPricing = await resolveSitePricingReadAccess(
+    supabase,
+    restaurantId,
+  );
+  if (!canReadPricing) {
+    return Errors.forbidden(
+      "Cost and margin access are required to view pricing alerts.",
+    );
+  }
 
   try {
     const alerts = await fetchPricingAlerts(supabase, restaurantId);

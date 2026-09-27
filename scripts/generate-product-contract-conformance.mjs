@@ -7,18 +7,29 @@ import {
   discoverRouteOperations,
   operationIdFor,
 } from "./generate-api-route-inventory.mjs";
+import { APPROVED_FEATURE_COUNT } from "./verify-feature-ledger.mjs";
 
 const LEDGER = "docs/feature-ledger.json";
 const OUTPUT = "docs/product-contract-conformance.json";
 const FIRST = 180;
 const LAST = 217;
-const ACTIVE_COUNT = 269;
-const requirementIds = Array.from(
-  { length: LAST - FIRST + 1 },
-  (_, index) => `TER-CF-${FIRST + index}`,
-);
+const requirementIds = [
+  ...Array.from(
+    { length: LAST - FIRST + 1 },
+    (_, index) => `TER-CF-${FIRST + index}`,
+  ),
+  "TER-CF-288",
+  "TER-CF-289",
+  "TER-CF-290",
+  "TER-CF-297",
+  "TER-CF-311",
+  "TER-CF-312",
+  "TER-CF-313",
+  "TER-CF-314",
+  "TER-CF-315",
+];
 const activeIds = Array.from(
-  { length: ACTIVE_COUNT },
+  { length: APPROVED_FEATURE_COUNT },
   (_, index) => `TER-CF-${String(index + 1).padStart(3, "0")}`,
 );
 const routeActor = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\/api\/\S+)$/;
@@ -32,13 +43,13 @@ function readLedger(projectRoot) {
     : [];
   const actualIds = new Set(active.map((item) => item.id));
   if (
-    ledger.featureCount !== ACTIVE_COUNT ||
-    active.length !== ACTIVE_COUNT ||
-    actualIds.size !== ACTIVE_COUNT ||
+    ledger.featureCount !== APPROVED_FEATURE_COUNT ||
+    active.length !== APPROVED_FEATURE_COUNT ||
+    actualIds.size !== APPROVED_FEATURE_COUNT ||
     activeIds.some((id) => !actualIds.has(id))
   ) {
     throw new Error(
-      "active feature ledger IDs must remain TER-CF-001 through TER-CF-269",
+      `active feature ledger IDs must remain TER-CF-001 through TER-CF-${APPROVED_FEATURE_COUNT}`,
     );
   }
   const byId = new Map(active.map((item) => [item.id, item]));

@@ -93,7 +93,10 @@ export function PricingTargetOverride({
     if (trimmed === "") {
       if (perWinePourCostPct == null) return; // already cleared
       try {
-        await patch({ pour_cost_pct: null });
+        await patch({
+          pour_cost_pct: null,
+          markup_ratio: markup.trim() === "" ? null : Number(markup),
+        });
       } catch {
         setPourCost(perWinePourCostPct?.toString() ?? "");
       }
@@ -107,7 +110,10 @@ export function PricingTargetOverride({
     }
     if (value === perWinePourCostPct) return;
     try {
-      await patch({ pour_cost_pct: value });
+      await patch({
+        pour_cost_pct: value,
+        markup_ratio: markup.trim() === "" ? null : Number(markup),
+      });
     } catch {
       setPourCost(perWinePourCostPct?.toString() ?? "");
     }
@@ -118,7 +124,10 @@ export function PricingTargetOverride({
     if (trimmed === "") {
       if (perWineMarkupRatio == null) return;
       try {
-        await patch({ markup_ratio: null });
+        await patch({
+          pour_cost_pct: pourCost.trim() === "" ? null : Number(pourCost),
+          markup_ratio: null,
+        });
       } catch {
         setMarkup(perWineMarkupRatio?.toString() ?? "");
       }
@@ -132,7 +141,10 @@ export function PricingTargetOverride({
     }
     if (value === perWineMarkupRatio) return;
     try {
-      await patch({ markup_ratio: value });
+      await patch({
+        pour_cost_pct: pourCost.trim() === "" ? null : Number(pourCost),
+        markup_ratio: value,
+      });
     } catch {
       setMarkup(perWineMarkupRatio?.toString() ?? "");
     }

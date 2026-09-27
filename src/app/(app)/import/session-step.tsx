@@ -377,7 +377,7 @@ export function SessionStep({
       <ActionDialog
         open={revertDialogOpen}
         title="Revert this import?"
-        description={`This removes exactly the ${progress.totals.applied} inventory row(s) this session created, across every chunk. Nothing else in your cellar is touched.`}
+        description={`This removes the ${progress.totals.applied} inventory row(s) this session created across every chunk and clears only eligible wine-catalog (LWIN) links it wrote. Wine catalog entries and import history stay in place. The entire session revert succeeds together or makes no changes.`}
         confirmLabel="Revert import"
         busy={reverting}
         onConfirm={() => void doRevert()}

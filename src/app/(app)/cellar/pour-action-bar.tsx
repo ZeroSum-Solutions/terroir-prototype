@@ -4,6 +4,7 @@ import { ChevronDown, PackageOpen, Undo2 } from "lucide-react";
 import { ML_PER_OZ } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import type { CellarWineRow } from "./types";
+import type { LastPourReceipt } from "./use-inventory-commands";
 
 /**
  * Sticky action bar pinned at the drawer's foot (Undo last pour / Open
@@ -14,52 +15,89 @@ import type { CellarWineRow } from "./types";
  */
 export function PourActionBar({
   row,
+  contractVersion = 1,
   canPour,
+  freshActionsAvailable = true,
+  requiresBottleSelection = false,
   outOfStock,
   pickerItem,
   busy,
   openBottleBusy,
+  openNeedsReview = false,
+  pourNeedsReview = false,
+  undoNeedsReview = false,
   lastPour,
   doOpenBottle,
   doPour,
   doUndo,
+  retryPriorOpen = doOpenBottle,
+  retryPriorPour = () => row.glass_pour_ml && doPour(row.glass_pour_ml),
+  retryPriorUndo = doUndo,
   onOpenPicker,
 }: {
   row: CellarWineRow;
+  contractVersion?: 1 | 2;
   canPour: boolean;
+  freshActionsAvailable?: boolean;
+  requiresBottleSelection?: boolean;
   outOfStock: boolean;
   pickerItem: unknown;
   busy: boolean;
   openBottleBusy: boolean;
-  lastPour: { ml: number } | null;
+  openNeedsReview?: boolean;
+  pourNeedsReview?: boolean;
+  undoNeedsReview?: boolean;
+  lastPour: LastPourReceipt | null;
   doOpenBottle: () => void;
   doPour: (ml: number) => void;
+  retryPriorOpen?: () => void;
+  retryPriorPour?: () => void;
+  retryPriorUndo?: () => void;
   doUndo: () => void;
   onOpenPicker: () => void;
 }) {
+  const physicalMode = contractVersion === 2;
+  const hasActiveBottle = physicalMode
+    ? row.activeBottleCount > 0
+    : Boolean(row.open_bottle_id);
+  const showUndo = undoNeedsReview ||
+    (freshActionsAvailable && Boolean(lastPour) && (physicalMode || canPour));
+
   return (
     <div
       className="shrink-0 border-t border-rule bg-surface px-md pt-sm md:px-lg"
       style={{ paddingBottom: "calc(var(--safe-bottom) + var(--spacing-sm))" }}
     >
       {/* BND-119: Undo last pour */}
-      {lastPour && canPour && (
+      {showUndo && (
         <button
           type="button"
           disabled={busy}
-          onClick={doUndo}
+          onClick={undoNeedsReview ? retryPriorUndo : doUndo}
           className="mb-xs flex h-11 w-full items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-[13px] font-medium text-ink transition-colors hover:bg-wash disabled:opacity-60"
         >
           <Undo2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-          Undo last pour ({(lastPour.ml / ML_PER_OZ).toFixed(1)} oz)
+          {undoNeedsReview
+            ? "Retry prior Undo"
+            : `Undo last pour (${(lastPour!.ml / ML_PER_OZ).toFixed(1)} oz)`}
         </button>
       )}
       <div className="flex gap-xs">
         {/* BND-121: Manually open a bottle without recording a pour */}
-        {row.sealed_count > 0 && (
+        {openNeedsReview ? (
           <button
             type="button"
             disabled={openBottleBusy}
+            onClick={retryPriorOpen}
+            className="flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill border border-edge bg-surface text-control font-medium text-ink hover:bg-wash disabled:opacity-60"
+          >
+            <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
+            Retry prior open
+          </button>
+        ) : freshActionsAvailable && row.sealed_count > 0 && (
+          <button
+            type="button"
+            disabled={openBottleBusy || (!physicalMode && hasActiveBottle)}
             onClick={doOpenBottle}
             className={cn(
               "flex h-[52px] flex-1 items-center justify-center gap-xs rounded-pill text-[14px] font-medium transition-colors disabled:opacity-60",
@@ -69,10 +107,33 @@ export function PourActionBar({
             )}
           >
             <PackageOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {openBottleBusy ? "Opening..." : "Open bottle"}
+            {physicalMode && hasActiveBottle
+              ? "Open another bottle"
+              : hasActiveBottle
+              ? "Bottle already open"
+              : openBottleBusy
+                ? "Opening..."
+                : "Open bottle"}
           </button>
         )}
-        {canPour && (
+        {pourNeedsReview ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={retryPriorPour}
+            className="h-[52px] flex-1 rounded-pill bg-primary text-body font-medium text-seal-ink hover:bg-primary-hover disabled:opacity-60"
+          >
+            Retry prior pour
+          </button>
+        ) : freshActionsAvailable && requiresBottleSelection ? (
+          <button
+            type="button"
+            disabled
+            className="h-[52px] flex-1 rounded-pill bg-primary text-body font-medium text-seal-ink opacity-60"
+          >
+            Select a bottle
+          </button>
+        ) : freshActionsAvailable && canPour && (
           <>
             <button
               type="button"
@@ -84,7 +145,7 @@ export function PourActionBar({
               )}
             >
               {outOfStock
-                ? "Out of stock"
+                ? physicalMode ? "Below pour size" : "Out of stock"
                 : `Pour ${(row.glass_pour_ml! / ML_PER_OZ).toFixed(1)} oz`}
             </button>
             {row.pour_size_mode === "picker" && pickerItem && (

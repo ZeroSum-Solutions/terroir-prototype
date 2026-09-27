@@ -204,6 +204,7 @@ test.describe("BND-038 pour → reconcile", () => {
     // in setup, so the banner suppression is fine here.
     if (bootstrappable.open_remaining_ml === null) {
       const pourRes = await page.request.post("/api/pour", {
+        headers: { "Idempotency-Key": crypto.randomUUID() },
         data: {
           wine_id: bootstrappable.wine_id,
           ml: bootstrappable.glass_pour_ml,

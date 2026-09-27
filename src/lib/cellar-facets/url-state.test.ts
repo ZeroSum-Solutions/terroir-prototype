@@ -12,7 +12,8 @@ describe("cellar URL state codec", () => {
         "q=cote&filter=low&colour=red&producer=Jamet&region=Rhone&country=France&" +
           "varietal=Syrah&vintage_min=2016&vintage_max=2020&format=750&" +
           "group_by=producer&health=hold&sort=window&view=grid&" +
-          "wine=123e4567-e89b-42d3-a456-426614174000&ignored=yes",
+          "wine=123e4567-e89b-42d3-a456-426614174000&" +
+          "bottle=223e4567-e89b-42d3-a456-426614174000&ignored=yes",
       ),
     );
 
@@ -32,6 +33,7 @@ describe("cellar URL state codec", () => {
       sort: "window",
       view: "grid",
       wine: "123e4567-e89b-42d3-a456-426614174000",
+      bottle: "223e4567-e89b-42d3-a456-426614174000",
     });
   });
 
@@ -39,7 +41,7 @@ describe("cellar URL state codec", () => {
     expect(
       parseCellarUrlState(
         new URLSearchParams(
-          "filter=broken&vintage_min=nope&format=-1&group_by=country&health=sleepy&sort=upside-down&view=map&wine=not-a-uuid",
+          "filter=broken&vintage_min=nope&format=-1&group_by=country&health=sleepy&sort=upside-down&view=map&wine=not-a-uuid&bottle=not-a-uuid",
         ),
       ),
     ).toEqual({
@@ -58,6 +60,7 @@ describe("cellar URL state codec", () => {
       sort: null,
       view: "list",
       wine: null,
+      bottle: null,
     });
   });
 
@@ -90,6 +93,10 @@ describe("cellar URL state codec", () => {
           rand() < 0.5
             ? null
             : `123e4567-e89b-42d3-a456-${String(run).padStart(12, "0")}`,
+        bottle:
+          rand() < 0.5
+            ? null
+            : `223e4567-e89b-42d3-a456-${String(run).padStart(12, "0")}`,
       };
       expect(parseCellarUrlState(serializeCellarUrlState(state)), `run ${run}`).toEqual(state);
     }

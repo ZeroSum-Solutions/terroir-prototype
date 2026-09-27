@@ -68,12 +68,9 @@ jobs:
           version: 2.109.1
 
       - name: Start local Supabase
-        # Disposable stack, lives only for this job. Identical to ci.yml.
-        run: |
-          if [ ! -f supabase/config.toml ]; then
-            supabase init --with-vscode-settings=false --with-intellij-settings=false
-          fi
-          supabase start
+        # Disposable stack, with the same per-migration transaction boundary
+        # used by ci.yml so LOCK TABLE migrations are exercised correctly.
+        run: scripts/local/ci-start-supabase.sh
 
       - name: Export local Supabase env for E2E
         # Kept byte-identical to ci.yml's equivalent step on purpose. If you

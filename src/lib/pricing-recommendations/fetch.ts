@@ -56,14 +56,9 @@ export async function fetchPricingRecommendations(
   const all: unknown[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
-      .from("pricing_recommendations")
-      .select(
-        "wine_id, class, rationale, evidence, timing, computed_at, wines!inner(name, producer, vintage)",
-      )
-      .eq("restaurant_id", restaurantId)
-      .order("class")
-      .order("computed_at", { ascending: false })
-      .order("wine_id")
+      .rpc("read_pricing_recommendations", {
+        p_restaurant_id: restaurantId,
+      })
       .range(from, from + pageSize - 1);
     if (error) throw error;
     const page = data ?? [];

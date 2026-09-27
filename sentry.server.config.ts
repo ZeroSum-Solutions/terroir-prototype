@@ -3,30 +3,39 @@
  *
  * Loaded by instrumentation.ts when NEXT_RUNTIME === "nodejs".
  * Captures unhandled errors from API routes, server components,
- * server actions, and background jobs. `includeLocalVariables`
- * attaches local variable values to stack frames so debugging
- * prod issues doesn't require a repro.
+ * server actions, and background jobs. Stack-local capture stays disabled:
+ * handlers can hold private notes, request payloads and session-bearing clients.
  */
 import * as Sentry from "@sentry/nextjs";
+import {
+  errorOnlyIntegrations,
+  errorOnlyMonitoring,
+  errorPrivacyIntegration,
+} from "./src/lib/monitoring/error-privacy";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
 
-  // 100% in dev for easy debugging; 10% in prod to control cost.
-  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
-
-  // sendDefaultPii=false as the prototype default — Sentry's automatic
-  // capture will NOT attach user IPs or request headers. Selective
-  // context still flows via explicit `{extra, tags}` at each
-  // captureException site. Flip to `true` if prod debugging needs the
-  // extra context — worth revisiting the moment we have EU customers.
-  sendDefaultPii: false,
-  // Sentry's local-vars integration mutates stack frames into
-  // {function, vars} objects, which breaks React 19 dev overlay's
-  // `buildFakeCallStack` (it calls frame.join(...) expecting a tuple).
-  // Keep it on in prod for prod debugging context; disable in dev so
-  // the local overlay doesn't crash.
-  includeLocalVariables: process.env.NODE_ENV !== "development",
-  enableLogs: true,
+  ...errorOnlyMonitoring,
+  // Never attach request/auth locals to error events, including in production.
+  // This also avoids the local-vars integration's React 19 dev-overlay conflict.
+  includeLocalVariables: false,
+  integrations: (defaults) => [
+    ...errorOnlyIntegrations(defaults).filter(
+      (integration) => integration.name !== "RequestData" && integration.name !== "Http",
+    ),
+    Sentry.requestDataIntegration({
+      include: {
+        headers: false, cookies: false, query_string: false,
+        url: false, data: false, ip: false,
+      },
+    }),
+    Sentry.httpIntegration({
+      maxIncomingRequestBodySize: "none",
+      trackIncomingRequestsAsSessions: false,
+      disableIncomingRequestSpans: true,
+    }),
+    errorPrivacyIntegration(),
+  ],
 });

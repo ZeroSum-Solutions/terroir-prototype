@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { requireMembership } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import { readInventoryCosts } from "@/lib/staff-cost/protected-readers";
+import { isRetailPlausible } from "@/lib/pricing/status";
 import {
   fetchRetailPrices,
   formatRetailPriceBasis,
@@ -36,7 +39,7 @@ export async function POST(
     return Errors.badRequest("wine id required");
   }
 
-  // Pull wine row (LWIN + invoice cost for sanity-check).
+  // LWIN and the persisted retail observations are cost-free wine fields.
   const { data: wine, error: fetchErr } = await supabase
     .from("wines")
     .select("id, lwin_id")
@@ -54,37 +57,72 @@ export async function POST(
         wineId: wine.id,
         refreshed: false,
         reason: "no_lwin",
+        costSanityCheck: "not_applicable",
         message: "This wine isn't matched to LWIN yet. Run cellar enrichment to attempt a match.",
       },
       { status: 200 },
     );
   }
 
-  // Pull most-recent invoice cost for the sanity-filter.
-  const { data: invRow } = await supabase
-    .from("inventory_items")
-    .select("unit_cost")
-    .eq("restaurant_id", restaurantId)
-    .eq("wine_id", id)
-    .order("added_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const invoiceCost = invRow?.unit_cost ?? null;
+  let canReadCost: boolean;
+  try {
+    canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+  } catch {
+    Sentry.captureMessage("Retail refresh cost authorization check failed", {
+      level: "error",
+      tags: { surface: "wines-refresh-retail", phase: "cost-authorization" },
+      extra: { wineId: id, restaurantId },
+    });
+    return Errors.internal("Cost authorization check failed.");
+  }
 
-  const result = await fetchRetailPrices({
-    lwinId: wine.lwin_id,
-    invoiceCost,
-  });
+  let invoiceCost: number | null = null;
+  if (canReadCost) {
+    try {
+      const costRows = await readInventoryCosts(supabase, restaurantId, [id]);
+      invoiceCost = costRows.at(-1)?.unit_cost ?? null;
+    } catch {
+      Sentry.captureMessage("Retail refresh private cost lookup failed", {
+        level: "error",
+        tags: { surface: "wines-refresh-retail", phase: "cost-read" },
+        extra: { wineId: id, restaurantId },
+      });
+      return Errors.internal("Cost lookup failed.");
+    }
+  }
 
-  if (!result) {
-    // Could be: no API key, network error, sanity-filter rejection,
-    // schema failure. wine-searcher.ts has already logged to Sentry
-    // with the specific reason.
+  const costSanityCheck = !canReadCost
+    ? "restricted"
+    : invoiceCost == null
+      ? "unavailable"
+      : "applied";
+
+  // Never pass acquisition cost to the provider wrapper: its failure telemetry
+  // is intentionally general-purpose. Apply the optional cost check locally so
+  // a pricing operator without cost.read can still refresh public observations.
+  const result = await fetchRetailPrices({ lwinId: wine.lwin_id });
+  const failedCostSanity =
+    result != null &&
+    invoiceCost != null &&
+    !isRetailPlausible(result.retailMedian, invoiceCost);
+
+  if (failedCostSanity) {
+    Sentry.captureMessage("Wine-Searcher response failed cost sanity filter", {
+      level: "warning",
+      tags: { surface: "wines-refresh-retail", phase: "cost-sanity-filter" },
+      extra: { wineId: id, restaurantId },
+    });
+  }
+
+  if (!result || failedCostSanity) {
+    // Provider/config/schema failures are logged by wine-searcher.ts; a local
+    // cost rejection is logged above without exporting its protected inputs.
     return NextResponse.json(
       {
         wineId: wine.id,
         refreshed: false,
         reason: "unavailable",
+        costSanityCheck,
         message: "Pricing data unavailable for this wine. Try again later.",
       },
       { status: 200 },
@@ -98,6 +136,7 @@ export async function POST(
       wineId: wine.id,
       refreshed: false,
       reason: "average_only",
+      costSanityCheck,
       message: "Only an avg-based retail price was available; it was not saved as a median.",
       retail: {
         min: result.retailMin,
@@ -134,6 +173,7 @@ export async function POST(
   return NextResponse.json({
     wineId: wine.id,
     refreshed: true,
+    costSanityCheck,
     retail: {
       min: result.retailMin,
       max: result.retailMax,

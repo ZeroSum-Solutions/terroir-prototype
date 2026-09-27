@@ -13889,3 +13889,11457 @@ select w.restaurant_id, w.id, null, btrim(w.tasting_notes), w.created_at
         and n.author_user_id is null
         and n.body = btrim(w.tasting_notes)
    );
+
+-- === 0151_inventory_commands.sql ===
+-- 0151_inventory_commands.sql
+--
+-- TER-CF-150 / TER-CF-270..273: one atomic, idempotent command boundary for
+-- explicit bottle opening, pours, spills, lifecycle discard, and close-outs.
+--
+-- `open_bottles` is a reusable slot per (wine_id, restaurant_id), not a
+-- physical-bottle identity: migration 0044 revives the same row id and resets
+-- opened_at. Close commands therefore compare BOTH id and opened_at while the
+-- slot is locked. Operation receipts are durable and transaction-local to the
+-- domain write; they intentionally do not reuse the 24-hour scan cache.
+
+create table public.inventory_command_receipts (
+  restaurant_id  uuid        not null references public.restaurants(id) on delete cascade,
+  operation_id   uuid        not null,
+  actor_user_id  uuid        not null references auth.users(id) on delete restrict,
+  wine_id         uuid        not null,
+  command_type    text        not null check (command_type in ('open', 'pour', 'spill', 'discard', 'close')),
+  request_payload jsonb       not null check (jsonb_typeof(request_payload) = 'object'),
+  result_payload  jsonb,
+  created_at      timestamptz not null default now(),
+  completed_at    timestamptz,
+  primary key (restaurant_id, operation_id),
+  constraint inventory_command_receipts_wine_restaurant_fkey
+    foreign key (wine_id, restaurant_id)
+    references public.wines(id, restaurant_id) on delete restrict,
+  constraint inventory_command_receipts_completion_pair check (
+    (result_payload is null) = (completed_at is null)
+  ),
+  constraint inventory_command_receipts_result_object check (
+    result_payload is null or jsonb_typeof(result_payload) = 'object'
+  )
+);
+
+create index inventory_command_receipts_wine_idx
+  on public.inventory_command_receipts (wine_id, restaurant_id, created_at desc);
+create index inventory_command_receipts_actor_idx
+  on public.inventory_command_receipts (actor_user_id, created_at desc);
+
+comment on table public.inventory_command_receipts is
+  'Durable, immutable receipts for open/pour/spill/discard/close commands. The primary '
+  'key scopes an operation UUID to a restaurant; execute_inventory_command '
+  'binds it to the current actor and a canonical payload before mutating stock.';
+
+alter table public.inventory_command_receipts enable row level security;
+
+-- No authenticated table policy: callers replay through the RPC, which first
+-- revalidates current membership and then compares actor + canonical payload.
+revoke all on table public.inventory_command_receipts from public, anon, authenticated;
+
+-- C02 commands can emit more than one pour/spill row when service crosses a
+-- physical-bottle boundary. The legacy undo RPC reverses one event, so it must
+-- refuse those commands atomically rather than crediting a replacement bottle
+-- or partially reversing one service action. Single-event legacy and command
+-- pours remain reversible while they still belong to the current lifecycle.
+create or replace function public.undo_last_pour(
+  p_wine_id uuid
+) returns public.open_bottles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_restaurant_id uuid;
+  v_event         public.pour_events%rowtype;
+  v_current       public.open_bottles%rowtype;
+  v_user          uuid := auth.uid();
+  v_receipt_result jsonb;
+  v_chunk_count    int;
+begin
+  select restaurant_id into v_restaurant_id
+    from public.wines where id = p_wine_id;
+  if v_restaurant_id is null then
+    raise exception 'wine not found';
+  end if;
+
+  if not public.is_member_with_role(v_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  -- Match execute_inventory_command's wine -> lifecycle lock order. NO KEY
+  -- UPDATE still serializes C02 writers, but remains compatible with the
+  -- wines FK KEY SHARE taken by legacy slot-first event writers during the
+  -- expand/contract transition.
+  perform 1
+    from public.wines w
+   where w.id = p_wine_id
+     and w.restaurant_id = v_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'wine not found';
+  end if;
+
+  select * into v_current
+    from public.open_bottles
+    where wine_id = p_wine_id and restaurant_id = v_restaurant_id
+    for update;
+  if not found then
+    raise exception 'no open bottle found to restore for wine %', p_wine_id;
+  end if;
+
+  select * into v_event
+    from public.pour_events
+    where wine_id = p_wine_id
+      and restaurant_id = v_restaurant_id
+      and kind in ('pour', 'spill')
+      and open_bottle_id is not null
+    order by occurred_at desc, id desc
+    limit 1
+    for update;
+  if not found then
+    raise exception 'no recent pour to undo';
+  end if;
+
+  -- The reusable slot id is not a physical lifecycle identity. An event older
+  -- than the slot's current opened_at belongs to a prior bottle and must never
+  -- be credited onto the replacement.
+  if v_event.occurred_at < v_current.opened_at then
+    raise exception 'undo_inventory_command_not_reversible' using errcode = 'P0001';
+  end if;
+
+  -- Bound the receipt lookup by indexed tenant + wine columns before checking
+  -- the stable event id stored in result_payload.
+  select r.result_payload into v_receipt_result
+    from public.inventory_command_receipts r
+    where r.restaurant_id = v_restaurant_id
+      and r.wine_id = p_wine_id
+      and r.command_type in ('pour', 'spill')
+      and r.result_payload is not null
+      and r.result_payload -> 'pour_event_ids' @> jsonb_build_array(v_event.id)
+    order by r.created_at desc
+    limit 1;
+
+  if found then
+    select count(*)::int into v_chunk_count
+      from jsonb_array_elements_text(v_receipt_result -> 'pour_event_ids') event_id
+      join public.pour_events pe on pe.id = event_id.value::uuid
+     where pe.kind in ('pour', 'spill');
+    if v_chunk_count > 1 then
+      raise exception 'undo_inventory_command_not_reversible' using errcode = 'P0001';
+    end if;
+  end if;
+
+  delete from public.pour_events where id = v_event.id;
+
+  insert into public.availability_events
+    (wine_id, restaurant_id, direction, user_id, note)
+  values
+    (p_wine_id, v_restaurant_id, 'restored', v_user,
+     'undo pour: ' || v_event.ml_delta || 'ml restored');
+
+  select * into v_current
+    from public.open_bottles
+    where wine_id = p_wine_id and restaurant_id = v_restaurant_id;
+  return v_current;
+end;
+$$;
+
+grant execute on function public.undo_last_pour(uuid) to authenticated;
+
+create or replace function public.execute_inventory_command(
+  p_operation_id             uuid,
+  p_restaurant_id            uuid,
+  p_command                  text,
+  p_wine_id                  uuid,
+  p_ml                       int default null,
+  p_note                     text default null,
+  p_preservation_method      text default null,
+  p_expected_open_bottle_id  uuid default null,
+  p_expected_opened_at       timestamptz default null,
+  p_actual_remaining_ml      int default null,
+  p_written_off_ml           int default 0,
+  p_reason_code_id           uuid default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user                 uuid := auth.uid();
+  v_size_ml              int;
+  v_note                  text := nullif(btrim(p_note), '');
+  v_preservation          text;
+  v_request               jsonb;
+  v_receipt               public.inventory_command_receipts%rowtype;
+  v_claimed_operation     uuid;
+  v_current               public.open_bottles%rowtype;
+  v_slot_exists           boolean := false;
+  v_sealed_item           public.inventory_items%rowtype;
+  v_previous_opened_at    timestamptz;
+  v_new_opened_at         timestamptz;
+  v_event_at              timestamptz;
+  v_last_event_at         timestamptz;
+  v_remaining_to_consume  int;
+  v_chunk                 int;
+  v_event_id              uuid;
+  v_event_ids             uuid[] := array[]::uuid[];
+  v_closeout              public.bottle_closeouts%rowtype;
+  v_result                jsonb;
+begin
+  if v_user is null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_operation_id is null
+     or p_restaurant_id is null
+     or p_wine_id is null
+     or p_command is null
+     or p_command not in ('open', 'pour', 'spill', 'discard', 'close') then
+    raise exception 'invalid_inventory_command' using errcode = 'P0001';
+  end if;
+  if v_note is not null and char_length(v_note) > 500 then
+    raise exception 'invalid_inventory_command' using errcode = 'P0001';
+  end if;
+  if p_preservation_method is not null
+     and p_preservation_method not in ('coravin', 'argon', 'vacuum', 'none') then
+    raise exception 'invalid_inventory_command' using errcode = 'P0001';
+  end if;
+
+  -- Every call, including replay, must still be authorized. FOR SHARE prevents
+  -- a membership delete/role change from committing beside this command.
+  perform 1
+    from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+     and m.role in ('owner', 'manager', 'staff')
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  -- Stable serialization point even when no open_bottles row exists yet.
+  -- NO KEY UPDATE serializes C02 writers without deadlocking legacy writers
+  -- that lock the bottle slot first and then take a wine FK KEY SHARE.
+  select w.size_ml
+    into v_size_ml
+    from public.wines w
+   where w.id = p_wine_id
+     and w.restaurant_id = p_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'wine_not_found' using errcode = 'P0001';
+  end if;
+
+  -- Reject irrelevant fields rather than silently giving two requests the same
+  -- physical effect under different payloads.
+  if p_command = 'open' then
+    if p_ml is not null
+       or p_expected_open_bottle_id is not null
+       or p_expected_opened_at is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+    v_preservation := coalesce(p_preservation_method, 'none');
+  elsif p_command in ('pour', 'spill') then
+    if p_ml is null or p_ml <= 0 or p_ml > 2000
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or ((p_expected_open_bottle_id is null) <> (p_expected_opened_at is null)) then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+    v_preservation := p_preservation_method;
+  elsif p_command = 'discard' then
+    if p_ml is not null
+       or p_preservation_method is not null
+       or p_expected_open_bottle_id is null
+       or p_expected_opened_at is null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+  else
+    if p_ml is not null
+       or p_preservation_method is not null
+       or p_expected_open_bottle_id is null
+       or p_expected_opened_at is null
+       or p_actual_remaining_ml is null
+       or p_actual_remaining_ml < 0
+       or p_written_off_ml is null
+       or p_written_off_ml < 0
+       or p_written_off_ml > p_actual_remaining_ml then
+      if p_actual_remaining_ml is not null
+         and p_actual_remaining_ml < 0 then
+        raise exception 'invalid_actual_remaining' using errcode = 'P0001';
+      end if;
+      if p_written_off_ml is not null
+         and p_actual_remaining_ml is not null
+         and (p_written_off_ml < 0 or p_written_off_ml > p_actual_remaining_ml) then
+        raise exception 'invalid_writeoff_amount' using errcode = 'P0001';
+      end if;
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+    if p_written_off_ml > 0 and p_reason_code_id is null then
+      raise exception 'writeoff_reason_required' using errcode = 'P0001';
+    end if;
+  end if;
+
+  v_request := jsonb_build_object(
+    'version', 1,
+    'command', p_command,
+    'wine_id', p_wine_id,
+    'ml', p_ml,
+    'note', v_note,
+    'preservation_method', case when p_command = 'open' then v_preservation else p_preservation_method end,
+    'expected_open_bottle_id', p_expected_open_bottle_id,
+    'expected_opened_at', case
+      when p_expected_opened_at is null then null
+      else to_char(
+        p_expected_opened_at at time zone 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      )
+    end,
+    'actual_remaining_ml', p_actual_remaining_ml,
+    'written_off_ml', p_written_off_ml,
+    'reason_code_id', p_reason_code_id
+  );
+
+  -- The unique insert blocks a concurrent retry until the first transaction
+  -- commits or aborts. An exception later rolls back both this claim and every
+  -- domain mutation made below.
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload
+  ) values (
+    p_restaurant_id, p_operation_id, v_user, p_wine_id, p_command, v_request
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed_operation;
+
+  if v_claimed_operation is null then
+    select *
+      into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id;
+
+    if not found or v_receipt.result_payload is null then
+      raise exception 'inventory_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'inventory_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.wine_id is distinct from p_wine_id
+       or v_receipt.command_type is distinct from p_command
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'inventory_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  -- Mutable wine attributes constrain only a fresh execution. A completed
+  -- receipt remains exactly replayable if the wine's configured size changes
+  -- later; current membership and wine identity were still revalidated above.
+  if v_size_ml is null or v_size_ml <= 0 then
+    raise exception 'wine_size_unknown' using errcode = 'P0001';
+  end if;
+  if p_command = 'close' and p_actual_remaining_ml > v_size_ml then
+    raise exception 'invalid_actual_remaining' using errcode = 'P0001';
+  end if;
+
+  -- Lock the reusable slot, active or closed. A missing row is safe because
+  -- the wine lock above serializes every command for this wine.
+  select *
+    into v_current
+    from public.open_bottles ob
+   where ob.wine_id = p_wine_id
+     and ob.restaurant_id = p_restaurant_id
+   for update;
+  v_slot_exists := found;
+
+  if p_command = 'open' then
+    if v_slot_exists and v_current.closed_at is null then
+      raise exception 'open_bottle_already_open' using errcode = 'P0001';
+    end if;
+
+    v_previous_opened_at := case
+      when v_slot_exists then greatest(v_current.opened_at, v_current.closed_at)
+      else null
+    end;
+
+    select *
+      into v_sealed_item
+      from public.inventory_items ii
+     where ii.wine_id = p_wine_id
+       and ii.restaurant_id = p_restaurant_id
+       and ii.quantity > 0
+     order by ii.added_at asc, ii.id asc
+     limit 1
+     for update;
+    if not found then
+      raise exception 'no_inventory' using errcode = 'P0001';
+    end if;
+
+    update public.inventory_items
+       set quantity = quantity - 1
+     where id = v_sealed_item.id;
+
+    v_new_opened_at := clock_timestamp();
+    if v_previous_opened_at is not null and v_new_opened_at <= v_previous_opened_at then
+      v_new_opened_at := v_previous_opened_at + interval '1 microsecond';
+    end if;
+
+    insert into public.pour_events (
+      wine_id, restaurant_id, ml_delta, kind, actor_user_id, note, occurred_at
+    ) values (
+      p_wine_id, p_restaurant_id, -v_size_ml, 'new_bottle', v_user, v_note,
+      v_new_opened_at
+    ) returning id into v_event_id;
+    v_event_ids := array_append(v_event_ids, v_event_id);
+    v_last_event_at := v_new_opened_at;
+
+    update public.open_bottles
+       set opened_at = v_new_opened_at,
+           preservation_method = v_preservation,
+           source_inventory_item_id = v_sealed_item.id
+     where wine_id = p_wine_id
+       and restaurant_id = p_restaurant_id
+    returning * into v_current;
+
+    v_result := jsonb_build_object(
+      'operation_id', p_operation_id,
+      'command', p_command,
+      'pour_event_ids', to_jsonb(v_event_ids),
+      'open_bottle', to_jsonb(v_current)
+    );
+
+  elsif p_command in ('pour', 'spill') then
+    if p_expected_open_bottle_id is not null and (
+      not v_slot_exists
+      or v_current.closed_at is not null
+      or v_current.id is distinct from p_expected_open_bottle_id
+      or v_current.opened_at is distinct from p_expected_opened_at
+    ) then
+      raise exception 'open_bottle_changed' using errcode = 'P0001';
+    end if;
+
+    v_remaining_to_consume := p_ml;
+
+    while v_remaining_to_consume > 0 loop
+      if not v_slot_exists or v_current.closed_at is not null then
+        v_previous_opened_at := case
+          when v_slot_exists then greatest(v_current.opened_at, v_current.closed_at)
+          else null
+        end;
+
+        select *
+          into v_sealed_item
+          from public.inventory_items ii
+         where ii.wine_id = p_wine_id
+           and ii.restaurant_id = p_restaurant_id
+           and ii.quantity > 0
+         order by ii.added_at asc, ii.id asc
+         limit 1
+         for update;
+        if not found then
+          raise exception 'no_inventory' using errcode = 'P0001';
+        end if;
+
+        update public.inventory_items
+           set quantity = quantity - 1
+         where id = v_sealed_item.id;
+
+        v_new_opened_at := clock_timestamp();
+        if v_previous_opened_at is not null and v_new_opened_at <= v_previous_opened_at then
+          v_new_opened_at := v_previous_opened_at + interval '1 microsecond';
+        end if;
+        if v_last_event_at is not null and v_new_opened_at <= v_last_event_at then
+          v_new_opened_at := v_last_event_at + interval '1 microsecond';
+        end if;
+
+        insert into public.pour_events (
+          wine_id, restaurant_id, ml_delta, kind, actor_user_id, note, occurred_at
+        ) values (
+          p_wine_id, p_restaurant_id, -v_size_ml, 'new_bottle', v_user, v_note,
+          v_new_opened_at
+        ) returning id into v_event_id;
+        v_event_ids := array_append(v_event_ids, v_event_id);
+        v_last_event_at := v_new_opened_at;
+
+        update public.open_bottles
+           set opened_at = v_new_opened_at,
+               preservation_method = coalesce(v_preservation, 'none'),
+               source_inventory_item_id = v_sealed_item.id
+         where wine_id = p_wine_id
+           and restaurant_id = p_restaurant_id
+        returning * into v_current;
+        v_slot_exists := true;
+      end if;
+
+      if v_current.remaining_ml <= 0 then
+        raise exception 'invalid_open_bottle_state' using errcode = 'P0001';
+      end if;
+
+      v_chunk := least(v_current.remaining_ml, v_remaining_to_consume);
+      v_event_at := clock_timestamp();
+      if v_event_at <= v_current.opened_at then
+        v_event_at := v_current.opened_at + interval '1 microsecond';
+      end if;
+      if v_last_event_at is not null and v_event_at <= v_last_event_at then
+        v_event_at := v_last_event_at + interval '1 microsecond';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, note, occurred_at
+      ) values (
+        p_wine_id, p_restaurant_id, v_current.id, v_chunk, p_command,
+        v_user, v_note, v_event_at
+      ) returning id into v_event_id;
+      v_event_ids := array_append(v_event_ids, v_event_id);
+      v_last_event_at := v_event_at;
+
+      v_remaining_to_consume := v_remaining_to_consume - v_chunk;
+      select *
+        into v_current
+        from public.open_bottles ob
+       where ob.wine_id = p_wine_id
+         and ob.restaurant_id = p_restaurant_id;
+      if v_current.remaining_ml = 0 then
+        update public.open_bottles
+           set closed_at = v_event_at
+         where id = v_current.id
+           and opened_at = v_current.opened_at
+        returning * into v_current;
+      end if;
+    end loop;
+
+    -- Preservation belongs to the final affected lifecycle. This update is
+    -- transactionally coupled to the pour even when that lifecycle just closed.
+    if v_preservation is not null then
+      update public.open_bottles
+         set preservation_method = v_preservation
+       where id = v_current.id
+         and opened_at = v_current.opened_at
+      returning * into v_current;
+    end if;
+
+    v_result := jsonb_build_object(
+      'operation_id', p_operation_id,
+      'command', p_command,
+      'pour_event_ids', to_jsonb(v_event_ids),
+      'open_bottle', to_jsonb(v_current)
+    );
+
+  elsif p_command = 'discard' then
+    if not v_slot_exists
+       or v_current.id is distinct from p_expected_open_bottle_id
+       or v_current.opened_at is distinct from p_expected_opened_at then
+      raise exception 'open_bottle_changed' using errcode = 'P0001';
+    end if;
+    if v_current.closed_at is not null then
+      raise exception 'open_bottle_already_closed' using errcode = 'P0001';
+    end if;
+
+    v_event_at := clock_timestamp();
+    if v_event_at <= v_current.opened_at then
+      v_event_at := v_current.opened_at + interval '1 microsecond';
+    end if;
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, note, occurred_at
+    ) values (
+      p_wine_id, p_restaurant_id, v_current.id, v_current.remaining_ml,
+      'spill', v_user, coalesce(v_note, 'Bottle discarded'), v_event_at
+    ) returning id into v_event_id;
+    v_event_ids := array_append(v_event_ids, v_event_id);
+
+    update public.open_bottles
+       set closed_at = v_event_at
+     where id = p_expected_open_bottle_id
+       and opened_at = p_expected_opened_at
+       and remaining_ml = 0
+    returning * into v_current;
+
+    v_result := jsonb_build_object(
+      'operation_id', p_operation_id,
+      'command', p_command,
+      'pour_event_ids', to_jsonb(v_event_ids),
+      'open_bottle', to_jsonb(v_current)
+    );
+
+  else
+    if not v_slot_exists
+       or v_current.closed_at is not null
+       or v_current.id is distinct from p_expected_open_bottle_id
+       or v_current.opened_at is distinct from p_expected_opened_at then
+      raise exception 'open_bottle_changed' using errcode = 'P0001';
+    end if;
+
+    if p_reason_code_id is not null then
+      perform 1
+        from public.reason_codes rc
+       where rc.id = p_reason_code_id
+         and rc.restaurant_id = p_restaurant_id
+         and rc.active
+         and rc.category in ('spoilage', 'adjustment')
+       for share;
+      if not found then
+        raise exception 'invalid_reason_code' using errcode = 'P0001';
+      end if;
+    end if;
+
+    v_event_at := clock_timestamp();
+    if v_event_at <= v_current.opened_at then
+      v_event_at := v_current.opened_at + interval '1 microsecond';
+    end if;
+
+    insert into public.bottle_closeouts (
+      restaurant_id, wine_id, open_bottle_id, preservation_method,
+      opened_at, closed_by, closed_at, theoretical_remaining_ml,
+      actual_remaining_ml, written_off_ml, reason_code_id
+    ) values (
+      p_restaurant_id, p_wine_id, v_current.id, v_current.preservation_method,
+      v_current.opened_at, v_user, v_event_at, v_current.remaining_ml,
+      p_actual_remaining_ml, p_written_off_ml, p_reason_code_id
+    ) returning * into v_closeout;
+
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, note, occurred_at
+    ) values (
+      p_wine_id, p_restaurant_id, v_current.id, v_current.remaining_ml,
+      'finish_bottle', v_user, coalesce(v_note, 'Bottle close-out'), v_event_at
+    ) returning id into v_event_id;
+    v_event_ids := array_append(v_event_ids, v_event_id);
+
+    update public.open_bottles
+       set closed_at = v_event_at
+     where id = p_expected_open_bottle_id
+       and opened_at = p_expected_opened_at
+       and remaining_ml = 0
+    returning * into v_current;
+
+    v_result := jsonb_build_object(
+      'operation_id', p_operation_id,
+      'command', p_command,
+      'pour_event_ids', to_jsonb(v_event_ids),
+      'open_bottle', to_jsonb(v_current),
+      'closeout', to_jsonb(v_closeout)
+    );
+  end if;
+
+  update public.inventory_command_receipts
+     set result_payload = v_result,
+         completed_at = clock_timestamp()
+   where restaurant_id = p_restaurant_id
+     and operation_id = p_operation_id
+     and result_payload is null;
+
+  if not found then
+    raise exception 'inventory_operation_incomplete' using errcode = 'P0001';
+  end if;
+
+  return v_result || jsonb_build_object('replayed', false);
+end;
+$$;
+
+comment on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) is
+  'Atomic TER-CF-150 open/pour/spill/discard/close command. Revalidates current '
+  'membership before replay, binds operation UUID to actor and canonical '
+  'payload, serializes per wine, and rejects stale bottle lifecycle versions.';
+
+revoke execute on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) from public, anon;
+grant execute on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) to authenticated;
+
+-- === 0152_workspace_access_foundation.sql ===
+-- DRAFT ONLY -- DO NOT APPLY FROM THIS LOCATION.
+--
+-- C04 Slice 1: additive workspace/site-access foundation and shadow capability
+-- helpers. Existing memberships, is_member*, member_restaurant_ids*, RLS,
+-- route guards, and role behavior remain authoritative.
+
+-- This file requires one outer transaction. Production uses psql
+-- --single-transaction and the isolated rehearsal uses psql -1. Fail before
+-- any DDL unless auth writers and all readers/writers of the two tables altered
+-- below have drained. This is an explicit maintenance-window boundary, not a
+-- zero-downtime migration claim.
+lock table auth.users
+  in share row exclusive mode nowait;
+lock table public.restaurants, public.memberships
+  in access exclusive mode nowait;
+
+create table public.workspaces (
+  id          uuid        primary key default gen_random_uuid(),
+  kind        text        not null check (kind in ('restaurant', 'personal')),
+  name        text        not null,
+  expanded_at timestamptz,
+  created_at  timestamptz not null default now(),
+  constraint workspaces_id_kind_key unique (id, kind)
+);
+
+alter table public.workspaces enable row level security;
+revoke all on table public.workspaces from public, anon, authenticated;
+grant select, insert, update, delete on table public.workspaces to service_role;
+
+create table public.workspace_memberships (
+  id               uuid        primary key default gen_random_uuid(),
+  workspace_id     uuid        not null,
+  user_id          uuid        not null,
+  governance_role  text        check (governance_role in ('workspace_owner', 'group_admin')),
+  status            text        not null default 'active'
+                                check (status in ('active', 'revoked')),
+  expires_at        timestamptz,
+  revoked_at        timestamptz,
+  created_by        uuid,
+  created_at        timestamptz not null default now(),
+  constraint workspace_memberships_workspace_fkey
+    foreign key (workspace_id) references public.workspaces(id) on delete cascade,
+  constraint workspace_memberships_user_fkey
+    foreign key (user_id) references auth.users(id) on delete cascade,
+  constraint workspace_memberships_created_by_fkey
+    foreign key (created_by) references auth.users(id) on delete set null,
+  constraint workspace_memberships_workspace_user_key unique (workspace_id, user_id),
+  constraint workspace_memberships_revocation_pair_check check (
+    (status = 'revoked') = (revoked_at is not null)
+  )
+);
+
+create index workspace_memberships_user_id_idx
+  on public.workspace_memberships (user_id);
+create index workspace_memberships_created_by_idx
+  on public.workspace_memberships (created_by)
+  where created_by is not null;
+
+alter table public.workspace_memberships enable row level security;
+revoke all on table public.workspace_memberships from public, anon, authenticated;
+grant select, insert, update, delete on table public.workspace_memberships to service_role;
+
+alter table public.restaurants
+  add column workspace_id uuid,
+  add column workspace_kind text generated always as ('restaurant'::text) stored;
+
+alter table public.memberships
+  add column workspace_membership_id uuid,
+  add column status text not null default 'active',
+  add column expires_at timestamptz,
+  add column revoked_at timestamptz,
+  add column granted_by uuid;
+
+-- Old restaurant inserts omit workspace_id. Default UUIDs have already been
+-- evaluated before this BEFORE trigger runs, so NEW.id is the deterministic
+-- singleton workspace identity.
+create or replace function public.ensure_restaurant_workspace()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.workspace_id is null then
+    insert into public.workspaces (id, kind, name, created_at)
+    values (new.id, 'restaurant', new.name, new.created_at)
+    on conflict (id) do nothing;
+
+    new.workspace_id := new.id;
+  elsif new.id <> new.workspace_id then
+    -- Remember that this workspace has ever contained a non-identity site.
+    -- Current sibling counts alone cannot distinguish a never-grouped
+    -- singleton after a former group's other sites have been deleted.
+    update public.workspaces w
+       set expanded_at = coalesce(w.expanded_at, statement_timestamp())
+     where w.id = new.workspace_id
+       and w.kind = 'restaurant';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.ensure_restaurant_workspace() from public;
+
+create trigger restaurants_ensure_workspace
+  before insert on public.restaurants
+  for each row execute function public.ensure_restaurant_workspace();
+
+create or replace function public.guard_restaurant_workspace_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- OLD may be null only during this migration's one-time backfill.
+  if old.workspace_id is not null
+     and old.workspace_id is distinct from new.workspace_id then
+    raise exception 'workspace_reassignment_requires_review' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_restaurant_workspace_assignment() from public;
+
+create trigger restaurants_guard_workspace_assignment
+  before update of workspace_id on public.restaurants
+  for each row execute function public.guard_restaurant_workspace_assignment();
+
+insert into public.workspaces (id, kind, name, created_at)
+select r.id, 'restaurant', r.name, r.created_at
+  from public.restaurants r
+on conflict (id) do nothing;
+
+-- Adding containment metadata must not make every existing restaurant appear
+-- freshly edited. The preceding ALTER TABLE lock is held to transaction end,
+-- so no writer can enter while only this named timestamp trigger is disabled.
+alter table public.restaurants disable trigger restaurants_set_updated_at;
+update public.restaurants
+   set workspace_id = id
+ where workspace_id is null;
+alter table public.restaurants enable trigger restaurants_set_updated_at;
+
+-- A workspace membership identity cannot be retargeted after a site grant has
+-- been linked to it.
+create or replace function public.guard_workspace_membership_identity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.workspace_id is distinct from new.workspace_id
+     or old.user_id is distinct from new.user_id then
+    raise exception 'workspace_membership_identity_immutable' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_workspace_membership_identity() from public;
+
+create trigger workspace_memberships_guard_identity
+  before update of workspace_id, user_id on public.workspace_memberships
+  for each row execute function public.guard_workspace_membership_identity();
+
+-- Compatibility and containment for old membership inserts. The outer table
+-- policy remains the authenticated authorization check; this trigger derives
+-- identity/provenance and never grants governance or reactivates a row.
+create or replace function public.link_membership_to_workspace()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_workspace_id           uuid;
+  v_workspace_membership   public.workspace_memberships%rowtype;
+  v_actor                  uuid := auth.uid();
+  v_backfill_link_update   boolean := false;
+begin
+  if tg_op = 'UPDATE' then
+    if new.granted_by is distinct from old.granted_by then
+      -- The FK's provenance-only ON DELETE SET NULL action sees its deleted
+      -- auth parent as absent. Return before any site/workspace lock. A caller
+      -- cannot clear or replace a still-existing granter.
+      if old.granted_by is not null
+         and new.granted_by is null
+         and (to_jsonb(new) - 'granted_by') = (to_jsonb(old) - 'granted_by')
+         and not exists (
+           select 1 from auth.users u where u.id = old.granted_by
+         ) then
+        return new;
+      end if;
+      raise exception 'membership_grant_provenance_immutable' using errcode = 'P0001';
+    end if;
+
+    -- The only identity update admitted is this migration's one-time nullable
+    -- link backfill. After NOT NULL is validated, moving a site grant is
+    -- delete+insert; rejecting retargeting also avoids row->restaurant lock
+    -- inversion with restaurant cleanup.
+    v_backfill_link_update := old.workspace_membership_id is null
+      and new.workspace_membership_id is not null
+      and new.user_id is not distinct from old.user_id
+      and new.restaurant_id is not distinct from old.restaurant_id;
+
+    if not v_backfill_link_update then
+      if new.user_id is distinct from old.user_id
+         or new.restaurant_id is distinct from old.restaurant_id
+         or new.workspace_membership_id is distinct from old.workspace_membership_id then
+        raise exception 'membership_identity_immutable' using errcode = 'P0001';
+      end if;
+      return new;
+    end if;
+  end if;
+
+  -- A legacy INSERT's outer restaurant FK has not fired yet. Take its parent
+  -- KEY SHARE lock before inserting/reusing a workspace member (whose FK takes
+  -- workspace KEY SHARE), matching restaurant cleanup's restaurant->workspace
+  -- order and preventing the inverse wait cycle.
+  select r.workspace_id
+    into v_workspace_id
+    from public.restaurants r
+   where r.id = new.restaurant_id
+   for key share;
+  if v_workspace_id is null then
+    raise exception 'membership_workspace_link_mismatch' using errcode = 'P0001';
+  end if;
+
+  if new.workspace_membership_id is null then
+    insert into public.workspace_memberships (
+      workspace_id, user_id, governance_role, created_by
+    ) values (
+      v_workspace_id, new.user_id, null, v_actor
+    )
+    on conflict (workspace_id, user_id) do nothing;
+
+    select *
+      into v_workspace_membership
+      from public.workspace_memberships wm
+     where wm.workspace_id = v_workspace_id
+       and wm.user_id = new.user_id;
+  else
+    select *
+      into v_workspace_membership
+      from public.workspace_memberships wm
+     where wm.id = new.workspace_membership_id;
+  end if;
+
+  if not found
+     or v_workspace_membership.workspace_id <> v_workspace_id
+     or v_workspace_membership.user_id <> new.user_id then
+    raise exception 'membership_workspace_link_mismatch' using errcode = 'P0001';
+  end if;
+
+  new.workspace_membership_id := v_workspace_membership.id;
+  if tg_op = 'INSERT' then
+    -- Ignore caller-supplied provenance. Authenticated legacy inserts record
+    -- their own JWT subject; service/trigger contexts remain null.
+    new.granted_by := v_actor;
+  else
+    new.granted_by := old.granted_by;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.link_membership_to_workspace() from public;
+
+create trigger memberships_link_workspace
+  before insert or update of user_id, restaurant_id, workspace_membership_id, granted_by
+  on public.memberships
+  for each row execute function public.link_membership_to_workspace();
+
+insert into public.workspace_memberships (
+  workspace_id, user_id, governance_role, created_at
+)
+select
+  r.workspace_id,
+  m.user_id,
+  case when bool_or(m.role = 'owner') then 'workspace_owner' end,
+  min(m.created_at)
+from public.memberships m
+join public.restaurants r on r.id = m.restaurant_id
+group by r.workspace_id, m.user_id
+on conflict (workspace_id, user_id) do nothing;
+
+-- A concurrent old-style owner insert may have created the row with null
+-- governance. The migration may promote only the governance exactly derivable
+-- from an existing singleton-site owner grant.
+update public.workspace_memberships wm
+   set governance_role = 'workspace_owner'
+ where wm.governance_role is null
+   and exists (
+     select 1
+       from public.restaurants r
+       join public.memberships m on m.restaurant_id = r.id
+      where r.workspace_id = wm.workspace_id
+        and m.user_id = wm.user_id
+        and m.role = 'owner'
+   );
+
+update public.memberships m
+   set workspace_membership_id = wm.id
+  from public.restaurants r,
+       public.workspace_memberships wm
+ where r.id = m.restaurant_id
+   and wm.workspace_id = r.workspace_id
+   and wm.user_id = m.user_id
+   and m.workspace_membership_id is null;
+
+do $foundation_assertions$
+begin
+  if exists (
+    select 1
+      from public.restaurants r
+      left join public.workspaces w
+        on w.id = r.workspace_id and w.kind = 'restaurant'
+     where r.workspace_id is null or w.id is null
+  ) then
+    raise exception 'workspace_backfill_restaurant_mismatch' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.memberships m
+      join public.restaurants r on r.id = m.restaurant_id
+      left join public.workspace_memberships wm
+        on wm.id = m.workspace_membership_id
+       and wm.workspace_id = r.workspace_id
+       and wm.user_id = m.user_id
+     where wm.id is null
+  ) then
+    raise exception 'workspace_backfill_membership_mismatch' using errcode = 'P0001';
+  end if;
+end;
+$foundation_assertions$;
+
+alter table public.restaurants
+  add constraint restaurants_workspace_kind_fkey
+    foreign key (workspace_id, workspace_kind)
+    references public.workspaces(id, kind)
+    on delete restrict
+    not valid;
+alter table public.restaurants validate constraint restaurants_workspace_kind_fkey;
+alter table public.restaurants alter column workspace_id set not null;
+create index restaurants_workspace_id_idx on public.restaurants (workspace_id);
+
+alter table public.memberships
+  add constraint memberships_status_check
+    check (status in ('active', 'revoked')) not valid,
+  add constraint memberships_revocation_pair_check
+    check ((status = 'revoked') = (revoked_at is not null)) not valid,
+  add constraint memberships_workspace_membership_fkey
+    foreign key (workspace_membership_id)
+    references public.workspace_memberships(id)
+    on delete no action
+    not valid,
+  add constraint memberships_granted_by_fkey
+    foreign key (granted_by)
+    references auth.users(id)
+    on delete set null
+    not valid;
+
+alter table public.memberships validate constraint memberships_status_check;
+alter table public.memberships validate constraint memberships_revocation_pair_check;
+alter table public.memberships validate constraint memberships_workspace_membership_fkey;
+alter table public.memberships validate constraint memberships_granted_by_fkey;
+alter table public.memberships alter column workspace_membership_id set not null;
+
+create index memberships_workspace_membership_id_idx
+  on public.memberships (workspace_membership_id);
+create index memberships_granted_by_idx
+  on public.memberships (granted_by)
+  where granted_by is not null;
+
+-- Legacy restaurant deletion compatibility. This is not a general account-
+-- erasure API. It removes a workspace only when every row is provably derived
+-- from the deterministic singleton site being deleted.
+create or replace function public.prepare_derived_workspace_cleanup()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.workspace_id <> old.id then
+    return old;
+  end if;
+
+  perform 1
+    from public.workspaces w
+   where w.id = old.workspace_id
+     and w.kind = 'restaurant'
+     and w.expanded_at is null
+   for update;
+  if not found then
+    return old;
+  end if;
+
+  if exists (
+    select 1 from public.restaurants r
+     where r.workspace_id = old.workspace_id and r.id <> old.id
+  ) then
+    return old;
+  end if;
+
+  perform 1
+    from public.memberships m
+   where m.restaurant_id = old.id
+   order by m.id
+   for update;
+  perform 1
+    from public.workspace_memberships wm
+   where wm.workspace_id = old.workspace_id
+   order by wm.id
+   for update;
+
+  if exists (
+    select 1
+      from public.workspace_memberships wm
+     where wm.workspace_id = old.workspace_id
+       and (
+         wm.status <> 'active'
+         or wm.expires_at is not null
+         or wm.revoked_at is not null
+         or wm.governance_role = 'group_admin'
+         or not exists (
+           select 1 from public.memberships m
+            where m.restaurant_id = old.id
+              and m.user_id = wm.user_id
+         )
+         or (
+           wm.governance_role = 'workspace_owner'
+           and not exists (
+             select 1 from public.memberships m
+              where m.restaurant_id = old.id
+                and m.user_id = wm.user_id
+                and m.role = 'owner'
+           )
+         )
+       )
+  ) or exists (
+    select 1
+      from public.memberships m
+     where m.restaurant_id = old.id
+       and (
+         m.status <> 'active'
+         or m.expires_at is not null
+         or m.revoked_at is not null
+       )
+  ) then
+    return old;
+  end if;
+
+  delete from public.memberships where restaurant_id = old.id;
+  delete from public.workspace_memberships where workspace_id = old.workspace_id;
+  return old;
+end;
+$$;
+
+revoke all on function public.prepare_derived_workspace_cleanup() from public;
+
+create trigger restaurants_prepare_derived_workspace_cleanup
+  before delete on public.restaurants
+  for each row execute function public.prepare_derived_workspace_cleanup();
+
+create or replace function public.finish_derived_workspace_cleanup()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.workspace_id = old.id then
+    delete from public.workspaces w
+     where w.id = old.workspace_id
+       and w.kind = 'restaurant'
+       and w.expanded_at is null
+       and not exists (
+         select 1 from public.restaurants r where r.workspace_id = w.id
+       )
+       and not exists (
+         select 1 from public.workspace_memberships wm where wm.workspace_id = w.id
+       );
+  end if;
+  return old;
+end;
+$$;
+
+revoke all on function public.finish_derived_workspace_cleanup() from public;
+
+create trigger restaurants_finish_derived_workspace_cleanup
+  after delete on public.restaurants
+  for each row execute function public.finish_derived_workspace_cleanup();
+
+-- Preserve the exact 0053 naming and reason-code behavior. Auth metadata
+-- cannot select workspace identity/kind/governance, site role, or lifecycle.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_restaurant_id          uuid;
+  new_workspace_id           uuid;
+  new_workspace_member_id    uuid;
+  restaurant_name            text;
+begin
+  restaurant_name := coalesce(
+    nullif(trim(new.raw_user_meta_data ->> 'restaurant_name'), ''),
+    'My Restaurant'
+  );
+
+  insert into public.restaurants (name)
+  values (restaurant_name)
+  returning id, workspace_id into new_restaurant_id, new_workspace_id;
+
+  insert into public.workspace_memberships (
+    workspace_id, user_id, governance_role, created_by
+  ) values (
+    new_workspace_id, new.id, 'workspace_owner', new.id
+  )
+  returning id into new_workspace_member_id;
+
+  insert into public.memberships (
+    user_id, restaurant_id, role, workspace_membership_id
+  ) values (
+    new.id, new_restaurant_id, 'owner', new_workspace_member_id
+  );
+
+  perform public.seed_reason_codes(new_restaurant_id);
+  return new;
+end;
+$$;
+
+create or replace function public.shadow_effective_site_access(p_restaurant_id uuid)
+returns table (
+  restaurant_id  uuid,
+  workspace_id   uuid,
+  legacy_role    public.membership_role,
+  preset_key     text,
+  capabilities   text[],
+  access_source  text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    r.id,
+    r.workspace_id,
+    m.role,
+    case m.role
+      when 'owner' then 'site_owner'
+      when 'manager' then 'beverage_manager'
+      when 'staff' then 'service_staff'
+    end,
+    case m.role
+      when 'owner' then
+        array[
+          'site.read', 'inventory.service', 'inventory.manage',
+          'receiving.capture', 'receiving.cost_capture', 'count.capture',
+          'discrepancy.approve', 'cost.read', 'margin.read',
+          'pricing.manage', 'team.site.manage'
+        ]::text[] || case
+          when wm.governance_role in ('workspace_owner', 'group_admin')
+            then array['group.manage']::text[]
+          else array[]::text[]
+        end
+      when 'manager' then array[
+        'site.read', 'inventory.service', 'inventory.manage',
+        'receiving.capture', 'receiving.cost_capture', 'count.capture',
+        'discrepancy.approve', 'cost.read', 'margin.read', 'pricing.manage'
+      ]::text[]
+      when 'staff' then array['site.read', 'inventory.service']::text[]
+    end,
+    'explicit_site_membership'::text
+  from public.memberships m
+  join public.restaurants r on r.id = m.restaurant_id
+  join public.workspaces w
+    on w.id = r.workspace_id and w.kind = 'restaurant'
+  join public.workspace_memberships wm
+    on wm.id = m.workspace_membership_id
+   and wm.workspace_id = r.workspace_id
+   and wm.user_id = m.user_id
+  where m.user_id = (select auth.uid())
+    and m.restaurant_id = p_restaurant_id
+    and m.status = 'active'
+    and m.revoked_at is null
+    and (m.expires_at is null or m.expires_at > now())
+    and wm.status = 'active'
+    and wm.revoked_at is null
+    and (wm.expires_at is null or wm.expires_at > now());
+$$;
+
+create or replace function public.shadow_has_site_capability(
+  p_restaurant_id uuid,
+  p_capability_key text
+) returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when p_capability_key is null or p_capability_key not in (
+      'site.read', 'inventory.service', 'inventory.manage',
+      'receiving.capture', 'receiving.cost_capture', 'count.capture',
+      'discrepancy.approve', 'cost.read', 'margin.read',
+      'pricing.manage', 'team.site.manage', 'group.manage'
+    ) then false
+    else coalesce((
+      select p_capability_key = any(a.capabilities)
+        from public.shadow_effective_site_access(p_restaurant_id) a
+    ), false)
+  end;
+$$;
+
+create or replace function public.shadow_effective_site_ids(p_capability_key text)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select distinct a.restaurant_id
+    from public.memberships m
+    cross join lateral public.shadow_effective_site_access(m.restaurant_id) a
+   where m.user_id = (select auth.uid())
+     and p_capability_key in (
+       'site.read', 'inventory.service', 'inventory.manage',
+       'receiving.capture', 'receiving.cost_capture', 'count.capture',
+       'discrepancy.approve', 'cost.read', 'margin.read',
+       'pricing.manage', 'team.site.manage', 'group.manage'
+     )
+     and p_capability_key = any(a.capabilities)
+   order by a.restaurant_id;
+$$;
+
+comment on function public.shadow_effective_site_access(uuid) is
+  'C04 Slice 1 observational result only. Legacy membership helpers and RLS remain authoritative.';
+comment on function public.shadow_has_site_capability(uuid, text) is
+  'C04 Slice 1 observational result only. Unknown capability keys return false.';
+comment on function public.shadow_effective_site_ids(text) is
+  'C04 Slice 1 observational explicit-site list only; workspace membership never grants a site.';
+
+revoke all on function public.shadow_effective_site_access(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.shadow_has_site_capability(uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.shadow_effective_site_ids(text)
+  from public, anon, authenticated, service_role;
+
+grant execute on function public.shadow_effective_site_access(uuid)
+  to authenticated, service_role;
+grant execute on function public.shadow_has_site_capability(uuid, text)
+  to authenticated, service_role;
+grant execute on function public.shadow_effective_site_ids(text)
+  to authenticated, service_role;
+
+-- === 0153_physical_bottle_expansion.sql ===
+-- 0153_physical_bottle_expansion.sql
+--
+-- TER-CF-298..315, Phase A only: additive physical-bottle schema, dormant
+-- version-2 writers, tenant-invoker readers, and a closed effect resolver.
+-- The legacy one-slot-per-wine contract and every legacy writer remain active.
+--
+-- Apply in one explicit transaction. The five ACCESS EXCLUSIVE NOWAIT locks
+-- are intentionally acquired before any mutable ownership, privilege, row, or
+-- relationship check. This is a maintenance-window migration, not a
+-- zero-downtime migration. A standalone operator preflight does not reserve
+-- this window: this migration repeats every mutable check after taking the
+-- locks and holds them through commit or rollback.
+
+do $static_admission$
+declare
+  v_name text;
+  v_present_column_pair_count integer := 0;
+  v_present_object_count integer := 0;
+  v_present_constraint_identity_count integer := 0;
+  v_present_index_identity_count integer := 0;
+  v_phase_state text;
+begin
+  foreach v_name in array array[
+    'inventory_items',
+    'open_bottles',
+    'pour_events',
+    'bottle_closeouts',
+    'inventory_command_receipts'
+  ] loop
+    if to_regclass('public.' || v_name) is null then
+      raise exception 'C06_REQUIRED_TABLE_MISSING: %', v_name using errcode = 'P0001';
+    end if;
+  end loop;
+
+  select count(*) into v_present_object_count
+    from (values
+      -- C06_PHASE_A_OBJECT_IDENTITIES_BEGIN
+      (to_regclass('public.inventory_command_bottle_effects') is not null),
+      (to_regclass('public.effective_service_pour_events') is not null),
+      (to_regprocedure('public.current_inventory_contract_version()') is not null),
+      (to_regprocedure('public.execute_physical_bottle_command(uuid,uuid,text,uuid,uuid,uuid,integer,text,text,integer,integer,uuid,uuid,text,boolean)') is not null),
+      (to_regprocedure('public.execute_physical_reconciliation_batch(uuid,uuid,jsonb)') is not null),
+      (to_regprocedure('public.list_active_physical_bottles(uuid)') is not null),
+      (to_regprocedure('public.list_open_bottle_aggregates(uuid)') is not null)
+      -- C06_PHASE_A_OBJECT_IDENTITIES_END
+    ) expected(occupied)
+   where occupied;
+
+  select count(*) into v_present_column_pair_count
+    from (values
+      -- C06_PHASE_A_COLUMN_PAIRS_BEGIN
+      ('public.open_bottles'::regclass, 'identity_contract'),
+      ('public.open_bottles'::regclass, 'identity_origin'),
+      ('public.open_bottles'::regclass, 'nominal_capacity_ml'),
+      ('public.open_bottles'::regclass, 'source_provenance'),
+      ('public.open_bottles'::regclass, 'opening_operation_id'),
+      ('public.open_bottles'::regclass, 'state_version'),
+      ('public.inventory_command_receipts'::regclass, 'command_version'),
+      ('public.inventory_command_receipts'::regclass, 'scope_kind'),
+      ('public.inventory_command_receipts'::regclass, 'batch_entry_count'),
+      ('public.pour_events'::regclass, 'event_contract'),
+      ('public.pour_events'::regclass, 'operation_id'),
+      ('public.pour_events'::regclass, 'operation_entry_ordinal'),
+      ('public.pour_events'::regclass, 'reversal_of_event_id'),
+      ('public.bottle_closeouts'::regclass, 'event_contract')
+      -- C06_PHASE_A_COLUMN_PAIRS_END
+    ) expected(relid, attname)
+    join pg_catalog.pg_attribute a
+      on a.attrelid = expected.relid
+     and a.attname = expected.attname
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  select count(*) into v_present_constraint_identity_count
+    from (values
+      -- C06_PHASE_A_CONSTRAINT_IDENTITIES_BEGIN
+      ('public.inventory_items'::regclass, 'inventory_items_id_restaurant_wine_key'),
+      ('public.open_bottles'::regclass, 'open_bottles_id_restaurant_wine_key'),
+      ('public.open_bottles'::regclass, 'open_bottles_identity_contract_check'),
+      ('public.open_bottles'::regclass, 'open_bottles_identity_origin_check'),
+      ('public.open_bottles'::regclass, 'open_bottles_nominal_capacity_check'),
+      ('public.open_bottles'::regclass, 'open_bottles_source_provenance_check'),
+      ('public.open_bottles'::regclass, 'open_bottles_state_version_check'),
+      ('public.open_bottles'::regclass, 'open_bottles_physical_shape_check'),
+      ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_command_version_check'),
+      ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_scope_kind_check'),
+      ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_batch_entry_count_check'),
+      ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_versioned_shape_check'),
+      ('public.pour_events'::regclass, 'pour_events_event_contract_check'),
+      ('public.pour_events'::regclass, 'pour_events_operation_entry_ordinal_check'),
+      ('public.pour_events'::regclass, 'pour_events_open_bottle_tenant_wine_fkey'),
+      ('public.pour_events'::regclass, 'pour_events_operation_receipt_fkey'),
+      ('public.pour_events'::regclass, 'pour_events_reversal_of_event_fkey'),
+      ('public.pour_events'::regclass, 'pour_events_physical_shape_check'),
+      ('public.bottle_closeouts'::regclass, 'bottle_closeouts_event_contract_check'),
+      ('public.bottle_closeouts'::regclass, 'bottle_closeouts_open_bottle_tenant_wine_fkey'),
+      ('public.bottle_closeouts'::regclass, 'bottle_closeouts_physical_shape_check')
+      -- C06_PHASE_A_CONSTRAINT_IDENTITIES_END
+    ) expected(relid, conname)
+    join pg_catalog.pg_constraint c
+      on c.conrelid = expected.relid
+     and c.conname = expected.conname;
+
+  select count(*) into v_present_index_identity_count
+    from (values
+      -- C06_PHASE_A_INDEX_IDENTITIES_BEGIN
+      ('public.pour_events_operation_entry_key'),
+      ('public.pour_events_reversal_key'),
+      ('public.pour_events_open_bottle_tenant_wine_idx'),
+      ('public.bottle_closeouts_open_bottle_tenant_wine_idx')
+      -- C06_PHASE_A_INDEX_IDENTITIES_END
+    ) expected(identity)
+   where to_regclass(expected.identity) is not null;
+
+  -- Pristine means none of the four exact collision classes is occupied.
+  -- Complete identity also requires the 21 newly named constraints and four
+  -- indexes on pre-existing relations. Two legacy constraints are replaced
+  -- in place and are validated separately; the new table owns its definitions.
+  -- C06_PHASE_A_STATE_CLASSIFIER_BEGIN
+  v_phase_state := case
+    when v_present_column_pair_count = 0
+      and v_present_object_count = 0
+      and v_present_constraint_identity_count = 0
+      and v_present_index_identity_count = 0
+      then 'pristine'
+    when v_present_column_pair_count = 14
+      and v_present_object_count = 7
+      and v_present_constraint_identity_count = 21
+      and v_present_index_identity_count = 4
+      then 'complete_identity'
+    else 'partial_mixed'
+  end;
+  -- C06_PHASE_A_STATE_CLASSIFIER_END
+
+  if v_phase_state = 'complete_identity' then
+    raise exception 'C06_0153_ALREADY_APPLIED' using errcode = 'P0001';
+  elsif v_phase_state = 'partial_mixed' then
+    raise exception 'C06_0153_PARTIAL_STATE' using errcode = 'P0001';
+  end if;
+end;
+$static_admission$;
+
+lock table public.inventory_items in access exclusive mode nowait;
+lock table public.open_bottles in access exclusive mode nowait;
+lock table public.pour_events in access exclusive mode nowait;
+lock table public.bottle_closeouts in access exclusive mode nowait;
+lock table public.inventory_command_receipts in access exclusive mode nowait;
+
+do $locked_preflight$
+declare
+  v_current_role_oid oid;
+  v_table record;
+  v_table_count int := 0;
+begin
+  select oid into strict v_current_role_oid
+    from pg_catalog.pg_roles
+   where rolname = current_user;
+
+  for v_table in
+    select c.oid::regclass::text as identity, c.relowner
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname in (
+         'inventory_items', 'open_bottles', 'pour_events',
+         'bottle_closeouts', 'inventory_command_receipts'
+       )
+       and c.relkind in ('r', 'p')
+  loop
+    v_table_count := v_table_count + 1;
+    if v_table.relowner <> v_current_role_oid then
+      raise exception 'C06_OPERATOR_NOT_DIRECT_OWNER: %', v_table.identity
+        using errcode = 'P0001';
+    end if;
+    if not has_table_privilege(current_user, v_table.identity, 'REFERENCES') then
+      raise exception 'C06_OPERATOR_MISSING_REFERENCES: %', v_table.identity
+        using errcode = 'P0001';
+    end if;
+  end loop;
+  if v_table_count <> 5 then
+    raise exception 'C06_REQUIRED_TABLE_SHAPE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if not has_schema_privilege(current_user, 'public', 'USAGE')
+     or not has_schema_privilege(current_user, 'public', 'CREATE') then
+    raise exception 'C06_OPERATOR_MISSING_PUBLIC_SCHEMA_AUTHORITY' using errcode = 'P0001';
+  end if;
+  if not has_schema_privilege(current_user, 'auth', 'USAGE')
+     or not has_function_privilege(current_user, 'auth.uid()', 'EXECUTE') then
+    raise exception 'C06_OPERATOR_MISSING_AUTH_UID_AUTHORITY' using errcode = 'P0001';
+  end if;
+  if not has_type_privilege(current_user, 'public.membership_role', 'USAGE')
+     or not has_language_privilege(current_user, 'sql', 'USAGE')
+     or not has_language_privilege(current_user, 'plpgsql', 'USAGE') then
+    raise exception 'C06_OPERATOR_MISSING_TYPE_OR_LANGUAGE_AUTHORITY' using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint c
+     where c.conrelid = 'public.open_bottles'::regclass
+       and c.conname = 'open_bottles_wine_id_restaurant_id_key'
+       and c.contype = 'u'
+       and not c.condeferrable
+       and not c.condeferred
+       and (
+         select array_agg(a.attname::text order by key.ordinality)
+           from unnest(c.conkey) with ordinality key(attnum, ordinality)
+           join pg_catalog.pg_attribute a
+             on a.attrelid = c.conrelid and a.attnum = key.attnum
+       ) = array['wine_id', 'restaurant_id']
+  )
+     or not exists (
+       select 1
+         from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.open_bottles'::regclass
+          and c.conname = 'open_bottles_source_inventory_item_id_fkey'
+          and c.contype = 'f'
+          and c.confrelid = 'public.inventory_items'::regclass
+          and c.confdeltype = 'n'
+          and not c.condeferrable
+          and pg_catalog.pg_get_constraintdef(c.oid, true) =
+            'FOREIGN KEY (source_inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL'
+     )
+     or not exists (
+       select 1 from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.pour_events'::regclass
+          and c.conname = 'pour_events_open_bottle_id_fkey'
+          and c.contype = 'f'
+          and c.confrelid = 'public.open_bottles'::regclass
+          and c.confdeltype = 'n'
+          and not c.condeferrable
+          and pg_catalog.pg_get_constraintdef(c.oid, true) =
+            'FOREIGN KEY (open_bottle_id) REFERENCES open_bottles(id) ON DELETE SET NULL'
+     )
+     or not exists (
+       select 1 from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.bottle_closeouts'::regclass
+          and c.conname = 'bottle_closeouts_open_bottle_id_fkey'
+          and c.contype = 'f'
+          and c.confrelid = 'public.open_bottles'::regclass
+          and c.confdeltype = 'n'
+          and not c.condeferrable
+          and pg_catalog.pg_get_constraintdef(c.oid, true) =
+            'FOREIGN KEY (open_bottle_id) REFERENCES open_bottles(id) ON DELETE SET NULL'
+     )
+     or exists (
+       select 1
+         from (values
+           ('public.open_bottles'::regclass, 'open_bottles_remaining_ml_check',
+             'CHECK (remaining_ml >= 0)'),
+           ('public.open_bottles'::regclass, 'open_bottles_preservation_method_check',
+             'CHECK (preservation_method = ANY (ARRAY[''coravin''::text, ''argon''::text, ''vacuum''::text, ''none''::text]))'),
+           ('public.pour_events'::regclass, 'pour_events_kind_check',
+             'CHECK (kind = ANY (ARRAY[''pour''::text, ''spill''::text, ''reconcile''::text, ''new_bottle''::text, ''finish_bottle''::text]))'),
+           ('public.bottle_closeouts'::regclass, 'bottle_closeouts_writeoff_requires_reason',
+             'CHECK (written_off_ml = 0 OR reason_code_id IS NOT NULL)'),
+           ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_completion_pair',
+             'CHECK ((result_payload IS NULL) = (completed_at IS NULL))'),
+           ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_result_object',
+             'CHECK (result_payload IS NULL OR jsonb_typeof(result_payload) = ''object''::text)'),
+           ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_command_type_check',
+             'CHECK (command_type = ANY (ARRAY[''open''::text, ''pour''::text, ''spill''::text, ''discard''::text, ''close''::text]))')
+         ) expected(relid, conname, definition)
+         left join pg_catalog.pg_constraint c
+           on c.conrelid = expected.relid
+          and c.conname = expected.conname
+          and c.contype = 'c'
+          and pg_catalog.pg_get_constraintdef(c.oid, true) = expected.definition
+        where c.oid is null
+     ) then
+    raise exception 'C06_LEGACY_CATALOG_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from (values
+        ('public.pour_events_maintain_open_bottle()'::text, '3c332a9ca14b6d4ceda236fe781d523f', false, null::text),
+        ('public.pour_events_reverse_open_bottle()'::text, 'b76aa11a1e25f9619cd2c2f0f3b91578', false, null::text),
+        ('public.open_bottles_enforce_capacity()'::text, '3229387cea973b91bdf1d34e1f99b6c8', false, null::text),
+        ('public.record_pour(uuid,integer,text,text)'::text, 'a36891d363afca3e15fee2c77b625285', true, 'public'::text),
+        ('public.reconcile_open_bottle(uuid,integer,text)'::text, '26824f46b3e8b6c4d0692fe21cb8d246', true, 'public'::text),
+        ('public.reconcile_open_bottles_batch(jsonb)'::text, 'fe0ee6e79deb385f655c95aa59bb8806', true, 'public'::text),
+        ('public.undo_last_pour(uuid)'::text, 'c213196b31d20f2a556ed6a0623738f4', true, 'public'::text),
+        ('public.execute_inventory_command(uuid,uuid,text,uuid,integer,text,text,uuid,timestamp with time zone,integer,integer,uuid)'::text,
+          'e94dc3bc06bd5d838bd02e4fefd01353', true, 'public'::text)
+      ) expected(identity, body_md5, security_definer, search_path)
+      left join pg_catalog.pg_proc p
+        on p.oid = to_regprocedure(expected.identity)
+     where p.oid is null
+        or md5(p.prosrc) <> expected.body_md5
+        or p.prosecdef is distinct from expected.security_definer
+        or p.provolatile <> 'v'
+        or coalesce(p.proconfig, array[]::text[]) is distinct from
+          case when expected.search_path is null then array[]::text[]
+               else array['search_path=' || expected.search_path]
+          end
+  ) then
+    raise exception 'C06_LEGACY_FUNCTION_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from (values
+        ('public.pour_events'::regclass, 'pour_events_trigger',
+          'public.pour_events_maintain_open_bottle()'::text, 5::smallint),
+        ('public.pour_events'::regclass, 'pour_events_delete_trigger',
+          'public.pour_events_reverse_open_bottle()'::text, 9::smallint),
+        ('public.open_bottles'::regclass, 'open_bottles_enforce_capacity_trigger',
+          'public.open_bottles_enforce_capacity()'::text, 23::smallint)
+      ) expected(relid, trigger_name, function_identity, trigger_type)
+      left join pg_catalog.pg_trigger t
+        on t.tgrelid = expected.relid
+       and t.tgname = expected.trigger_name
+       and t.tgfoid = to_regprocedure(expected.function_identity)
+       and t.tgtype = expected.trigger_type
+       and t.tgenabled = 'O'
+       and not t.tgisinternal
+       and t.tgnargs = 0
+       and t.tgqual is null
+     where t.oid is null
+  ) then
+    raise exception 'C06_LEGACY_TRIGGER_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.pour_events pe
+      left join public.open_bottles ob on ob.id = pe.open_bottle_id
+     where pe.open_bottle_id is not null
+       and (
+         ob.id is null
+         or ob.restaurant_id is distinct from pe.restaurant_id
+         or ob.wine_id is distinct from pe.wine_id
+       )
+  ) then
+    raise exception 'C06_POUR_EVENT_BOTTLE_CONTAINMENT_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.bottle_closeouts bc
+      left join public.open_bottles ob on ob.id = bc.open_bottle_id
+     where bc.open_bottle_id is not null
+       and (
+         ob.id is null
+         or ob.restaurant_id is distinct from bc.restaurant_id
+         or ob.wine_id is distinct from bc.wine_id
+       )
+  ) then
+    raise exception 'C06_CLOSEOUT_BOTTLE_CONTAINMENT_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.open_bottles ob
+      join public.inventory_items ii on ii.id = ob.source_inventory_item_id
+     where ob.source_inventory_item_id is not null
+       and (
+         ii.restaurant_id is distinct from ob.restaurant_id
+         or ii.wine_id is distinct from ob.wine_id
+       )
+  ) then
+    raise exception 'C06_SOURCE_LOT_CONTAINMENT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$locked_preflight$;
+
+alter table public.inventory_items
+  add constraint inventory_items_id_restaurant_wine_key
+  unique (id, restaurant_id, wine_id);
+
+alter table public.open_bottles
+  add column identity_contract smallint not null default 1,
+  add column identity_origin text not null default 'legacy_slot',
+  add column nominal_capacity_ml int,
+  add column source_provenance text not null default 'legacy_unknown',
+  add column opening_operation_id uuid,
+  add column state_version bigint not null default 0,
+  add constraint open_bottles_id_restaurant_wine_key
+    unique (id, restaurant_id, wine_id),
+  add constraint open_bottles_identity_contract_check
+    check (identity_contract in (1, 2)),
+  add constraint open_bottles_identity_origin_check
+    check (identity_origin in ('legacy_slot', 'migrated_active', 'native')),
+  add constraint open_bottles_nominal_capacity_check
+    check (nominal_capacity_ml is null or nominal_capacity_ml > 0),
+  add constraint open_bottles_source_provenance_check
+    check (source_provenance in ('known', 'legacy_unknown')),
+  add constraint open_bottles_state_version_check
+    check (state_version >= 0),
+  add constraint open_bottles_physical_shape_check check (
+    identity_contract = 1
+    or (
+      nominal_capacity_ml is not null
+      and identity_origin in ('migrated_active', 'native')
+      and (
+        identity_origin <> 'native'
+        or (
+          source_provenance = 'known'
+          and source_inventory_item_id is not null
+          and opening_operation_id is not null
+        )
+      )
+    )
+  ) not valid;
+
+alter table public.inventory_command_receipts
+  drop constraint inventory_command_receipts_command_type_check,
+  alter column wine_id drop not null,
+  add column command_version smallint not null default 1,
+  add column scope_kind text not null default 'single_wine',
+  add column batch_entry_count int,
+  add constraint inventory_command_receipts_command_version_check
+    check (command_version in (1, 2)),
+  add constraint inventory_command_receipts_command_type_check check (
+    command_type in (
+      'open', 'pour', 'spill', 'discard', 'close', 'reconcile_batch', 'undo'
+    )
+  ),
+  add constraint inventory_command_receipts_scope_kind_check
+    check (scope_kind in ('single_wine', 'exact_bottle_batch')),
+  add constraint inventory_command_receipts_batch_entry_count_check
+    check (batch_entry_count is null or batch_entry_count > 0),
+  add constraint inventory_command_receipts_versioned_shape_check check (
+    (
+      command_version = 1
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close', 'undo')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type = 'reconcile_batch'
+      and scope_kind = 'exact_bottle_batch'
+      and wine_id is null
+      and batch_entry_count > 0
+    )
+  );
+
+alter table public.pour_events
+  drop constraint pour_events_open_bottle_id_fkey,
+  drop constraint pour_events_kind_check,
+  add column event_contract smallint not null default 1,
+  add column operation_id uuid,
+  add column operation_entry_ordinal int,
+  add column reversal_of_event_id uuid,
+  add constraint pour_events_kind_check check (
+    kind in ('pour', 'spill', 'reconcile', 'new_bottle', 'finish_bottle', 'undo')
+  ),
+  add constraint pour_events_event_contract_check
+    check (event_contract in (1, 2)),
+  add constraint pour_events_operation_entry_ordinal_check
+    check (operation_entry_ordinal is null or operation_entry_ordinal >= 0),
+  add constraint pour_events_open_bottle_tenant_wine_fkey
+    foreign key (open_bottle_id, restaurant_id, wine_id)
+    references public.open_bottles (id, restaurant_id, wine_id)
+    on delete set null (open_bottle_id)
+    deferrable initially deferred,
+  add constraint pour_events_operation_receipt_fkey
+    foreign key (restaurant_id, operation_id)
+    references public.inventory_command_receipts (restaurant_id, operation_id)
+    on delete restrict
+    deferrable initially deferred,
+  add constraint pour_events_reversal_of_event_fkey
+    foreign key (reversal_of_event_id)
+    references public.pour_events (id)
+    on delete restrict,
+  add constraint pour_events_physical_shape_check check (
+    (
+      event_contract = 1
+      and kind <> 'undo'
+      and operation_id is null
+      and operation_entry_ordinal is null
+      and reversal_of_event_id is null
+    )
+    or (
+      event_contract = 2
+      and open_bottle_id is not null
+      and operation_id is not null
+      and operation_entry_ordinal is not null
+      and ((kind = 'undo') = (reversal_of_event_id is not null))
+    )
+  ) not valid;
+
+create unique index pour_events_operation_entry_key
+  on public.pour_events (restaurant_id, operation_id, operation_entry_ordinal)
+  where operation_id is not null;
+create unique index pour_events_reversal_key
+  on public.pour_events (reversal_of_event_id)
+  where reversal_of_event_id is not null;
+create index pour_events_open_bottle_tenant_wine_idx
+  on public.pour_events (open_bottle_id, restaurant_id, wine_id)
+  where open_bottle_id is not null;
+
+alter table public.bottle_closeouts
+  drop constraint bottle_closeouts_open_bottle_id_fkey,
+  add column event_contract smallint not null default 1,
+  add constraint bottle_closeouts_event_contract_check
+    check (event_contract in (1, 2)),
+  add constraint bottle_closeouts_open_bottle_tenant_wine_fkey
+    foreign key (open_bottle_id, restaurant_id, wine_id)
+    references public.open_bottles (id, restaurant_id, wine_id)
+    on delete set null (open_bottle_id)
+    deferrable initially deferred,
+  add constraint bottle_closeouts_physical_shape_check check (
+    event_contract = 1 or open_bottle_id is not null
+  ) not valid;
+
+create index bottle_closeouts_open_bottle_tenant_wine_idx
+  on public.bottle_closeouts (open_bottle_id, restaurant_id, wine_id);
+
+create table public.inventory_command_bottle_effects (
+  restaurant_id uuid not null,
+  operation_id uuid not null,
+  entry_ordinal int not null check (entry_ordinal >= 0),
+  open_bottle_id uuid not null,
+  wine_id uuid not null,
+  effect_type text not null check (
+    effect_type in ('open', 'pour', 'spill', 'reconcile', 'close', 'discard', 'undo')
+  ),
+  primary key (restaurant_id, operation_id, entry_ordinal),
+  constraint inventory_command_bottle_effects_operation_bottle_effect_key
+    unique (restaurant_id, operation_id, open_bottle_id, effect_type),
+  constraint inventory_command_bottle_effects_receipt_fkey
+    foreign key (restaurant_id, operation_id)
+    references public.inventory_command_receipts (restaurant_id, operation_id)
+    on delete restrict,
+  constraint inventory_command_bottle_effects_bottle_fkey
+    foreign key (open_bottle_id, restaurant_id, wine_id)
+    references public.open_bottles (id, restaurant_id, wine_id)
+    on delete restrict
+    deferrable initially deferred
+);
+
+create unique index inventory_command_bottle_effects_open_operation_key
+  on public.inventory_command_bottle_effects (restaurant_id, operation_id)
+  where effect_type = 'open';
+create index inventory_command_bottle_effects_bottle_idx
+  on public.inventory_command_bottle_effects (open_bottle_id, restaurant_id, wine_id);
+create index inventory_command_bottle_effects_wine_idx
+  on public.inventory_command_bottle_effects (restaurant_id, wine_id, operation_id);
+
+alter table public.inventory_command_bottle_effects enable row level security;
+revoke all on table public.inventory_command_bottle_effects
+  from public, anon, authenticated, service_role;
+
+create function public.current_inventory_contract_version()
+returns smallint
+language sql
+stable
+security invoker
+set search_path = ''
+as $$ select 1::smallint $$;
+
+revoke all on function public.current_inventory_contract_version()
+  from public, anon, service_role;
+grant execute on function public.current_inventory_contract_version()
+  to authenticated;
+
+create function public.execute_physical_bottle_command(
+  p_operation_id uuid,
+  p_restaurant_id uuid,
+  p_command text,
+  p_wine_id uuid,
+  p_open_bottle_id uuid default null,
+  p_predecessor_open_operation_id uuid default null,
+  p_ml int default null,
+  p_note text default null,
+  p_preservation_method text default null,
+  p_actual_remaining_ml int default null,
+  p_written_off_ml int default 0,
+  p_reason_code_id uuid default null,
+  p_reversal_of_event_id uuid default null,
+  p_correction_reason text default null,
+  p_operator_confirms_same_bottle_present boolean default false
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user uuid := auth.uid();
+  v_role public.membership_role;
+  v_note text := nullif(btrim(p_note), '');
+  v_request jsonb;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_claimed uuid;
+  v_size_ml int;
+  v_bottle public.open_bottles%rowtype;
+  v_source public.inventory_items%rowtype;
+  v_selected_bottle_id uuid;
+  v_event public.pour_events%rowtype;
+  v_new_event_id uuid;
+  v_closeout public.bottle_closeouts%rowtype;
+  v_effect_type text;
+  v_occurred_at timestamptz := clock_timestamp();
+  v_result jsonb;
+  v_is_discard boolean;
+begin
+  if public.current_inventory_contract_version() <> 2 then
+    raise exception 'physical_inventory_contract_inactive' using errcode = 'P0001';
+  end if;
+  if v_user is null
+     or p_operation_id is null
+     or p_restaurant_id is null
+     or p_wine_id is null
+     or p_command is null
+     or p_command not in ('open', 'pour', 'spill', 'close', 'discard', 'undo')
+     or (v_note is not null and char_length(v_note) > 500)
+     or p_written_off_ml is null
+     or p_operator_confirms_same_bottle_present is null then
+    raise exception 'invalid_physical_command' using errcode = 'P0001';
+  end if;
+
+  if p_command = 'open' then
+    if p_open_bottle_id is not null
+       or p_predecessor_open_operation_id is not null
+       or p_ml is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present
+       or coalesce(p_preservation_method, 'none') not in ('coravin', 'argon', 'vacuum', 'none') then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  elsif p_command in ('pour', 'spill') then
+    if (p_open_bottle_id is null) = (p_predecessor_open_operation_id is null)
+       or p_ml is null or p_ml <= 0 or p_ml > 2000
+       or p_preservation_method is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  elsif p_command in ('close', 'discard') then
+    if (p_open_bottle_id is null) = (p_predecessor_open_operation_id is null)
+       or p_ml is not null
+       or p_preservation_method is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    if p_command = 'discard' and (
+      p_actual_remaining_ml is not null or p_written_off_ml <> 0 or p_reason_code_id is not null
+    ) then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    if p_command = 'close' and (
+      p_actual_remaining_ml is null or p_actual_remaining_ml < 0
+      or p_written_off_ml < 0 or p_written_off_ml > p_actual_remaining_ml
+      or (p_written_off_ml > 0 and p_reason_code_id is null)
+    ) then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  else
+    if p_open_bottle_id is not null
+       or p_predecessor_open_operation_id is not null
+       or p_ml is not null
+       or p_preservation_method is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is null then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  end if;
+
+  select m.role into v_role
+    from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_request := jsonb_build_object(
+    'version', 2,
+    'command', p_command,
+    'wine_id', p_wine_id,
+    'open_bottle_id', p_open_bottle_id,
+    'predecessor_open_operation_id', p_predecessor_open_operation_id,
+    'ml', p_ml,
+    'note', v_note,
+    'preservation_method', case when p_command = 'open' then coalesce(p_preservation_method, 'none') else null end,
+    'actual_remaining_ml', p_actual_remaining_ml,
+    'written_off_ml', p_written_off_ml,
+    'reason_code_id', p_reason_code_id,
+    'reversal_of_event_id', p_reversal_of_event_id,
+    'correction_reason', p_correction_reason,
+    'operator_confirms_same_bottle_present', p_operator_confirms_same_bottle_present
+  );
+
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id;
+  if found then
+    if v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.scope_kind <> 'single_wine'
+       or v_receipt.command_type is distinct from p_command
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  select w.size_ml into v_size_ml
+    from public.wines w
+   where w.id = p_wine_id
+     and w.restaurant_id = p_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'wine_not_found' using errcode = 'P0001';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_operation_id, v_user, p_wine_id, p_command,
+    v_request, 2, 'single_wine', null
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id;
+    if not found or v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.scope_kind <> 'single_wine'
+       or v_receipt.command_type is distinct from p_command
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  if p_command = 'open' then
+    if v_size_ml is null or v_size_ml <= 0 then
+      raise exception 'wine_size_unknown' using errcode = 'P0001';
+    end if;
+    select * into v_source
+      from public.inventory_items ii
+     where ii.restaurant_id = p_restaurant_id
+       and ii.wine_id = p_wine_id
+       and ii.quantity > 0
+     order by ii.added_at, ii.id
+     limit 1
+     for update;
+    if not found then
+      raise exception 'no_inventory' using errcode = 'P0001';
+    end if;
+    update public.inventory_items
+       set quantity = quantity - 1
+     where id = v_source.id and quantity > 0;
+    if not found then
+      raise exception 'no_inventory' using errcode = 'P0001';
+    end if;
+
+    insert into public.open_bottles (
+      wine_id, restaurant_id, remaining_ml, opened_at, opened_by,
+      source_inventory_item_id, preservation_method, identity_contract,
+      identity_origin, nominal_capacity_ml, source_provenance,
+      opening_operation_id, state_version
+    ) values (
+      p_wine_id, p_restaurant_id, v_size_ml, v_occurred_at, v_user,
+      v_source.id, coalesce(p_preservation_method, 'none'), 2,
+      'native', v_size_ml, 'known', p_operation_id, 0
+    ) returning * into v_bottle;
+
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, occurred_at, note, event_contract, operation_id,
+      operation_entry_ordinal
+    ) values (
+      p_wine_id, p_restaurant_id, v_bottle.id, -v_size_ml, 'new_bottle',
+      v_user, v_occurred_at, v_note, 2, p_operation_id, 0
+    ) returning id into v_new_event_id;
+    v_effect_type := 'open';
+  else
+    if p_command = 'undo' then
+      select * into v_event
+        from public.pour_events pe
+       where pe.id = p_reversal_of_event_id
+         and pe.restaurant_id = p_restaurant_id
+         and pe.wine_id = p_wine_id
+         and pe.event_contract = 2
+         and pe.kind in ('pour', 'spill')
+         and pe.ml_delta > 0
+         and pe.open_bottle_id is not null
+       for update;
+      if not found then
+        raise exception 'open_bottle_not_found' using errcode = 'P0001';
+      end if;
+      v_selected_bottle_id := v_event.open_bottle_id;
+    elsif p_open_bottle_id is not null then
+      v_selected_bottle_id := p_open_bottle_id;
+    else
+      select e.open_bottle_id into v_selected_bottle_id
+        from public.inventory_command_bottle_effects e
+        join public.inventory_command_receipts r
+          on r.restaurant_id = e.restaurant_id
+         and r.operation_id = e.operation_id
+       where e.restaurant_id = p_restaurant_id
+         and e.operation_id = p_predecessor_open_operation_id
+         and e.effect_type = 'open'
+         and r.command_version = 2
+         and r.completed_at is not null;
+      if not found then
+        raise exception 'physical_dependency_not_found' using errcode = 'P0001';
+      end if;
+    end if;
+
+    select * into v_bottle
+      from public.open_bottles ob
+     where ob.id = v_selected_bottle_id
+       and ob.restaurant_id = p_restaurant_id
+       and ob.wine_id = p_wine_id
+       and ob.identity_contract = 2
+     for update;
+    if not found then
+      if p_predecessor_open_operation_id is not null then
+        raise exception 'physical_dependency_stale' using errcode = 'P0001';
+      end if;
+      raise exception 'open_bottle_not_found' using errcode = 'P0001';
+    end if;
+
+    if p_command <> 'undo' and v_bottle.closed_at is not null then
+      raise exception 'open_bottle_closed' using errcode = 'P0001';
+    end if;
+
+    if p_command in ('pour', 'spill') then
+      if v_bottle.remaining_ml < p_ml then
+        raise exception 'insufficient_bottle_volume' using errcode = 'P0001';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, p_ml, p_command,
+        v_user, v_occurred_at, v_note, 2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := p_command;
+    elsif p_command = 'close' then
+      if p_actual_remaining_ml > v_bottle.nominal_capacity_ml then
+        raise exception 'invalid_actual_remaining' using errcode = 'P0001';
+      end if;
+      if p_reason_code_id is not null then
+        perform 1 from public.reason_codes rc
+         where rc.id = p_reason_code_id
+           and rc.restaurant_id = p_restaurant_id
+           and rc.active
+           and rc.category in ('spoilage', 'adjustment')
+         for share;
+        if not found then
+          raise exception 'invalid_reason_code' using errcode = 'P0001';
+        end if;
+      end if;
+      insert into public.bottle_closeouts (
+        restaurant_id, wine_id, open_bottle_id, preservation_method,
+        opened_at, closed_by, closed_at, theoretical_remaining_ml,
+        actual_remaining_ml, written_off_ml, reason_code_id, event_contract
+      ) values (
+        p_restaurant_id, p_wine_id, v_bottle.id, v_bottle.preservation_method,
+        v_bottle.opened_at, v_user, v_occurred_at, v_bottle.remaining_ml,
+        p_actual_remaining_ml, p_written_off_ml, p_reason_code_id, 2
+      ) returning * into v_closeout;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, v_bottle.remaining_ml,
+        'finish_bottle', v_user, v_occurred_at, coalesce(v_note, 'Bottle close-out'),
+        2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := 'close';
+    elsif p_command = 'discard' then
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, v_bottle.remaining_ml,
+        'spill', v_user, v_occurred_at, coalesce(v_note, 'Bottle discarded'),
+        2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := 'discard';
+    else
+      if v_event.occurred_at + interval '15 minutes' < v_occurred_at then
+        raise exception 'undo_window_expired' using errcode = 'P0001';
+      end if;
+      if v_event.actor_user_id is distinct from v_user
+         and v_role not in ('owner', 'manager') then
+        raise exception 'forbidden' using errcode = '42501';
+      end if;
+      if exists (
+        select 1 from public.pour_events pe
+         where pe.reversal_of_event_id = v_event.id
+      ) then
+        raise exception 'undo_already_applied' using errcode = 'P0001';
+      end if;
+      if exists (
+        select 1 from public.pour_events pe
+         where pe.open_bottle_id = v_bottle.id
+           and pe.id <> v_event.id
+           and (pe.occurred_at, pe.id) > (v_event.occurred_at, v_event.id)
+      ) or exists (
+        select 1 from public.bottle_closeouts bc
+         where bc.open_bottle_id = v_bottle.id
+      ) then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      if v_bottle.remaining_ml + v_event.ml_delta > v_bottle.nominal_capacity_ml then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      select exists (
+        select 1 from public.inventory_command_bottle_effects e
+         where e.restaurant_id = p_restaurant_id
+           and e.operation_id = v_event.operation_id
+           and e.open_bottle_id = v_bottle.id
+           and e.effect_type = 'discard'
+      ) into v_is_discard;
+      if v_is_discard and (
+        p_correction_reason is distinct from 'mistaken_report'
+        or not p_operator_confirms_same_bottle_present
+      ) then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      if not v_is_discard and (
+        p_correction_reason is not null or p_operator_confirms_same_bottle_present
+      ) then
+        raise exception 'invalid_physical_command' using errcode = 'P0001';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal, reversal_of_event_id
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, -v_event.ml_delta, 'undo',
+        v_user, v_occurred_at, v_note, 2, p_operation_id, 0, v_event.id
+      ) returning id into v_new_event_id;
+      v_effect_type := 'undo';
+    end if;
+
+    select * into v_bottle
+      from public.open_bottles ob where ob.id = v_selected_bottle_id;
+  end if;
+
+  insert into public.inventory_command_bottle_effects (
+    restaurant_id, operation_id, entry_ordinal, open_bottle_id, wine_id, effect_type
+  ) values (
+    p_restaurant_id, p_operation_id, 0, v_bottle.id, p_wine_id, v_effect_type
+  );
+
+  v_result := jsonb_build_object(
+    'operation_id', p_operation_id,
+    'command', p_command,
+    'open_bottle', jsonb_build_object(
+      'id', v_bottle.id,
+      'restaurant_id', v_bottle.restaurant_id,
+      'wine_id', v_bottle.wine_id,
+      'remaining_ml', v_bottle.remaining_ml,
+      'nominal_capacity_ml', v_bottle.nominal_capacity_ml,
+      'opened_at', v_bottle.opened_at,
+      'closed_at', v_bottle.closed_at,
+      'preservation_method', v_bottle.preservation_method,
+      'source_inventory_item_id', v_bottle.source_inventory_item_id,
+      'source_provenance', v_bottle.source_provenance,
+      'identity_contract', v_bottle.identity_contract,
+      'identity_origin', v_bottle.identity_origin,
+      'state_version', v_bottle.state_version
+    ),
+    'pour_event_ids', jsonb_build_array(v_new_event_id),
+    'closeout', case when p_command = 'close' then jsonb_build_object(
+      'id', v_closeout.id,
+      'restaurant_id', v_closeout.restaurant_id,
+      'wine_id', v_closeout.wine_id,
+      'open_bottle_id', v_closeout.open_bottle_id,
+      'preservation_method', v_closeout.preservation_method,
+      'opened_at', v_closeout.opened_at,
+      'closed_at', v_closeout.closed_at,
+      'theoretical_remaining_ml', v_closeout.theoretical_remaining_ml,
+      'actual_remaining_ml', v_closeout.actual_remaining_ml,
+      'variance_ml', v_closeout.variance_ml,
+      'written_off_ml', v_closeout.written_off_ml,
+      'reason_code_id', v_closeout.reason_code_id,
+      'event_contract', v_closeout.event_contract
+    ) else null end
+  );
+
+  update public.inventory_command_receipts
+     set result_payload = v_result,
+         completed_at = clock_timestamp()
+   where restaurant_id = p_restaurant_id
+     and operation_id = p_operation_id
+     and result_payload is null;
+  if not found then
+    raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+  end if;
+
+  return v_result || jsonb_build_object('replayed', false);
+end;
+$function$;
+
+revoke all on function public.execute_physical_bottle_command(
+  uuid, uuid, text, uuid, uuid, uuid, int, text, text, int, int, uuid, uuid, text, boolean
+) from public, anon, authenticated, service_role;
+
+create function public.execute_physical_reconciliation_batch(
+  p_operation_id uuid,
+  p_restaurant_id uuid,
+  p_entries jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user uuid := auth.uid();
+  v_entry jsonb;
+  v_canonical_entries jsonb;
+  v_request jsonb;
+  v_entry_count int;
+  v_distinct_count int;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_claimed uuid;
+  v_pre_wines uuid[];
+  v_locked_wines uuid[];
+  v_bottle public.open_bottles%rowtype;
+  v_event_id uuid;
+  v_ordinal int := 0;
+  v_occurred_at timestamptz := clock_timestamp();
+  v_results jsonb := '[]'::jsonb;
+  v_result jsonb;
+begin
+  if public.current_inventory_contract_version() <> 2 then
+    raise exception 'physical_inventory_contract_inactive' using errcode = 'P0001';
+  end if;
+  if v_user is null or p_operation_id is null or p_restaurant_id is null
+     or jsonb_typeof(p_entries) <> 'array' then
+    raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+  end if;
+
+  v_entry_count := jsonb_array_length(p_entries);
+  if v_entry_count < 1 or v_entry_count > 100 then
+    raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+  end if;
+
+  for v_entry in select value from jsonb_array_elements(p_entries)
+  loop
+    if jsonb_typeof(v_entry) <> 'object'
+       or (select count(*) from jsonb_object_keys(v_entry)) <> 4
+       or exists (
+         select 1 from jsonb_object_keys(v_entry) k
+          where k not in ('open_bottle_id', 'expected_state_version', 'target_remaining_ml', 'note')
+       )
+       or not (v_entry ?& array['open_bottle_id', 'expected_state_version', 'target_remaining_ml', 'note'])
+       or jsonb_typeof(v_entry->'open_bottle_id') <> 'string'
+       or (v_entry->>'open_bottle_id') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+       or jsonb_typeof(v_entry->'expected_state_version') <> 'number'
+       or (v_entry->>'expected_state_version') !~ '^[0-9]+$'
+       or jsonb_typeof(v_entry->'target_remaining_ml') <> 'number'
+       or (v_entry->>'target_remaining_ml') !~ '^[0-9]+$'
+       or jsonb_typeof(v_entry->'note') not in ('string', 'null')
+       or (jsonb_typeof(v_entry->'note') = 'string' and char_length(v_entry->>'note') > 500) then
+      raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+    end if;
+    if (v_entry->>'expected_state_version')::numeric > 9223372036854775807
+       or (v_entry->>'target_remaining_ml')::numeric > 2147483647 then
+      raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  select count(distinct (value->>'open_bottle_id')::uuid)
+    into v_distinct_count
+    from jsonb_array_elements(p_entries);
+  if v_distinct_count <> v_entry_count then
+    raise exception 'duplicate_reconciliation_bottle' using errcode = 'P0001';
+  end if;
+
+  select jsonb_agg(
+    jsonb_build_object(
+      'open_bottle_id', (value->>'open_bottle_id')::uuid,
+      'expected_state_version', (value->>'expected_state_version')::bigint,
+      'target_remaining_ml', (value->>'target_remaining_ml')::int,
+      'note', case when jsonb_typeof(value->'note') = 'null' then null else value->>'note' end
+    ) order by (value->>'open_bottle_id')::uuid
+  ) into v_canonical_entries
+    from jsonb_array_elements(p_entries);
+
+  v_request := jsonb_build_object(
+    'version', 2,
+    'command', 'reconcile_batch',
+    'entries', v_canonical_entries
+  );
+
+  perform 1 from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+     and m.role in ('owner', 'manager')
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id;
+  if found then
+    if v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.command_type <> 'reconcile_batch'
+       or v_receipt.scope_kind <> 'exact_bottle_batch'
+       or v_receipt.wine_id is not null
+       or v_receipt.batch_entry_count <> v_entry_count
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  select array_agg(distinct ob.wine_id order by ob.wine_id)
+    into v_pre_wines
+    from jsonb_array_elements(v_canonical_entries) e
+    join public.open_bottles ob
+      on ob.id = (e->>'open_bottle_id')::uuid
+     and ob.restaurant_id = p_restaurant_id;
+  if coalesce(array_length(v_pre_wines, 1), 0) = 0
+     or (select count(*) from public.open_bottles ob
+          where ob.restaurant_id = p_restaurant_id
+            and ob.id in (
+              select (e->>'open_bottle_id')::uuid
+                from jsonb_array_elements(v_canonical_entries) e
+            )) <> v_entry_count then
+    raise exception 'open_bottle_not_found' using errcode = 'P0001';
+  end if;
+
+  perform 1 from public.wines w
+   where w.restaurant_id = p_restaurant_id
+     and w.id = any(v_pre_wines)
+   order by w.id
+   for no key update;
+  if not found then
+    raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_operation_id, v_user, null, 'reconcile_batch',
+    v_request, 2, 'exact_bottle_batch', v_entry_count
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id;
+    if not found or v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.command_type <> 'reconcile_batch'
+       or v_receipt.scope_kind <> 'exact_bottle_batch'
+       or v_receipt.wine_id is not null
+       or v_receipt.batch_entry_count <> v_entry_count
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    perform 1 from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id
+     for update;
+    if not found then
+      raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  select array_agg(distinct ob.wine_id order by ob.wine_id)
+    into v_locked_wines
+    from public.open_bottles ob
+   where ob.restaurant_id = p_restaurant_id
+     and ob.id in (
+       select (e->>'open_bottle_id')::uuid
+         from jsonb_array_elements(v_canonical_entries) e
+     );
+  if v_locked_wines is distinct from v_pre_wines then
+    raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+  end if;
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    select * into strict v_bottle
+      from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id;
+    if v_bottle.identity_contract <> 2
+       or v_bottle.closed_at is not null
+       or v_bottle.nominal_capacity_ml is null
+       or v_bottle.state_version <> (v_entry->>'expected_state_version')::bigint
+       or (v_entry->>'target_remaining_ml')::int > v_bottle.nominal_capacity_ml then
+      raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    select * into strict v_bottle
+      from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id;
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, occurred_at, note, event_contract, operation_id,
+      operation_entry_ordinal
+    ) values (
+      v_bottle.wine_id, p_restaurant_id, v_bottle.id,
+      v_bottle.remaining_ml - (v_entry->>'target_remaining_ml')::int,
+      'reconcile', v_user, v_occurred_at,
+      case when jsonb_typeof(v_entry->'note') = 'null' then null else v_entry->>'note' end,
+      2, p_operation_id, v_ordinal
+    ) returning id into v_event_id;
+    insert into public.inventory_command_bottle_effects (
+      restaurant_id, operation_id, entry_ordinal, open_bottle_id, wine_id, effect_type
+    ) values (
+      p_restaurant_id, p_operation_id, v_ordinal, v_bottle.id,
+      v_bottle.wine_id, 'reconcile'
+    );
+    select * into strict v_bottle
+      from public.open_bottles ob where ob.id = v_bottle.id;
+    v_results := v_results || jsonb_build_array(jsonb_build_object(
+      'entry_ordinal', v_ordinal,
+      'open_bottle_id', v_bottle.id,
+      'wine_id', v_bottle.wine_id,
+      'pour_event_id', v_event_id,
+      'open_bottle', jsonb_build_object(
+        'id', v_bottle.id,
+        'restaurant_id', v_bottle.restaurant_id,
+        'wine_id', v_bottle.wine_id,
+        'remaining_ml', v_bottle.remaining_ml,
+        'nominal_capacity_ml', v_bottle.nominal_capacity_ml,
+        'opened_at', v_bottle.opened_at,
+        'closed_at', v_bottle.closed_at,
+        'preservation_method', v_bottle.preservation_method,
+        'source_inventory_item_id', v_bottle.source_inventory_item_id,
+        'source_provenance', v_bottle.source_provenance,
+        'identity_contract', v_bottle.identity_contract,
+        'identity_origin', v_bottle.identity_origin,
+        'state_version', v_bottle.state_version
+      )
+    ));
+    v_ordinal := v_ordinal + 1;
+  end loop;
+
+  v_result := jsonb_build_object(
+    'operation_id', p_operation_id,
+    'command', 'reconcile_batch',
+    'entries', v_results
+  );
+  update public.inventory_command_receipts
+     set result_payload = v_result,
+         completed_at = clock_timestamp()
+   where restaurant_id = p_restaurant_id
+     and operation_id = p_operation_id
+     and result_payload is null;
+  if not found then
+    raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+  end if;
+  return v_result || jsonb_build_object('replayed', false);
+end;
+$function$;
+
+revoke all on function public.execute_physical_reconciliation_batch(uuid, uuid, jsonb)
+  from public, anon, authenticated, service_role;
+
+create function public.list_active_physical_bottles(p_restaurant_id uuid)
+returns table (
+  id uuid,
+  restaurant_id uuid,
+  wine_id uuid,
+  remaining_ml int,
+  nominal_capacity_ml int,
+  opened_at timestamptz,
+  preservation_method text,
+  source_inventory_item_id uuid,
+  source_provenance text,
+  source_bin_location text,
+  identity_contract smallint,
+  identity_origin text,
+  state_version bigint
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $function$
+  select
+    ob.id,
+    ob.restaurant_id,
+    ob.wine_id,
+    ob.remaining_ml,
+    ob.nominal_capacity_ml,
+    ob.opened_at,
+    ob.preservation_method,
+    ob.source_inventory_item_id,
+    ob.source_provenance,
+    ii.bin_location as source_bin_location,
+    ob.identity_contract,
+    ob.identity_origin,
+    ob.state_version
+  from public.open_bottles ob
+  left join public.inventory_items ii
+    on ii.id = ob.source_inventory_item_id
+   and ii.restaurant_id = ob.restaurant_id
+   and ii.wine_id = ob.wine_id
+  where ob.restaurant_id = p_restaurant_id
+    and ob.closed_at is null
+  order by ob.wine_id, ob.opened_at, ob.id
+$function$;
+
+revoke all on function public.list_active_physical_bottles(uuid)
+  from public, anon, service_role;
+grant execute on function public.list_active_physical_bottles(uuid)
+  to authenticated;
+
+create function public.list_open_bottle_aggregates(p_restaurant_id uuid)
+returns table (
+  wine_id uuid,
+  active_bottle_count bigint,
+  open_remaining_ml bigint
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $function$
+  select
+    ob.wine_id,
+    count(*)::bigint as active_bottle_count,
+    sum(ob.remaining_ml)::bigint as open_remaining_ml
+  from public.open_bottles ob
+  where ob.restaurant_id = p_restaurant_id
+    and ob.closed_at is null
+  group by ob.wine_id
+  order by ob.wine_id
+$function$;
+
+revoke all on function public.list_open_bottle_aggregates(uuid)
+  from public, anon, service_role;
+grant execute on function public.list_open_bottle_aggregates(uuid)
+  to authenticated;
+
+create view public.effective_service_pour_events
+with (security_invoker = true)
+as
+select
+  pe.id,
+  pe.wine_id,
+  pe.restaurant_id,
+  pe.open_bottle_id,
+  pe.ml_delta,
+  pe.kind,
+  pe.actor_user_id,
+  pe.occurred_at,
+  pe.note,
+  pe.event_contract,
+  pe.operation_id,
+  pe.operation_entry_ordinal
+from public.pour_events pe
+where not (pe.event_contract = 2 and pe.kind = 'undo')
+  and not (
+    pe.event_contract = 2
+    and exists (
+    select 1
+      from public.pour_events reversal
+     where reversal.event_contract = 2
+       and reversal.kind = 'undo'
+       and reversal.reversal_of_event_id = pe.id
+       and pe.kind in ('pour', 'spill')
+       and reversal.restaurant_id = pe.restaurant_id
+       and reversal.wine_id = pe.wine_id
+       and reversal.open_bottle_id = pe.open_bottle_id
+       and reversal.ml_delta::bigint = -(pe.ml_delta::bigint)
+    )
+  );
+
+revoke all on table public.effective_service_pour_events
+  from public, anon, authenticated, service_role;
+grant select on table public.effective_service_pour_events
+  to authenticated;
+
+-- Seal the server-normalized definitions that guarded down must observe. These
+-- comments make a rename, drop/recreate, or definition change fail closed
+-- without depending on PostgreSQL pretty-printer formatting in this source.
+do $catalog_seal$
+declare
+  v_constraint record;
+  v_constraint_count integer := 0;
+  v_index record;
+  v_index_count integer := 0;
+  v_view record;
+begin
+  for v_constraint in
+    select c.conrelid::regclass as relation_identity, c.conname, c.oid
+      from pg_catalog.pg_constraint c
+     where (c.conrelid, c.conname) in (
+       ('public.inventory_items'::regclass, 'inventory_items_id_restaurant_wine_key'),
+       ('public.open_bottles'::regclass, 'open_bottles_id_restaurant_wine_key'),
+       ('public.open_bottles'::regclass, 'open_bottles_identity_contract_check'),
+       ('public.open_bottles'::regclass, 'open_bottles_identity_origin_check'),
+       ('public.open_bottles'::regclass, 'open_bottles_nominal_capacity_check'),
+       ('public.open_bottles'::regclass, 'open_bottles_source_provenance_check'),
+       ('public.open_bottles'::regclass, 'open_bottles_state_version_check'),
+       ('public.open_bottles'::regclass, 'open_bottles_physical_shape_check'),
+       ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_command_version_check'),
+       ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_command_type_check'),
+       ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_scope_kind_check'),
+       ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_batch_entry_count_check'),
+       ('public.inventory_command_receipts'::regclass, 'inventory_command_receipts_versioned_shape_check'),
+       ('public.pour_events'::regclass, 'pour_events_kind_check'),
+       ('public.pour_events'::regclass, 'pour_events_event_contract_check'),
+       ('public.pour_events'::regclass, 'pour_events_operation_entry_ordinal_check'),
+       ('public.pour_events'::regclass, 'pour_events_open_bottle_tenant_wine_fkey'),
+       ('public.pour_events'::regclass, 'pour_events_operation_receipt_fkey'),
+       ('public.pour_events'::regclass, 'pour_events_reversal_of_event_fkey'),
+       ('public.pour_events'::regclass, 'pour_events_physical_shape_check'),
+       ('public.bottle_closeouts'::regclass, 'bottle_closeouts_event_contract_check'),
+       ('public.bottle_closeouts'::regclass, 'bottle_closeouts_open_bottle_tenant_wine_fkey'),
+       ('public.bottle_closeouts'::regclass, 'bottle_closeouts_physical_shape_check'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_pkey'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_entry_ordinal_check'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_effect_type_check'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_operation_bottle_effect_key'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_receipt_fkey'),
+       ('public.inventory_command_bottle_effects'::regclass, 'inventory_command_bottle_effects_bottle_fkey')
+     )
+  loop
+    v_constraint_count := v_constraint_count + 1;
+    execute format(
+      'comment on constraint %I on %s is %L',
+      v_constraint.conname,
+      v_constraint.relation_identity,
+      'C06_DEFINITION_MD5:' || md5(pg_catalog.pg_get_constraintdef(v_constraint.oid, false))
+    );
+  end loop;
+  if v_constraint_count <> 29 then
+    raise exception 'C06_0153_CONSTRAINT_SEAL_MISSING' using errcode = 'P0001';
+  end if;
+
+  for v_index in
+    select c.oid::regclass as index_identity, c.oid
+      from pg_catalog.pg_class c
+     where c.oid in (
+       'public.pour_events_operation_entry_key'::regclass,
+       'public.pour_events_reversal_key'::regclass,
+       'public.pour_events_open_bottle_tenant_wine_idx'::regclass,
+       'public.bottle_closeouts_open_bottle_tenant_wine_idx'::regclass,
+       'public.inventory_command_bottle_effects_open_operation_key'::regclass,
+       'public.inventory_command_bottle_effects_bottle_idx'::regclass,
+       'public.inventory_command_bottle_effects_wine_idx'::regclass
+     )
+  loop
+    v_index_count := v_index_count + 1;
+    execute format(
+      'comment on index %s is %L',
+      v_index.index_identity,
+      'C06_DEFINITION_MD5:' || md5(pg_catalog.pg_get_indexdef(v_index.oid))
+    );
+  end loop;
+  if v_index_count <> 7 then
+    raise exception 'C06_0153_INDEX_SEAL_MISSING' using errcode = 'P0001';
+  end if;
+
+  select c.oid::regclass as view_identity, c.oid
+    into strict v_view
+    from pg_catalog.pg_class c
+   where c.oid = 'public.effective_service_pour_events'::regclass
+     and c.relkind = 'v';
+  execute format(
+    'comment on view %s is %L',
+    v_view.view_identity,
+    'C06_DEFINITION_MD5:' || md5(pg_catalog.pg_get_viewdef(v_view.oid, false))
+  );
+end;
+$catalog_seal$;
+
+comment on function public.current_inventory_contract_version() is
+  'Normative inventory contract gate. Phase A is deliberately version 1.';
+comment on table public.inventory_command_bottle_effects is
+  'Closed, non-client-writable operation-to-physical-bottle resolver for version-2 commands.';
+
+-- === 0154_site_capability_authority.sql ===
+-- 0154_site_capability_authority.sql
+--
+-- C04 additive authority A only. This migration introduces explicit exact-site
+-- capability grants and an authorized pricing reader without removing the
+-- legacy pricing SELECT policy or activating an application cutover.
+--
+-- Apply in one explicit transaction. The parent-table ACCESS EXCLUSIVE locks
+-- are acquired before either table is rewritten with a volatile UUID default.
+
+do $static_admission$
+begin
+  if to_regclass('public.workspaces') is null
+     or to_regclass('public.restaurants') is null
+     or to_regclass('public.workspace_memberships') is null
+     or to_regclass('public.memberships') is null
+     or to_regclass('public.pricing_recommendations') is null
+     or to_regclass('public.wines') is null then
+    raise exception 'C04_0154_REQUIRED_RELATION_MISSING' using errcode = 'P0001';
+  end if;
+
+  if to_regclass('public.membership_capability_grants') is not null
+     or to_regprocedure('public.retire_membership_capability_grants(uuid[],uuid,text,text)') is not null
+     or to_regprocedure('public.guard_membership_capability_grant_history()') is not null
+     or to_regprocedure('public.enforce_site_membership_capability_lifecycle()') is not null
+     or to_regprocedure('public.enforce_workspace_membership_capability_lifecycle()') is not null
+     or to_regprocedure('public.effective_site_capability(uuid,text)') is not null
+     or to_regprocedure('public.effective_site_ids(text)') is not null
+     or to_regprocedure('public.replace_member_site_capabilities(uuid,text[],timestamp with time zone,text)') is not null
+     or to_regprocedure('public.read_pricing_recommendations(uuid)') is not null
+     or exists (
+       select 1 from pg_catalog.pg_attribute a
+        where a.attrelid in (
+          'public.memberships'::regclass,
+          'public.workspace_memberships'::regclass
+        )
+          and a.attname = 'lifecycle_generation'
+          and a.attnum > 0 and not a.attisdropped
+     ) then
+    raise exception 'C04_0154_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+end;
+$static_admission$;
+
+lock table public.memberships in access exclusive mode nowait;
+lock table public.workspace_memberships in access exclusive mode nowait;
+lock table public.workspaces in share mode nowait;
+lock table public.restaurants in share mode nowait;
+lock table public.pricing_recommendations in share mode nowait;
+lock table public.wines in share mode nowait;
+
+do $locked_preflight$
+declare
+  v_role_oid oid;
+  v_object record;
+  v_count integer := 0;
+begin
+  select oid into strict v_role_oid
+    from pg_catalog.pg_roles where rolname = current_user;
+
+  for v_object in
+    select c.oid::regclass::text as identity, c.relowner
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relkind in ('r', 'p')
+       and c.relname in (
+         'workspaces', 'restaurants', 'workspace_memberships', 'memberships',
+         'pricing_recommendations', 'wines'
+       )
+  loop
+    v_count := v_count + 1;
+    if v_object.relowner <> v_role_oid then
+      raise exception 'C04_0154_OPERATOR_NOT_DIRECT_OWNER: %', v_object.identity
+        using errcode = 'P0001';
+    end if;
+  end loop;
+  if v_count <> 6 then
+    raise exception 'C04_0154_REQUIRED_RELATION_COUNT: %', v_count using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_trigger t
+     where t.tgrelid = 'public.memberships'::regclass
+       and t.tgname = 'memberships_link_workspace'
+       and not t.tgisinternal
+  ) or not exists (
+    select 1 from pg_catalog.pg_trigger t
+     where t.tgrelid = 'public.workspace_memberships'::regclass
+       and t.tgname = 'workspace_memberships_guard_identity'
+       and not t.tgisinternal
+  ) then
+    raise exception 'C04_0154_0152_GUARD_MISSING' using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_policy p
+     where p.polrelid = 'public.pricing_recommendations'::regclass
+       and p.polname = 'members can read pricing_recommendations'
+       and p.polcmd = 'r'
+       and p.polpermissive
+       and p.polroles = array[0::oid]
+       and pg_catalog.pg_get_expr(p.polqual, p.polrelid) =
+         '(restaurant_id IN ( SELECT member_restaurant_ids() AS member_restaurant_ids))'
+       and p.polwithcheck is null
+  ) or not has_table_privilege(
+    'authenticated', 'public.pricing_recommendations', 'SELECT'
+  ) then
+    raise exception 'C04_0154_LEGACY_PRICING_SELECT_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1 from pg_catalog.pg_attribute a
+     where a.attrelid in (
+       'public.memberships'::regclass,
+       'public.workspace_memberships'::regclass
+     )
+       and a.attname = 'lifecycle_generation'
+       and a.attnum > 0 and not a.attisdropped
+  ) or to_regclass('public.membership_capability_grants') is not null then
+    raise exception 'C04_0154_TARGET_CHANGED_AFTER_ADMISSION' using errcode = 'P0001';
+  end if;
+end;
+$locked_preflight$;
+
+alter table public.memberships
+  add column lifecycle_generation uuid not null default gen_random_uuid();
+
+alter table public.workspace_memberships
+  add column lifecycle_generation uuid not null default gen_random_uuid();
+
+create table public.membership_capability_grants (
+  id                             uuid        primary key default gen_random_uuid(),
+  workspace_id                   uuid        not null,
+  restaurant_id                  uuid        not null,
+  workspace_membership_id        uuid        not null,
+  membership_id                  uuid        not null,
+  subject_user_id                uuid        not null,
+  site_lifecycle_generation      uuid        not null,
+  workspace_lifecycle_generation uuid        not null,
+  capability_key                 text        not null,
+  granted_at                     timestamptz not null default statement_timestamp(),
+  granted_by_user_id             uuid        not null,
+  grant_reason                   text        not null,
+  source                         text        not null default 'workspace_governance',
+  expires_at                     timestamptz,
+  revoked_at                     timestamptz,
+  revoked_by_user_id             uuid,
+  revoke_reason                  text,
+  revoke_cause                   text,
+  constraint membership_capability_grants_capability_key_check check (
+    capability_key in ('cost.read', 'margin.read', 'pricing.manage')
+  ),
+  constraint membership_capability_grants_source_check check (
+    source = 'workspace_governance'
+  ),
+  constraint membership_capability_grants_grant_reason_check check (
+    btrim(grant_reason) <> ''
+  ),
+  constraint membership_capability_grants_revoke_cause_check check (
+    revoke_cause is null or revoke_cause in (
+      'governance_replacement', 'site_lifecycle', 'workspace_lifecycle',
+      'site_delete', 'workspace_delete'
+    )
+  ),
+  constraint membership_capability_grants_revocation_shape_check check (
+    (revoked_at is null and revoked_by_user_id is null
+      and revoke_reason is null and revoke_cause is null)
+    or
+    (revoked_at is not null and revoke_reason is not null
+      and btrim(revoke_reason) <> '' and revoke_cause is not null)
+  )
+);
+
+create unique index membership_capability_grants_current_key
+  on public.membership_capability_grants (membership_id, capability_key)
+  where revoked_at is null;
+
+create index membership_capability_grants_current_workspace_member_idx
+  on public.membership_capability_grants (
+    workspace_membership_id, membership_id, capability_key, id
+  ) where revoked_at is null;
+
+create index membership_capability_grants_subject_capability_site_idx
+  on public.membership_capability_grants (
+    subject_user_id, capability_key, restaurant_id
+  ) where revoked_at is null;
+
+alter table public.membership_capability_grants enable row level security;
+revoke all on table public.membership_capability_grants
+  from public, anon, authenticated, service_role;
+
+create function public.guard_membership_capability_grant_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'C04_CAPABILITY_GRANT_HISTORY_DELETE_FORBIDDEN'
+      using errcode = 'P0001';
+  end if;
+
+  if old.revoked_at is not null
+     or new.revoked_at is null
+     or new.revoke_reason is null
+     or btrim(new.revoke_reason) = ''
+     or new.revoke_cause is null
+     or (to_jsonb(new) - 'revoked_at' - 'revoked_by_user_id' - 'revoke_reason' - 'revoke_cause')
+        is distinct from
+        (to_jsonb(old) - 'revoked_at' - 'revoked_by_user_id' - 'revoke_reason' - 'revoke_cause') then
+    raise exception 'C04_CAPABILITY_GRANT_HISTORY_IMMUTABLE'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_membership_capability_grant_history()
+  from public, anon, authenticated, service_role;
+
+create trigger membership_capability_grants_guard_history
+  before update or delete on public.membership_capability_grants
+  for each row execute function public.guard_membership_capability_grant_history();
+
+create function public.retire_membership_capability_grants(
+  p_membership_ids uuid[],
+  p_revoked_by_user_id uuid,
+  p_revoke_reason text,
+  p_revoke_cause text
+) returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_locked_ids uuid[];
+  v_count integer;
+begin
+  if p_revoke_reason is null or btrim(p_revoke_reason) = '' then
+    raise exception 'C04_RETIRE_REASON_REQUIRED' using errcode = 'P0001';
+  end if;
+  if p_revoke_cause is null or p_revoke_cause not in (
+    'governance_replacement', 'site_lifecycle', 'workspace_lifecycle',
+    'site_delete', 'workspace_delete'
+  ) then
+    raise exception 'C04_RETIRE_CAUSE_UNKNOWN' using errcode = 'P0001';
+  end if;
+
+  select coalesce(array_agg(locked.id order by
+    locked.membership_id, locked.capability_key, locked.id), array[]::uuid[])
+    into v_locked_ids
+    from (
+      select g.id, g.membership_id, g.capability_key
+        from public.membership_capability_grants g
+       where g.membership_id = any(coalesce(p_membership_ids, array[]::uuid[]))
+         and g.revoked_at is null
+       order by g.membership_id, g.capability_key, g.id
+       for update
+    ) locked;
+
+  update public.membership_capability_grants g
+     set revoked_at = statement_timestamp(),
+         revoked_by_user_id = p_revoked_by_user_id,
+         revoke_reason = p_revoke_reason,
+         revoke_cause = p_revoke_cause
+   where g.id = any(v_locked_ids)
+     and g.revoked_at is null;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+revoke all on function public.retire_membership_capability_grants(uuid[],uuid,text,text)
+  from public, anon, authenticated, service_role;
+
+create function public.enforce_site_membership_capability_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.lifecycle_generation := gen_random_uuid();
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    perform public.retire_membership_capability_grants(
+      array[old.id], auth.uid(), 'site membership deleted', 'site_delete'
+    );
+    return old;
+  end if;
+
+  if new.lifecycle_generation is distinct from old.lifecycle_generation then
+    raise exception 'C04_SITE_LIFECYCLE_GENERATION_FORGERY' using errcode = 'P0001';
+  end if;
+
+  if new.status is distinct from old.status
+     or new.revoked_at is distinct from old.revoked_at
+     or new.expires_at is distinct from old.expires_at
+     or new.user_id is distinct from old.user_id
+     or new.restaurant_id is distinct from old.restaurant_id
+     or new.workspace_membership_id is distinct from old.workspace_membership_id then
+    perform public.retire_membership_capability_grants(
+      array[old.id], auth.uid(), 'site membership lifecycle changed', 'site_lifecycle'
+    );
+    new.lifecycle_generation := gen_random_uuid();
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_site_membership_capability_lifecycle()
+  from public, anon, authenticated, service_role;
+
+-- PostgreSQL sorts same-event triggers by name. This name sorts after the
+-- existing 0152 memberships_link_workspace trigger and observes finalized NEW.
+create trigger memberships_z_capability_lifecycle
+  before insert or update or delete on public.memberships
+  for each row execute function public.enforce_site_membership_capability_lifecycle();
+
+create function public.enforce_workspace_membership_capability_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_membership_ids uuid[];
+begin
+  if tg_op = 'INSERT' then
+    new.lifecycle_generation := gen_random_uuid();
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    select coalesce(array_agg(distinct g.membership_id), array[]::uuid[])
+      into v_membership_ids
+      from public.membership_capability_grants g
+     where g.workspace_membership_id = old.id
+       and g.revoked_at is null;
+    perform public.retire_membership_capability_grants(
+      v_membership_ids, auth.uid(), 'workspace membership deleted', 'workspace_delete'
+    );
+    return old;
+  end if;
+
+  if new.lifecycle_generation is distinct from old.lifecycle_generation then
+    raise exception 'C04_WORKSPACE_LIFECYCLE_GENERATION_FORGERY' using errcode = 'P0001';
+  end if;
+
+  if new.status is distinct from old.status
+     or new.revoked_at is distinct from old.revoked_at
+     or new.expires_at is distinct from old.expires_at
+     or new.user_id is distinct from old.user_id
+     or new.workspace_id is distinct from old.workspace_id then
+    select coalesce(array_agg(distinct g.membership_id), array[]::uuid[])
+      into v_membership_ids
+      from public.membership_capability_grants g
+     where g.workspace_membership_id = old.id
+       and g.revoked_at is null;
+    perform public.retire_membership_capability_grants(
+      v_membership_ids, auth.uid(), 'workspace membership lifecycle changed',
+      'workspace_lifecycle'
+    );
+    new.lifecycle_generation := gen_random_uuid();
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_workspace_membership_capability_lifecycle()
+  from public, anon, authenticated, service_role;
+
+create trigger workspace_memberships_z_capability_lifecycle
+  before insert or update or delete on public.workspace_memberships
+  for each row execute function public.enforce_workspace_membership_capability_lifecycle();
+
+create function public.effective_site_capability(
+  p_restaurant_id uuid,
+  p_capability_key text
+) returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_capability_key in ('cost.read', 'margin.read', 'pricing.manage')
+    and exists (
+      select 1
+        from public.membership_capability_grants g
+        join public.memberships m
+          on m.id = g.membership_id
+         and m.user_id = g.subject_user_id
+         and m.restaurant_id = g.restaurant_id
+         and m.workspace_membership_id = g.workspace_membership_id
+         and m.lifecycle_generation = g.site_lifecycle_generation
+        join public.restaurants r
+          on r.id = m.restaurant_id
+         and r.id = g.restaurant_id
+         and r.workspace_id = g.workspace_id
+        join public.workspaces w
+          on w.id = r.workspace_id
+         and w.kind = 'restaurant'
+        join public.workspace_memberships wm
+          on wm.id = m.workspace_membership_id
+         and wm.id = g.workspace_membership_id
+         and wm.user_id = m.user_id
+         and wm.user_id = g.subject_user_id
+         and wm.workspace_id = r.workspace_id
+         and wm.workspace_id = g.workspace_id
+         and wm.lifecycle_generation = g.workspace_lifecycle_generation
+       where g.subject_user_id = (select auth.uid())
+         and g.restaurant_id = p_restaurant_id
+         and g.capability_key = p_capability_key
+         and g.revoked_at is null
+         and (g.expires_at is null or g.expires_at > statement_timestamp())
+         and m.status = 'active'
+         and m.revoked_at is null
+         and (m.expires_at is null or m.expires_at > statement_timestamp())
+         and wm.status = 'active'
+         and wm.revoked_at is null
+         and (wm.expires_at is null or wm.expires_at > statement_timestamp())
+    );
+$$;
+
+create function public.effective_site_ids(p_capability_key text)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select distinct g.restaurant_id
+    from public.membership_capability_grants g
+   where g.subject_user_id = (select auth.uid())
+     and g.capability_key = p_capability_key
+     and p_capability_key in ('cost.read', 'margin.read', 'pricing.manage')
+     and public.effective_site_capability(g.restaurant_id, p_capability_key)
+   order by g.restaurant_id;
+$$;
+
+create function public.replace_member_site_capabilities(
+  p_membership_id uuid,
+  p_capability_keys text[],
+  p_expires_at timestamptz,
+  p_grant_reason text
+) returns setof text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_workspace_id uuid;
+  v_live_workspace_id uuid;
+  v_target_workspace_membership_id uuid;
+  v_caller_workspace_membership_id uuid;
+  v_target public.memberships%rowtype;
+  v_target_workspace_member public.workspace_memberships%rowtype;
+  v_caller_workspace_member public.workspace_memberships%rowtype;
+  v_keys text[];
+  v_key text;
+begin
+  if v_actor is null then
+    raise exception 'C04_CAPABILITY_REPLACEMENT_AUTH_REQUIRED' using errcode = 'P0001';
+  end if;
+  if p_capability_keys is null then
+    raise exception 'C04_CAPABILITY_SET_REQUIRED' using errcode = 'P0001';
+  end if;
+  if p_grant_reason is null or btrim(p_grant_reason) = '' then
+    raise exception 'C04_GRANT_REASON_REQUIRED' using errcode = 'P0001';
+  end if;
+  if p_expires_at is not null and p_expires_at <= statement_timestamp() then
+    raise exception 'C04_GRANT_EXPIRY_NOT_FUTURE' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from unnest(p_capability_keys) as supplied(capability_key)
+     where supplied.capability_key is null
+  )
+     or exists (
+       select 1 from unnest(p_capability_keys) as supplied(capability_key)
+        where supplied.capability_key not in (
+          'cost.read', 'margin.read', 'pricing.manage'
+        )
+     ) then
+    raise exception 'C04_CAPABILITY_KEY_UNKNOWN' using errcode = 'P0001';
+  end if;
+  if cardinality(p_capability_keys) <>
+     (select count(distinct supplied.capability_key)
+        from unnest(p_capability_keys) as supplied(capability_key)) then
+    raise exception 'C04_CAPABILITY_SET_DUPLICATE' using errcode = 'P0001';
+  end if;
+  select coalesce(
+    array_agg(supplied.capability_key order by supplied.capability_key),
+    array[]::text[]
+  ) into v_keys
+    from unnest(p_capability_keys) as supplied(capability_key);
+
+  select r.workspace_id, m.workspace_membership_id
+    into v_workspace_id, v_target_workspace_membership_id
+    from public.memberships m
+    join public.restaurants r on r.id = m.restaurant_id
+   where m.id = p_membership_id;
+  if not found then
+    raise exception 'C04_TARGET_MEMBERSHIP_NOT_FOUND' using errcode = 'P0001';
+  end if;
+
+  select wm.id into v_caller_workspace_membership_id
+    from public.workspace_memberships wm
+   where wm.workspace_id = v_workspace_id
+     and wm.user_id = v_actor;
+  if not found then
+    raise exception 'C04_CALLER_NOT_GOVERNOR' using errcode = 'P0001';
+  end if;
+
+  perform 1 from public.workspaces w
+   where w.id = v_workspace_id and w.kind = 'restaurant'
+   for update;
+  if not found then
+    raise exception 'C04_TARGET_WORKSPACE_NOT_CURRENT' using errcode = 'P0001';
+  end if;
+
+  perform 1 from public.workspace_memberships wm
+   where wm.id in (
+     v_caller_workspace_membership_id, v_target_workspace_membership_id
+   )
+   order by wm.id
+   for update;
+
+  perform 1 from public.memberships m
+   where m.id = p_membership_id
+   for update;
+
+  select m.* into v_target
+    from public.memberships m where m.id = p_membership_id;
+  select wm.* into v_target_workspace_member
+    from public.workspace_memberships wm
+   where wm.id = v_target_workspace_membership_id;
+  select wm.* into v_caller_workspace_member
+    from public.workspace_memberships wm
+   where wm.id = v_caller_workspace_membership_id;
+
+  if v_caller_workspace_member.id is null
+     or v_caller_workspace_member.workspace_id is distinct from v_workspace_id
+     or v_caller_workspace_member.user_id is distinct from v_actor
+     or v_caller_workspace_member.governance_role is null
+     or v_caller_workspace_member.governance_role not in (
+       'workspace_owner', 'group_admin'
+     )
+     or v_caller_workspace_member.status <> 'active'
+     or v_caller_workspace_member.revoked_at is not null
+     or (v_caller_workspace_member.expires_at is not null
+         and v_caller_workspace_member.expires_at <= statement_timestamp()) then
+    raise exception 'C04_CALLER_NOT_GOVERNOR' using errcode = 'P0001';
+  end if;
+
+  select r.workspace_id into v_live_workspace_id
+    from public.restaurants r where r.id = v_target.restaurant_id;
+  if v_target.id is null
+     or v_target.status <> 'active'
+     or v_target.revoked_at is not null
+     or (v_target.expires_at is not null
+         and v_target.expires_at <= statement_timestamp())
+     or v_target.workspace_membership_id is distinct from
+        v_target_workspace_membership_id
+     or v_live_workspace_id is distinct from v_workspace_id
+     or v_target_workspace_member.id is null
+     or v_target_workspace_member.id is distinct from
+        v_target.workspace_membership_id
+     or v_target_workspace_member.user_id is distinct from v_target.user_id
+     or v_target_workspace_member.workspace_id is distinct from v_workspace_id
+     or v_target_workspace_member.status <> 'active'
+     or v_target_workspace_member.revoked_at is not null
+     or (v_target_workspace_member.expires_at is not null
+         and v_target_workspace_member.expires_at <= statement_timestamp())
+     or v_caller_workspace_member.workspace_id is distinct from v_workspace_id then
+    raise exception 'C04_TARGET_IDENTITY_NOT_CURRENT' using errcode = 'P0001';
+  end if;
+
+  perform public.retire_membership_capability_grants(
+    array[p_membership_id], v_actor, p_grant_reason, 'governance_replacement'
+  );
+
+  foreach v_key in array v_keys loop
+    insert into public.membership_capability_grants (
+      workspace_id, restaurant_id, workspace_membership_id, membership_id,
+      subject_user_id, site_lifecycle_generation,
+      workspace_lifecycle_generation, capability_key, granted_by_user_id,
+      grant_reason, expires_at
+    ) values (
+      v_workspace_id, v_target.restaurant_id, v_target.workspace_membership_id,
+      v_target.id, v_target.user_id, v_target.lifecycle_generation,
+      v_target_workspace_member.lifecycle_generation, v_key, v_actor,
+      btrim(p_grant_reason), p_expires_at
+    );
+  end loop;
+
+  return query
+  select supplied.capability_key
+    from unnest(v_keys) as supplied(capability_key)
+   order by supplied.capability_key;
+end;
+$$;
+
+create function public.read_pricing_recommendations(p_restaurant_id uuid)
+returns table (
+  wine_id uuid,
+  class text,
+  rationale text,
+  evidence jsonb,
+  timing text,
+  computed_at timestamptz,
+  wines jsonb
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.effective_site_capability(p_restaurant_id, 'cost.read')
+     or not public.effective_site_capability(p_restaurant_id, 'margin.read') then
+    return;
+  end if;
+
+  return query
+  select
+    pr.wine_id,
+    pr.class,
+    pr.rationale,
+    pr.evidence,
+    pr.timing,
+    pr.computed_at,
+    jsonb_build_object(
+      'name', w.name,
+      'producer', w.producer,
+      'vintage', w.vintage
+    ) as wines
+  from public.pricing_recommendations pr
+  join public.wines w
+    on w.id = pr.wine_id
+   and w.restaurant_id = pr.restaurant_id
+  where pr.restaurant_id = p_restaurant_id
+  order by pr.class asc, pr.computed_at desc, pr.wine_id asc;
+end;
+$$;
+
+revoke all on function public.effective_site_capability(uuid,text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.effective_site_ids(text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.replace_member_site_capabilities(uuid,text[],timestamptz,text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.read_pricing_recommendations(uuid)
+  from public, anon, authenticated, service_role;
+
+grant execute on function public.effective_site_capability(uuid,text)
+  to authenticated;
+grant execute on function public.effective_site_ids(text)
+  to authenticated;
+grant execute on function public.replace_member_site_capabilities(uuid,text[],timestamptz,text)
+  to authenticated;
+grant execute on function public.read_pricing_recommendations(uuid)
+  to authenticated;
+
+comment on table public.membership_capability_grants is
+  'C04 additive authority A append-history; no direct Data API table access.';
+comment on function public.effective_site_capability(uuid,text) is
+  'C04 exact-site authority using live identity and both lifecycle generations.';
+comment on function public.effective_site_ids(text) is
+  'C04 explicitly granted current sites only; governance never implies site access.';
+comment on function public.replace_member_site_capabilities(uuid,text[],timestamptz,text) is
+  'C04 workspace-governed exact-set replacement with ordered immutable retirement.';
+comment on function public.read_pricing_recommendations(uuid) is
+  'C04 cost-and-margin gated reader; legacy direct SELECT remains during expand.';
+
+-- === 0155_effective_service_pour_events_service_role_grant.sql ===
+-- Permit the existing server-side analytics readers to use the narrow,
+-- undo-correct event projection. The service role already has SELECT on the
+-- base table and BYPASSRLS; application callers must still supply an exact
+-- restaurant_id predicate.
+--
+-- REQUIRES one caller-owned transaction: run with
+-- `psql -X -v ON_ERROR_STOP=1 --single-transaction` and record the 0155
+-- schema_migrations row in that same transaction. This file deliberately owns
+-- no BEGIN/COMMIT so a failed ledger write also rolls back this ACL change.
+
+do $preimage$
+declare
+  v_view_oid oid;
+  v_owner_oid oid;
+  v_executor_oid oid;
+  v_authenticated_oid oid;
+  v_service_role_oid oid;
+  v_acl_profiles text[];
+  v_acl_profile text;
+begin
+  select c.oid, c.relowner
+    into strict v_view_oid, v_owner_oid
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'effective_service_pour_events'
+     and c.relkind = 'v';
+
+  select oid into strict v_executor_oid
+    from pg_catalog.pg_roles where rolname = current_user;
+  select oid into strict v_authenticated_oid
+    from pg_catalog.pg_roles where rolname = 'authenticated';
+  select oid into strict v_service_role_oid
+    from pg_catalog.pg_roles where rolname = 'service_role';
+
+  if v_owner_oid <> v_executor_oid then
+    raise exception 'C06_0155_EXECUTOR_NOT_DIRECT_VIEW_OWNER'
+      using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_class c
+     where c.oid = v_view_oid
+       and c.reloptions = array['security_invoker=true']
+       and pg_catalog.obj_description(c.oid, 'pg_class') =
+         'C06_DEFINITION_MD5:' || md5(pg_catalog.pg_get_viewdef(c.oid, false))
+  ) then
+    raise exception 'C06_0155_EFFECTIVE_VIEW_DEFINITION_DRIFT'
+      using errcode = 'P0001';
+  end if;
+
+  with actual as (
+    select acl.grantor, acl.grantee, acl.privilege_type, acl.is_grantable
+      from pg_catalog.pg_class c
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(c.relacl, pg_catalog.acldefault('r', c.relowner))
+      ) acl
+     where c.oid = v_view_oid
+  ), profiles(profile) as (
+    values ('select_only'::text), ('supabase_five'::text)
+  ), expected as (
+    select p.profile, owner_acl.grantor, owner_acl.grantee,
+           owner_acl.privilege_type, owner_acl.is_grantable
+      from profiles p
+      cross join lateral pg_catalog.aclexplode(
+        pg_catalog.acldefault('r', v_owner_oid)
+      ) owner_acl
+     where owner_acl.grantee = v_owner_oid
+    union all
+    select p.profile, v_owner_oid, v_authenticated_oid, 'SELECT'::text, false
+      from profiles p
+    union all
+    select 'supabase_five'::text, v_owner_oid, v_authenticated_oid,
+           extra.privilege_type, false
+      from (values
+        ('MAINTAIN'::text),
+        ('REFERENCES'::text),
+        ('TRIGGER'::text),
+        ('TRUNCATE'::text)
+      ) extra(privilege_type)
+  ), matching as (
+    select p.profile
+      from profiles p
+     where not exists (
+       (select a.grantor, a.grantee, a.privilege_type, a.is_grantable
+          from actual a
+        except
+        select e.grantor, e.grantee, e.privilege_type, e.is_grantable
+          from expected e where e.profile = p.profile)
+       union all
+       (select e.grantor, e.grantee, e.privilege_type, e.is_grantable
+          from expected e where e.profile = p.profile
+        except
+        select a.grantor, a.grantee, a.privilege_type, a.is_grantable
+          from actual a)
+     )
+  )
+  select array_agg(profile order by profile)
+    into v_acl_profiles
+    from matching;
+
+  if coalesce(cardinality(v_acl_profiles), 0) <> 1 then
+    raise exception 'C06_0155_EFFECTIVE_VIEW_PREIMAGE_ACL_DRIFT'
+      using errcode = 'P0001';
+  end if;
+
+  v_acl_profile := v_acl_profiles[1];
+
+  if exists (
+    select 1
+      from pg_catalog.pg_class c
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(c.relacl, pg_catalog.acldefault('r', c.relowner))
+      ) acl
+     where c.oid = v_view_oid
+       and acl.grantee = v_service_role_oid
+  ) then
+    raise exception 'C06_0155_SERVICE_ROLE_GRANT_ALREADY_PRESENT'
+      using errcode = 'P0001';
+  end if;
+
+  perform pg_catalog.set_config(
+    'terroir.c06_0155_authenticated_acl_profile',
+    v_acl_profile,
+    true
+  );
+end;
+$preimage$;
+
+do $outer_transaction_guard$
+declare
+  v_acl_profile text;
+begin
+  v_acl_profile := pg_catalog.current_setting(
+    'terroir.c06_0155_authenticated_acl_profile',
+    true
+  );
+  if v_acl_profile is null
+     or v_acl_profile = ''
+     or v_acl_profile not in ('select_only', 'supabase_five') then
+    raise exception 'C06_0155_OUTER_TRANSACTION_REQUIRED'
+      using errcode = 'P0001';
+  end if;
+end;
+$outer_transaction_guard$;
+
+grant select on table public.effective_service_pour_events to service_role;
+
+do $postimage$
+declare
+  v_view_oid oid;
+  v_owner_oid oid;
+  v_executor_oid oid;
+  v_authenticated_oid oid;
+  v_service_role_oid oid;
+  v_acl_profile text;
+begin
+  select c.oid, c.relowner
+    into strict v_view_oid, v_owner_oid
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'effective_service_pour_events'
+     and c.relkind = 'v';
+  select oid into strict v_executor_oid
+    from pg_catalog.pg_roles where rolname = current_user;
+  select oid into strict v_authenticated_oid
+    from pg_catalog.pg_roles where rolname = 'authenticated';
+  select oid into strict v_service_role_oid
+    from pg_catalog.pg_roles where rolname = 'service_role';
+
+  if v_owner_oid <> v_executor_oid then
+    raise exception 'C06_0155_EXECUTOR_CHANGED_DURING_MIGRATION'
+      using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_class c
+     where c.oid = v_view_oid
+       and c.reloptions = array['security_invoker=true']
+       and pg_catalog.obj_description(c.oid, 'pg_class') =
+         'C06_DEFINITION_MD5:' || md5(pg_catalog.pg_get_viewdef(c.oid, false))
+  ) then
+    raise exception 'C06_0155_EFFECTIVE_VIEW_DEFINITION_CHANGED'
+      using errcode = 'P0001';
+  end if;
+
+  v_acl_profile := pg_catalog.current_setting(
+    'terroir.c06_0155_authenticated_acl_profile',
+    true
+  );
+  if v_acl_profile is null
+     or v_acl_profile not in ('select_only', 'supabase_five') then
+    raise exception 'C06_0155_ACL_PROFILE_CONTEXT_MISSING'
+      using errcode = 'P0001';
+  end if;
+
+  if exists (
+    with actual as (
+      select acl.grantor, acl.grantee, acl.privilege_type, acl.is_grantable
+        from pg_catalog.pg_class c
+        cross join lateral pg_catalog.aclexplode(
+          coalesce(c.relacl, pg_catalog.acldefault('r', c.relowner))
+        ) acl
+       where c.oid = v_view_oid
+    ), expected as (
+      select owner_acl.grantor, owner_acl.grantee,
+             owner_acl.privilege_type, owner_acl.is_grantable
+        from pg_catalog.aclexplode(
+          pg_catalog.acldefault('r', v_owner_oid)
+        ) owner_acl
+       where owner_acl.grantee = v_owner_oid
+      union all
+      select v_owner_oid, v_authenticated_oid, 'SELECT'::text, false
+      union all
+      select v_owner_oid, v_authenticated_oid, extra.privilege_type, false
+        from (values
+          ('MAINTAIN'::text),
+          ('REFERENCES'::text),
+          ('TRIGGER'::text),
+          ('TRUNCATE'::text)
+        ) extra(privilege_type)
+       where v_acl_profile = 'supabase_five'
+      union all
+      select v_owner_oid, v_service_role_oid, 'SELECT'::text, false
+    ), mismatch as (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    )
+    select 1 from mismatch
+  ) then
+    raise exception 'C06_0155_EFFECTIVE_VIEW_POSTIMAGE_ACL_DRIFT'
+      using errcode = 'P0001';
+  end if;
+end;
+$postimage$;
+
+-- === 0156_physical_bottle_cutover.sql ===
+-- 0156_physical_bottle_cutover.sql
+--
+-- Phase C for the accepted physical-bottle contract. This migration is an
+-- atomic maintenance-window cutover: it promotes valid active legacy slots,
+-- removes one-slot-per-wine semantics, activates exact-bottle writers, retires
+-- every legacy writer, protects source provenance, and flips the normative
+-- contract version only in the final statement.
+
+do $static_admission$
+begin
+  if public.current_inventory_contract_version() <> 1 then
+    raise exception 'C06_0156_REQUIRES_CONTRACT_VERSION_1' using errcode = 'P0001';
+  end if;
+
+  if to_regclass('public.inventory_command_bottle_effects') is null
+     or to_regclass('public.effective_service_pour_events') is null
+     or to_regprocedure('public.execute_physical_bottle_command(uuid,uuid,text,uuid,uuid,uuid,integer,text,text,integer,integer,uuid,uuid,text,boolean)') is null
+     or to_regprocedure('public.execute_physical_reconciliation_batch(uuid,uuid,jsonb)') is null
+     or to_regprocedure('public.list_active_physical_bottles(uuid)') is null
+     or to_regprocedure('public.list_open_bottle_aggregates(uuid)') is null then
+    raise exception 'C06_0156_PHASE_A_INCOMPLETE' using errcode = 'P0001';
+  end if;
+
+  if to_regprocedure('public.execute_inventory_command_pre_0156(uuid,uuid,text,uuid,integer,text,text,uuid,timestamp with time zone,integer,integer,uuid)') is not null
+     or to_regprocedure('public.execute_physical_bottle_command_phase_a_0156(uuid,uuid,text,uuid,uuid,uuid,integer,text,text,integer,integer,uuid,uuid,text,boolean)') is not null
+     or to_regprocedure('public.execute_physical_reconciliation_batch_phase_a_0156(uuid,uuid,jsonb)') is not null
+     or to_regprocedure('public.pour_events_maintain_open_bottle_pre_0156()') is not null
+     or to_regclass('public.open_bottles_restaurant_wine_opened_idx') is not null
+     or to_regclass('public.open_bottles_active_restaurant_wine_idx') is not null then
+    raise exception 'C06_0156_ALREADY_OR_PARTIALLY_APPLIED' using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint c
+     where c.conrelid = 'public.open_bottles'::regclass
+       and c.conname = 'open_bottles_wine_id_restaurant_id_key'
+       and c.contype = 'u'
+  ) or not exists (
+    select 1
+      from pg_catalog.pg_constraint c
+     where c.conrelid = 'public.open_bottles'::regclass
+       and c.conname = 'open_bottles_source_inventory_item_id_fkey'
+       and c.contype = 'f'
+       and c.confdeltype = 'n'
+  ) then
+    raise exception 'C06_0156_LEGACY_CONTRACT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$static_admission$;
+
+-- This order matches the Phase A rehearsal and blocks every legacy inventory
+-- writer before mutable admission is repeated.
+lock table public.inventory_items in access exclusive mode nowait;
+lock table public.open_bottles in access exclusive mode nowait;
+lock table public.pour_events in access exclusive mode nowait;
+lock table public.bottle_closeouts in access exclusive mode nowait;
+lock table public.inventory_command_receipts in access exclusive mode nowait;
+lock table public.inventory_command_bottle_effects in access exclusive mode nowait;
+
+do $locked_preflight$
+begin
+  if public.current_inventory_contract_version() <> 1 then
+    raise exception 'C06_0156_REQUIRES_CONTRACT_VERSION_1' using errcode = 'P0001';
+  end if;
+
+  if exists (select 1 from public.inventory_command_bottle_effects)
+     or exists (
+       select 1 from public.inventory_command_receipts
+        where command_version = 2
+           or scope_kind <> 'single_wine'
+           or batch_entry_count is not null
+     )
+     or exists (
+       select 1 from public.pour_events
+        where event_contract = 2
+           or operation_id is not null
+           or operation_entry_ordinal is not null
+           or reversal_of_event_id is not null
+     )
+     or exists (select 1 from public.bottle_closeouts where event_contract = 2)
+     or exists (
+       select 1 from public.open_bottles
+        where identity_contract <> 1
+           or identity_origin <> 'legacy_slot'
+           or nominal_capacity_ml is not null
+           or source_provenance <> 'legacy_unknown'
+           or opening_operation_id is not null
+           or state_version <> 0
+     ) then
+    raise exception 'C06_0156_DORMANT_PHASE_A_STATE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.open_bottles ob
+      left join public.wines w
+        on w.id = ob.wine_id
+       and w.restaurant_id = ob.restaurant_id
+      left join public.inventory_items ii
+        on ii.id = ob.source_inventory_item_id
+     where ob.closed_at is null
+       and (
+         w.id is null
+         or w.size_ml is null
+         or w.size_ml <= 0
+         or ob.remaining_ml <= 0
+         or ob.remaining_ml > w.size_ml
+         or (
+           ob.source_inventory_item_id is not null
+           and (
+             ii.id is null
+             or ii.restaurant_id is distinct from ob.restaurant_id
+             or ii.wine_id is distinct from ob.wine_id
+           )
+         )
+       )
+  ) then
+    raise exception 'C06_0156_ACTIVE_SLOT_PREFLIGHT_FAILED' using errcode = 'P0001';
+  end if;
+end;
+$locked_preflight$;
+
+-- Preserve the exact Phase A / legacy definitions as revoked database-local
+-- rollback helpers. They are never granted or called while contract 2 is live.
+alter function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) rename to execute_inventory_command_pre_0156;
+revoke all on function public.execute_inventory_command_pre_0156(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) from public, anon, authenticated, service_role;
+
+alter function public.execute_physical_bottle_command(
+  uuid, uuid, text, uuid, uuid, uuid, int, text, text, int, int, uuid, uuid, text, boolean
+) rename to execute_physical_bottle_command_phase_a_0156;
+revoke all on function public.execute_physical_bottle_command_phase_a_0156(
+  uuid, uuid, text, uuid, uuid, uuid, int, text, text, int, int, uuid, uuid, text, boolean
+) from public, anon, authenticated, service_role;
+
+alter function public.execute_physical_reconciliation_batch(uuid, uuid, jsonb)
+  rename to execute_physical_reconciliation_batch_phase_a_0156;
+revoke all on function public.execute_physical_reconciliation_batch_phase_a_0156(uuid, uuid, jsonb)
+  from public, anon, authenticated, service_role;
+
+alter function public.pour_events_maintain_open_bottle()
+  rename to pour_events_maintain_open_bottle_pre_0156;
+alter function public.open_bottles_enforce_capacity()
+  rename to open_bottles_enforce_capacity_pre_0156;
+alter function public.auto_eightysix_on_low_inventory()
+  rename to auto_eightysix_on_low_inventory_pre_0156;
+alter function public.import_batch_rows_reflect_inventory_delete()
+  rename to import_batch_rows_reflect_inventory_delete_pre_0156;
+alter function public.revert_import_batch(uuid)
+  rename to revert_import_batch_pre_0156;
+alter function public.revert_import_session(uuid)
+  rename to revert_import_session_pre_0156;
+alter function public.delete_invoice_scan(uuid)
+  rename to delete_invoice_scan_pre_0156;
+alter function public.merge_wines(uuid, uuid)
+  rename to merge_wines_pre_0156;
+alter function public.list_open_bottle_items(uuid)
+  rename to list_open_bottle_items_pre_0156;
+
+revoke all on function public.pour_events_maintain_open_bottle_pre_0156()
+  from public, anon, authenticated, service_role;
+revoke all on function public.open_bottles_enforce_capacity_pre_0156()
+  from public, anon, authenticated, service_role;
+revoke all on function public.auto_eightysix_on_low_inventory_pre_0156()
+  from public, anon, authenticated, service_role;
+revoke all on function public.import_batch_rows_reflect_inventory_delete_pre_0156()
+  from public, anon, authenticated, service_role;
+revoke all on function public.revert_import_batch_pre_0156(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.revert_import_session_pre_0156(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.delete_invoice_scan_pre_0156(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.merge_wines_pre_0156(uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.list_open_bottle_items_pre_0156(uuid)
+  from public, anon, authenticated, service_role;
+
+drop trigger pour_events_trigger on public.pour_events;
+drop trigger pour_events_trigger_auto_eightysix on public.pour_events;
+drop trigger pour_events_delete_trigger on public.pour_events;
+drop trigger open_bottles_enforce_capacity_trigger on public.open_bottles;
+drop trigger inventory_items_reflect_import_delete on public.inventory_items;
+
+-- Promote only active legacy slots. Closed rows remain explicitly contract-1
+-- history, because their slot IDs may span multiple physical lifecycles.
+update public.open_bottles ob
+   set identity_contract = 2,
+       identity_origin = 'migrated_active',
+       nominal_capacity_ml = w.size_ml,
+       source_provenance = case
+         when ob.source_inventory_item_id is null then 'legacy_unknown'
+         else 'known'
+       end,
+       state_version = 0
+  from public.wines w
+ where ob.closed_at is null
+   and w.id = ob.wine_id
+   and w.restaurant_id = ob.restaurant_id;
+
+alter table public.open_bottles
+  drop constraint open_bottles_source_inventory_item_id_fkey,
+  add constraint open_bottles_source_inventory_item_tenant_wine_fkey
+    foreign key (source_inventory_item_id, restaurant_id, wine_id)
+    references public.inventory_items (id, restaurant_id, wine_id)
+    on delete restrict
+    deferrable initially deferred
+    not valid;
+
+alter table public.open_bottles
+  validate constraint open_bottles_source_inventory_item_tenant_wine_fkey,
+  validate constraint open_bottles_physical_shape_check;
+alter table public.pour_events
+  validate constraint pour_events_physical_shape_check;
+alter table public.bottle_closeouts
+  validate constraint bottle_closeouts_physical_shape_check;
+
+alter table public.open_bottles
+  drop constraint open_bottles_wine_id_restaurant_id_key;
+
+create index open_bottles_restaurant_wine_opened_idx
+  on public.open_bottles (restaurant_id, wine_id, opened_at desc);
+create index open_bottles_active_restaurant_wine_idx
+  on public.open_bottles (restaurant_id, wine_id, opened_at desc)
+  where closed_at is null;
+
+create function public.open_bottles_enforce_capacity()
+returns trigger
+language plpgsql
+set search_path = ''
+as $function$
+declare
+  v_size_ml int;
+begin
+  if new.identity_contract = 2 then
+    if new.nominal_capacity_ml is null
+       or new.nominal_capacity_ml <= 0
+       or new.remaining_ml > new.nominal_capacity_ml then
+      raise exception 'physical_bottle_capacity_exceeded' using errcode = 'P0003';
+    end if;
+  else
+    select w.size_ml into v_size_ml
+      from public.wines w
+     where w.id = new.wine_id;
+    if v_size_ml is not null and new.remaining_ml > v_size_ml then
+      raise exception 'open_bottles.remaining_ml (%) would exceed wine % size_ml (%)',
+        new.remaining_ml, new.wine_id, v_size_ml using errcode = 'P0003';
+    end if;
+  end if;
+  return new;
+end;
+$function$;
+
+create function public.import_batch_rows_reflect_inventory_delete()
+returns trigger
+language plpgsql
+set search_path = ''
+as $function$
+begin
+  if exists (
+    select 1
+      from public.open_bottles ob
+     where ob.source_inventory_item_id = old.id
+  ) then
+    raise exception 'physical_bottle_dependency' using errcode = 'P0001';
+  end if;
+
+  update public.import_batch_rows
+     set apply_status = 'reverted',
+         applied_inventory_item_id = null,
+         updated_at = now()
+   where applied_inventory_item_id = old.id
+     and apply_status = 'applied';
+  return old;
+end;
+$function$;
+
+create trigger inventory_items_reflect_import_delete
+  before delete on public.inventory_items
+  for each row execute function public.import_batch_rows_reflect_inventory_delete();
+
+create function public.revert_import_batch(p_batch_id uuid)
+returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $function$
+declare
+  v_restaurant_id uuid;
+  v_status text;
+  v_row record;
+  v_count integer := 0;
+begin
+  select b.restaurant_id, b.status
+    into v_restaurant_id, v_status
+    from public.import_batches b
+   where b.id = p_batch_id
+   for update;
+  if not found then
+    raise exception 'import batch % not found', p_batch_id using errcode = 'P0002';
+  end if;
+  if v_status = 'reverted' then
+    raise exception 'import batch % is already reverted', p_batch_id using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from public.import_batch_rows row_to_revert
+      join public.open_bottles ob
+        on ob.source_inventory_item_id = row_to_revert.applied_inventory_item_id
+     where row_to_revert.batch_id = p_batch_id
+       and row_to_revert.apply_status = 'applied'
+  ) then
+    raise exception 'physical_bottle_dependency' using errcode = 'P0001';
+  end if;
+
+  for v_row in
+    select r.id, r.applied_inventory_item_id
+      from public.import_batch_rows r
+     where r.batch_id = p_batch_id
+       and r.apply_status = 'applied'
+     order by r.id
+     for update
+  loop
+    update public.import_batch_rows
+       set apply_status = 'reverted',
+           applied_inventory_item_id = null,
+           updated_at = now()
+     where id = v_row.id;
+    delete from public.inventory_items
+     where id = v_row.applied_inventory_item_id
+       and restaurant_id = v_restaurant_id;
+    v_count := v_count + 1;
+  end loop;
+
+  update public.import_batches
+     set status = 'reverted',
+         reverted_at = now(),
+         reverted_by = auth.uid()
+   where id = p_batch_id;
+  return v_count;
+end;
+$function$;
+
+revoke all on function public.revert_import_batch(uuid) from public, anon;
+grant execute on function public.revert_import_batch(uuid) to authenticated;
+
+create function public.revert_import_session(p_session_id uuid)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $function$
+declare
+  v_batch record;
+  v_results jsonb := '[]'::jsonb;
+  v_reverted_count integer;
+  v_session_exists boolean := false;
+  v_blocked boolean := false;
+  v_reason text;
+begin
+  select true into v_session_exists
+    from public.import_sessions s
+   where s.id = p_session_id;
+  if not v_session_exists then
+    raise exception 'import session % not found', p_session_id using errcode = 'P0002';
+  end if;
+
+  for v_batch in
+    select b.id, b.status, b.chunk_index
+      from public.import_batches b
+     where b.session_id = p_session_id
+     order by coalesce(b.chunk_index, 0) desc, b.created_at desc
+  loop
+    if v_batch.status = 'reverted' then
+      v_results := v_results || jsonb_build_object(
+        'batchId', v_batch.id, 'chunkIndex', v_batch.chunk_index,
+        'skipped', true, 'reason', 'already reverted'
+      );
+      continue;
+    end if;
+
+    begin
+      select public.revert_import_batch(v_batch.id) into v_reverted_count;
+      v_results := v_results || jsonb_build_object(
+        'batchId', v_batch.id, 'chunkIndex', v_batch.chunk_index,
+        'skipped', false, 'revertedCount', v_reverted_count
+      );
+    exception when others then
+      v_blocked := true;
+      v_reason := case
+        when sqlstate = 'P0001' and sqlerrm = 'physical_bottle_dependency'
+          then 'physical_bottle_dependency'
+        else sqlerrm
+      end;
+      v_results := v_results || jsonb_build_object(
+        'batchId', v_batch.id, 'chunkIndex', v_batch.chunk_index,
+        'skipped', true, 'reason', v_reason
+      );
+    end;
+  end loop;
+
+  if exists (
+    select 1 from public.import_batches b
+     where b.session_id = p_session_id
+       and b.status <> 'reverted'
+  ) then
+    v_blocked := true;
+  end if;
+
+  update public.import_sessions
+     set status = case when v_blocked then 'in_progress' else 'reverted' end,
+         updated_at = now()
+   where id = p_session_id;
+
+  return jsonb_build_object(
+    'sessionId', p_session_id,
+    'status', case when v_blocked then 'in_progress' else 'reverted' end,
+    'batches', v_results
+  );
+end;
+$function$;
+
+revoke all on function public.revert_import_session(uuid) from public, anon;
+grant execute on function public.revert_import_session(uuid) to authenticated;
+
+create function public.delete_invoice_scan(p_scan_id uuid)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $function$
+declare
+  v_restaurant_id uuid;
+  v_distributor text;
+  v_invoice_number text;
+  v_status text;
+  v_item_count int;
+  v_final jsonb;
+  v_rows int := 0;
+  v_bottles int := 0;
+begin
+  select s.restaurant_id, s.distributor_name, s.invoice_number, s.status,
+         s.item_count, s.final_line_items
+    into v_restaurant_id, v_distributor, v_invoice_number, v_status,
+         v_item_count, v_final
+    from public.invoice_scans s
+   where s.id = p_scan_id
+   for update;
+  if not found then
+    raise exception 'invoice scan % not found', p_scan_id using errcode = 'P0002';
+  end if;
+  if not public.is_member_with_role(v_restaurant_id, 'manager') then
+    raise exception 'insufficient privilege to delete invoice scan %', p_scan_id
+      using errcode = 'P0003';
+  end if;
+
+  if exists (
+    select 1
+      from public.inventory_items ii
+      join public.open_bottles ob on ob.source_inventory_item_id = ii.id
+     where ii.invoice_scan_id = p_scan_id
+       and ii.restaurant_id = v_restaurant_id
+  ) then
+    raise exception 'physical_bottle_dependency' using errcode = 'P0001';
+  end if;
+
+  select count(*), coalesce(sum(ii.quantity), 0)
+    into v_rows, v_bottles
+    from public.inventory_items ii
+   where ii.invoice_scan_id = p_scan_id
+     and ii.restaurant_id = v_restaurant_id;
+
+  delete from public.inventory_items
+   where invoice_scan_id = p_scan_id
+     and restaurant_id = v_restaurant_id;
+
+  insert into public.invoice_scan_deletions (
+    restaurant_id, invoice_scan_id, deleted_by, distributor_name,
+    invoice_number, scan_status, item_count, inventory_rows_deleted,
+    bottles_removed, final_line_items
+  ) values (
+    v_restaurant_id, p_scan_id, auth.uid(), v_distributor,
+    v_invoice_number, v_status, v_item_count, v_rows,
+    v_bottles, coalesce(v_final, '[]'::jsonb)
+  );
+
+  delete from public.invoice_scans where id = p_scan_id;
+  if not found then
+    raise exception 'invoice scan % could not be deleted', p_scan_id
+      using errcode = 'P0001';
+  end if;
+
+  return jsonb_build_object(
+    'scanId', p_scan_id,
+    'inventoryRowsDeleted', v_rows,
+    'bottlesRemoved', v_bottles
+  );
+end;
+$function$;
+
+revoke all on function public.delete_invoice_scan(uuid) from public, anon;
+grant execute on function public.delete_invoice_scan(uuid) to authenticated;
+
+create function public.merge_wines(p_source_wine_id uuid, p_target_wine_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_source public.wines%rowtype;
+  v_target public.wines%rowtype;
+  v_restaurant_id uuid;
+  v_moved_inventory int;
+  v_moved_pours int;
+  v_moved_bottles int;
+  v_moved_list_items int;
+  v_deduped_list_items int;
+  v_moved_avail int;
+  v_moved_bottle_closeouts int;
+  v_moved_stock_adjustments int;
+  v_moved_pricing_recs int;
+  v_moved_cellar_health int;
+  v_dropped_cellar_health int;
+  v_moved_import_batch_rows int;
+  v_moved_receipts int;
+  v_moved_bottle_effects int;
+begin
+  if p_source_wine_id = p_target_wine_id then
+    raise exception 'identical_merge: source and target are the same wine';
+  end if;
+
+  perform 1
+    from public.wines w
+   where w.id in (p_source_wine_id, p_target_wine_id)
+   order by w.id
+   for update;
+
+  select * into v_source from public.wines where id = p_source_wine_id;
+  select * into v_target from public.wines where id = p_target_wine_id;
+  if v_source.id is null or v_target.id is null
+     or v_source.restaurant_id <> v_target.restaurant_id then
+    raise exception 'wine_not_found: both wines must exist in the same restaurant';
+  end if;
+
+  v_restaurant_id := v_source.restaurant_id;
+  if not public.is_member_with_role(v_restaurant_id, 'manager') then
+    raise exception 'forbidden: manager role required to merge wines';
+  end if;
+  if v_source.lineage_id is null or v_target.lineage_id is null
+     or v_source.lineage_id <> v_target.lineage_id then
+    raise exception 'lineage_mismatch_merge: wines are not the same producer-cuvée — merging is only for true duplicates';
+  end if;
+  if coalesce(v_source.vintage, 0) <> coalesce(v_target.vintage, 0) then
+    raise exception 'cross_vintage_merge: % and % are distinct vintages — they are already linked as vintage siblings, not duplicates',
+      coalesce(v_source.vintage::text, 'NV'), coalesce(v_target.vintage::text, 'NV');
+  end if;
+  if v_source.size_ml <> v_target.size_ml then
+    raise exception 'format_mismatch_merge: % ml and % ml are distinct formats',
+      v_source.size_ml, v_target.size_ml;
+  end if;
+  if v_source.wine_variant_id is not null
+     and v_target.wine_variant_id is not null
+     and v_source.wine_variant_id <> v_target.wine_variant_id then
+    raise exception 'variant_identity_conflict: source wine_variant_id % and target wine_variant_id % disagree — run merge_canonical_wines to reconcile the underlying identities first',
+      v_source.wine_variant_id, v_target.wine_variant_id;
+  end if;
+
+  set constraints
+    public.open_bottles_source_inventory_item_tenant_wine_fkey,
+    public.pour_events_open_bottle_tenant_wine_fkey,
+    public.bottle_closeouts_open_bottle_tenant_wine_fkey,
+    public.inventory_command_bottle_effects_bottle_fkey
+  deferred;
+
+  if v_target.wine_variant_id is null and v_source.wine_variant_id is not null then
+    update public.wines set wine_variant_id = v_source.wine_variant_id
+     where id = p_target_wine_id;
+  end if;
+
+  update public.inventory_items set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_inventory = row_count;
+
+  update public.open_bottles set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_bottles = row_count;
+
+  update public.pour_events set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_pours = row_count;
+
+  update public.bottle_closeouts set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_bottle_closeouts = row_count;
+
+  update public.inventory_command_receipts set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id
+     and scope_kind = 'single_wine';
+  get diagnostics v_moved_receipts = row_count;
+
+  update public.inventory_command_bottle_effects set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_bottle_effects = row_count;
+
+  delete from public.wine_list_items source_item
+   where source_item.wine_id = p_source_wine_id
+     and exists (
+       select 1 from public.wine_list_items target_item
+        where target_item.section_id = source_item.section_id
+          and target_item.wine_id = p_target_wine_id
+     );
+  get diagnostics v_deduped_list_items = row_count;
+
+  update public.wine_list_items set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_list_items = row_count;
+
+  update public.availability_events set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_avail = row_count;
+
+  update public.stock_adjustments set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_stock_adjustments = row_count;
+
+  update public.pricing_recommendations set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_pricing_recs = row_count;
+
+  delete from public.cellar_health source_health
+   where source_health.wine_id = p_source_wine_id
+     and exists (
+       select 1 from public.cellar_health target_health
+        where target_health.wine_id = p_target_wine_id
+          and target_health.restaurant_id = source_health.restaurant_id
+     );
+  get diagnostics v_dropped_cellar_health = row_count;
+
+  update public.cellar_health set wine_id = p_target_wine_id
+   where wine_id = p_source_wine_id;
+  get diagnostics v_moved_cellar_health = row_count;
+
+  update public.import_batch_rows set applied_wine_id = p_target_wine_id
+   where applied_wine_id = p_source_wine_id;
+  get diagnostics v_moved_import_batch_rows = row_count;
+
+  insert into public.identity_merge_log (
+    merge_type, source_id, target_id, restaurant_id,
+    source_snapshot, moved_counts, merged_by
+  ) values (
+    'wine', p_source_wine_id, p_target_wine_id, v_restaurant_id,
+    to_jsonb(v_source),
+    jsonb_build_object(
+      'moved_inventory_items', v_moved_inventory,
+      'moved_pour_events', v_moved_pours,
+      'moved_open_bottles', v_moved_bottles,
+      'moved_wine_list_items', v_moved_list_items,
+      'deduped_wine_list_items', v_deduped_list_items,
+      'moved_availability_events', v_moved_avail,
+      'moved_bottle_closeouts', v_moved_bottle_closeouts,
+      'moved_stock_adjustments', v_moved_stock_adjustments,
+      'moved_pricing_recommendations', v_moved_pricing_recs,
+      'moved_cellar_health', v_moved_cellar_health,
+      'dropped_cellar_health', v_dropped_cellar_health,
+      'moved_import_batch_rows', v_moved_import_batch_rows,
+      'moved_inventory_command_receipts', v_moved_receipts,
+      'moved_inventory_command_bottle_effects', v_moved_bottle_effects
+    ),
+    auth.uid()
+  );
+
+  delete from public.wines where id = p_source_wine_id;
+
+  return jsonb_build_object(
+    'target_id', p_target_wine_id,
+    'moved_inventory_items', v_moved_inventory,
+    'moved_pour_events', v_moved_pours,
+    'moved_open_bottles', v_moved_bottles,
+    'moved_wine_list_items', v_moved_list_items,
+    'deduped_wine_list_items', v_deduped_list_items,
+    'moved_availability_events', v_moved_avail,
+    'moved_bottle_closeouts', v_moved_bottle_closeouts,
+    'moved_stock_adjustments', v_moved_stock_adjustments,
+    'moved_pricing_recommendations', v_moved_pricing_recs,
+    'moved_cellar_health', v_moved_cellar_health,
+    'dropped_cellar_health', v_dropped_cellar_health,
+    'moved_import_batch_rows', v_moved_import_batch_rows,
+    'moved_inventory_command_receipts', v_moved_receipts,
+    'moved_inventory_command_bottle_effects', v_moved_bottle_effects
+  );
+end;
+$function$;
+
+revoke all on function public.merge_wines(uuid, uuid) from public, anon;
+grant execute on function public.merge_wines(uuid, uuid) to authenticated;
+
+create function public.execute_inventory_command(
+  p_operation_id uuid,
+  p_restaurant_id uuid,
+  p_command text,
+  p_wine_id uuid,
+  p_ml int default null,
+  p_note text default null,
+  p_preservation_method text default null,
+  p_expected_open_bottle_id uuid default null,
+  p_expected_opened_at timestamptz default null,
+  p_actual_remaining_ml int default null,
+  p_written_off_ml int default 0,
+  p_reason_code_id uuid default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user uuid := auth.uid();
+  v_note text := nullif(btrim(p_note), '');
+  v_preservation text;
+  v_request jsonb;
+  v_receipt public.inventory_command_receipts%rowtype;
+begin
+  if v_user is null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_operation_id is null
+     or p_restaurant_id is null
+     or p_wine_id is null
+     or p_command is null
+     or p_command not in ('open', 'pour', 'spill', 'discard', 'close')
+     or (v_note is not null and char_length(v_note) > 500)
+     or (p_preservation_method is not null
+         and p_preservation_method not in ('coravin', 'argon', 'vacuum', 'none')) then
+    raise exception 'invalid_inventory_command' using errcode = 'P0001';
+  end if;
+
+  if p_command = 'open' then
+    if p_ml is not null
+       or p_expected_open_bottle_id is not null
+       or p_expected_opened_at is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+    v_preservation := coalesce(p_preservation_method, 'none');
+  elsif p_command in ('pour', 'spill') then
+    if p_ml is null or p_ml <= 0 or p_ml > 2000
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or ((p_expected_open_bottle_id is null) <> (p_expected_opened_at is null)) then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+    v_preservation := p_preservation_method;
+  elsif p_command = 'discard' then
+    if p_ml is not null
+       or p_preservation_method is not null
+       or p_expected_open_bottle_id is null
+       or p_expected_opened_at is null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml is null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+  else
+    if p_ml is not null
+       or p_preservation_method is not null
+       or p_expected_open_bottle_id is null
+       or p_expected_opened_at is null
+       or p_actual_remaining_ml is null
+       or p_actual_remaining_ml < 0
+       or p_written_off_ml is null
+       or p_written_off_ml < 0
+       or p_written_off_ml > p_actual_remaining_ml
+       or (p_written_off_ml > 0 and p_reason_code_id is null) then
+      raise exception 'invalid_inventory_command' using errcode = 'P0001';
+    end if;
+  end if;
+
+  perform 1
+    from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+     and m.role in ('owner', 'manager', 'staff')
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_request := jsonb_build_object(
+    'version', 1,
+    'command', p_command,
+    'wine_id', p_wine_id,
+    'ml', p_ml,
+    'note', v_note,
+    'preservation_method', case
+      when p_command = 'open' then v_preservation
+      else p_preservation_method
+    end,
+    'expected_open_bottle_id', p_expected_open_bottle_id,
+    'expected_opened_at', case
+      when p_expected_opened_at is null then null
+      else to_char(
+        p_expected_opened_at at time zone 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      )
+    end,
+    'actual_remaining_ml', p_actual_remaining_ml,
+    'written_off_ml', p_written_off_ml,
+    'reason_code_id', p_reason_code_id
+  );
+
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id;
+
+  if not found
+     or v_receipt.command_version <> 1
+     or v_receipt.result_payload is null
+     or v_receipt.completed_at is null then
+    raise exception 'legacy_inventory_command_retired' using errcode = 'P0001';
+  end if;
+  if v_receipt.actor_user_id is distinct from v_user then
+    raise exception 'inventory_operation_actor_conflict' using errcode = 'P0001';
+  end if;
+  if v_receipt.command_type is distinct from p_command
+     or v_receipt.request_payload is distinct from v_request then
+    raise exception 'inventory_operation_payload_conflict' using errcode = 'P0001';
+  end if;
+
+  return v_receipt.result_payload || jsonb_build_object('replayed', true);
+end;
+$function$;
+
+create function public.auto_eightysix_on_low_inventory()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_enabled boolean;
+  v_threshold int;
+  v_size_ml int;
+  v_already_eightysixed boolean;
+  v_open_ml bigint;
+  v_sealed_total_ml bigint;
+  v_total_ml bigint;
+begin
+  if new.kind not in ('pour', 'spill', 'finish_bottle', 'reconcile', 'undo') then
+    return new;
+  end if;
+
+  select r.auto_eightysix_from_inventory, r.eightysix_ml_threshold
+    into v_enabled, v_threshold
+    from public.restaurants r
+   where r.id = new.restaurant_id;
+  if not v_enabled then
+    return new;
+  end if;
+
+  select w.is_eightysixed, w.size_ml
+    into v_already_eightysixed, v_size_ml
+    from public.wines w
+   where w.id = new.wine_id
+     and w.restaurant_id = new.restaurant_id;
+  if v_already_eightysixed then
+    return new;
+  end if;
+
+  select coalesce(sum(ob.remaining_ml) filter (where ob.closed_at is null), 0)
+    into v_open_ml
+    from public.open_bottles ob
+   where ob.wine_id = new.wine_id
+     and ob.restaurant_id = new.restaurant_id;
+
+  select coalesce(sum(ii.quantity::bigint * v_size_ml::bigint), 0)
+    into v_sealed_total_ml
+    from public.inventory_items ii
+   where ii.wine_id = new.wine_id
+     and ii.restaurant_id = new.restaurant_id;
+
+  v_total_ml := v_open_ml + v_sealed_total_ml;
+  if v_total_ml < v_threshold then
+    update public.wines
+       set is_eightysixed = true,
+           eightysixed_at = now(),
+           eightysixed_by = null
+     where id = new.wine_id
+       and restaurant_id = new.restaurant_id
+       and is_eightysixed = false;
+    if found then
+      insert into public.availability_events (
+        wine_id, restaurant_id, direction, user_id, note
+      ) values (
+        new.wine_id, new.restaurant_id, 'eightysixed', null,
+        'auto: below threshold'
+      );
+    end if;
+  end if;
+  return new;
+end;
+$function$;
+
+create trigger pour_events_trigger_auto_eightysix
+  after insert on public.pour_events
+  for each row execute function public.auto_eightysix_on_low_inventory();
+
+create function public.list_open_bottle_items(p_restaurant_id uuid)
+returns table (
+  wine_list_item_id uuid,
+  glass_pour_ml int,
+  pour_size_mode text,
+  wine_id uuid,
+  name text,
+  producer text,
+  vintage int,
+  size_ml int,
+  open_remaining_ml bigint,
+  active_bottle_count bigint,
+  opened_at timestamptz,
+  sealed_count bigint
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select
+    wli.id,
+    wli.glass_pour_ml,
+    wli.pour_size_mode,
+    w.id,
+    w.name,
+    w.producer,
+    w.vintage,
+    w.size_ml,
+    coalesce(ob.open_remaining_ml, 0),
+    coalesce(ob.active_bottle_count, 0),
+    ob.opened_at,
+    coalesce((
+      select sum(ii.quantity)::bigint
+        from public.inventory_items ii
+       where ii.wine_id = w.id
+         and ii.restaurant_id = p_restaurant_id
+    ), 0)
+  from public.wine_list_items wli
+  join public.wine_list_sections s on s.id = wli.section_id
+  join public.wine_lists wl on wl.id = s.wine_list_id
+  join public.wines w on w.id = wli.wine_id
+  left join lateral (
+    select
+      sum(active.remaining_ml)::bigint as open_remaining_ml,
+      count(*)::bigint as active_bottle_count,
+      min(active.opened_at) as opened_at
+    from public.open_bottles active
+    where active.wine_id = w.id
+      and active.restaurant_id = p_restaurant_id
+      and active.closed_at is null
+  ) ob on true
+  where wl.restaurant_id = p_restaurant_id
+    and wli.glass_pour_ml is not null
+    and public.is_member(p_restaurant_id)
+  order by w.producer, w.name
+$function$;
+
+revoke all on function public.list_open_bottle_items(uuid)
+  from public, anon, service_role;
+grant execute on function public.list_open_bottle_items(uuid) to authenticated;
+
+create trigger open_bottles_enforce_capacity_trigger
+  before insert or update on public.open_bottles
+  for each row execute function public.open_bottles_enforce_capacity();
+
+create function public.pour_events_maintain_open_bottle()
+returns trigger
+language plpgsql
+set search_path = ''
+as $function$
+declare
+  v_bottle public.open_bottles%rowtype;
+  v_next_remaining int;
+  v_prior_occurred_at timestamptz;
+begin
+  if new.event_contract <> 2 then
+    raise exception 'legacy_writer_retired' using errcode = 'P0001';
+  end if;
+
+  select * into v_bottle
+    from public.open_bottles ob
+   where ob.id = new.open_bottle_id
+     and ob.restaurant_id = new.restaurant_id
+     and ob.wine_id = new.wine_id
+     and ob.identity_contract = 2
+   for update;
+  if not found then
+    raise exception 'open_bottle_not_found' using errcode = 'P0001';
+  end if;
+
+  -- The bottle row is the serialization point for every physical mutation.
+  -- Clamp the persisted event time under that lock so equal/backward wall-clock
+  -- readings and callers that began before they blocked cannot invert the
+  -- per-bottle event order.
+  select max(pe.occurred_at) into v_prior_occurred_at
+    from public.pour_events pe
+   where pe.open_bottle_id = v_bottle.id;
+  if new.occurred_at is null then
+    raise exception 'invalid_physical_command' using errcode = 'P0001';
+  end if;
+  if v_prior_occurred_at is not null
+     and new.occurred_at <= v_prior_occurred_at then
+    new.occurred_at := v_prior_occurred_at + interval '1 microsecond';
+  end if;
+
+  if new.kind = 'new_bottle' then
+    if v_bottle.identity_origin <> 'native'
+       or v_bottle.opening_operation_id is distinct from new.operation_id
+       or v_bottle.state_version <> 0
+       or v_bottle.closed_at is not null
+       or new.ml_delta <> -v_bottle.nominal_capacity_ml
+       or v_bottle.remaining_ml <> v_bottle.nominal_capacity_ml then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    return new;
+  end if;
+
+  if new.kind in ('pour', 'spill', 'finish_bottle') then
+    if v_bottle.closed_at is not null or new.ml_delta <= 0 then
+      raise exception 'open_bottle_closed' using errcode = 'P0001';
+    end if;
+    if new.kind = 'finish_bottle' and new.ml_delta <> v_bottle.remaining_ml then
+      raise exception 'open_bottle_changed' using errcode = 'P0001';
+    end if;
+    if new.ml_delta > v_bottle.remaining_ml then
+      raise exception 'insufficient_bottle_volume' using errcode = 'P0001';
+    end if;
+    v_next_remaining := v_bottle.remaining_ml - new.ml_delta;
+  elsif new.kind = 'reconcile' then
+    if v_bottle.closed_at is not null then
+      raise exception 'open_bottle_closed' using errcode = 'P0001';
+    end if;
+    v_next_remaining := v_bottle.remaining_ml - new.ml_delta;
+    if v_next_remaining < 0 or v_next_remaining > v_bottle.nominal_capacity_ml then
+      raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+    end if;
+  elsif new.kind = 'undo' then
+    if new.ml_delta >= 0 then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    v_next_remaining := v_bottle.remaining_ml - new.ml_delta;
+    if v_next_remaining > v_bottle.nominal_capacity_ml then
+      raise exception 'undo_requires_review' using errcode = 'P0001';
+    end if;
+  else
+    raise exception 'invalid_physical_command' using errcode = 'P0001';
+  end if;
+
+  update public.open_bottles
+     set remaining_ml = v_next_remaining,
+         closed_at = case
+           when v_next_remaining = 0 then new.occurred_at
+           when new.kind = 'undo' then null
+           else closed_at
+         end,
+         state_version = state_version + 1
+   where id = v_bottle.id;
+  return new;
+end;
+$function$;
+
+create trigger pour_events_trigger
+  before insert on public.pour_events
+  for each row execute function public.pour_events_maintain_open_bottle();
+
+create function public.execute_physical_bottle_command(
+  p_operation_id uuid,
+  p_restaurant_id uuid,
+  p_command text,
+  p_wine_id uuid,
+  p_open_bottle_id uuid default null,
+  p_predecessor_open_operation_id uuid default null,
+  p_ml int default null,
+  p_note text default null,
+  p_preservation_method text default null,
+  p_actual_remaining_ml int default null,
+  p_written_off_ml int default 0,
+  p_reason_code_id uuid default null,
+  p_reversal_of_event_id uuid default null,
+  p_correction_reason text default null,
+  p_operator_confirms_same_bottle_present boolean default false
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user uuid := auth.uid();
+  v_role public.membership_role;
+  v_note text := nullif(btrim(p_note), '');
+  v_request jsonb;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_claimed uuid;
+  v_size_ml int;
+  v_bottle public.open_bottles%rowtype;
+  v_source public.inventory_items%rowtype;
+  v_selected_bottle_id uuid;
+  v_event public.pour_events%rowtype;
+  v_new_event_id uuid;
+  v_closeout public.bottle_closeouts%rowtype;
+  v_effect_type text;
+  v_occurred_at timestamptz;
+  v_event_state_version bigint;
+  v_result jsonb;
+  v_is_discard boolean;
+begin
+  if public.current_inventory_contract_version() <> 2 then
+    raise exception 'physical_inventory_contract_inactive' using errcode = 'P0001';
+  end if;
+  if v_user is null
+     or p_operation_id is null
+     or p_restaurant_id is null
+     or p_wine_id is null
+     or p_command is null
+     or p_command not in ('open', 'pour', 'spill', 'close', 'discard', 'undo')
+     or (v_note is not null and char_length(v_note) > 500)
+     or p_written_off_ml is null
+     or p_operator_confirms_same_bottle_present is null then
+    raise exception 'invalid_physical_command' using errcode = 'P0001';
+  end if;
+
+  if p_command = 'open' then
+    if p_open_bottle_id is not null
+       or p_predecessor_open_operation_id is not null
+       or p_ml is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present
+       or coalesce(p_preservation_method, 'none') not in ('coravin', 'argon', 'vacuum', 'none') then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  elsif p_command in ('pour', 'spill') then
+    if (p_open_bottle_id is null) = (p_predecessor_open_operation_id is null)
+       or p_ml is null or p_ml <= 0 or p_ml > 2000
+       or p_preservation_method is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  elsif p_command in ('close', 'discard') then
+    if (p_open_bottle_id is null) = (p_predecessor_open_operation_id is null)
+       or p_ml is not null
+       or p_preservation_method is not null
+       or p_reversal_of_event_id is not null
+       or p_correction_reason is not null
+       or p_operator_confirms_same_bottle_present then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    if p_command = 'discard' and (
+      p_actual_remaining_ml is not null or p_written_off_ml <> 0 or p_reason_code_id is not null
+    ) then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+    if p_command = 'close' and (
+      p_actual_remaining_ml is null or p_actual_remaining_ml < 0
+      or p_written_off_ml < 0 or p_written_off_ml > p_actual_remaining_ml
+      or (p_written_off_ml > 0 and p_reason_code_id is null)
+    ) then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  else
+    if p_open_bottle_id is not null
+       or p_predecessor_open_operation_id is not null
+       or p_ml is not null
+       or p_preservation_method is not null
+       or p_actual_remaining_ml is not null
+       or p_written_off_ml <> 0
+       or p_reason_code_id is not null
+       or p_reversal_of_event_id is null then
+      raise exception 'invalid_physical_command' using errcode = 'P0001';
+    end if;
+  end if;
+
+  select m.role into v_role
+    from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_request := jsonb_build_object(
+    'version', 2,
+    'command', p_command,
+    'wine_id', p_wine_id,
+    'open_bottle_id', p_open_bottle_id,
+    'predecessor_open_operation_id', p_predecessor_open_operation_id,
+    'ml', p_ml,
+    'note', v_note,
+    'preservation_method', case when p_command = 'open' then coalesce(p_preservation_method, 'none') else null end,
+    'actual_remaining_ml', p_actual_remaining_ml,
+    'written_off_ml', p_written_off_ml,
+    'reason_code_id', p_reason_code_id,
+    'reversal_of_event_id', p_reversal_of_event_id,
+    'correction_reason', p_correction_reason,
+    'operator_confirms_same_bottle_present', p_operator_confirms_same_bottle_present
+  );
+
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id;
+  if found then
+    if v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.scope_kind <> 'single_wine'
+       or v_receipt.command_type is distinct from p_command
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  select w.size_ml into v_size_ml
+    from public.wines w
+   where w.id = p_wine_id
+     and w.restaurant_id = p_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'wine_not_found' using errcode = 'P0001';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_operation_id, v_user, p_wine_id, p_command,
+    v_request, 2, 'single_wine', null
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id;
+    if not found or v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.scope_kind <> 'single_wine'
+       or v_receipt.command_type is distinct from p_command
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  if p_command = 'open' then
+    if v_size_ml is null or v_size_ml <= 0 then
+      raise exception 'wine_size_unknown' using errcode = 'P0001';
+    end if;
+    select * into v_source
+      from public.inventory_items ii
+     where ii.restaurant_id = p_restaurant_id
+       and ii.wine_id = p_wine_id
+       and ii.quantity > 0
+     order by ii.added_at, ii.id
+     limit 1
+     for update;
+    if not found then
+      raise exception 'no_inventory' using errcode = 'P0001';
+    end if;
+    v_occurred_at := clock_timestamp();
+    update public.inventory_items
+       set quantity = quantity - 1
+     where id = v_source.id and quantity > 0;
+    if not found then
+      raise exception 'no_inventory' using errcode = 'P0001';
+    end if;
+
+    insert into public.open_bottles (
+      wine_id, restaurant_id, remaining_ml, opened_at, opened_by,
+      source_inventory_item_id, preservation_method, identity_contract,
+      identity_origin, nominal_capacity_ml, source_provenance,
+      opening_operation_id, state_version
+    ) values (
+      p_wine_id, p_restaurant_id, v_size_ml, v_occurred_at, v_user,
+      v_source.id, coalesce(p_preservation_method, 'none'), 2,
+      'native', v_size_ml, 'known', p_operation_id, 0
+    ) returning * into v_bottle;
+
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, occurred_at, note, event_contract, operation_id,
+      operation_entry_ordinal
+    ) values (
+      p_wine_id, p_restaurant_id, v_bottle.id, -v_size_ml, 'new_bottle',
+      v_user, v_occurred_at, v_note, 2, p_operation_id, 0
+    ) returning id into v_new_event_id;
+    v_effect_type := 'open';
+  else
+    if p_command = 'undo' then
+      select * into v_event
+        from public.pour_events pe
+       where pe.id = p_reversal_of_event_id
+         and pe.restaurant_id = p_restaurant_id
+         and pe.wine_id = p_wine_id
+         and pe.event_contract = 2
+         and pe.kind in ('pour', 'spill')
+         and pe.ml_delta > 0
+         and pe.open_bottle_id is not null
+       for update;
+      if not found then
+        raise exception 'open_bottle_not_found' using errcode = 'P0001';
+      end if;
+      v_selected_bottle_id := v_event.open_bottle_id;
+    elsif p_open_bottle_id is not null then
+      v_selected_bottle_id := p_open_bottle_id;
+    else
+      select e.open_bottle_id into v_selected_bottle_id
+        from public.inventory_command_bottle_effects e
+        join public.inventory_command_receipts r
+          on r.restaurant_id = e.restaurant_id
+         and r.operation_id = e.operation_id
+       where e.restaurant_id = p_restaurant_id
+         and e.operation_id = p_predecessor_open_operation_id
+         and e.effect_type = 'open'
+         and r.command_version = 2
+         and r.completed_at is not null;
+      if not found then
+        raise exception 'physical_dependency_not_found' using errcode = 'P0001';
+      end if;
+    end if;
+
+    select * into v_bottle
+      from public.open_bottles ob
+     where ob.id = v_selected_bottle_id
+       and ob.restaurant_id = p_restaurant_id
+       and ob.wine_id = p_wine_id
+       and ob.identity_contract = 2
+     for update;
+    if not found then
+      if p_predecessor_open_operation_id is not null then
+        raise exception 'physical_dependency_stale' using errcode = 'P0001';
+      end if;
+      raise exception 'open_bottle_not_found' using errcode = 'P0001';
+    end if;
+
+    -- Match the trigger's per-bottle ordering while the same serialization
+    -- lock is held. Scalar close/open response timestamps therefore remain
+    -- equal to their event timestamps; the trigger independently protects
+    -- batch and any future event writer.
+    v_occurred_at := clock_timestamp();
+    select greatest(
+      v_occurred_at,
+      coalesce(max(pe.occurred_at) + interval '1 microsecond', v_occurred_at)
+    ) into v_occurred_at
+      from public.pour_events pe
+     where pe.open_bottle_id = v_bottle.id;
+
+    if p_command <> 'undo' and v_bottle.closed_at is not null then
+      raise exception 'open_bottle_closed' using errcode = 'P0001';
+    end if;
+
+    if p_command in ('pour', 'spill') then
+      if v_bottle.remaining_ml < p_ml then
+        raise exception 'insufficient_bottle_volume' using errcode = 'P0001';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, p_ml, p_command,
+        v_user, v_occurred_at, v_note, 2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := p_command;
+    elsif p_command = 'close' then
+      if p_actual_remaining_ml > v_bottle.nominal_capacity_ml then
+        raise exception 'invalid_actual_remaining' using errcode = 'P0001';
+      end if;
+      if p_reason_code_id is not null then
+        perform 1 from public.reason_codes rc
+         where rc.id = p_reason_code_id
+           and rc.restaurant_id = p_restaurant_id
+           and rc.active
+           and rc.category in ('spoilage', 'adjustment')
+         for share;
+        if not found then
+          raise exception 'invalid_reason_code' using errcode = 'P0001';
+        end if;
+      end if;
+      insert into public.bottle_closeouts (
+        restaurant_id, wine_id, open_bottle_id, preservation_method,
+        opened_at, closed_by, closed_at, theoretical_remaining_ml,
+        actual_remaining_ml, written_off_ml, reason_code_id, event_contract
+      ) values (
+        p_restaurant_id, p_wine_id, v_bottle.id, v_bottle.preservation_method,
+        v_bottle.opened_at, v_user, v_occurred_at, v_bottle.remaining_ml,
+        p_actual_remaining_ml, p_written_off_ml, p_reason_code_id, 2
+      ) returning * into v_closeout;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, v_bottle.remaining_ml,
+        'finish_bottle', v_user, v_occurred_at, coalesce(v_note, 'Bottle close-out'),
+        2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := 'close';
+    elsif p_command = 'discard' then
+      -- A zero-mL discard cannot produce the contract's positive depletion
+      -- event. Reject it before event/effect/receipt completion or state change.
+      if v_bottle.remaining_ml <= 0 then
+        raise exception 'open_bottle_changed' using errcode = 'P0001';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, v_bottle.remaining_ml,
+        'spill', v_user, v_occurred_at, coalesce(v_note, 'Bottle discarded'),
+        2, p_operation_id, 0
+      ) returning id into v_new_event_id;
+      v_effect_type := 'discard';
+    else
+      if v_event.occurred_at + interval '15 minutes' < v_occurred_at then
+        raise exception 'undo_window_expired' using errcode = 'P0001';
+      end if;
+      if v_event.actor_user_id is distinct from v_user
+         and v_role not in ('owner', 'manager') then
+        raise exception 'forbidden' using errcode = '42501';
+      end if;
+      select case
+        when jsonb_typeof(r.result_payload #> '{open_bottle,state_version}') = 'number' then
+          case
+            when (r.result_payload #>> '{open_bottle,state_version}') ~ '^[0-9]+$' then
+              case
+                when (r.result_payload #>> '{open_bottle,state_version}')::numeric
+                       <= 9223372036854775807
+                then (r.result_payload #>> '{open_bottle,state_version}')::bigint
+                else null
+              end
+            else null
+          end
+        else null
+      end
+        into v_event_state_version
+        from public.inventory_command_receipts r
+        join public.inventory_command_bottle_effects e
+          on e.restaurant_id = r.restaurant_id
+         and e.operation_id = r.operation_id
+         and e.entry_ordinal = v_event.operation_entry_ordinal
+       where r.restaurant_id = p_restaurant_id
+         and r.operation_id = v_event.operation_id
+         and r.command_version = 2
+         and r.scope_kind = 'single_wine'
+         and r.completed_at is not null
+         and r.result_payload #>> '{operation_id}' = v_event.operation_id::text
+         and e.open_bottle_id = v_bottle.id
+         and e.wine_id = p_wine_id
+         and r.result_payload #>> '{open_bottle,id}' = v_bottle.id::text;
+      if not found or v_event_state_version is null then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      if exists (
+        select 1 from public.pour_events pe
+         where pe.reversal_of_event_id = v_event.id
+      ) then
+        raise exception 'undo_already_applied' using errcode = 'P0001';
+      end if;
+      -- The receipt snapshot is the authoritative post-mutation sequence.
+      -- Timestamps remain presentation/audit data and cannot authorize Undo.
+      if v_bottle.state_version is distinct from v_event_state_version
+         or exists (
+        select 1 from public.bottle_closeouts bc
+         where bc.open_bottle_id = v_bottle.id
+      ) then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      if v_bottle.remaining_ml + v_event.ml_delta > v_bottle.nominal_capacity_ml then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      select exists (
+        select 1 from public.inventory_command_bottle_effects e
+         where e.restaurant_id = p_restaurant_id
+           and e.operation_id = v_event.operation_id
+           and e.open_bottle_id = v_bottle.id
+           and e.effect_type = 'discard'
+      ) into v_is_discard;
+      if v_is_discard and (
+        p_correction_reason is distinct from 'mistaken_report'
+        or not p_operator_confirms_same_bottle_present
+      ) then
+        raise exception 'undo_requires_review' using errcode = 'P0001';
+      end if;
+      if not v_is_discard and (
+        p_correction_reason is not null or p_operator_confirms_same_bottle_present
+      ) then
+        raise exception 'invalid_physical_command' using errcode = 'P0001';
+      end if;
+      insert into public.pour_events (
+        wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+        actor_user_id, occurred_at, note, event_contract, operation_id,
+        operation_entry_ordinal, reversal_of_event_id
+      ) values (
+        p_wine_id, p_restaurant_id, v_bottle.id, -v_event.ml_delta, 'undo',
+        v_user, v_occurred_at, v_note, 2, p_operation_id, 0, v_event.id
+      ) returning id into v_new_event_id;
+      v_effect_type := 'undo';
+    end if;
+
+    select * into v_bottle
+      from public.open_bottles ob where ob.id = v_selected_bottle_id;
+  end if;
+
+  insert into public.inventory_command_bottle_effects (
+    restaurant_id, operation_id, entry_ordinal, open_bottle_id, wine_id, effect_type
+  ) values (
+    p_restaurant_id, p_operation_id, 0, v_bottle.id, p_wine_id, v_effect_type
+  );
+
+  v_result := jsonb_build_object(
+    'operation_id', p_operation_id,
+    'command', p_command,
+    'open_bottle', jsonb_build_object(
+      'id', v_bottle.id,
+      'restaurant_id', v_bottle.restaurant_id,
+      'wine_id', v_bottle.wine_id,
+      'remaining_ml', v_bottle.remaining_ml,
+      'nominal_capacity_ml', v_bottle.nominal_capacity_ml,
+      'opened_at', v_bottle.opened_at,
+      'closed_at', v_bottle.closed_at,
+      'preservation_method', v_bottle.preservation_method,
+      'source_inventory_item_id', v_bottle.source_inventory_item_id,
+      'source_provenance', v_bottle.source_provenance,
+      'identity_contract', v_bottle.identity_contract,
+      'identity_origin', v_bottle.identity_origin,
+      'state_version', v_bottle.state_version
+    ),
+    'pour_event_ids', jsonb_build_array(v_new_event_id),
+    'closeout', case when p_command = 'close' then jsonb_build_object(
+      'id', v_closeout.id,
+      'restaurant_id', v_closeout.restaurant_id,
+      'wine_id', v_closeout.wine_id,
+      'open_bottle_id', v_closeout.open_bottle_id,
+      'preservation_method', v_closeout.preservation_method,
+      'opened_at', v_closeout.opened_at,
+      'closed_at', v_closeout.closed_at,
+      'theoretical_remaining_ml', v_closeout.theoretical_remaining_ml,
+      'actual_remaining_ml', v_closeout.actual_remaining_ml,
+      'variance_ml', v_closeout.variance_ml,
+      'written_off_ml', v_closeout.written_off_ml,
+      'reason_code_id', v_closeout.reason_code_id,
+      'event_contract', v_closeout.event_contract
+    ) else null end
+  );
+
+  update public.inventory_command_receipts
+     set result_payload = v_result,
+         completed_at = clock_timestamp()
+   where restaurant_id = p_restaurant_id
+     and operation_id = p_operation_id
+     and result_payload is null;
+  if not found then
+    raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+  end if;
+
+  return v_result || jsonb_build_object('replayed', false);
+end;
+$function$;
+
+create function public.execute_physical_reconciliation_batch(
+  p_operation_id uuid,
+  p_restaurant_id uuid,
+  p_entries jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user uuid := auth.uid();
+  v_entry jsonb;
+  v_canonical_entries jsonb;
+  v_request jsonb;
+  v_entry_count int;
+  v_distinct_count int;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_claimed uuid;
+  v_pre_wines uuid[];
+  v_locked_wines uuid[];
+  v_bottle public.open_bottles%rowtype;
+  v_event_id uuid;
+  v_ordinal int := 0;
+  v_occurred_at timestamptz;
+  v_results jsonb := '[]'::jsonb;
+  v_result jsonb;
+begin
+  if public.current_inventory_contract_version() <> 2 then
+    raise exception 'physical_inventory_contract_inactive' using errcode = 'P0001';
+  end if;
+  if v_user is null or p_operation_id is null or p_restaurant_id is null
+     or jsonb_typeof(p_entries) <> 'array' then
+    raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+  end if;
+
+  v_entry_count := jsonb_array_length(p_entries);
+  if v_entry_count < 1 or v_entry_count > 100 then
+    raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+  end if;
+
+  for v_entry in select value from jsonb_array_elements(p_entries)
+  loop
+    if jsonb_typeof(v_entry) <> 'object'
+       or (select count(*) from jsonb_object_keys(v_entry)) <> 4
+       or exists (
+         select 1 from jsonb_object_keys(v_entry) k
+          where k not in ('open_bottle_id', 'expected_state_version', 'target_remaining_ml', 'note')
+       )
+       or not (v_entry ?& array['open_bottle_id', 'expected_state_version', 'target_remaining_ml', 'note'])
+       or jsonb_typeof(v_entry->'open_bottle_id') <> 'string'
+       or (v_entry->>'open_bottle_id') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+       or jsonb_typeof(v_entry->'expected_state_version') <> 'number'
+       or (v_entry->>'expected_state_version') !~ '^[0-9]+$'
+       or jsonb_typeof(v_entry->'target_remaining_ml') <> 'number'
+       or (v_entry->>'target_remaining_ml') !~ '^[0-9]+$'
+       or jsonb_typeof(v_entry->'note') not in ('string', 'null')
+       or (jsonb_typeof(v_entry->'note') = 'string' and char_length(v_entry->>'note') > 500) then
+      raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+    end if;
+    if (v_entry->>'expected_state_version')::numeric > 9223372036854775807
+       or (v_entry->>'target_remaining_ml')::numeric > 2147483647 then
+      raise exception 'invalid_reconciliation_batch' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  select count(distinct (value->>'open_bottle_id')::uuid)
+    into v_distinct_count
+    from jsonb_array_elements(p_entries);
+  if v_distinct_count <> v_entry_count then
+    raise exception 'duplicate_reconciliation_bottle' using errcode = 'P0001';
+  end if;
+
+  select jsonb_agg(
+    jsonb_build_object(
+      'open_bottle_id', (value->>'open_bottle_id')::uuid,
+      'expected_state_version', (value->>'expected_state_version')::bigint,
+      'target_remaining_ml', (value->>'target_remaining_ml')::int,
+      'note', case when jsonb_typeof(value->'note') = 'null' then null else value->>'note' end
+    ) order by (value->>'open_bottle_id')::uuid
+  ) into v_canonical_entries
+    from jsonb_array_elements(p_entries);
+
+  v_request := jsonb_build_object(
+    'version', 2,
+    'command', 'reconcile_batch',
+    'entries', v_canonical_entries
+  );
+
+  perform 1 from public.memberships m
+   where m.user_id = v_user
+     and m.restaurant_id = p_restaurant_id
+     and m.role in ('owner', 'manager')
+   for share;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id;
+  if found then
+    if v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.command_type <> 'reconcile_batch'
+       or v_receipt.scope_kind <> 'exact_bottle_batch'
+       or v_receipt.wine_id is not null
+       or v_receipt.batch_entry_count <> v_entry_count
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  select array_agg(distinct ob.wine_id order by ob.wine_id)
+    into v_pre_wines
+    from jsonb_array_elements(v_canonical_entries) e
+    join public.open_bottles ob
+      on ob.id = (e->>'open_bottle_id')::uuid
+     and ob.restaurant_id = p_restaurant_id;
+  if coalesce(array_length(v_pre_wines, 1), 0) = 0
+     or (select count(*) from public.open_bottles ob
+          where ob.restaurant_id = p_restaurant_id
+            and ob.id in (
+              select (e->>'open_bottle_id')::uuid
+                from jsonb_array_elements(v_canonical_entries) e
+            )) <> v_entry_count then
+    raise exception 'open_bottle_not_found' using errcode = 'P0001';
+  end if;
+
+  perform 1 from public.wines w
+   where w.restaurant_id = p_restaurant_id
+     and w.id = any(v_pre_wines)
+   order by w.id
+   for no key update;
+  if not found then
+    raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_operation_id, v_user, null, 'reconcile_batch',
+    v_request, 2, 'exact_bottle_batch', v_entry_count
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id;
+    if not found or v_receipt.result_payload is null then
+      raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+    end if;
+    if v_receipt.actor_user_id is distinct from v_user then
+      raise exception 'physical_operation_actor_conflict' using errcode = 'P0001';
+    end if;
+    if v_receipt.command_version <> 2
+       or v_receipt.command_type <> 'reconcile_batch'
+       or v_receipt.scope_kind <> 'exact_bottle_batch'
+       or v_receipt.wine_id is not null
+       or v_receipt.batch_entry_count <> v_entry_count
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'physical_operation_payload_conflict' using errcode = 'P0001';
+    end if;
+    return v_receipt.result_payload || jsonb_build_object('replayed', true);
+  end if;
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    perform 1 from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id
+     for update;
+    if not found then
+      raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  select array_agg(distinct ob.wine_id order by ob.wine_id)
+    into v_locked_wines
+    from public.open_bottles ob
+   where ob.restaurant_id = p_restaurant_id
+     and ob.id in (
+       select (e->>'open_bottle_id')::uuid
+         from jsonb_array_elements(v_canonical_entries) e
+     );
+  if v_locked_wines is distinct from v_pre_wines then
+    raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+  end if;
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    select * into strict v_bottle
+      from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id;
+    if v_bottle.identity_contract <> 2
+       or v_bottle.closed_at is not null
+       or v_bottle.nominal_capacity_ml is null
+       or v_bottle.state_version <> (v_entry->>'expected_state_version')::bigint
+       or (v_entry->>'target_remaining_ml')::int > v_bottle.nominal_capacity_ml then
+      raise exception 'reconciliation_batch_stale' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  -- Every selected bottle is locked. Choose one timestamp that is newer than
+  -- every selected bottle's prior event so the batch retains a shared
+  -- occurrence time even under equal or backward wall-clock readings.
+  v_occurred_at := clock_timestamp();
+  select greatest(
+    v_occurred_at,
+    coalesce(max(pe.occurred_at) + interval '1 microsecond', v_occurred_at)
+  ) into v_occurred_at
+    from public.pour_events pe
+   where pe.open_bottle_id in (
+     select (e->>'open_bottle_id')::uuid
+       from jsonb_array_elements(v_canonical_entries) e
+   );
+
+  for v_entry in
+    select value from jsonb_array_elements(v_canonical_entries)
+     order by (value->>'open_bottle_id')::uuid
+  loop
+    select * into strict v_bottle
+      from public.open_bottles ob
+     where ob.id = (v_entry->>'open_bottle_id')::uuid
+       and ob.restaurant_id = p_restaurant_id;
+    insert into public.pour_events (
+      wine_id, restaurant_id, open_bottle_id, ml_delta, kind,
+      actor_user_id, occurred_at, note, event_contract, operation_id,
+      operation_entry_ordinal
+    ) values (
+      v_bottle.wine_id, p_restaurant_id, v_bottle.id,
+      v_bottle.remaining_ml - (v_entry->>'target_remaining_ml')::int,
+      'reconcile', v_user, v_occurred_at,
+      case when jsonb_typeof(v_entry->'note') = 'null' then null else v_entry->>'note' end,
+      2, p_operation_id, v_ordinal
+    ) returning id into v_event_id;
+    insert into public.inventory_command_bottle_effects (
+      restaurant_id, operation_id, entry_ordinal, open_bottle_id, wine_id, effect_type
+    ) values (
+      p_restaurant_id, p_operation_id, v_ordinal, v_bottle.id,
+      v_bottle.wine_id, 'reconcile'
+    );
+    select * into strict v_bottle
+      from public.open_bottles ob where ob.id = v_bottle.id;
+    v_results := v_results || jsonb_build_array(jsonb_build_object(
+      'entry_ordinal', v_ordinal,
+      'open_bottle_id', v_bottle.id,
+      'wine_id', v_bottle.wine_id,
+      'pour_event_id', v_event_id,
+      'open_bottle', jsonb_build_object(
+        'id', v_bottle.id,
+        'restaurant_id', v_bottle.restaurant_id,
+        'wine_id', v_bottle.wine_id,
+        'remaining_ml', v_bottle.remaining_ml,
+        'nominal_capacity_ml', v_bottle.nominal_capacity_ml,
+        'opened_at', v_bottle.opened_at,
+        'closed_at', v_bottle.closed_at,
+        'preservation_method', v_bottle.preservation_method,
+        'source_inventory_item_id', v_bottle.source_inventory_item_id,
+        'source_provenance', v_bottle.source_provenance,
+        'identity_contract', v_bottle.identity_contract,
+        'identity_origin', v_bottle.identity_origin,
+        'state_version', v_bottle.state_version
+      )
+    ));
+    v_ordinal := v_ordinal + 1;
+  end loop;
+
+  v_result := jsonb_build_object(
+    'operation_id', p_operation_id,
+    'command', 'reconcile_batch',
+    'entries', v_results
+  );
+  update public.inventory_command_receipts
+     set result_payload = v_result,
+         completed_at = clock_timestamp()
+   where restaurant_id = p_restaurant_id
+     and operation_id = p_operation_id
+     and result_payload is null;
+  if not found then
+    raise exception 'physical_operation_incomplete' using errcode = 'P0001';
+  end if;
+  return v_result || jsonb_build_object('replayed', false);
+end;
+$function$;
+
+-- The physical RPCs become the only application write boundary.
+revoke all on function public.execute_physical_bottle_command(
+  uuid, uuid, text, uuid, uuid, uuid, int, text, text, int, int, uuid, uuid, text, boolean
+) from public, anon, authenticated, service_role;
+grant execute on function public.execute_physical_bottle_command(
+  uuid, uuid, text, uuid, uuid, uuid, int, text, text, int, int, uuid, uuid, text, boolean
+) to authenticated;
+
+revoke all on function public.execute_physical_reconciliation_batch(uuid, uuid, jsonb)
+  from public, anon, authenticated, service_role;
+grant execute on function public.execute_physical_reconciliation_batch(uuid, uuid, jsonb)
+  to authenticated;
+
+revoke all on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) from public, anon, service_role;
+grant execute on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) to authenticated;
+
+revoke execute on function public.record_pour(uuid, int, text, text)
+  from public, anon, authenticated, service_role;
+revoke execute on function public.reconcile_open_bottle(uuid, int, text)
+  from public, anon, authenticated, service_role;
+revoke execute on function public.reconcile_open_bottles_batch(jsonb)
+  from public, anon, authenticated, service_role;
+revoke execute on function public.close_open_bottle(uuid, int, int, uuid)
+  from public, anon, authenticated, service_role;
+revoke execute on function public.undo_last_pour(uuid)
+  from public, anon, authenticated, service_role;
+
+drop policy "members can insert bottle_closeouts" on public.bottle_closeouts;
+
+revoke insert, update, delete, truncate, references, trigger on table public.open_bottles
+  from public, anon, authenticated, service_role;
+revoke insert, update, delete, truncate, references, trigger on table public.pour_events
+  from public, anon, authenticated, service_role;
+revoke insert, update, delete, truncate, references, trigger on table public.bottle_closeouts
+  from public, anon, authenticated, service_role;
+revoke insert, update, delete, truncate, references, trigger on table public.inventory_command_receipts
+  from public, anon, authenticated, service_role;
+revoke insert, update, delete, truncate, references, trigger on table public.inventory_command_bottle_effects
+  from public, anon, authenticated, service_role;
+
+revoke all on function public.open_bottles_enforce_capacity()
+  from public, anon, authenticated, service_role;
+revoke all on function public.pour_events_maintain_open_bottle()
+  from public, anon, authenticated, service_role;
+revoke all on function public.auto_eightysix_on_low_inventory()
+  from public, anon, authenticated, service_role;
+revoke all on function public.import_batch_rows_reflect_inventory_delete()
+  from public, anon, authenticated, service_role;
+
+comment on function public.execute_inventory_command(
+  uuid, uuid, text, uuid, int, text, text, uuid, timestamptz, int, int, uuid
+) is 'Contract-2 cutover: completed version-1 receipt replay only. Fresh legacy writes raise legacy_inventory_command_retired.';
+comment on function public.pour_events_reverse_open_bottle() is
+  'Retained without a trigger for guarded Phase-C rollback/forensics. Contract-2 evidence is never deleted.';
+comment on constraint open_bottles_source_inventory_item_tenant_wine_fkey
+  on public.open_bottles is
+  'Physical bottle source provenance is same-restaurant/same-wine and deletion-restricted.';
+
+-- This must remain the final statement. The transaction exposes version 2
+-- only after promotion, exact triggers, RPC grants, provenance guards, legacy
+-- retirement, readers, and ACLs are all installed.
+create or replace function public.current_inventory_contract_version()
+returns smallint
+language sql
+stable
+security invoker
+set search_path = ''
+as $$ select 2::smallint $$;
+
+-- === 0157_staff_cost_seal_additive.sql ===
+-- 0157_staff_cost_seal_additive.sql
+--
+-- C04 additive staff-cost boundary. This migration adds closed, exact-site
+-- readers and useful operational mutations while retaining every legacy table
+-- privilege for the compatible-application window. The later contract
+-- migration owns all direct column/table revokes.
+
+do $static_admission$
+begin
+  if to_regprocedure('public.effective_site_capability(uuid,text)') is null
+     or to_regprocedure('public.effective_site_ids(text)') is null
+     or to_regprocedure('public.read_pricing_recommendations(uuid)') is null
+     or public.current_inventory_contract_version() <> 2 then
+    raise exception 'C04_0157_REQUIRES_0154_AND_0156' using errcode = 'P0001';
+  end if;
+
+  if to_regclass('public.scan_idempotency') is null
+     or to_regclass('public.invoice_scan_deletions') is null
+     or to_regclass('public.identity_merge_log') is null
+     or to_regclass('public.reconcile_actions') is null
+     or to_regclass('public.import_batch_rows') is null then
+    raise exception 'C04_0157_REQUIRED_RELATION_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1 from pg_catalog.pg_attribute a
+     where a.attrelid = 'public.scan_idempotency'::regclass
+       and a.attname = 'claimed_by_user_id'
+       and a.attnum > 0 and not a.attisdropped
+  ) or to_regprocedure('public.current_site_role_at_least(uuid,public.membership_role)') is not null then
+    raise exception 'C04_0157_ALREADY_OR_PARTIALLY_APPLIED' using errcode = 'P0001';
+  end if;
+end;
+$static_admission$;
+
+lock table public.invoice_scans in share row exclusive mode nowait;
+lock table public.wines in share row exclusive mode nowait;
+lock table public.scan_idempotency in share row exclusive mode nowait;
+
+create function public.wine_manual_overrides_valid(p_value text[])
+returns boolean
+language sql
+immutable
+security definer
+set search_path = ''
+as $function$
+  select p_value is null or (
+    cardinality(p_value) <= 4
+    and cardinality(p_value) = (
+      select count(distinct f)::integer from unnest(p_value) as supplied(f)
+    )
+    and not exists (
+      select 1 from unnest(p_value) as supplied(f)
+       where f is null
+          or f not in ('drink_window', 'region', 'country', 'varietal')
+    )
+  )
+$function$;
+
+create function public.wine_enrichment_metadata_valid(p_value jsonb)
+returns boolean
+language plpgsql
+immutable
+security definer
+set search_path = ''
+as $function$
+declare
+  v_timestamp_text text;
+  v_timestamp timestamptz;
+begin
+  if p_value is null then
+    return true;
+  end if;
+  if jsonb_typeof(p_value) <> 'object' then return false; end if;
+  if (select count(*) from jsonb_object_keys(p_value)) <> 3
+     or not (p_value ?& array['source', 'fields_enriched', 'enriched_at'])
+     or exists (
+       select 1 from jsonb_object_keys(p_value) as supplied(k)
+        where k not in ('source', 'fields_enriched', 'enriched_at')
+     )
+     or jsonb_typeof(p_value->'source') <> 'string'
+     or p_value->>'source' not in ('rule_engine', 'lwin_fallback')
+     or jsonb_typeof(p_value->'fields_enriched') <> 'array'
+     or jsonb_typeof(p_value->'enriched_at') <> 'string' then
+    return false;
+  end if;
+  if jsonb_array_length(p_value->'fields_enriched') > 10
+     or exists (
+       select 1 from jsonb_array_elements(p_value->'fields_enriched') as supplied(value)
+        where jsonb_typeof(value) <> 'string'
+           or value #>> '{}' not in (
+             'drink_window', 'serving_temp', 'decant', 'peak_year',
+             'rating_source', 'review_excerpt', 'region', 'country',
+             'varietal', 'colour'
+           )
+     )
+     or jsonb_array_length(p_value->'fields_enriched') <> (
+       select count(distinct value)::integer
+         from jsonb_array_elements(p_value->'fields_enriched')
+     ) then
+    return false;
+  end if;
+
+  v_timestamp_text := p_value->>'enriched_at';
+  if octet_length(v_timestamp_text) > 32
+     or v_timestamp_text !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?Z$' then
+    return false;
+  end if;
+  begin
+    v_timestamp := v_timestamp_text::timestamptz;
+  exception when invalid_datetime_format or datetime_field_overflow then
+    return false;
+  end;
+  return extract(epoch from v_timestamp) >= extract(epoch from '2000-01-01T00:00:00Z'::timestamptz)
+     and extract(epoch from v_timestamp) < extract(epoch from '2100-01-01T00:00:00Z'::timestamptz);
+end;
+$function$;
+
+revoke all on function public.wine_manual_overrides_valid(text[])
+  from public, anon, authenticated, service_role;
+revoke all on function public.wine_enrichment_metadata_valid(jsonb)
+  from public, anon, authenticated, service_role;
+grant execute on function public.wine_manual_overrides_valid(text[])
+  to authenticated, service_role;
+grant execute on function public.wine_enrichment_metadata_valid(jsonb)
+  to authenticated, service_role;
+
+do $historical_metadata_preflight$
+begin
+  if exists (
+    select 1 from public.wines w
+     where not public.wine_manual_overrides_valid(w.manual_overrides)
+  ) then
+    raise exception 'C04_0157_HISTORICAL_MANUAL_OVERRIDES_INVALID' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.wines w
+     where not public.wine_enrichment_metadata_valid(w.enrichment_metadata)
+  ) then
+    raise exception 'C04_0157_HISTORICAL_ENRICHMENT_METADATA_INVALID' using errcode = 'P0001';
+  end if;
+end;
+$historical_metadata_preflight$;
+
+alter table public.wines
+  add constraint wines_manual_overrides_valid_check
+    check (public.wine_manual_overrides_valid(manual_overrides)) not valid,
+  add constraint wines_enrichment_metadata_valid_check
+    check (public.wine_enrichment_metadata_valid(enrichment_metadata)) not valid;
+alter table public.wines validate constraint wines_manual_overrides_valid_check;
+alter table public.wines validate constraint wines_enrichment_metadata_valid_check;
+
+alter table public.scan_idempotency
+  add column claimed_by_user_id uuid;
+
+create index scan_idempotency_actor_created_idx
+  on public.scan_idempotency (claimed_by_user_id, created_at)
+  where claimed_by_user_id is not null;
+
+create function public.current_site_role_at_least(
+  p_restaurant_id uuid,
+  p_required public.membership_role
+) returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select (select auth.uid()) is not null and exists (
+    select 1
+      from public.memberships m
+      join public.restaurants r
+        on r.id = m.restaurant_id
+       and r.id = p_restaurant_id
+      join public.workspace_memberships wm
+        on m.workspace_membership_id = wm.id
+       and m.user_id = wm.user_id
+       and r.workspace_id = wm.workspace_id
+     where m.user_id = (select auth.uid())
+       and m.restaurant_id = p_restaurant_id
+       and m.status = 'active'
+       and m.revoked_at is null
+       and (m.expires_at is null or m.expires_at > statement_timestamp())
+       and wm.status = 'active'
+       and wm.revoked_at is null
+       and (wm.expires_at is null or wm.expires_at > statement_timestamp())
+       and (
+         m.role = p_required
+         or (p_required = 'manager' and m.role = 'owner')
+         or (p_required = 'staff' and m.role in ('owner', 'manager'))
+       )
+  )
+$function$;
+
+revoke all on function public.current_site_role_at_least(uuid,public.membership_role)
+  from public, anon, authenticated, service_role;
+
+create function public.read_inventory_costs(
+  p_restaurant_id uuid,
+  p_wine_ids uuid[] default null
+) returns table (
+  inventory_item_id uuid,
+  wine_id uuid,
+  invoice_scan_id uuid,
+  unit_cost numeric,
+  currency text,
+  added_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $function$
+begin
+  if p_wine_ids is not null and (
+    cardinality(p_wine_ids) > 500
+    or cardinality(p_wine_ids) <> (select count(distinct x)::integer from unnest(p_wine_ids) x)
+    or exists (select 1 from unnest(p_wine_ids) x where x is null)
+  ) then
+    raise exception 'C04_WINE_FILTER_INVALID' using errcode = 'P0001';
+  end if;
+  if not public.effective_site_capability(p_restaurant_id, 'cost.read') then return; end if;
+  return query
+  select ii.id, ii.wine_id, ii.invoice_scan_id, ii.unit_cost, ii.currency, ii.added_at
+    from public.inventory_items ii
+    join public.wines w on w.id = ii.wine_id and w.restaurant_id = ii.restaurant_id
+   where ii.restaurant_id = p_restaurant_id
+     and (p_wine_ids is null or ii.wine_id = any(p_wine_ids))
+   order by ii.wine_id asc, ii.added_at asc, ii.id asc;
+end;
+$function$;
+
+create function public.read_wine_pricing_strategy(
+  p_restaurant_id uuid,
+  p_wine_ids uuid[] default null
+) returns table (
+  wine_id uuid,
+  pricing_target_pour_cost_pct numeric,
+  pricing_target_markup_ratio numeric,
+  pricing_dismissed_until timestamptz
+)
+language plpgsql stable security definer set search_path = ''
+as $function$
+begin
+  if p_wine_ids is not null and (
+    cardinality(p_wine_ids) > 500
+    or cardinality(p_wine_ids) <> (select count(distinct x)::integer from unnest(p_wine_ids) x)
+    or exists (select 1 from unnest(p_wine_ids) x where x is null)
+  ) then raise exception 'C04_WINE_FILTER_INVALID' using errcode = 'P0001'; end if;
+  if not public.effective_site_capability(p_restaurant_id, 'margin.read') then return; end if;
+  return query
+  select w.id, w.pricing_target_pour_cost_pct, w.pricing_target_markup_ratio,
+         w.pricing_dismissed_until
+    from public.wines w
+   where w.restaurant_id = p_restaurant_id
+     and (p_wine_ids is null or w.id = any(p_wine_ids))
+   order by w.id asc;
+end;
+$function$;
+
+create function public.read_wine_cost_flags(
+  p_restaurant_id uuid,
+  p_wine_ids uuid[] default null
+) returns table (wine_id uuid, overpaid_flag boolean)
+language plpgsql stable security definer set search_path = ''
+as $function$
+begin
+  if p_wine_ids is not null and (
+    cardinality(p_wine_ids) > 500
+    or cardinality(p_wine_ids) <> (select count(distinct x)::integer from unnest(p_wine_ids) x)
+    or exists (select 1 from unnest(p_wine_ids) x where x is null)
+  ) then raise exception 'C04_WINE_FILTER_INVALID' using errcode = 'P0001'; end if;
+  if not public.effective_site_capability(p_restaurant_id, 'cost.read') then return; end if;
+  return query select w.id, w.overpaid_flag from public.wines w
+   where w.restaurant_id = p_restaurant_id
+     and (p_wine_ids is null or w.id = any(p_wine_ids))
+   order by w.id asc;
+end;
+$function$;
+
+create function public.read_restaurant_pricing_defaults(p_restaurant_id uuid)
+returns table (
+  restaurant_id uuid,
+  default_target_pour_cost_pct numeric,
+  default_target_markup_ratio numeric
+)
+language sql stable security definer set search_path = ''
+as $function$
+  select r.id, r.default_target_pour_cost_pct, r.default_target_markup_ratio
+    from public.restaurants r
+   where r.id = p_restaurant_id
+     and public.effective_site_capability(p_restaurant_id, 'margin.read')
+$function$;
+
+create or replace function public.read_pricing_recommendations(p_restaurant_id uuid)
+returns table (
+  wine_id uuid, class text, rationale text, evidence jsonb, timing text,
+  computed_at timestamptz, wines jsonb
+)
+language plpgsql stable security definer set search_path = ''
+as $function$
+begin
+  if not public.effective_site_capability(p_restaurant_id, 'cost.read')
+     or not public.effective_site_capability(p_restaurant_id, 'margin.read') then return; end if;
+  return query
+  select pr.wine_id, pr.class, pr.rationale, pr.evidence, pr.timing, pr.computed_at,
+         jsonb_build_object('name', w.name, 'producer', w.producer, 'vintage', w.vintage)
+    from public.pricing_recommendations pr
+    join public.wines w on w.id = pr.wine_id and w.restaurant_id = pr.restaurant_id
+   where pr.restaurant_id = p_restaurant_id
+   order by pr.class asc, pr.computed_at desc, pr.wine_id asc;
+end;
+$function$;
+
+create function public.read_invoice_scan_private(p_scan_id uuid)
+returns table (
+  scan_id uuid, restaurant_id uuid, distributor_name text, invoice_number text,
+  invoice_date date, status text, status_reason text, accuracy_score real,
+  item_count integer, created_at timestamptz, created_by uuid, updated_at timestamptz,
+  committed_at timestamptz, parsed_line_items jsonb, final_line_items jsonb,
+  edits jsonb, ocr_text jsonb, has_image boolean, image_count integer
+)
+language sql stable security definer set search_path = ''
+as $function$
+  select s.id, s.restaurant_id, s.distributor_name, s.invoice_number, s.invoice_date,
+         s.status, s.status_reason, s.accuracy_score, s.item_count, s.created_at,
+         s.created_by, s.updated_at, s.committed_at, s.parsed_line_items,
+         s.final_line_items, s.edits, s.ocr_text,
+         s.raw_image_path is not null,
+         (case when s.raw_image_path is null then 0 else 1 end)
+           + case when jsonb_typeof(s.extra_image_paths) = 'array'
+                  then jsonb_array_length(s.extra_image_paths) else 0 end
+    from public.invoice_scans s
+   where s.id = p_scan_id
+     and public.effective_site_capability(s.restaurant_id, 'cost.read')
+$function$;
+
+create function public.read_invoice_scan_deletion_private(p_deletion_id uuid)
+returns table (
+  deletion_id uuid, restaurant_id uuid, invoice_scan_id uuid, deleted_by uuid,
+  deleted_at timestamptz, distributor_name text, invoice_number text,
+  scan_status text, item_count integer, inventory_rows_deleted integer,
+  bottles_removed integer, final_line_items jsonb
+)
+language sql stable security definer set search_path = ''
+as $function$
+  select d.id, d.restaurant_id, d.invoice_scan_id, d.deleted_by, d.deleted_at,
+         d.distributor_name, d.invoice_number, d.scan_status, d.item_count,
+         d.inventory_rows_deleted, d.bottles_removed, d.final_line_items
+    from public.invoice_scan_deletions d
+   where d.id = p_deletion_id
+     and public.effective_site_capability(d.restaurant_id, 'cost.read')
+$function$;
+
+create function public.read_reconcile_action_private(p_batch_id uuid)
+returns table (
+  action_id uuid, batch_id uuid, restaurant_id uuid, action_type text,
+  subject_table text, subject_id uuid, ordinal integer, prior_state jsonb,
+  new_state jsonb, created_at timestamptz
+)
+language sql stable security definer set search_path = ''
+as $function$
+  select a.id, a.batch_id, a.restaurant_id, a.action_type, a.subject_table,
+         a.subject_id, a.ordinal, a.prior_state, a.new_state, a.created_at
+    from public.reconcile_actions a
+    join public.reconcile_batches b on b.id = a.batch_id and b.restaurant_id = a.restaurant_id
+   where a.batch_id = p_batch_id
+     and public.effective_site_capability(a.restaurant_id, 'cost.read')
+     and public.effective_site_capability(a.restaurant_id, 'margin.read')
+   order by a.ordinal asc, a.id asc
+$function$;
+
+create function public.read_identity_merge_private(p_merge_id uuid)
+returns table (
+  merge_id uuid, merge_type text, source_id uuid, target_id uuid,
+  restaurant_id uuid, source_snapshot jsonb, moved_counts jsonb,
+  merged_by uuid, merged_at timestamptz
+)
+language sql stable security definer set search_path = ''
+as $function$
+  select l.id, l.merge_type, l.source_id, l.target_id, l.restaurant_id,
+         l.source_snapshot, l.moved_counts, l.merged_by, l.merged_at
+    from public.identity_merge_log l
+   where l.id = p_merge_id
+     and l.restaurant_id is not null
+     and public.effective_site_capability(l.restaurant_id, 'cost.read')
+     and public.effective_site_capability(l.restaurant_id, 'margin.read')
+$function$;
+
+create function public.read_import_batch_cost_rows(
+  p_batch_id uuid,
+  p_after_row_number integer default 0,
+  p_limit integer default 100
+) returns table (
+  row_id uuid, batch_id uuid, restaurant_id uuid, row_number integer,
+  raw jsonb, manual_unit_cost numeric, validation_errors jsonb,
+  last_error_message text, cost_status text, resolution text,
+  apply_status text, applied_inventory_item_id uuid, applied_wine_id uuid,
+  apply_attempts integer, lwin_id text, lwin_score real, lwin_status text,
+  duplicate_reason jsonb, row_state text, resolved_at timestamptz,
+  resolved_by uuid, created_at timestamptz, updated_at timestamptz
+)
+language plpgsql stable security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid;
+begin
+  if p_after_row_number is null or p_limit is null
+     or not (p_after_row_number >= 0) or not (p_limit between 1 and 500) then
+    raise exception 'C04_IMPORT_PAGE_INVALID' using errcode = 'P0001';
+  end if;
+  select b.restaurant_id into v_restaurant_id from public.import_batches b where b.id = p_batch_id;
+  if v_restaurant_id is null
+     or not public.effective_site_capability(v_restaurant_id, 'cost.read') then return; end if;
+  return query
+  select r.id, r.batch_id, r.restaurant_id, r.row_number, r.raw, r.manual_unit_cost,
+         r.validation_errors, r.last_error_message, r.cost_status, r.resolution,
+         r.apply_status, r.applied_inventory_item_id, r.applied_wine_id,
+         r.apply_attempts, r.lwin_id, r.lwin_score, r.lwin_status,
+         r.duplicate_reason, r.row_state, r.resolved_at, r.resolved_by,
+         r.created_at, r.updated_at
+    from public.import_batch_rows r
+   where r.batch_id = p_batch_id and r.restaurant_id = v_restaurant_id
+     and r.row_number > p_after_row_number
+   order by r.row_number asc, r.id asc limit p_limit;
+end;
+$function$;
+
+create function public.read_cellar_health_private(
+  p_restaurant_id uuid,
+  p_wine_ids uuid[] default null
+) returns table (
+  health_id uuid, restaurant_id uuid, wine_id uuid, segment text,
+  reason text, computed_at timestamptz
+)
+language plpgsql stable security definer set search_path = ''
+as $function$
+begin
+  if p_wine_ids is not null and (
+    cardinality(p_wine_ids) > 500
+    or cardinality(p_wine_ids) <> (select count(distinct x)::integer from unnest(p_wine_ids) x)
+    or exists (select 1 from unnest(p_wine_ids) x where x is null)
+  ) then raise exception 'C04_WINE_FILTER_INVALID' using errcode = 'P0001'; end if;
+  if not public.effective_site_capability(p_restaurant_id, 'cost.read') then return; end if;
+  return query
+  select h.id, h.restaurant_id, h.wine_id, h.segment, h.reason, h.computed_at
+    from public.cellar_health h
+    join public.wines w on w.id = h.wine_id and w.restaurant_id = h.restaurant_id
+   where h.restaurant_id = p_restaurant_id
+     and (p_wine_ids is null or h.wine_id = any(p_wine_ids))
+   order by h.wine_id asc, h.id asc;
+end;
+$function$;
+
+create function public.set_wine_pricing_strategy(
+  p_restaurant_id uuid,
+  p_wine_id uuid,
+  p_target_pour_cost_pct numeric,
+  p_target_markup_ratio numeric
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if not public.effective_site_capability(p_restaurant_id, 'pricing.manage') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_target_pour_cost_pct is not null
+     and not (p_target_pour_cost_pct > 0 and p_target_pour_cost_pct < 100) then
+    raise exception 'C04_PRICING_TARGET_INVALID' using errcode = 'P0001';
+  end if;
+  if p_target_markup_ratio is not null
+     and not (p_target_markup_ratio between 1 and 10) then
+    raise exception 'C04_PRICING_TARGET_INVALID' using errcode = 'P0001';
+  end if;
+  update public.wines w
+     set pricing_target_pour_cost_pct = p_target_pour_cost_pct,
+         pricing_target_markup_ratio = p_target_markup_ratio
+   where w.id = p_wine_id and w.restaurant_id = p_restaurant_id;
+  if not found then raise exception 'wine_not_found' using errcode = 'P0002'; end if;
+  return jsonb_build_object('wineId', p_wine_id, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'wine_not_found' using errcode='P0002';
+  when others then raise exception 'C04_PRICING_UPDATE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.set_restaurant_pricing_defaults(
+  p_restaurant_id uuid,
+  p_target_pour_cost_pct numeric,
+  p_target_markup_ratio numeric
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if not public.effective_site_capability(p_restaurant_id, 'pricing.manage') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_target_pour_cost_pct is not null
+     and not (p_target_pour_cost_pct > 0 and p_target_pour_cost_pct < 100) then
+    raise exception 'C04_PRICING_TARGET_INVALID' using errcode = 'P0001';
+  end if;
+  if p_target_markup_ratio is not null
+     and not (p_target_markup_ratio between 1 and 10) then
+    raise exception 'C04_PRICING_TARGET_INVALID' using errcode = 'P0001';
+  end if;
+  update public.restaurants r
+     set default_target_pour_cost_pct = p_target_pour_cost_pct,
+         default_target_markup_ratio = p_target_markup_ratio
+   where r.id = p_restaurant_id;
+  if not found then raise exception 'restaurant_not_found' using errcode = 'P0002'; end if;
+  return jsonb_build_object('restaurantId', p_restaurant_id, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'restaurant_not_found' using errcode='P0002';
+  when others then raise exception 'C04_PRICING_UPDATE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.dismiss_pricing_alert_private(
+  p_wine_id uuid,
+  p_days integer default 30
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid;
+begin
+  if p_days is null or p_days < 0 or p_days > 365 then
+    raise exception 'C04_PRICING_DISMISSAL_INVALID' using errcode = 'P0001';
+  end if;
+  select w.restaurant_id into v_restaurant_id from public.wines w where w.id = p_wine_id;
+  if v_restaurant_id is null
+     or not public.effective_site_capability(v_restaurant_id, 'pricing.manage') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  update public.wines w
+     set pricing_dismissed_until = case when p_days=0 then null
+                                       else statement_timestamp()+make_interval(days=>p_days) end
+   where w.id = p_wine_id and w.restaurant_id = v_restaurant_id;
+  if not found then raise exception 'wine_not_found' using errcode = 'P0002'; end if;
+  return jsonb_build_object('wineId', p_wine_id, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'wine_not_found' using errcode='P0002';
+  when others then raise exception 'C04_PRICING_DISMISS_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.set_wine_overpaid_flag(
+  p_restaurant_id uuid,
+  p_wine_id uuid,
+  p_flag boolean
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if p_flag is null then raise exception 'C04_FLAG_REQUIRED' using errcode = 'P0001'; end if;
+  if not public.effective_site_capability(p_restaurant_id, 'pricing.manage') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  update public.wines w set overpaid_flag = p_flag
+   where w.id = p_wine_id and w.restaurant_id = p_restaurant_id;
+  if not found then raise exception 'wine_not_found' using errcode = 'P0002'; end if;
+  return jsonb_build_object('wineId', p_wine_id, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'wine_not_found' using errcode='P0002';
+  when others then raise exception 'C04_PRICING_FLAG_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.create_inventory_item_private(
+  p_restaurant_id uuid,
+  p_wine_id uuid,
+  p_quantity integer,
+  p_unit_cost numeric default 0,
+  p_currency text default null,
+  p_bin_id uuid default null,
+  p_bin_location text default null,
+  p_section text default null,
+  p_format text default null,
+  p_invoice_scan_id uuid default null,
+  p_added_via public.added_via default 'manual'::public.added_via
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_id uuid;
+begin
+  if not public.current_site_role_at_least(p_restaurant_id, 'manager') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_unit_cost is null then
+    -- Omission takes the function default; an explicit SQL null is refused.
+    raise exception 'C04_UNIT_COST_REQUIRED' using errcode = 'P0001';
+  end if;
+  if not (p_quantity between 0 and 100000)
+     or not (p_unit_cost between 0 and 1000000)
+     or (p_currency is not null and p_currency not in ('USD','EUR','GBP','CAD','AUD','CHF','JPY'))
+     or (p_bin_location is not null and octet_length(p_bin_location) > 500)
+     or (p_section is not null and octet_length(p_section) > 500)
+     or (p_format is not null and octet_length(p_format) > 100) then
+    raise exception 'C04_INVENTORY_VALUE_INVALID' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from public.wines w where w.id = p_wine_id and w.restaurant_id = p_restaurant_id
+  ) or (p_bin_id is not null and not exists (
+    select 1 from public.bins b where b.id = p_bin_id and b.restaurant_id = p_restaurant_id
+  )) or (p_invoice_scan_id is not null and not exists (
+    select 1 from public.invoice_scans s where s.id = p_invoice_scan_id and s.restaurant_id = p_restaurant_id
+  )) then raise exception 'C04_INVENTORY_REFERENCE_INVALID' using errcode = 'P0001'; end if;
+
+  insert into public.inventory_items(
+    restaurant_id,wine_id,quantity,unit_cost,currency,bin_id,bin_location,
+    section,format,invoice_scan_id,added_via
+  ) values (
+    p_restaurant_id,p_wine_id,p_quantity,p_unit_cost,p_currency,p_bin_id,p_bin_location,
+    p_section,p_format,p_invoice_scan_id,coalesce(p_added_via,'manual'::public.added_via)
+  ) returning id into v_id;
+  return jsonb_build_object('inventoryItemId', v_id, 'quantity', p_quantity, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_INVENTORY_CREATE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.patch_inventory_item_private(
+  p_inventory_item_id uuid,
+  p_expected_updated_at timestamptz,
+  p_set_quantity boolean,
+  p_quantity integer,
+  p_set_unit_cost boolean,
+  p_unit_cost numeric,
+  p_set_currency boolean,
+  p_currency text,
+  p_set_bin_id boolean,
+  p_bin_id uuid,
+  p_set_bin_location boolean,
+  p_bin_location text,
+  p_set_section boolean,
+  p_section text,
+  p_set_format boolean,
+  p_format text
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_item public.inventory_items%rowtype;
+  v_quantity integer;
+  v_unit_cost numeric;
+  v_currency text;
+  v_bin_id uuid;
+  v_bin_location text;
+  v_section text;
+  v_format text;
+begin
+  if p_expected_updated_at is null
+     or p_set_quantity is null or p_set_unit_cost is null or p_set_currency is null
+     or p_set_bin_id is null or p_set_bin_location is null or p_set_section is null
+     or p_set_format is null then
+    raise exception 'C04_PATCH_FLAGS_REQUIRED' using errcode = 'P0001';
+  end if;
+  select * into v_item from public.inventory_items ii
+   where ii.id = p_inventory_item_id for update;
+  if not found or not public.current_site_role_at_least(v_item.restaurant_id, 'manager') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if v_item.updated_at is distinct from p_expected_updated_at then
+    raise exception 'inventory_item_stale' using errcode = 'P04S1';
+  end if;
+  if p_set_unit_cost and p_unit_cost is null then
+    raise exception 'C04_UNIT_COST_REQUIRED' using errcode = 'P0001';
+  end if;
+  v_quantity := case when p_set_quantity then p_quantity else v_item.quantity end;
+  v_unit_cost := case when p_set_unit_cost then p_unit_cost else v_item.unit_cost end;
+  v_currency := case when p_set_currency then p_currency else v_item.currency end;
+  v_bin_id := case when p_set_bin_id then p_bin_id else v_item.bin_id end;
+  v_bin_location := case when p_set_bin_location then p_bin_location else v_item.bin_location end;
+  v_section := case when p_set_section then p_section else v_item.section end;
+  v_format := case when p_set_format then p_format else v_item.format end;
+  if not (v_quantity between 0 and 100000) or not (v_unit_cost between 0 and 1000000)
+     or (v_currency is not null and v_currency not in ('USD','EUR','GBP','CAD','AUD','CHF','JPY'))
+     or (v_bin_location is not null and octet_length(v_bin_location) > 500)
+     or (v_section is not null and octet_length(v_section) > 500)
+     or (v_format is not null and octet_length(v_format) > 100)
+     or (v_bin_id is not null and not exists (
+       select 1 from public.bins b where b.id = v_bin_id and b.restaurant_id = v_item.restaurant_id
+     )) then raise exception 'C04_INVENTORY_VALUE_INVALID' using errcode = 'P0001'; end if;
+  if v_quantity < v_item.quantity and exists (
+    select 1 from public.open_bottles ob
+     where ob.source_inventory_item_id = v_item.id and ob.identity_contract = 2
+  ) then raise exception 'physical_bottle_dependency' using errcode = 'P04D1'; end if;
+  update public.inventory_items ii
+     set quantity=v_quantity,unit_cost=v_unit_cost,currency=v_currency,bin_id=v_bin_id,
+         bin_location=v_bin_location,section=v_section,format=v_format
+   where ii.id=v_item.id;
+  return jsonb_build_object('inventoryItemId', v_item.id, 'quantity', v_quantity, 'updated', true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P04S1' then raise exception 'inventory_item_stale' using errcode='P0001';
+  when sqlstate 'P04D1' then raise exception 'physical_bottle_dependency' using errcode='P0001';
+  when others then raise exception 'C04_INVENTORY_PATCH_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.delete_wine_private(
+  p_restaurant_id uuid,
+  p_wine_id uuid,
+  p_expected_updated_at timestamptz
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_wine public.wines%rowtype;
+begin
+  if not public.current_site_role_at_least(p_restaurant_id, 'owner') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  -- Shared identity mutations take locks in scan -> wine -> inventory order.
+  -- Locking every mutable site scan closes the gap where reconciliation could
+  -- add a wine reference after a narrower dependency probe.
+  perform 1 from public.invoice_scans s
+   where s.restaurant_id=p_restaurant_id and s.committed_at is null
+   order by s.id for update;
+  select * into v_wine from public.wines w
+   where w.id=p_wine_id and w.restaurant_id=p_restaurant_id for update;
+  if not found then raise exception 'wine_not_found' using errcode='P0002'; end if;
+  if p_expected_updated_at is null or v_wine.updated_at is distinct from p_expected_updated_at then
+    raise exception 'wine_stale' using errcode='P04S2';
+  end if;
+  if exists(select 1 from public.inventory_items x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.wine_list_items x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.open_bottles x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.pour_events x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.bottle_closeouts x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.availability_events x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.stock_adjustments x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.pricing_recommendations x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.cellar_health x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.import_batch_rows x where x.applied_wine_id=p_wine_id)
+     or exists(select 1 from public.inventory_command_receipts x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.inventory_command_bottle_effects x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.wine_notes x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.producer_backfill_audit x where x.wine_id=p_wine_id)
+     or exists(select 1 from public.invoice_scans x
+               where x.restaurant_id=p_restaurant_id and (
+                 x.parsed_line_items @> jsonb_build_array(jsonb_build_object('wine_id',p_wine_id))
+                 or x.final_line_items @> jsonb_build_array(jsonb_build_object('wine_id',p_wine_id))
+               ))
+     or exists(select 1 from public.invoice_scan_deletions x
+               where x.restaurant_id=p_restaurant_id
+                 and x.final_line_items @> jsonb_build_array(jsonb_build_object('wine_id',p_wine_id)))
+     or exists(select 1 from public.reconcile_actions x
+               where x.restaurant_id=p_restaurant_id and (
+                 (x.subject_table='wines' and x.subject_id=p_wine_id)
+                 or x.prior_state @> jsonb_build_object(
+                   'final_line_items',jsonb_build_array(jsonb_build_object('wine_id',p_wine_id)))
+                 or x.new_state @> jsonb_build_object(
+                   'final_line_items',jsonb_build_array(jsonb_build_object('wine_id',p_wine_id)))
+               ))
+     or exists(select 1 from public.identity_merge_log x
+               where x.restaurant_id=p_restaurant_id and (x.source_id=p_wine_id or x.target_id=p_wine_id)) then
+    raise exception 'wine_has_dependencies' using errcode='P04D2';
+  end if;
+  delete from public.wines w where w.id=p_wine_id and w.restaurant_id=p_restaurant_id;
+  return jsonb_build_object('wineId',p_wine_id,'deleted',true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'wine_not_found' using errcode='P0002';
+  when sqlstate 'P04S2' then raise exception 'wine_stale' using errcode='P0001';
+  when sqlstate 'P04D2' then raise exception 'wine_has_dependencies' using errcode='P0001';
+  when others then raise exception 'C04_WINE_DELETE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.add_manual_overrides(uuid,text[])
+  rename to add_manual_overrides_pre_0157;
+revoke all on function public.add_manual_overrides_pre_0157(uuid,text[])
+  from public, anon, authenticated, service_role;
+
+create function public.add_manual_overrides(p_wine_id uuid,p_fields text[])
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid; v_result text[];
+begin
+  select w.restaurant_id into v_restaurant_id from public.wines w where w.id=p_wine_id for update;
+  if v_restaurant_id is null or not public.current_site_role_at_least(v_restaurant_id,'manager') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  select array(select distinct f from unnest(coalesce((select w.manual_overrides from public.wines w where w.id=p_wine_id),array[]::text[]) || coalesce(p_fields,array[]::text[])) f order by f)
+    into v_result;
+  if not public.wine_manual_overrides_valid(v_result) then
+    raise exception 'C04_MANUAL_OVERRIDE_INVALID' using errcode='P0001';
+  end if;
+  update public.wines w set manual_overrides=v_result where w.id=p_wine_id;
+  return jsonb_build_object('wineId',p_wine_id,'updated',true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_MANUAL_OVERRIDE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.enrich_wines_batch(uuid,jsonb)
+  rename to enrich_wines_batch_pre_0157;
+revoke all on function public.enrich_wines_batch_pre_0157(uuid,jsonb)
+  from public, anon, authenticated, service_role;
+
+create function public.enrich_wines_batch(p_restaurant_id uuid,p_enrichments jsonb)
+returns integer
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_item jsonb; v_count integer;
+begin
+  if not public.current_site_role_at_least(p_restaurant_id,'manager') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_enrichments is null then return 0; end if;
+  if jsonb_typeof(p_enrichments)<>'array' then
+    raise exception 'C04_ENRICHMENT_ITEM_INVALID' using errcode='P0001';
+  end if;
+  if jsonb_array_length(p_enrichments)=0 then return 0; end if;
+  if jsonb_array_length(p_enrichments) > 2000 then
+    raise exception 'C04_ENRICHMENT_BATCH_TOO_LARGE' using errcode='P0001';
+  end if;
+  for v_item in select value from jsonb_array_elements(p_enrichments) loop
+    if jsonb_typeof(v_item)<>'object' then
+      raise exception 'C04_ENRICHMENT_ITEM_INVALID' using errcode='P0001';
+    end if;
+    if exists(select 1 from jsonb_object_keys(v_item) k where k not in (
+         'id','drink_window_start','drink_window_end','peak_year','rating',
+         'rating_source','review_excerpt','serving_temp_min','serving_temp_max',
+         'serving_temp_label','decant_minutes','region','country','varietal','colour',
+         'enrichment_metadata'
+       ))
+       or not (v_item ? 'id')
+       or (v_item ? 'enrichment_metadata' and not public.wine_enrichment_metadata_valid(v_item->'enrichment_metadata'))
+       or (v_item ? 'rating' and ((v_item->>'rating')::numeric < 0 or (v_item->>'rating')::numeric > 100))
+       or (v_item ? 'peak_year' and ((v_item->>'peak_year')::integer < 1900 or (v_item->>'peak_year')::integer > 2100))
+       or (v_item ? 'decant_minutes' and ((v_item->>'decant_minutes')::integer < 0 or (v_item->>'decant_minutes')::integer > 1440))
+       or exists(select 1 from jsonb_each_text(v_item) f where f.key in ('rating_source','review_excerpt','serving_temp_label','region','country','varietal','colour') and octet_length(f.value)>1000) then
+      raise exception 'C04_ENRICHMENT_ITEM_INVALID' using errcode='P0001';
+    end if;
+  end loop;
+  select public.enrich_wines_batch_pre_0157(p_restaurant_id,p_enrichments) into v_count;
+  return v_count;
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_ENRICHMENT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.claim_scan_idempotency(
+  p_restaurant_id uuid,
+  p_key uuid,
+  p_kind text
+) returns table(disposition text, receipt jsonb)
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_row public.scan_idempotency%rowtype;
+  v_claimed integer := 0;
+  v_expected_claim jsonb;
+begin
+  if v_actor is null or p_key is null
+     or p_kind is null
+     or p_kind not in ('invoice_scan_upload','invoice_inventory_save','bottle_inventory_save') then
+    raise exception 'C04_IDEMPOTENCY_INVALID' using errcode='P0001';
+  end if;
+  if not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  v_expected_claim := jsonb_build_object('version',1,'kind',p_kind,'status','claimed');
+  insert into public.scan_idempotency(
+    key,restaurant_id,response_status,response_body,created_at,claimed_by_user_id
+  ) values (p_key,p_restaurant_id,null,v_expected_claim,statement_timestamp(),v_actor)
+  on conflict (key,restaurant_id) do nothing;
+  get diagnostics v_claimed = row_count;
+  if v_claimed = 1 then
+    return query select 'claimed'::text,null::jsonb;
+    return;
+  end if;
+
+  select * into v_row from public.scan_idempotency c
+   where c.key=p_key and c.restaurant_id=p_restaurant_id for update;
+  if not found then raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001'; end if;
+  if v_row.claimed_by_user_id is distinct from v_actor then
+    raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+  end if;
+  if v_row.response_body is null
+     or jsonb_typeof(v_row.response_body) is distinct from 'object'
+     or jsonb_typeof(v_row.response_body->'kind') is distinct from 'string'
+     or v_row.response_body->>'kind' is distinct from p_kind then
+    raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+  end if;
+  if v_row.created_at <= statement_timestamp()-interval '24 hours' then
+    return query select 'expired'::text,null::jsonb; return;
+  end if;
+  if v_row.response_status is null then
+    if v_row.response_body is distinct from v_expected_claim then
+      return query select 'expired'::text,null::jsonb; return;
+    end if;
+    return query select 'in_progress'::text,null::jsonb; return;
+  end if;
+
+  if (p_kind='invoice_scan_upload' and v_row.response_status=202
+      and (select count(*) from jsonb_object_keys(v_row.response_body))=5
+      and jsonb_typeof(v_row.response_body->'version')='number'
+      and v_row.response_body->>'version'='1'
+      and jsonb_typeof(v_row.response_body->'kind')='string'
+      and v_row.response_body->>'kind'=p_kind
+      and jsonb_typeof(v_row.response_body->'status')='string'
+      and v_row.response_body->>'status'='queued'
+      and jsonb_typeof(v_row.response_body->'scanId')='string'
+      and jsonb_typeof(v_row.response_body->'itemCount')='number'
+      and v_row.response_body->>'itemCount'='0'
+      and exists(select 1 from public.invoice_scans s
+                  where s.id::text=v_row.response_body->>'scanId'
+                    and s.restaurant_id=p_restaurant_id))
+     or (p_kind='invoice_inventory_save' and v_row.response_status=200
+      and (select count(*) from jsonb_object_keys(v_row.response_body))=6
+      and jsonb_typeof(v_row.response_body->'version')='number'
+      and v_row.response_body->>'version'='1'
+      and jsonb_typeof(v_row.response_body->'kind')='string'
+      and v_row.response_body->>'kind'=p_kind
+      and jsonb_typeof(v_row.response_body->'status')='string'
+      and v_row.response_body->>'status'='committed'
+      and jsonb_typeof(v_row.response_body->'scanId')='string'
+      and jsonb_typeof(v_row.response_body->'itemCount')='number'
+      and jsonb_typeof(v_row.response_body->'wineCount')='number'
+      and (v_row.response_body->>'itemCount') ~ '^[0-9]+$'
+      and (v_row.response_body->>'wineCount') ~ '^[0-9]+$'
+      and (v_row.response_body->>'itemCount')::numeric between 0 and 500
+      and (v_row.response_body->>'wineCount')::numeric between 0 and (v_row.response_body->>'itemCount')::numeric
+      and exists(select 1 from public.invoice_scans s
+                  where s.id::text=v_row.response_body->>'scanId'
+                    and s.restaurant_id=p_restaurant_id))
+     or (p_kind='bottle_inventory_save' and v_row.response_status=200
+      and (select count(*) from jsonb_object_keys(v_row.response_body))=5
+      and jsonb_typeof(v_row.response_body->'version')='number'
+      and v_row.response_body->>'version'='1'
+      and jsonb_typeof(v_row.response_body->'kind')='string'
+      and v_row.response_body->>'kind'=p_kind
+      and jsonb_typeof(v_row.response_body->'status')='string'
+      and v_row.response_body->>'status'='committed'
+      and jsonb_typeof(v_row.response_body->'wineId')='string'
+      and jsonb_typeof(v_row.response_body->'itemCount')='number'
+      and v_row.response_body->>'itemCount'='1'
+      and exists(select 1 from public.wines w
+                  where w.id::text=v_row.response_body->>'wineId'
+                    and w.restaurant_id=p_restaurant_id)) then
+    return query select 'replay'::text,v_row.response_body; return;
+  end if;
+  return query select 'expired'::text,null::jsonb;
+end;
+$function$;
+
+create function public.complete_scan_idempotency(
+  p_restaurant_id uuid,
+  p_key uuid,
+  p_kind text,
+  p_scan_id uuid,
+  p_item_count integer,
+  p_wine_count integer,
+  p_wine_id uuid
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_row public.scan_idempotency%rowtype;
+  v_claim jsonb;
+  v_receipt jsonb;
+  v_status integer;
+begin
+  if p_key is null or p_kind is null
+     or p_kind not in ('invoice_scan_upload','invoice_inventory_save','bottle_inventory_save') then
+    raise exception 'C04_IDEMPOTENCY_INVALID' using errcode='P0001';
+  end if;
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  v_claim:=jsonb_build_object('version',1,'kind',p_kind,'status','claimed');
+
+  select * into v_row from public.scan_idempotency c
+   where c.key=p_key and c.restaurant_id=p_restaurant_id for update;
+  if not found or v_row.claimed_by_user_id is distinct from v_actor then
+    raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+  end if;
+  if jsonb_typeof(v_row.response_body)<>'object' then
+    raise exception 'C04_IDEMPOTENCY_LEGACY_OR_MALFORMED' using errcode='P0001';
+  end if;
+  if v_row.response_body->>'kind' is distinct from p_kind then
+    raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+  end if;
+  if v_row.created_at < statement_timestamp()-interval '24 hours' then
+    raise exception 'C04_IDEMPOTENCY_EXPIRED' using errcode='P0001';
+  end if;
+  if p_kind='invoice_scan_upload' then
+    if p_scan_id is null or p_item_count is distinct from 0
+       or p_wine_count is not null or p_wine_id is not null
+       or not exists(select 1 from public.invoice_scans s where s.id=p_scan_id and s.restaurant_id=p_restaurant_id) then
+      raise exception 'C04_IDEMPOTENCY_COMPLETION_INVALID' using errcode='P0001';
+    end if;
+    v_status:=202;
+    v_receipt:=jsonb_build_object('version',1,'kind',p_kind,'scanId',p_scan_id,'status','queued','itemCount',0);
+  elsif p_kind='invoice_inventory_save' then
+    if p_scan_id is null or p_item_count is null or p_wine_count is null
+       or p_wine_id is not null or p_item_count not between 0 and 500
+       or p_wine_count not between 0 and p_item_count
+       or not exists(select 1 from public.invoice_scans s where s.id=p_scan_id and s.restaurant_id=p_restaurant_id) then
+      raise exception 'C04_IDEMPOTENCY_COMPLETION_INVALID' using errcode='P0001';
+    end if;
+    v_status:=200;
+    v_receipt:=jsonb_build_object('version',1,'kind',p_kind,'scanId',p_scan_id,'status','committed','itemCount',p_item_count,'wineCount',p_wine_count);
+  else
+    if p_scan_id is not null or p_item_count is distinct from 1
+       or p_wine_count is not null or p_wine_id is null
+       or not exists(select 1 from public.wines w where w.id=p_wine_id and w.restaurant_id=p_restaurant_id) then
+      raise exception 'C04_IDEMPOTENCY_COMPLETION_INVALID' using errcode='P0001';
+    end if;
+    v_status:=200;
+    v_receipt:=jsonb_build_object('version',1,'kind',p_kind,'wineId',p_wine_id,'status','committed','itemCount',1);
+  end if;
+  if v_row.response_status is not null then
+    if v_row.response_status=v_status and v_row.response_body=v_receipt then return v_receipt; end if;
+    raise exception 'C04_IDEMPOTENCY_RECOMPLETION_MISMATCH' using errcode='P0001';
+  end if;
+  if v_row.response_body is distinct from v_claim then
+    raise exception 'C04_IDEMPOTENCY_LEGACY_OR_MALFORMED' using errcode='P0001';
+  end if;
+  update public.scan_idempotency c
+     set response_status=v_status,response_body=v_receipt
+   where c.key=p_key and c.restaurant_id=p_restaurant_id
+     and c.claimed_by_user_id=v_actor and c.response_status is null
+     and c.response_body=v_claim;
+  if not found then raise exception 'C04_IDEMPOTENCY_CONFLICT' using errcode='P0001'; end if;
+  return v_receipt;
+end;
+$function$;
+
+create function public.abandon_scan_idempotency(
+  p_restaurant_id uuid,
+  p_key uuid,
+  p_kind text
+) returns boolean
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_actor uuid:=(select auth.uid()); v_claim jsonb;
+begin
+  if p_key is null or p_kind is null
+     or p_kind not in ('invoice_scan_upload','invoice_inventory_save','bottle_inventory_save') then
+    raise exception 'C04_IDEMPOTENCY_INVALID' using errcode='P0001';
+  end if;
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  v_claim:=jsonb_build_object('version',1,'kind',p_kind,'status','claimed');
+  delete from public.scan_idempotency c
+   where c.key=p_key and c.restaurant_id=p_restaurant_id
+     and c.claimed_by_user_id=v_actor and c.response_status is null and c.response_body=v_claim;
+  if not found then raise exception 'C04_IDEMPOTENCY_ABANDON_REFUSED' using errcode='P0001'; end if;
+  return true;
+end;
+$function$;
+
+alter function public.cleanup_scan_idempotency()
+  rename to cleanup_scan_idempotency_pre_0157;
+revoke all on function public.cleanup_scan_idempotency_pre_0157()
+  from public, anon, authenticated, service_role;
+create function public.cleanup_scan_idempotency() returns void
+language sql security definer set search_path = ''
+as $function$
+  delete from public.scan_idempotency c
+   where c.created_at < statement_timestamp()-interval '24 hours'
+$function$;
+revoke all on function public.cleanup_scan_idempotency()
+  from public, anon, authenticated, service_role;
+grant execute on function public.cleanup_scan_idempotency() to service_role;
+
+-- Invoice operations -------------------------------------------------------
+
+create function public.invoice_line_items_valid(p_items jsonb)
+returns boolean
+language plpgsql immutable security definer set search_path = ''
+as $function$
+declare v_item jsonb; v_field jsonb;
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then
+    return false;
+  end if;
+  if jsonb_array_length(p_items) < 1 or jsonb_array_length(p_items) > 500 then
+    return false;
+  end if;
+  for v_item in select value from jsonb_array_elements(p_items) loop
+    if jsonb_typeof(v_item) <> 'object' then return false; end if;
+    if not (v_item ?& array['id','name','producer','vintage','varietal','region','qty','unitCost','confidence'])
+       or exists(select 1 from jsonb_object_keys(v_item) k where k not in (
+         'id','name','producer','vintage','varietal','region','qty','unitCost',
+         'lineTotal','currency','format','confidence','lowFields','wine_id'
+       ))
+       or jsonb_typeof(v_item->'id') <> 'string'
+       or octet_length(v_item->>'id') not between 1 and 500
+       or jsonb_typeof(v_item->'name') <> 'string'
+       or octet_length(v_item->>'name') not between 1 and 500
+       or jsonb_typeof(v_item->'producer') <> 'string'
+       or octet_length(v_item->>'producer') not between 1 and 500
+       or jsonb_typeof(v_item->'varietal') <> 'string'
+       or octet_length(v_item->>'varietal') > 500
+       or jsonb_typeof(v_item->'region') <> 'string'
+       or octet_length(v_item->>'region') > 500
+       or not (jsonb_typeof(v_item->'vintage') = 'null'
+               or (jsonb_typeof(v_item->'vintage') = 'number'
+                   and (v_item->>'vintage')::numeric = trunc((v_item->>'vintage')::numeric)
+                   and (v_item->>'vintage')::numeric between 0 and 2100))
+       or jsonb_typeof(v_item->'qty') <> 'number'
+       or (v_item->>'qty')::numeric <> trunc((v_item->>'qty')::numeric)
+       or (v_item->>'qty')::numeric not between 1 and 100000
+       or jsonb_typeof(v_item->'unitCost') <> 'number'
+       or (v_item->>'unitCost')::numeric not between 0 and 1000000
+       or jsonb_typeof(v_item->'confidence') <> 'number'
+       or (v_item->>'confidence')::numeric not between 0 and 1
+       or (v_item ? 'lineTotal' and not (
+         jsonb_typeof(v_item->'lineTotal') = 'null'
+         or (jsonb_typeof(v_item->'lineTotal') = 'number'
+             and (v_item->>'lineTotal')::numeric between 0 and 100000000000)
+       ))
+       or (v_item ? 'currency' and not (
+         jsonb_typeof(v_item->'currency') = 'null'
+         or (jsonb_typeof(v_item->'currency') = 'string'
+             and octet_length(v_item->>'currency') <= 16)
+       ))
+       or (v_item ? 'format' and not (
+         jsonb_typeof(v_item->'format') = 'null'
+         or (jsonb_typeof(v_item->'format') = 'string'
+             and octet_length(v_item->>'format') <= 100)
+       ))
+       or (v_item ? 'wine_id' and not (
+         jsonb_typeof(v_item->'wine_id') = 'string'
+         and (v_item->>'wine_id') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       ))
+       or (v_item ? 'lowFields' and jsonb_typeof(v_item->'lowFields') <> 'array') then
+      return false;
+    end if;
+    if v_item ? 'lowFields' then
+      if jsonb_array_length(v_item->'lowFields') > 9 then return false; end if;
+      for v_field in select value from jsonb_array_elements(v_item->'lowFields') loop
+        if jsonb_typeof(v_field) <> 'string' or v_field #>> '{}' not in (
+          'name','producer','vintage','varietal','region','qty','unitCost','currency','format'
+        ) then return false; end if;
+      end loop;
+      if jsonb_array_length(v_item->'lowFields') <> (
+        select count(distinct value)::integer from jsonb_array_elements(v_item->'lowFields')
+      ) then return false; end if;
+    end if;
+  end loop;
+  return true;
+exception when others then
+  return false;
+end;
+$function$;
+
+create function public.invoice_edits_valid(p_edits jsonb)
+returns boolean
+language plpgsql immutable security definer set search_path = ''
+as $function$
+begin
+  if p_edits is null or jsonb_typeof(p_edits)<>'object' then return false; end if;
+  return (select count(*) from jsonb_object_keys(p_edits)) <= 500
+     and not exists (
+       select 1 from jsonb_each(p_edits) e
+        where octet_length(e.key) not between 1 and 500 or e.value <> 'true'::jsonb
+     );
+exception when others then
+  return false;
+end;
+$function$;
+
+revoke all on function public.invoice_line_items_valid(jsonb)
+  from public, anon, authenticated, service_role;
+revoke all on function public.invoice_edits_valid(jsonb)
+  from public, anon, authenticated, service_role;
+
+create function public.create_invoice_scan_upload(
+  p_restaurant_id uuid,
+  p_scan_id uuid,
+  p_object_name text,
+  p_distributor_name text,
+  p_invoice_number text,
+  p_invoice_date date
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_prefix text := p_restaurant_id::text || '/' || p_scan_id::text;
+  v_primary text;
+  v_extra jsonb;
+  v_count integer;
+  v_pdf_count integer;
+  v_page_count integer;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_scan_id is null or p_object_name is null
+     or p_object_name !~ ('^' || v_prefix || '(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$')
+     or p_distributor_name is null or octet_length(p_distributor_name) not between 1 and 500
+     or (p_invoice_number is not null and octet_length(p_invoice_number) > 500) then
+    raise exception 'C04_SCAN_UPLOAD_INVALID' using errcode='P0001';
+  end if;
+
+  select count(*)::integer,
+         count(*) filter (where lower(right(o.name,4)) = '.pdf')::integer,
+         count(*) filter (where o.name ~ ('^' || v_prefix || '_page[1-8][.](jpg|jpeg|png|heic|heif)$'))::integer,
+         min(o.name) filter (where o.name = p_object_name),
+         coalesce(jsonb_agg(o.name order by o.name) filter (where o.name <> p_object_name),'[]'::jsonb)
+    into v_count,v_pdf_count,v_page_count,v_primary,v_extra
+    from storage.objects o
+   where o.bucket_id='invoice-images'
+     and (o.name = v_prefix || '.jpg' or o.name = v_prefix || '.jpeg'
+       or o.name = v_prefix || '.png' or o.name = v_prefix || '.heic'
+       or o.name = v_prefix || '.heif' or o.name = v_prefix || '.pdf'
+       or o.name ~ ('^' || v_prefix || '_page[1-8][.](jpg|jpeg|png|heic|heif)$'))
+     and coalesce((o.metadata->>'size')::numeric,-1) between 1 and 10485760
+     and o.metadata->>'mimetype' in (
+       'image/jpeg','image/png','image/heic','image/heif','application/pdf'
+     );
+  if v_primary is null or v_count not between 1 and 8
+     or (v_pdf_count > 0 and (v_pdf_count <> 1 or v_count <> 1))
+     or (v_count > 1 and v_page_count <> v_count)
+     or (v_count > 1 and exists (
+       select 1 from generate_series(1,v_count) n
+        where not exists (
+          select 1 from storage.objects o
+           where o.bucket_id='invoice-images'
+             and o.name ~ ('^' || v_prefix || '_page' || n::text || '[.](jpg|jpeg|png|heic|heif)$')
+        )
+     )) then
+    raise exception 'C04_SCAN_UPLOAD_OBJECT_INVALID' using errcode='P0001';
+  end if;
+
+  insert into public.invoice_scans(
+    id,restaurant_id,created_by,distributor_name,invoice_number,invoice_date,
+    raw_image_path,extra_image_paths,parsed_line_items,final_line_items,edits,item_count,status
+  ) values (
+    p_scan_id,p_restaurant_id,v_actor,p_distributor_name,p_invoice_number,p_invoice_date,
+    p_object_name,v_extra,'[]'::jsonb,'[]'::jsonb,'{}'::jsonb,0,'processing'
+  );
+  perform public.enqueue_invoice_extract_job(p_restaurant_id,p_scan_id);
+  return jsonb_build_object('scanId',p_scan_id,'status','queued');
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when unique_violation then raise exception 'scan_upload_conflict' using errcode='23505';
+  when others then raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.review_invoice_scan(
+  p_scan_id uuid,
+  p_expected_updated_at timestamptz,
+  p_distributor_name text,
+  p_invoice_number text,
+  p_invoice_date date,
+  p_final_line_items jsonb,
+  p_edits jsonb
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_scan public.invoice_scans%rowtype; v_count integer; v_expected_wines integer; v_found_wines integer;
+begin
+  select * into v_scan from public.invoice_scans s where s.id=p_scan_id for update;
+  if not found
+     or not public.current_site_role_at_least(v_scan.restaurant_id,'manager')
+     or not public.effective_site_capability(v_scan.restaurant_id,'cost.read') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_scan.committed_at is not null then
+    raise exception 'scan_already_committed' using errcode='P04S4';
+  end if;
+  if p_expected_updated_at is null or v_scan.updated_at is distinct from p_expected_updated_at then
+    raise exception 'scan_superseded' using errcode='P04S3';
+  end if;
+  if p_distributor_name is null or octet_length(p_distributor_name) not between 1 and 500
+     or (p_invoice_number is not null and octet_length(p_invoice_number)>500)
+     or not public.invoice_line_items_valid(p_final_line_items)
+     or not public.invoice_edits_valid(p_edits)
+     or octet_length(p_final_line_items::text)+octet_length(p_edits::text)>2097152 then
+    raise exception 'C04_SCAN_REVIEW_INVALID' using errcode='P0001';
+  end if;
+  select count(distinct (x.item->>'wine_id')::uuid)::integer into v_expected_wines
+    from jsonb_array_elements(p_final_line_items) x(item) where x.item?'wine_id';
+  perform 1 from public.wines w join (
+    select distinct (x.item->>'wine_id')::uuid id
+      from jsonb_array_elements(p_final_line_items) x(item) where x.item?'wine_id'
+  ) requested on requested.id=w.id
+   where w.restaurant_id=v_scan.restaurant_id order by w.id for update of w;
+  select count(*)::integer into v_found_wines from public.wines w
+   where w.restaurant_id=v_scan.restaurant_id and w.id in (
+     select distinct (x.item->>'wine_id')::uuid
+       from jsonb_array_elements(p_final_line_items) x(item) where x.item?'wine_id'
+   );
+  if v_found_wines is distinct from v_expected_wines then
+    raise exception 'C04_SCAN_REVIEW_INVALID' using errcode='P0001';
+  end if;
+  v_count:=jsonb_array_length(p_final_line_items);
+  update public.invoice_scans s set
+    distributor_name=p_distributor_name,invoice_number=p_invoice_number,
+    invoice_date=p_invoice_date,final_line_items=p_final_line_items,edits=p_edits,
+    item_count=v_count,status='complete'
+  where s.id=p_scan_id and s.restaurant_id=v_scan.restaurant_id;
+  return jsonb_build_object('scanId',p_scan_id,'status','complete','itemCount',v_count,'updated',true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P04S3' then raise exception 'scan_superseded' using errcode='P0001';
+  when sqlstate 'P04S4' then raise exception 'scan_already_committed' using errcode='P0001';
+  when others then raise exception 'C04_SCAN_REVIEW_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+-- Committed receipts can only be replayed exactly when every committed line
+-- already records the identity used by its inventory write. Refuse admission
+-- rather than silently derive a different distinct-wine count from mutable
+-- inventory references.
+do $historical_committed_scan_identity_preflight$
+begin
+  if exists(
+    select 1 from public.invoice_scans s
+     where s.committed_at is not null and case
+       when not public.invoice_line_items_valid(s.final_line_items) then true
+       else exists(
+         select 1 from jsonb_array_elements(s.final_line_items) x(item)
+          where not (x.item?'wine_id')
+       ) end
+  ) then
+    raise exception 'C04_0157_COMMITTED_SCAN_IDENTITY_MISSING' using errcode='P0001';
+  end if;
+end;
+$historical_committed_scan_identity_preflight$;
+
+create function public.commit_invoice_scan(p_scan_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_scan public.invoice_scans%rowtype;
+  v_wines jsonb;
+  v_created_ids uuid[];
+  v_lines jsonb;
+  v_count integer;
+  v_wine_count integer;
+  v_expected_wines integer;
+  v_found_wines integer;
+begin
+  select * into v_scan from public.invoice_scans s where s.id=p_scan_id for update;
+  if not found
+     or not public.current_site_role_at_least(v_scan.restaurant_id,'manager')
+     or not public.effective_site_capability(v_scan.restaurant_id,'cost.read') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_scan.committed_at is not null then
+    if not public.invoice_line_items_valid(v_scan.final_line_items) then
+      raise exception 'C04_SCAN_COMMIT_REPLAY_INVALID' using errcode='P0001';
+    end if;
+    if exists(select 1 from jsonb_array_elements(v_scan.final_line_items) x(item)
+               where not (x.item?'wine_id')) then
+      raise exception 'C04_SCAN_COMMIT_REPLAY_INVALID' using errcode='P0001';
+    end if;
+    v_count:=jsonb_array_length(v_scan.final_line_items);
+    select count(distinct (x.item->>'wine_id')::uuid)::integer into v_wine_count
+      from jsonb_array_elements(v_scan.final_line_items) x(item);
+    return jsonb_build_object('scanId',p_scan_id,'itemCount',v_count,'wineCount',v_wine_count);
+  end if;
+  if not public.invoice_line_items_valid(v_scan.final_line_items) then
+    raise exception 'C04_SCAN_COMMIT_INVALID' using errcode='P0001';
+  end if;
+  v_count:=jsonb_array_length(v_scan.final_line_items);
+  select jsonb_agg(jsonb_build_object(
+    'name',x.item->>'name','producer',x.item->>'producer',
+    'vintage',case when jsonb_typeof(x.item->'vintage')='null' then null else (x.item->>'vintage')::integer end,
+    'varietal',nullif(x.item->>'varietal',''),'region',nullif(x.item->>'region',''),
+    'country',null,'size_ml',750
+  ) order by x.ordinality) into v_wines
+    from jsonb_array_elements(v_scan.final_line_items) with ordinality x(item,ordinality)
+   where not (x.item?'wine_id');
+  if v_wines is not null then
+    select public.find_or_create_wines_batch(v_scan.restaurant_id,v_wines) into v_created_ids;
+  else
+    v_created_ids:=array[]::uuid[];
+  end if;
+  if cardinality(v_created_ids) is distinct from coalesce(jsonb_array_length(v_wines),0) then
+    raise exception 'C04_SCAN_WINE_RESULT_INVALID' using errcode='P0001';
+  end if;
+
+  select jsonb_agg(
+           case when q.item?'wine_id' then q.item
+                else q.item||jsonb_build_object('wine_id',v_created_ids[q.unmatched_ordinal]) end
+           order by q.ordinality
+         ) into v_lines
+    from (
+      select x.item,x.ordinality,
+             count(*) filter(where not (x.item?'wine_id'))
+               over(order by x.ordinality)::integer as unmatched_ordinal
+        from jsonb_array_elements(v_scan.final_line_items) with ordinality x(item,ordinality)
+    ) q;
+  if not public.invoice_line_items_valid(v_lines) then
+    raise exception 'C04_SCAN_WINE_RESULT_INVALID' using errcode='P0001';
+  end if;
+  if exists(select 1 from jsonb_array_elements(v_lines) x(item) where not (x.item?'wine_id')) then
+    raise exception 'C04_SCAN_WINE_RESULT_INVALID' using errcode='P0001';
+  end if;
+
+  select count(distinct (x.item->>'wine_id')::uuid)::integer into v_expected_wines
+    from jsonb_array_elements(v_lines) x(item);
+  perform 1 from public.wines w join (
+    select distinct (x.item->>'wine_id')::uuid id from jsonb_array_elements(v_lines) x(item)
+  ) resolved on resolved.id=w.id
+   where w.restaurant_id=v_scan.restaurant_id order by w.id for update of w;
+  select count(*)::integer into v_found_wines from public.wines w
+   where w.restaurant_id=v_scan.restaurant_id and w.id in (
+     select distinct (x.item->>'wine_id')::uuid from jsonb_array_elements(v_lines) x(item)
+   );
+  if v_found_wines is distinct from v_expected_wines then
+    raise exception 'C04_SCAN_WINE_RESULT_INVALID' using errcode='P0001';
+  end if;
+
+  insert into public.inventory_items(
+    wine_id,restaurant_id,invoice_scan_id,quantity,unit_cost,format,currency,added_via
+  )
+  select (x.item->>'wine_id')::uuid,v_scan.restaurant_id,p_scan_id,
+         (x.item->>'qty')::integer,(x.item->>'unitCost')::numeric,
+         nullif(x.item->>'format',''),nullif(x.item->>'currency',''),'invoice_scan'::public.added_via
+    from jsonb_array_elements(v_lines) with ordinality x(item,ordinality)
+   order by x.ordinality;
+  update public.invoice_scans s set final_line_items=v_lines,committed_at=statement_timestamp()
+   where s.id=p_scan_id and s.restaurant_id=v_scan.restaurant_id and s.committed_at is null;
+  if not found then raise exception 'scan_commit_conflict' using errcode='P0001'; end if;
+  v_wine_count:=v_expected_wines;
+  return jsonb_build_object('scanId',p_scan_id,'itemCount',v_count,'wineCount',v_wine_count);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when unique_violation then raise exception 'scan_commit_conflict' using errcode='23505';
+  when others then raise exception 'C04_SCAN_COMMIT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.delete_invoice_scan(uuid) rename to delete_invoice_scan_pre_0157;
+revoke all on function public.delete_invoice_scan_pre_0157(uuid)
+  from public, anon, authenticated, service_role;
+
+create function public.delete_invoice_scan(p_scan_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid; v_receipt jsonb;
+begin
+  select s.restaurant_id into v_restaurant_id from public.invoice_scans s
+   where s.id=p_scan_id and public.current_site_role_at_least(s.restaurant_id,'manager')
+   for update;
+  if not found then
+    raise exception 'invoice_scan_not_found' using errcode='P0002';
+  end if;
+  perform 1 from public.inventory_items ii
+   where ii.invoice_scan_id=p_scan_id and ii.restaurant_id=v_restaurant_id
+   order by ii.id for update;
+  if exists(
+    select 1 from public.inventory_items ii join public.open_bottles ob
+      on ob.source_inventory_item_id=ii.id
+     where ii.invoice_scan_id=p_scan_id and ii.restaurant_id=v_restaurant_id
+  ) then
+    raise exception 'physical_bottle_dependency' using errcode='P04D4';
+  end if;
+  select public.delete_invoice_scan_pre_0157(p_scan_id) into v_receipt;
+  return jsonb_build_object(
+    'scanId',p_scan_id,
+    'inventoryRowsDeleted',(v_receipt->>'inventoryRowsDeleted')::integer,
+    'bottlesRemoved',(v_receipt->>'bottlesRemoved')::integer
+  );
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'invoice_scan_not_found' using errcode='P0002';
+  when sqlstate 'P04D4' then raise exception 'physical_bottle_dependency' using errcode='P0001';
+  when others then raise exception 'C04_SCAN_DELETE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.request_invoice_scan_reextract(p_scan_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_scan public.invoice_scans%rowtype; v_job_id uuid;
+begin
+  select * into v_scan from public.invoice_scans s where s.id=p_scan_id for update;
+  if not found
+     or not public.current_site_role_at_least(v_scan.restaurant_id,'manager')
+     or not public.effective_site_capability(v_scan.restaurant_id,'cost.read') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_scan.ocr_text is null then raise exception 'missing_ocr_text' using errcode='P0001'; end if;
+  select b.id into v_job_id from public.background_jobs b
+   where b.job_type='invoice_extract' and b.idempotency_key=p_scan_id::text for update;
+  if v_job_id is null then
+    insert into public.background_jobs(
+      restaurant_id,created_by,job_type,status,subject_table,subject_id,
+      idempotency_key,max_attempts,run_after
+    ) values (
+      v_scan.restaurant_id,(select auth.uid()),'invoice_extract','queued',
+      'invoice_scans',p_scan_id,p_scan_id::text,5,statement_timestamp()
+    ) returning id into v_job_id;
+  else
+    if exists(select 1 from public.background_jobs b where b.id=v_job_id and b.status='processing') then
+      raise exception 'scan_reextract_in_progress' using errcode='P0001';
+    end if;
+    update public.background_jobs b set
+      status='queued',attempt_count=0,error_code=null,error_message=null,
+      claimed_by=null,claimed_at=null,run_after=statement_timestamp(),
+      finished_at=null,result='{}'::jsonb
+    where b.id=v_job_id;
+  end if;
+  return jsonb_build_object('scanId',p_scan_id,'status','queued');
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_SCAN_REEXTRACT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+-- CSV import operations ----------------------------------------------------
+
+alter function public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text)
+  rename to create_import_batch_pre_0157;
+revoke all on function public.create_import_batch_pre_0157(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text)
+  from public, anon, authenticated, service_role;
+
+create function public.create_import_batch(
+  p_restaurant_id uuid,
+  p_created_by uuid,
+  p_filename text,
+  p_total_rows integer,
+  p_rows jsonb,
+  p_session_id uuid default null,
+  p_chunk_index integer default null,
+  p_chunk_total integer default null,
+  p_content_sha256 text default null,
+  p_source_sha256 text default null
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid()); v_result jsonb;
+  v_session_site uuid; v_session_source text;
+begin
+  if v_actor is null or p_created_by is distinct from v_actor
+     or not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_filename is null or octet_length(p_filename) not between 1 and 500
+     or p_total_rows not between 1 and 5000
+     or p_rows is null or jsonb_typeof(p_rows)<>'array'
+     or jsonb_array_length(p_rows) is distinct from p_total_rows
+     or (p_content_sha256 is not null and p_content_sha256 !~ '^(?:[0-9a-f]{64}|overrides-v[0-9]+:[0-9a-f]{64}:[0-9a-f]{64})$')
+     or (p_source_sha256 is not null and p_source_sha256 !~ '^[0-9a-f]{64}$')
+     or ((p_chunk_index is null) <> (p_chunk_total is null))
+     or (p_chunk_index is not null and (p_chunk_index<1 or p_chunk_total<1 or p_chunk_index>p_chunk_total)) then
+    raise exception 'C04_IMPORT_BATCH_INVALID' using errcode='P0001';
+  end if;
+  if p_session_id is not null then
+    select s.restaurant_id,s.source_sha256 into v_session_site,v_session_source
+      from public.import_sessions s where s.id=p_session_id;
+    if not found or v_session_site is distinct from p_restaurant_id then
+      raise exception 'import_session_not_found' using errcode='P0002';
+    end if;
+    if v_session_source is not null and p_source_sha256 is not null
+       and v_session_source is distinct from p_source_sha256 then
+      raise exception 'import_source_mismatch' using errcode='P0006';
+    end if;
+  end if;
+  select public.create_import_batch_pre_0157(
+    p_restaurant_id,v_actor,p_filename,p_total_rows,p_rows,p_session_id,
+    p_chunk_index,p_chunk_total,p_content_sha256,p_source_sha256
+  ) into v_result;
+  return jsonb_build_object('batchId',v_result->'batchId','status','created','rowCount',p_total_rows);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'import_session_not_found' using errcode='P0002';
+  when sqlstate 'P0006' then raise exception 'import_source_mismatch' using errcode='P0006';
+  when unique_violation then raise exception 'import_batch_conflict' using errcode='23505';
+  when others then raise exception 'C04_IMPORT_CREATE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.count_import_batch_rows(uuid)
+  rename to count_import_batch_rows_pre_0157;
+revoke all on function public.count_import_batch_rows_pre_0157(uuid)
+  from public, anon, authenticated, service_role;
+
+create function public.count_import_batch_rows(p_batch_id uuid)
+returns table(total integer,applied integer,excluded integer,pending integer,eligible_not_applied integer)
+language plpgsql stable security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid;
+begin
+  select b.restaurant_id into v_restaurant_id from public.import_batches b where b.id=p_batch_id;
+  if v_restaurant_id is null or not public.current_site_role_at_least(v_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  return query select
+    count(*)::integer,
+    count(*) filter(where r.apply_status='applied')::integer,
+    count(*) filter(where r.resolution='exclude')::integer,
+    count(*) filter(where r.resolution='pending')::integer,
+    count(*) filter(where r.apply_status='not_applied' and r.resolution in ('auto','include'))::integer
+  from public.import_batch_rows r
+  where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id;
+end;
+$function$;
+
+alter function public.apply_import_batch_chunk(uuid,integer)
+  rename to apply_import_batch_chunk_pre_0157;
+revoke all on function public.apply_import_batch_chunk_pre_0157(uuid,integer)
+  from public, anon, authenticated, service_role;
+
+create function public.apply_import_batch_chunk(p_batch_id uuid,p_limit integer default 100)
+returns table(
+  row_id uuid,row_number integer,outcome text,inventory_item_id uuid,
+  error_message text,error_code text
+)
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid; v_status text; v_row record;
+begin
+  if p_limit is null or p_limit not between 1 and 100 then
+    raise exception 'C04_IMPORT_CHUNK_INVALID' using errcode='P0001';
+  end if;
+  select b.restaurant_id,b.status into v_restaurant_id,v_status
+    from public.import_batches b where b.id=p_batch_id;
+  if v_restaurant_id is null or not public.current_site_role_at_least(v_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  for v_row in select * from public.apply_import_batch_chunk_pre_0157(p_batch_id,p_limit) loop
+    row_id:=v_row.row_id;
+    row_number:=v_row.row_number;
+    outcome:=case when v_row.outcome in ('applied','blocked','error') then v_row.outcome else 'error' end;
+    inventory_item_id:=case when v_row.outcome='applied' then v_row.inventory_item_id else null end;
+    error_code:=case when v_row.outcome='blocked' then 'missing_unit_cost'
+                     when v_row.outcome='error' then 'row_apply_failed' else null end;
+    error_message:=error_code;
+    return next;
+  end loop;
+  update public.import_batches b set status=case
+    when b.status='reverted' then 'reverted'
+    when not exists(select 1 from public.import_batch_rows r where r.batch_id=p_batch_id
+      and not (r.apply_status='applied' or r.resolution='exclude')) then 'completed'
+    when exists(select 1 from public.import_batch_rows r where r.batch_id=p_batch_id
+      and r.apply_status='applied') then 'applying'
+    else 'created' end
+  where b.id=p_batch_id and b.restaurant_id=v_restaurant_id;
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0004' then raise exception 'import_batch_conflict' using errcode='P0004';
+  when others then raise exception 'C04_IMPORT_APPLY_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.resolve_import_batch_row(
+  p_row_id uuid,p_action text,p_manual_unit_cost numeric default null
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_row public.import_batch_rows%rowtype; v_actor uuid:=(select auth.uid());
+begin
+  select * into v_row from public.import_batch_rows r where r.id=p_row_id for update;
+  if not found or v_actor is null
+     or not public.current_site_role_at_least(v_row.restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_row.resolution<>'pending' then raise exception 'row_not_pending' using errcode='P0001'; end if;
+  if p_action not in ('include','exclude')
+     or (p_action='exclude' and p_manual_unit_cost is not null)
+     or (p_action='include' and v_row.cost_status='missing'
+       and (p_manual_unit_cost is null or p_manual_unit_cost not between 0 and 1000000))
+     or (p_action='include' and v_row.cost_status<>'missing' and p_manual_unit_cost is not null) then
+    raise exception 'C04_IMPORT_RESOLUTION_INVALID' using errcode='P0001';
+  end if;
+  update public.import_batch_rows r set
+    resolution=p_action,
+    manual_unit_cost=case when p_action='include' and v_row.cost_status='missing'
+                          then round(p_manual_unit_cost,2) else v_row.manual_unit_cost end,
+    resolved_at=statement_timestamp(),resolved_by=v_actor
+  where r.id=p_row_id and r.restaurant_id=v_row.restaurant_id and r.resolution='pending';
+  update public.import_batches b set status=case
+    when not exists(select 1 from public.import_batch_rows r where r.batch_id=v_row.batch_id
+      and not (r.apply_status='applied' or r.resolution='exclude')) then 'completed'
+    when exists(select 1 from public.import_batch_rows r where r.batch_id=v_row.batch_id
+      and r.apply_status='applied') then 'applying' else 'created' end
+  where b.id=v_row.batch_id and b.restaurant_id=v_row.restaurant_id and b.status<>'reverted';
+  return jsonb_build_object('rowId',p_row_id,'batchId',v_row.batch_id,'status','resolved','updated',true);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_IMPORT_RESOLVE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.bulk_resolve_import_batch_rows(p_batch_id uuid,p_action text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid; v_actor uuid:=(select auth.uid()); v_count integer; v_remaining integer;
+begin
+  select b.restaurant_id into v_restaurant_id from public.import_batches b
+   where b.id=p_batch_id and b.status<>'reverted' for update;
+  if v_restaurant_id is null or v_actor is null
+     or not public.current_site_role_at_least(v_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_action not in ('include','exclude') then
+    raise exception 'C04_IMPORT_RESOLUTION_INVALID' using errcode='P0001';
+  end if;
+  update public.import_batch_rows r set
+    resolution=p_action,resolved_at=statement_timestamp(),resolved_by=v_actor
+  where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id
+    and r.resolution='pending'
+    and (p_action='exclude' or r.cost_status='present');
+  get diagnostics v_count=row_count;
+  select count(*)::integer into v_remaining from public.import_batch_rows r
+   where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id and r.resolution='pending';
+  update public.import_batches b set status=case
+    when not exists(select 1 from public.import_batch_rows r where r.batch_id=p_batch_id
+      and not (r.apply_status='applied' or r.resolution='exclude')) then 'completed'
+    when exists(select 1 from public.import_batch_rows r where r.batch_id=p_batch_id
+      and r.apply_status='applied') then 'applying' else 'created' end
+  where b.id=p_batch_id and b.restaurant_id=v_restaurant_id;
+  return jsonb_build_object('batchId',p_batch_id,'status','resolved','resolvedCount',v_count,'remainingPending',v_remaining);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_IMPORT_BULK_RESOLVE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.revert_import_batch(uuid) rename to revert_import_batch_pre_0157;
+revoke all on function public.revert_import_batch_pre_0157(uuid)
+  from public, anon, authenticated, service_role;
+
+create function public.revert_import_batch(p_batch_id uuid)
+returns integer
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid; v_status text; v_count integer;
+begin
+  select b.restaurant_id,b.status into v_restaurant_id,v_status
+    from public.import_batches b
+   where b.id=p_batch_id and public.current_site_role_at_least(b.restaurant_id,'staff')
+   for update;
+  if not found then
+    raise exception 'import_batch_not_found' using errcode='P0002';
+  end if;
+  if v_status='reverted' then
+    raise exception 'import_batch_already_reverted' using errcode='P04I1';
+  end if;
+  perform 1 from public.inventory_items ii join public.import_batch_rows r
+    on r.applied_inventory_item_id=ii.id
+   where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id
+     and r.apply_status='applied'
+   order by ii.id for update of ii;
+  if exists(
+    select 1 from public.import_batch_rows r join public.open_bottles ob
+      on ob.source_inventory_item_id=r.applied_inventory_item_id
+     where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id
+       and r.apply_status='applied'
+  ) then
+    raise exception 'physical_bottle_dependency' using errcode='P04D3';
+  end if;
+  select public.revert_import_batch_pre_0157(p_batch_id) into v_count;
+  return v_count;
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'import_batch_not_found' using errcode='P0002';
+  when sqlstate 'P04I1' then raise exception 'import_batch_already_reverted' using errcode='P0001';
+  when sqlstate 'P04D3' then raise exception 'physical_bottle_dependency' using errcode='P0001';
+  when others then raise exception 'C04_IMPORT_REVERT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.revert_import_session(uuid) rename to revert_import_session_pre_0157;
+revoke all on function public.revert_import_session_pre_0157(uuid)
+  from public, anon, authenticated, service_role;
+
+create function public.revert_import_session(p_session_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_restaurant_id uuid; v_batch record; v_count integer;
+  v_reverted_batches integer:=0; v_blocked_batches integer:=0; v_reverted_items integer:=0;
+  v_results jsonb:='[]'::jsonb;
+begin
+  select s.restaurant_id into v_restaurant_id from public.import_sessions s
+   where s.id=p_session_id and public.current_site_role_at_least(s.restaurant_id,'staff')
+   for update;
+  if not found then
+    raise exception 'import_session_not_found' using errcode='P0002';
+  end if;
+  for v_batch in select b.id,b.status,b.chunk_index from public.import_batches b
+    where b.session_id=p_session_id and b.restaurant_id=v_restaurant_id
+    order by coalesce(b.chunk_index,0) desc,b.created_at desc,b.id desc
+    for update
+  loop
+    if v_batch.status='reverted' then
+      v_results:=v_results||jsonb_build_object(
+        'batchId',v_batch.id,'chunkIndex',v_batch.chunk_index,
+        'skipped',true,'reason','already_reverted'
+      );
+      continue;
+    end if;
+    perform 1 from public.inventory_items ii join public.import_batch_rows r
+      on r.applied_inventory_item_id=ii.id
+     where r.batch_id=v_batch.id and r.restaurant_id=v_restaurant_id
+       and r.apply_status='applied'
+     order by ii.id for update of ii;
+    if exists(
+      select 1 from public.import_batch_rows r join public.open_bottles ob
+        on ob.source_inventory_item_id=r.applied_inventory_item_id
+       where r.batch_id=v_batch.id and r.restaurant_id=v_restaurant_id
+         and r.apply_status='applied'
+    ) then
+      v_blocked_batches:=v_blocked_batches+1;
+      v_results:=v_results||jsonb_build_object(
+        'batchId',v_batch.id,'chunkIndex',v_batch.chunk_index,
+        'skipped',true,'reason','physical_bottle_dependency'
+      );
+      continue;
+    end if;
+    begin
+      select public.revert_import_batch_pre_0157(v_batch.id) into v_count;
+      v_reverted_batches:=v_reverted_batches+1;
+      v_reverted_items:=v_reverted_items+v_count;
+      v_results:=v_results||jsonb_build_object(
+        'batchId',v_batch.id,'chunkIndex',v_batch.chunk_index,
+        'skipped',false,'revertedCount',v_count
+      );
+    exception when others then
+      v_blocked_batches:=v_blocked_batches+1;
+      v_results:=v_results||jsonb_build_object(
+        'batchId',v_batch.id,'chunkIndex',v_batch.chunk_index,
+        'skipped',true,'reason','revert_refused'
+      );
+    end;
+  end loop;
+  update public.import_sessions s set
+    status=case when v_blocked_batches=0 then 'reverted' else 'in_progress' end,
+    updated_at=statement_timestamp()
+  where s.id=p_session_id and s.restaurant_id=v_restaurant_id;
+  return jsonb_build_object(
+    'sessionId',p_session_id,
+    'status',case when v_blocked_batches=0 then 'reverted' else 'in_progress' end,
+    'batches',v_results,
+    'revertedBatchCount',v_reverted_batches,
+    'blockedBatchCount',v_blocked_batches,
+    'revertedItemCount',v_reverted_items
+  );
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0002' then raise exception 'import_session_not_found' using errcode='P0002';
+  when others then raise exception 'C04_IMPORT_SESSION_REVERT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+-- The admitted source convention is produced by src/app/api/scan/route.ts:
+-- one page is <site>/<scan>.<ext>; a photo batch is
+-- <site>/<scan>_page1.<ext> followed by _page2.._page8.
+create function public.invoice_image_paths_valid(
+  p_restaurant_id uuid,p_scan_id uuid,p_raw_image_path text,p_extra_image_paths jsonb
+) returns boolean
+language plpgsql immutable security definer set search_path = ''
+as $function$
+declare v_prefix text:=p_restaurant_id::text||'/'||p_scan_id::text; v_path jsonb; v_n integer;
+begin
+  if p_extra_image_paths is null or jsonb_typeof(p_extra_image_paths)<>'array' then
+    return false;
+  end if;
+  if jsonb_array_length(p_extra_image_paths)>7 then return false; end if;
+  if p_raw_image_path is null then return jsonb_array_length(p_extra_image_paths)=0; end if;
+  if octet_length(p_raw_image_path)>200
+     or p_raw_image_path !~ ('^'||v_prefix||'(_page1)?[.](jpg|jpeg|png|heic|heif|pdf)$') then
+    return false;
+  end if;
+  if jsonb_array_length(p_extra_image_paths)>0
+     and p_raw_image_path !~ ('^'||v_prefix||'_page1[.](jpg|jpeg|png|heic|heif)$') then
+    return false;
+  end if;
+  v_n:=0;
+  for v_path in select value from jsonb_array_elements(p_extra_image_paths) loop
+    v_n:=v_n+1;
+    if jsonb_typeof(v_path)<>'string' or octet_length(v_path#>>'{}')>200
+       or (v_path#>>'{}') !~ ('^'||v_prefix||'_page'||(v_n+1)::text||'[.](jpg|jpeg|png|heic|heif)$') then
+      return false;
+    end if;
+  end loop;
+  return true;
+exception when others then return false;
+end;
+$function$;
+
+revoke all on function public.invoice_image_paths_valid(uuid,uuid,text,jsonb)
+  from public, anon, authenticated, service_role;
+grant execute on function public.invoice_image_paths_valid(uuid,uuid,text,jsonb)
+  to authenticated, service_role;
+
+do $historical_invoice_image_preflight$
+begin
+  if exists(
+    select 1 from public.invoice_scans s
+     where not public.invoice_image_paths_valid(s.restaurant_id,s.id,s.raw_image_path,s.extra_image_paths)
+  ) then
+    raise exception 'C04_0157_HISTORICAL_INVOICE_IMAGE_PATH_INVALID' using errcode='P0001';
+  end if;
+end;
+$historical_invoice_image_preflight$;
+
+alter table public.invoice_scans
+  add constraint invoice_scans_image_paths_valid_check check (
+    public.invoice_image_paths_valid(restaurant_id,id,raw_image_path,extra_image_paths)
+  ) not valid;
+alter table public.invoice_scans validate constraint invoice_scans_image_paths_valid_check;
+
+create function public.read_invoice_image_target(p_scan_id uuid,p_page_index integer default 0)
+returns table(object_name text)
+language plpgsql stable security definer set search_path = ''
+as $function$
+declare v_scan public.invoice_scans%rowtype; v_name text;
+begin
+  if p_page_index is null or p_page_index not between 0 and 7 then
+    raise exception 'C04_IMAGE_PAGE_INVALID' using errcode='P0001';
+  end if;
+  select * into v_scan from public.invoice_scans s where s.id=p_scan_id;
+  if not found or not public.current_site_role_at_least(v_scan.restaurant_id,'staff')
+     or not public.effective_site_capability(v_scan.restaurant_id,'cost.read') then
+    return;
+  end if;
+  if not public.invoice_image_paths_valid(
+    v_scan.restaurant_id,v_scan.id,v_scan.raw_image_path,v_scan.extra_image_paths
+  ) then return; end if;
+  v_name:=case when p_page_index=0 then v_scan.raw_image_path
+               else v_scan.extra_image_paths->>(p_page_index-1) end;
+  if v_name is null then return; end if;
+  if exists(select 1 from storage.objects o where o.bucket_id='invoice-images' and o.name=v_name) then
+    return query select v_name;
+  end if;
+end;
+$function$;
+
+-- Reconciliation and identity merge ---------------------------------------
+
+create function public.accept_reconcile_batch(
+  p_restaurant_id uuid,p_actions jsonb,p_idempotency_key uuid
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid()); v_action jsonb; v_patch jsonb; v_record public.reconcile_actions%rowtype;
+  v_index integer; v_subject_id uuid; v_bin_id uuid; v_wine_id uuid; v_lineage_id uuid;
+  v_line_index integer; v_prior jsonb; v_new jsonb; v_lines jsonb; v_expected jsonb; v_bin_code text;
+  v_existing public.reconcile_batches%rowtype;
+  v_existing_found boolean;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'manager') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_idempotency_key is null or p_actions is null or jsonb_typeof(p_actions)<>'array' then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+  if jsonb_array_length(p_actions) not between 1 and 100 then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    if jsonb_typeof(v_action)<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    if (select count(*) from jsonb_object_keys(v_action))<>4
+       or not (v_action ?& array['action_type','subject_table','subject_id','patch'])
+       or exists(select 1 from jsonb_object_keys(v_action) k where k not in ('action_type','subject_table','subject_id','patch'))
+       or jsonb_typeof(v_action->'action_type')<>'string'
+       or jsonb_typeof(v_action->'subject_table')<>'string'
+       or jsonb_typeof(v_action->'subject_id')<>'string'
+       or (v_action->>'subject_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       or jsonb_typeof(v_action->'patch')<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    v_patch:=v_action->'patch';
+    if v_action->>'action_type'='place_bin' then
+      if v_action->>'subject_table'<>'inventory_items' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'bin_id') or jsonb_typeof(v_patch->'bin_id')<>'string'
+         or (v_patch->>'bin_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='match_scan' then
+      if v_action->>'subject_table'<>'invoice_scans' or (select count(*) from jsonb_object_keys(v_patch))<>3
+         or not (v_patch?&array['line_index','wine_id','expected_line'])
+         or exists(select 1 from jsonb_object_keys(v_patch) k where k not in ('line_index','wine_id','expected_line'))
+         or jsonb_typeof(v_patch->'line_index')<>'number'
+         or (v_patch->>'line_index')::numeric<>trunc((v_patch->>'line_index')::numeric)
+         or (v_patch->>'line_index')::numeric not between 0 and 499
+         or jsonb_typeof(v_patch->'wine_id')<>'string'
+         or (v_patch->>'wine_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+         or not public.invoice_line_items_valid(jsonb_build_array(v_patch->'expected_line')) then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='link_lineage' then
+      if v_action->>'subject_table'<>'wines' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'lineage_id') or jsonb_typeof(v_patch->'lineage_id')<>'string'
+         or (v_patch->>'lineage_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='dismiss' then
+      if v_action->>'subject_table' not in ('inventory_items','invoice_scans','wines')
+         or (select count(*) from jsonb_object_keys(v_patch))<>0 then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    else raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001'; end if;
+    v_index:=v_index+1;
+  end loop;
+  if exists(
+    select 1 from (
+      select (a->>'subject_table')||':'||(a->>'subject_id')||
+             case when a->>'action_type'='match_scan' then ':'||(a->'patch'->>'line_index') else '' end as k,
+             count(*) from jsonb_array_elements(p_actions) a group by 1 having count(*)>1
+    ) duplicates
+  ) then raise exception 'C04_RECONCILE_DUPLICATE_SUBJECT' using errcode='P0001'; end if;
+
+  -- Existing idempotency rows lock before their subjects, matching undo.
+  -- New batches have no row yet and serialize on the later unique insert.
+  select * into v_existing from public.reconcile_batches b
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id for update;
+  v_existing_found:=found;
+
+  -- Shared identity mutations lock exact-site rows in scan -> wine ->
+  -- inventory order. match_scan wine targets are wine locks too even though
+  -- their subject_table is invoice_scans.
+  perform 1 from public.invoice_scans s join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='invoice_scans'
+  ) q on q.id=s.id
+   where s.restaurant_id=p_restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join (
+    select (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='wines'
+    union
+    select (a->'patch'->>'wine_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'action_type'='match_scan'
+  ) q on q.id=w.id
+   where w.restaurant_id=p_restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='inventory_items'
+  ) q on q.id=ii.id
+   where ii.restaurant_id=p_restaurant_id order by ii.id for update of ii;
+
+  if v_existing_found then
+    if v_existing.restaurant_id is distinct from p_restaurant_id
+       or v_existing.created_by is distinct from v_actor
+       or v_existing.action_count is distinct from jsonb_array_length(p_actions)
+       or v_existing.undone_at is not null then
+      raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+    end if;
+    v_index:=0;
+    for v_action in select value from jsonb_array_elements(p_actions) loop
+      select * into v_record from public.reconcile_actions a
+       where a.batch_id=p_idempotency_key and a.restaurant_id=p_restaurant_id
+         and a.ordinal=v_index;
+      if not found or v_record.action_type is distinct from v_action->>'action_type'
+         or v_record.subject_table is distinct from v_action->>'subject_table'
+         or v_record.subject_id is distinct from (v_action->>'subject_id')::uuid then
+        raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+      end if;
+      v_patch:=v_action->'patch';
+      if (v_record.action_type='place_bin' and v_record.new_state->>'bin_id' is distinct from v_patch->>'bin_id')
+         or (v_record.action_type='link_lineage' and v_record.new_state->>'lineage_id' is distinct from v_patch->>'lineage_id')
+         or (v_record.action_type='dismiss' and (v_record.prior_state<>'{}'::jsonb or v_record.new_state<>'{}'::jsonb))
+         or (v_record.action_type='match_scan' and (
+           v_record.prior_state->'final_line_items'->((v_patch->>'line_index')::integer) is distinct from v_patch->'expected_line'
+           or v_record.new_state->'final_line_items'->((v_patch->>'line_index')::integer)->>'wine_id' is distinct from v_patch->>'wine_id'
+         )) then raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001'; end if;
+      v_index:=v_index+1;
+    end loop;
+    return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_existing.action_count,'status','accepted');
+  end if;
+
+  insert into public.reconcile_batches(id,restaurant_id,created_by,action_count)
+  values(p_idempotency_key,p_restaurant_id,v_actor,0);
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    v_patch:=v_action->'patch'; v_subject_id:=(v_action->>'subject_id')::uuid;
+    if v_action->>'action_type'='place_bin' then
+      v_bin_id:=(v_patch->>'bin_id')::uuid;
+      select jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)
+        into v_prior from public.inventory_items ii
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id;
+      select b.code into v_bin_code from public.bins b
+       where b.id=v_bin_id and b.restaurant_id=p_restaurant_id and b.retired_at is null;
+      if v_prior is null or v_bin_code is null or v_prior->'bin_id'<>'null'::jsonb then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_new:=jsonb_build_object('bin_id',v_bin_id,'bin_location',v_bin_code);
+      update public.inventory_items ii set bin_id=v_bin_id,bin_location=v_bin_code
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id and ii.bin_id is null;
+      if not found then raise exception 'reconcile_subject_conflict' using errcode='P0001'; end if;
+    elsif v_action->>'action_type'='match_scan' then
+      v_line_index:=(v_patch->>'line_index')::integer; v_wine_id:=(v_patch->>'wine_id')::uuid;
+      select s.final_line_items into v_lines from public.invoice_scans s
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id and s.committed_at is null;
+      if v_lines is null or jsonb_typeof(v_lines)<>'array' or jsonb_array_length(v_lines)<=v_line_index
+         or v_lines->v_line_index is distinct from v_patch->'expected_line'
+         or not exists(select 1 from public.wines w where w.id=v_wine_id and w.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_prior:=jsonb_build_object('final_line_items',v_lines);
+      v_lines:=jsonb_set(v_lines,array[v_line_index::text],(v_patch->'expected_line')||jsonb_build_object('wine_id',v_wine_id),false);
+      v_new:=jsonb_build_object('final_line_items',v_lines);
+      update public.invoice_scans s set final_line_items=v_lines
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id;
+    elsif v_action->>'action_type'='link_lineage' then
+      v_lineage_id:=(v_patch->>'lineage_id')::uuid;
+      select jsonb_build_object('lineage_id',w.lineage_id) into v_prior from public.wines w
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id;
+      if v_prior is null or not exists(select 1 from public.wine_lineages l
+        where l.id=v_lineage_id and l.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_new:=jsonb_build_object('lineage_id',v_lineage_id);
+      update public.wines w set lineage_id=v_lineage_id
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id;
+    else
+      if (v_action->>'subject_table'='inventory_items' and not exists(select 1 from public.inventory_items x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='invoice_scans' and not exists(select 1 from public.invoice_scans x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='wines' and not exists(select 1 from public.wines x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id)) then
+        raise exception 'reconcile_subject_not_found' using errcode='P0002';
+      end if;
+      v_prior:='{}'::jsonb; v_new:='{}'::jsonb;
+    end if;
+    insert into public.reconcile_actions(
+      batch_id,restaurant_id,action_type,subject_table,subject_id,ordinal,prior_state,new_state
+    ) values (
+      p_idempotency_key,p_restaurant_id,v_action->>'action_type',v_action->>'subject_table',
+      v_subject_id,v_index,v_prior,v_new
+    );
+    v_index:=v_index+1;
+  end loop;
+  update public.reconcile_batches b set action_count=v_index
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id;
+  return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_index,'status','accepted');
+exception when invalid_text_representation or numeric_value_out_of_range then
+  raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+when unique_violation then raise exception 'reconcile_batch_conflict' using errcode='23505';
+when others then raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create function public.undo_reconcile_batch(p_batch_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_actor uuid:=(select auth.uid()); v_batch public.reconcile_batches%rowtype; v_action public.reconcile_actions%rowtype; v_now timestamptz;
+begin
+  select * into v_batch from public.reconcile_batches b
+   where b.id=p_batch_id
+     and public.current_site_role_at_least(b.restaurant_id,'manager')
+   for update;
+  if not found or v_actor is null then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_batch.undone_at is not null then raise exception 'reconcile_batch_already_undone' using errcode='P0001'; end if;
+  perform 1 from public.reconcile_actions a
+   where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+   order by a.ordinal for update;
+  perform 1 from public.invoice_scans s join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='invoice_scans' and a.subject_id=s.id
+   where s.restaurant_id=v_batch.restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='wines' and a.subject_id=w.id
+   where w.restaurant_id=v_batch.restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='inventory_items' and a.subject_id=ii.id
+   where ii.restaurant_id=v_batch.restaurant_id order by ii.id for update of ii;
+  for v_action in select * from public.reconcile_actions a
+    where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+      and a.ordinal<v_batch.action_count
+    order by a.ordinal desc
+  loop
+    if v_action.action_type='place_bin' then
+      if not exists(select 1 from public.inventory_items ii where ii.id=v_action.subject_id
+        and ii.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.inventory_items ii set
+        bin_id=(v_action.prior_state->>'bin_id')::uuid,
+        bin_location=v_action.prior_state->>'bin_location'
+      where ii.id=v_action.subject_id and ii.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='match_scan' then
+      if not exists(select 1 from public.invoice_scans s where s.id=v_action.subject_id
+        and s.restaurant_id=v_batch.restaurant_id
+        and s.final_line_items=v_action.new_state->'final_line_items') then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.invoice_scans s set final_line_items=v_action.prior_state->'final_line_items'
+       where s.id=v_action.subject_id and s.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='link_lineage' then
+      if not exists(select 1 from public.wines w where w.id=v_action.subject_id
+        and w.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('lineage_id',w.lineage_id)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.wines w set lineage_id=(v_action.prior_state->>'lineage_id')::uuid
+       where w.id=v_action.subject_id and w.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type<>'dismiss' then
+      raise exception 'reconcile_action_invalid' using errcode='P0001';
+    end if;
+  end loop;
+  v_now:=statement_timestamp();
+  update public.reconcile_batches b set undone_at=v_now,undone_by=v_actor
+   where b.id=p_batch_id and b.restaurant_id=v_batch.restaurant_id and b.undone_at is null;
+  if not found then raise exception 'reconcile_batch_conflict' using errcode='P0001'; end if;
+  return jsonb_build_object('batchId',p_batch_id,'actionCount',v_batch.action_count,'status','undone','undoneAt',v_now);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when others then raise exception 'C04_RECONCILE_UNDO_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+alter function public.merge_wines(uuid,uuid) rename to merge_wines_pre_0157;
+revoke all on function public.merge_wines_pre_0157(uuid,uuid)
+  from public, anon, authenticated, service_role;
+
+create function public.merge_wines(p_source_wine_id uuid,p_target_wine_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_site uuid; v_source public.wines%rowtype; v_target public.wines%rowtype;
+  v_result jsonb; v_parsed_scan_ids uuid[]:=array[]::uuid[];
+  v_final_scan_ids uuid[]:=array[]::uuid[]; v_moved_scan_count integer:=0;
+begin
+  if p_source_wine_id is not distinct from p_target_wine_id then
+    raise exception 'identical_merge' using errcode='P04M0';
+  end if;
+
+  select source.restaurant_id into v_site
+    from public.wines source join public.wines target
+      on target.id=p_target_wine_id and target.restaurant_id=source.restaurant_id
+   where source.id=p_source_wine_id
+     and public.current_site_role_at_least(source.restaurant_id,'manager');
+  if not found then
+    raise exception 'wine_not_found' using errcode='P04M1';
+  end if;
+
+  -- Lock every mutable scan before either wine. This prevents a concurrent
+  -- reconciliation from adding a source reference between a narrow probe and
+  -- the merge, while committed scan evidence remains immutable history.
+  perform 1 from public.invoice_scans s
+   where s.restaurant_id=v_site and s.committed_at is null
+   order by s.id for update;
+  perform 1 from public.wines w
+   where w.restaurant_id=v_site and w.id in (p_source_wine_id,p_target_wine_id)
+   order by w.id for update;
+  select * into v_source from public.wines w
+   where w.id=p_source_wine_id and w.restaurant_id=v_site;
+  select * into v_target from public.wines w
+   where w.id=p_target_wine_id and w.restaurant_id=v_site;
+  if v_source.id is null or v_target.id is null then
+    raise exception 'wine_not_found' using errcode='P04M1';
+  end if;
+  if v_source.lineage_id is null or v_target.lineage_id is null
+     or v_source.lineage_id is distinct from v_target.lineage_id then
+    raise exception 'lineage_mismatch_merge' using errcode='P04M2';
+  end if;
+  if coalesce(v_source.vintage,0) is distinct from coalesce(v_target.vintage,0) then
+    raise exception 'cross_vintage_merge' using errcode='P04M3';
+  end if;
+  if v_source.size_ml is distinct from v_target.size_ml then
+    raise exception 'format_mismatch_merge' using errcode='P04M4';
+  end if;
+  if v_source.wine_variant_id is not null and v_target.wine_variant_id is not null
+     and v_source.wine_variant_id is distinct from v_target.wine_variant_id then
+    raise exception 'variant_identity_conflict' using errcode='P04M5';
+  end if;
+
+  with updated as (
+    update public.invoice_scans s set parsed_line_items=(
+      select jsonb_agg(
+        case when x.item->>'wine_id'=p_source_wine_id::text
+             then x.item||jsonb_build_object('wine_id',p_target_wine_id)
+             else x.item end order by x.ordinality
+      ) from jsonb_array_elements(s.parsed_line_items) with ordinality x(item,ordinality)
+    )
+     where s.restaurant_id=v_site and s.committed_at is null
+       and jsonb_typeof(s.parsed_line_items)='array'
+       and s.parsed_line_items @> jsonb_build_array(jsonb_build_object('wine_id',p_source_wine_id))
+    returning s.id
+  ) select coalesce(array_agg(updated.id),array[]::uuid[]) into v_parsed_scan_ids from updated;
+  with updated as (
+    update public.invoice_scans s set final_line_items=(
+      select jsonb_agg(
+        case when x.item->>'wine_id'=p_source_wine_id::text
+             then x.item||jsonb_build_object('wine_id',p_target_wine_id)
+             else x.item end order by x.ordinality
+      ) from jsonb_array_elements(s.final_line_items) with ordinality x(item,ordinality)
+    )
+     where s.restaurant_id=v_site and s.committed_at is null
+       and jsonb_typeof(s.final_line_items)='array'
+       and s.final_line_items @> jsonb_build_array(jsonb_build_object('wine_id',p_source_wine_id))
+    returning s.id
+  ) select coalesce(array_agg(updated.id),array[]::uuid[]) into v_final_scan_ids from updated;
+  select count(distinct moved.id)::integer into v_moved_scan_count
+    from unnest(v_parsed_scan_ids||v_final_scan_ids) moved(id);
+
+  select public.merge_wines_pre_0157(p_source_wine_id,p_target_wine_id) into v_result;
+  return v_result||jsonb_build_object('moved_uncommitted_invoice_scans',v_moved_scan_count);
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P04M0' then raise exception 'identical_merge' using errcode='P0001';
+  when sqlstate 'P04M1' then raise exception 'wine_not_found' using errcode='P0002';
+  when sqlstate 'P04M2' then raise exception 'lineage_mismatch_merge' using errcode='P0001';
+  when sqlstate 'P04M3' then raise exception 'cross_vintage_merge' using errcode='P0001';
+  when sqlstate 'P04M4' then raise exception 'format_mismatch_merge' using errcode='P0001';
+  when sqlstate 'P04M5' then raise exception 'variant_identity_conflict' using errcode='P0001';
+  when unique_violation then raise exception 'merge_conflict' using errcode='23505';
+  when others then raise exception 'C04_WINE_MERGE_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+-- Exact routine ACLs. Legacy table/column grants remain untouched here; the
+-- separately admitted contract migration owns their later removal.
+revoke all on function public.read_inventory_costs(uuid,uuid[]) from public,anon,authenticated,service_role;
+grant execute on function public.read_inventory_costs(uuid,uuid[]) to authenticated;
+revoke all on function public.read_wine_pricing_strategy(uuid,uuid[]) from public,anon,authenticated,service_role;
+grant execute on function public.read_wine_pricing_strategy(uuid,uuid[]) to authenticated;
+revoke all on function public.read_wine_cost_flags(uuid,uuid[]) from public,anon,authenticated,service_role;
+grant execute on function public.read_wine_cost_flags(uuid,uuid[]) to authenticated;
+revoke all on function public.read_restaurant_pricing_defaults(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_restaurant_pricing_defaults(uuid) to authenticated;
+revoke all on function public.read_pricing_recommendations(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_pricing_recommendations(uuid) to authenticated;
+revoke all on function public.read_invoice_scan_private(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_invoice_scan_private(uuid) to authenticated;
+revoke all on function public.read_invoice_image_target(uuid,integer) from public,anon,authenticated,service_role;
+grant execute on function public.read_invoice_image_target(uuid,integer) to authenticated;
+revoke all on function public.read_invoice_scan_deletion_private(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_invoice_scan_deletion_private(uuid) to authenticated;
+revoke all on function public.read_reconcile_action_private(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_reconcile_action_private(uuid) to authenticated;
+revoke all on function public.read_identity_merge_private(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.read_identity_merge_private(uuid) to authenticated;
+revoke all on function public.read_import_batch_cost_rows(uuid,integer,integer) from public,anon,authenticated,service_role;
+grant execute on function public.read_import_batch_cost_rows(uuid,integer,integer) to authenticated;
+revoke all on function public.read_cellar_health_private(uuid,uuid[]) from public,anon,authenticated,service_role;
+grant execute on function public.read_cellar_health_private(uuid,uuid[]) to authenticated;
+
+revoke all on function public.set_wine_pricing_strategy(uuid,uuid,numeric,numeric) from public,anon,authenticated,service_role;
+grant execute on function public.set_wine_pricing_strategy(uuid,uuid,numeric,numeric) to authenticated;
+revoke all on function public.set_restaurant_pricing_defaults(uuid,numeric,numeric) from public,anon,authenticated,service_role;
+grant execute on function public.set_restaurant_pricing_defaults(uuid,numeric,numeric) to authenticated;
+revoke all on function public.dismiss_pricing_alert_private(uuid,integer) from public,anon,authenticated,service_role;
+grant execute on function public.dismiss_pricing_alert_private(uuid,integer) to authenticated;
+revoke all on function public.set_wine_overpaid_flag(uuid,uuid,boolean) from public,anon,authenticated,service_role;
+grant execute on function public.set_wine_overpaid_flag(uuid,uuid,boolean) to authenticated;
+revoke all on function public.create_inventory_item_private(uuid,uuid,integer,numeric,text,uuid,text,text,text,uuid,public.added_via) from public,anon,authenticated,service_role;
+grant execute on function public.create_inventory_item_private(uuid,uuid,integer,numeric,text,uuid,text,text,text,uuid,public.added_via) to authenticated;
+revoke all on function public.patch_inventory_item_private(uuid,timestamp with time zone,boolean,integer,boolean,numeric,boolean,text,boolean,uuid,boolean,text,boolean,text,boolean,text) from public,anon,authenticated,service_role;
+grant execute on function public.patch_inventory_item_private(uuid,timestamp with time zone,boolean,integer,boolean,numeric,boolean,text,boolean,uuid,boolean,text,boolean,text,boolean,text) to authenticated;
+revoke all on function public.delete_wine_private(uuid,uuid,timestamp with time zone) from public,anon,authenticated,service_role;
+grant execute on function public.delete_wine_private(uuid,uuid,timestamp with time zone) to authenticated;
+revoke all on function public.add_manual_overrides(uuid,text[]) from public,anon,authenticated,service_role;
+grant execute on function public.add_manual_overrides(uuid,text[]) to authenticated;
+revoke all on function public.enrich_wines_batch(uuid,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.enrich_wines_batch(uuid,jsonb) to authenticated;
+
+revoke all on function public.create_invoice_scan_upload(uuid,uuid,text,text,text,date) from public,anon,authenticated,service_role;
+grant execute on function public.create_invoice_scan_upload(uuid,uuid,text,text,text,date) to authenticated;
+revoke all on function public.review_invoice_scan(uuid,timestamp with time zone,text,text,date,jsonb,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.review_invoice_scan(uuid,timestamp with time zone,text,text,date,jsonb,jsonb) to authenticated;
+revoke all on function public.commit_invoice_scan(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.commit_invoice_scan(uuid) to authenticated;
+revoke all on function public.delete_invoice_scan(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.delete_invoice_scan(uuid) to authenticated;
+revoke all on function public.request_invoice_scan_reextract(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.request_invoice_scan_reextract(uuid) to authenticated;
+
+revoke all on function public.claim_scan_idempotency(uuid,uuid,text) from public,anon,authenticated,service_role;
+grant execute on function public.claim_scan_idempotency(uuid,uuid,text) to authenticated;
+revoke all on function public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid) from public,anon,authenticated,service_role;
+grant execute on function public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid) to authenticated;
+revoke all on function public.abandon_scan_idempotency(uuid,uuid,text) from public,anon,authenticated,service_role;
+grant execute on function public.abandon_scan_idempotency(uuid,uuid,text) to authenticated;
+
+revoke all on function public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text) to authenticated;
+revoke all on function public.count_import_batch_rows(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.count_import_batch_rows(uuid) to authenticated;
+revoke all on function public.apply_import_batch_chunk(uuid,integer) from public,anon,authenticated,service_role;
+grant execute on function public.apply_import_batch_chunk(uuid,integer) to authenticated;
+revoke all on function public.resolve_import_batch_row(uuid,text,numeric) from public,anon,authenticated,service_role;
+grant execute on function public.resolve_import_batch_row(uuid,text,numeric) to authenticated;
+revoke all on function public.bulk_resolve_import_batch_rows(uuid,text) from public,anon,authenticated,service_role;
+grant execute on function public.bulk_resolve_import_batch_rows(uuid,text) to authenticated;
+revoke all on function public.revert_import_batch(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.revert_import_batch(uuid) to authenticated;
+revoke all on function public.revert_import_session(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.revert_import_session(uuid) to authenticated;
+
+revoke all on function public.accept_reconcile_batch(uuid,jsonb,uuid) from public,anon,authenticated,service_role;
+grant execute on function public.accept_reconcile_batch(uuid,jsonb,uuid) to authenticated;
+revoke all on function public.undo_reconcile_batch(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.undo_reconcile_batch(uuid) to authenticated;
+revoke all on function public.merge_wines(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function public.merge_wines(uuid,uuid) to authenticated;
+
+comment on column public.scan_idempotency.claimed_by_user_id is
+  'Actor binding for the bounded 24-hour scan transport retry cache. This is not durable business-operation idempotency and is not atomic with earlier inventory writes.';
+comment on function public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid) is
+  'Completes only an actor/site/kind-bound unfinished claim with one internally constructed typed receipt. This 24-hour transport cache does not make a separate business write atomic.';
+
+-- Cost-free staff display projection admitted after the concrete import UI
+-- inventory. Raw JSON is never returned or stringified.
+create function public.read_import_batch_display_rows(
+  p_batch_id uuid,p_after_row_number integer default 0,p_limit integer default 100
+) returns table(
+  row_id uuid,batch_id uuid,restaurant_id uuid,row_number integer,
+  producer text,name text
+)
+language plpgsql stable security definer set search_path = ''
+as $function$
+declare v_restaurant_id uuid;
+begin
+  if p_after_row_number is null or p_limit is null
+     or not (p_after_row_number>=0) or not (p_limit between 1 and 500) then
+    raise exception 'C04_IMPORT_PAGE_INVALID' using errcode='P0001';
+  end if;
+  select b.restaurant_id into v_restaurant_id from public.import_batches b where b.id=p_batch_id;
+  if v_restaurant_id is null or not public.current_site_role_at_least(v_restaurant_id,'staff') then return; end if;
+  return query
+  select r.id,r.batch_id,r.restaurant_id,r.row_number,
+         case when jsonb_typeof(r.raw->'producer')='string' then r.raw->>'producer' else null end,
+         case when jsonb_typeof(r.raw->'name')='string' then r.raw->>'name' else null end
+    from public.import_batch_rows r
+   where r.batch_id=p_batch_id and r.restaurant_id=v_restaurant_id
+     and r.row_number>p_after_row_number
+   order by r.row_number asc,r.id asc limit p_limit;
+end;
+$function$;
+revoke all on function public.read_import_batch_display_rows(uuid,integer,integer)
+  from public,anon,authenticated,service_role;
+grant execute on function public.read_import_batch_display_rows(uuid,integer,integer)
+  to authenticated;
+
+-- Definer identity is part of the boundary. Do not inherit the migration
+-- runner as owner: normalize every new or replaced routine explicitly to the
+-- existing postgres role, without creating or altering any cluster role.
+alter function public.wine_manual_overrides_valid(text[]) owner to postgres;
+alter function public.wine_enrichment_metadata_valid(jsonb) owner to postgres;
+alter function public.current_site_role_at_least(uuid,public.membership_role) owner to postgres;
+alter function public.read_inventory_costs(uuid,uuid[]) owner to postgres;
+alter function public.read_wine_pricing_strategy(uuid,uuid[]) owner to postgres;
+alter function public.read_wine_cost_flags(uuid,uuid[]) owner to postgres;
+alter function public.read_restaurant_pricing_defaults(uuid) owner to postgres;
+alter function public.read_pricing_recommendations(uuid) owner to postgres;
+alter function public.read_invoice_scan_private(uuid) owner to postgres;
+alter function public.read_invoice_scan_deletion_private(uuid) owner to postgres;
+alter function public.read_reconcile_action_private(uuid) owner to postgres;
+alter function public.read_identity_merge_private(uuid) owner to postgres;
+alter function public.read_import_batch_cost_rows(uuid,integer,integer) owner to postgres;
+alter function public.read_import_batch_display_rows(uuid,integer,integer) owner to postgres;
+alter function public.read_cellar_health_private(uuid,uuid[]) owner to postgres;
+alter function public.set_wine_pricing_strategy(uuid,uuid,numeric,numeric) owner to postgres;
+alter function public.set_restaurant_pricing_defaults(uuid,numeric,numeric) owner to postgres;
+alter function public.dismiss_pricing_alert_private(uuid,integer) owner to postgres;
+alter function public.set_wine_overpaid_flag(uuid,uuid,boolean) owner to postgres;
+alter function public.create_inventory_item_private(uuid,uuid,integer,numeric,text,uuid,text,text,text,uuid,public.added_via) owner to postgres;
+alter function public.patch_inventory_item_private(uuid,timestamp with time zone,boolean,integer,boolean,numeric,boolean,text,boolean,uuid,boolean,text,boolean,text,boolean,text) owner to postgres;
+alter function public.delete_wine_private(uuid,uuid,timestamp with time zone) owner to postgres;
+alter function public.add_manual_overrides(uuid,text[]) owner to postgres;
+alter function public.enrich_wines_batch(uuid,jsonb) owner to postgres;
+alter function public.claim_scan_idempotency(uuid,uuid,text) owner to postgres;
+alter function public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid) owner to postgres;
+alter function public.abandon_scan_idempotency(uuid,uuid,text) owner to postgres;
+alter function public.cleanup_scan_idempotency() owner to postgres;
+alter function public.invoice_line_items_valid(jsonb) owner to postgres;
+alter function public.invoice_edits_valid(jsonb) owner to postgres;
+alter function public.create_invoice_scan_upload(uuid,uuid,text,text,text,date) owner to postgres;
+alter function public.review_invoice_scan(uuid,timestamp with time zone,text,text,date,jsonb,jsonb) owner to postgres;
+alter function public.commit_invoice_scan(uuid) owner to postgres;
+alter function public.delete_invoice_scan(uuid) owner to postgres;
+alter function public.request_invoice_scan_reextract(uuid) owner to postgres;
+alter function public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text) owner to postgres;
+alter function public.count_import_batch_rows(uuid) owner to postgres;
+alter function public.apply_import_batch_chunk(uuid,integer) owner to postgres;
+alter function public.resolve_import_batch_row(uuid,text,numeric) owner to postgres;
+alter function public.bulk_resolve_import_batch_rows(uuid,text) owner to postgres;
+alter function public.revert_import_batch(uuid) owner to postgres;
+alter function public.revert_import_session(uuid) owner to postgres;
+alter function public.invoice_image_paths_valid(uuid,uuid,text,jsonb) owner to postgres;
+alter function public.read_invoice_image_target(uuid,integer) owner to postgres;
+alter function public.accept_reconcile_batch(uuid,jsonb,uuid) owner to postgres;
+alter function public.undo_reconcile_batch(uuid) owner to postgres;
+alter function public.merge_wines(uuid,uuid) owner to postgres;
+
+-- === 0158_staff_operational_bridge.sql ===
+-- 0158_staff_operational_bridge.sql
+--
+-- Additive bridge for lifecycle-current operational membership selection and
+-- staff-capable atomic bottle receiving. The 24-hour scan cache remains only
+-- the HTTP transport state machine; inventory_command_receipts is the durable
+-- business-operation anchor.
+
+do $static_admission$
+begin
+  if public.current_inventory_contract_version() <> 2
+     or to_regprocedure('public.current_site_role_at_least(uuid,public.membership_role)') is null
+     or to_regprocedure('public.claim_scan_idempotency(uuid,uuid,text)') is null
+     or to_regprocedure('public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid)') is null
+     or to_regprocedure('public.cleanup_scan_idempotency()') is null
+     or to_regprocedure('public.find_or_create_wines_batch(uuid,jsonb)') is null
+     or to_regrole('postgres') is null then
+    raise exception 'C04_0158_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+  if to_regprocedure('public.read_current_operational_memberships(uuid)') is not null
+     or to_regprocedure('public.save_bottle_inventory_private(uuid,uuid,text,text,integer,text,text,text,text,integer,numeric)') is not null then
+    raise exception 'C04_0158_ALREADY_OR_PARTIALLY_APPLIED' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_constraint c
+     where c.conrelid = 'public.inventory_command_receipts'::regclass
+       and c.conname in (
+         'inventory_command_receipts_command_version_check',
+         'inventory_command_receipts_command_type_check',
+         'inventory_command_receipts_versioned_shape_check'
+       )
+     group by c.conrelid having count(*) = 3
+  ) or exists (
+    select 1 from public.inventory_command_receipts r where r.command_version = 3
+  ) then
+    raise exception 'C04_0158_RECEIPT_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$static_admission$;
+
+-- Promotion must drain the old bottle route before taking these locks and
+-- keep it drained until the exact RPC caller is deployed. No old two-write
+-- claim has enough canonical input to backfill honestly.
+lock table public.scan_idempotency in share row exclusive mode nowait;
+lock table public.inventory_command_receipts in access exclusive mode nowait;
+
+do $locked_route_drain_admission$
+begin
+  if exists (
+    select 1
+      from public.scan_idempotency c
+     where c.claimed_by_user_id is not null
+       and jsonb_typeof(c.response_body) = 'object'
+       and jsonb_typeof(c.response_body -> 'kind') = 'string'
+       and c.response_body ->> 'kind' = 'bottle_inventory_save'
+  ) then
+    raise exception 'C04_0158_UNBACKFILLABLE_BOTTLE_TRANSPORT_CLAIM'
+      using errcode = 'P0001';
+  end if;
+end;
+$locked_route_drain_admission$;
+
+alter table public.inventory_command_receipts
+  drop constraint inventory_command_receipts_command_version_check,
+  drop constraint inventory_command_receipts_command_type_check,
+  drop constraint inventory_command_receipts_versioned_shape_check,
+  add constraint inventory_command_receipts_command_version_check
+    check (command_version in (1, 2, 3)),
+  add constraint inventory_command_receipts_command_type_check check (
+    command_type in (
+      'open', 'pour', 'spill', 'discard', 'close', 'reconcile_batch', 'undo',
+      'bottle_inventory_save'
+    )
+  ),
+  add constraint inventory_command_receipts_versioned_shape_check check (
+    (
+      command_version = 1
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close', 'undo')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type = 'reconcile_batch'
+      and scope_kind = 'exact_bottle_batch'
+      and wine_id is null
+      and batch_entry_count > 0
+    )
+    or (
+      command_version = 3
+      and command_type = 'bottle_inventory_save'
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+  );
+
+create function public.read_current_operational_memberships(p_user_id uuid)
+returns table (
+  restaurant_id uuid,
+  restaurant_name text,
+  role public.membership_role
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select m.restaurant_id, r.name, m.role
+    from public.memberships m
+    join public.restaurants r
+      on r.id = m.restaurant_id
+    join public.workspaces w
+      on w.id = r.workspace_id
+     and w.kind = 'restaurant'
+    join public.workspace_memberships wm
+      on wm.id = m.workspace_membership_id
+     and wm.workspace_id = w.id
+     and wm.user_id = m.user_id
+   where p_user_id is not null
+     and p_user_id = (select auth.uid())
+     and m.user_id = p_user_id
+     and m.role in ('owner', 'manager', 'staff')
+     and m.status = 'active'
+     and m.revoked_at is null
+     and (m.expires_at is null or m.expires_at > statement_timestamp())
+     and wm.status = 'active'
+     and wm.revoked_at is null
+     and (wm.expires_at is null or wm.expires_at > statement_timestamp())
+   order by m.created_at desc, m.id desc
+$function$;
+
+create function public.save_bottle_inventory_private(
+  p_restaurant_id uuid,
+  p_key uuid,
+  p_name text,
+  p_producer text,
+  p_vintage integer,
+  p_varietal text,
+  p_region text,
+  p_country text,
+  p_format text,
+  p_quantity integer,
+  p_unit_cost numeric
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_name text := btrim(p_name);
+  v_producer text := btrim(p_producer);
+  v_varietal text := nullif(p_varietal, '');
+  v_region text := nullif(p_region, '');
+  v_claim jsonb := jsonb_build_object(
+    'version', 1, 'kind', 'bottle_inventory_save', 'status', 'claimed'
+  );
+  v_request jsonb;
+  v_transport public.scan_idempotency%rowtype;
+  v_transport_completed boolean := false;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_wine_ids uuid[];
+  v_wine_id uuid;
+  v_claimed uuid;
+  v_result jsonb;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_restaurant_id is null or p_key is null
+     or p_name is null or v_name = '' or octet_length(v_name) > 500
+     or p_producer is null or v_producer = '' or octet_length(v_producer) > 500
+     or p_varietal is null or octet_length(p_varietal) > 500
+     or p_region is null or octet_length(p_region) > 500
+     or (p_country is not null and octet_length(p_country) > 500)
+     or (p_format is not null and octet_length(p_format) > 100)
+     or p_quantity is null or p_quantity not between 1 and 100000
+     or p_unit_cost is null or p_unit_cost not between 0 and 1000000 then
+    raise exception 'C04_BOTTLE_SAVE_INVALID' using errcode = 'P0001';
+  end if;
+
+  -- This row is the outer HTTP state machine, not the durable receipt. Lock it
+  -- first and admit only the exact unfinished claim or a strict current bottle
+  -- completion. A completed transport still has to pass the durable validator.
+  select * into v_transport
+    from public.scan_idempotency c
+   where c.key = p_key and c.restaurant_id = p_restaurant_id
+   for update;
+  if not found
+     or v_transport.created_at <= statement_timestamp() - interval '24 hours' then
+    raise exception 'C04_BOTTLE_TRANSPORT_CLAIM_REQUIRED' using errcode = 'P0001';
+  end if;
+  if v_transport.claimed_by_user_id is distinct from v_actor then
+    raise exception 'C04_BOTTLE_TRANSPORT_CLAIM_REQUIRED' using errcode = 'P0001';
+  end if;
+  if v_transport.response_status is null
+     and v_transport.response_body = v_claim then
+    v_transport_completed := false;
+  elsif v_transport.response_status = 200
+     and jsonb_typeof(v_transport.response_body) = 'object'
+     and (select count(*) from jsonb_object_keys(v_transport.response_body)) = 5
+     and jsonb_typeof(v_transport.response_body -> 'version') = 'number'
+     and v_transport.response_body ->> 'version' = '1'
+     and jsonb_typeof(v_transport.response_body -> 'kind') = 'string'
+     and v_transport.response_body ->> 'kind' = 'bottle_inventory_save'
+     and jsonb_typeof(v_transport.response_body -> 'status') = 'string'
+     and v_transport.response_body ->> 'status' = 'committed'
+     and jsonb_typeof(v_transport.response_body -> 'wineId') = 'string'
+     and jsonb_typeof(v_transport.response_body -> 'itemCount') = 'number'
+     and v_transport.response_body ->> 'itemCount' = '1' then
+    v_transport_completed := true;
+  else
+    raise exception 'C04_BOTTLE_TRANSPORT_CLAIM_REQUIRED' using errcode = 'P0001';
+  end if;
+
+  v_request := jsonb_build_object(
+    'version', 3,
+    'kind', 'bottle_inventory_save',
+    'name', v_name,
+    'producer', v_producer,
+    'vintage', p_vintage,
+    'varietal', v_varietal,
+    'region', v_region,
+    'country', p_country,
+    'size_ml', 750,
+    'format', p_format,
+    'quantity', p_quantity,
+    'unit_cost', p_unit_cost
+  );
+
+  -- Completed replay is checked before touching a wine. The scalar wine_id is
+  -- merge-current; result_payload is only a fixed completion marker.
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id and r.operation_id = p_key
+   for update;
+  if found then
+    if v_receipt.actor_user_id is distinct from v_actor
+       or v_receipt.command_version <> 3
+       or v_receipt.command_type is distinct from 'bottle_inventory_save'
+       or v_receipt.scope_kind is distinct from 'single_wine'
+       or v_receipt.batch_entry_count is not null
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'C04_BOTTLE_OPERATION_CONFLICT' using errcode = 'P0001';
+    end if;
+    if v_receipt.wine_id is null
+       or v_receipt.completed_at is null
+       or v_receipt.result_payload is distinct from '{"status":"committed"}'::jsonb
+       or (v_transport_completed and v_transport.response_body is distinct from
+         jsonb_build_object(
+           'version', 1, 'kind', 'bottle_inventory_save',
+           'wineId', v_receipt.wine_id, 'status', 'committed', 'itemCount', 1
+         )) then
+      raise exception 'C04_BOTTLE_OPERATION_INCOMPLETE' using errcode = 'P0001';
+    end if;
+    return public.complete_scan_idempotency(
+      p_restaurant_id, p_key, 'bottle_inventory_save',
+      null, 1, null, v_receipt.wine_id
+    );
+  end if;
+
+  if v_transport_completed then
+    raise exception 'C04_BOTTLE_OPERATION_INCOMPLETE' using errcode = 'P0001';
+  end if;
+
+  select public.find_or_create_wines_batch(
+    p_restaurant_id,
+    jsonb_build_array(jsonb_build_object(
+      'name', v_name, 'producer', v_producer, 'vintage', p_vintage,
+      'varietal', v_varietal, 'region', v_region, 'country', p_country,
+      'size_ml', 750
+    ))
+  ) into v_wine_ids;
+  if cardinality(v_wine_ids) <> 1 or v_wine_ids[1] is null then
+    raise exception 'C04_BOTTLE_WINE_REFUSED' using errcode = 'P0001';
+  end if;
+  v_wine_id := v_wine_ids[1];
+
+  -- Match the established physical-command order: wine, then durable receipt.
+  perform 1 from public.wines w
+   where w.id = v_wine_id and w.restaurant_id = p_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'C04_BOTTLE_WINE_REFUSED' using errcode = 'P0001';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_key, v_actor, v_wine_id, 'bottle_inventory_save',
+    v_request, 3, 'single_wine', null
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id and r.operation_id = p_key
+     for update;
+    if not found
+       or v_receipt.actor_user_id is distinct from v_actor
+       or v_receipt.command_version <> 3
+       or v_receipt.command_type is distinct from 'bottle_inventory_save'
+       or v_receipt.scope_kind is distinct from 'single_wine'
+       or v_receipt.batch_entry_count is not null
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'C04_BOTTLE_OPERATION_CONFLICT' using errcode = 'P0001';
+    end if;
+    if v_receipt.wine_id is null
+       or v_receipt.completed_at is null
+       or v_receipt.result_payload is distinct from '{"status":"committed"}'::jsonb then
+      raise exception 'C04_BOTTLE_OPERATION_INCOMPLETE' using errcode = 'P0001';
+    end if;
+    return public.complete_scan_idempotency(
+      p_restaurant_id, p_key, 'bottle_inventory_save',
+      null, 1, null, v_receipt.wine_id
+    );
+  end if;
+
+  insert into public.inventory_items (
+    wine_id, restaurant_id, invoice_scan_id, quantity, unit_cost, format, added_via
+  ) values (
+    v_wine_id, p_restaurant_id, null, p_quantity, p_unit_cost, p_format,
+    'bottle_scan'::public.added_via
+  );
+
+  update public.inventory_command_receipts r
+     set result_payload = '{"status":"committed"}'::jsonb,
+         completed_at = statement_timestamp()
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_key
+     and r.command_version = 3
+     and r.result_payload is null
+     and r.completed_at is null;
+  if not found then
+    raise exception 'C04_BOTTLE_OPERATION_INCOMPLETE' using errcode = 'P0001';
+  end if;
+
+  v_result := public.complete_scan_idempotency(
+    p_restaurant_id, p_key, 'bottle_inventory_save',
+    null, 1, null, v_wine_id
+  );
+  return v_result;
+end;
+$function$;
+
+comment on function public.read_current_operational_memberships(uuid) is
+  'Closed lifecycle-current operational membership projection for the calling user.';
+comment on function public.save_bottle_inventory_private(
+  uuid,uuid,text,text,integer,text,text,text,text,integer,numeric
+) is
+  'Atomic staff bottle receiving with a durable version-3 business receipt.';
+
+revoke all on function public.read_current_operational_memberships(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.save_bottle_inventory_private(
+  uuid,uuid,text,text,integer,text,text,text,text,integer,numeric
+) from public, anon, authenticated, service_role;
+grant execute on function public.read_current_operational_memberships(uuid)
+  to authenticated;
+grant execute on function public.save_bottle_inventory_private(
+  uuid,uuid,text,text,integer,text,text,text,text,integer,numeric
+) to authenticated;
+
+alter function public.read_current_operational_memberships(uuid) owner to postgres;
+alter function public.save_bottle_inventory_private(
+  uuid,uuid,text,text,integer,text,text,text,text,integer,numeric
+) owner to postgres;
+
+-- === 0159_reconcile_error_preservation.sql ===
+-- 0159_reconcile_error_preservation.sql
+--
+-- Preserve the exact admitted reconciliation error contract without changing
+-- either function signature, owner, configuration, or existing ACL.
+
+do $c04_0159_forward_admission$
+begin
+  if exists (
+    select 1
+      from (values
+        (
+          'public.accept_reconcile_batch(uuid,jsonb,uuid)'::text,
+          '87e476575d603ed4e06acbf5c57cc222dc1975b166356b230b9675645c55ed35'::text,
+          '["p_restaurant_id", "p_actions", "p_idempotency_key"]'::pg_catalog.jsonb
+        ),
+        (
+          'public.undo_reconcile_batch(uuid)'::text,
+          '5b3053519370a0e8a2b0f931668ddcad56b20c055396ee130d472315d0413045'::text,
+          '["p_batch_id"]'::pg_catalog.jsonb
+        )
+      ) expected(identity, body_sha256, argument_names)
+      left join pg_catalog.pg_proc p
+        on p.oid = pg_catalog.to_regprocedure(expected.identity)
+     where p.oid is null
+        or pg_catalog.encode(
+             pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')),
+             'hex'
+           ) is distinct from expected.body_sha256
+        or pg_catalog.pg_get_userbyid(p.proowner) is distinct from 'postgres'
+        or p.prolang is distinct from (
+             select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+           )
+        or p.prorettype is distinct from pg_catalog.to_regtype('pg_catalog.jsonb')
+        or p.prokind is distinct from 'f'
+        or p.provolatile is distinct from 'v'
+        or p.prosecdef is distinct from true
+        or p.proisstrict is distinct from false
+        or p.proretset is distinct from false
+        or p.proparallel is distinct from 'u'
+        or p.proleakproof is distinct from false
+        or p.procost is distinct from 100::real
+        or p.prorows is distinct from 0::real
+        or p.pronargdefaults is distinct from 0
+        or p.provariadic is distinct from 0::pg_catalog.oid
+        or p.prosupport is distinct from 0::pg_catalog.oid
+        or p.proconfig is distinct from array['search_path=""']::text[]
+        or pg_catalog.to_jsonb(p.proacl) is distinct from
+             '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+        or pg_catalog.to_jsonb(p.proargnames) is distinct from expected.argument_names
+        or p.proargmodes is not null
+        or p.proallargtypes is not null
+        or p.protrftypes is not null
+        or p.proargdefaults is not null
+        or p.prosqlbody is not null
+        or p.probin is not null
+  ) then
+    raise exception 'C04_0159_FORWARD_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c04_0159_forward_admission$;
+
+create or replace function public.accept_reconcile_batch(
+  p_restaurant_id uuid,p_actions jsonb,p_idempotency_key uuid
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid()); v_action jsonb; v_patch jsonb; v_record public.reconcile_actions%rowtype;
+  v_index integer; v_subject_id uuid; v_bin_id uuid; v_wine_id uuid; v_lineage_id uuid;
+  v_line_index integer; v_prior jsonb; v_new jsonb; v_lines jsonb; v_expected jsonb; v_bin_code text;
+  v_existing public.reconcile_batches%rowtype;
+  v_existing_found boolean;
+  v_error text;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'manager') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_idempotency_key is null or p_actions is null or jsonb_typeof(p_actions)<>'array' then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+  if jsonb_array_length(p_actions) not between 1 and 100 then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    if jsonb_typeof(v_action)<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    if (select count(*) from jsonb_object_keys(v_action))<>4
+       or not (v_action ?& array['action_type','subject_table','subject_id','patch'])
+       or exists(select 1 from jsonb_object_keys(v_action) k where k not in ('action_type','subject_table','subject_id','patch'))
+       or jsonb_typeof(v_action->'action_type')<>'string'
+       or jsonb_typeof(v_action->'subject_table')<>'string'
+       or jsonb_typeof(v_action->'subject_id')<>'string'
+       or (v_action->>'subject_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       or jsonb_typeof(v_action->'patch')<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    v_patch:=v_action->'patch';
+    if v_action->>'action_type'='place_bin' then
+      if v_action->>'subject_table'<>'inventory_items' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'bin_id') or jsonb_typeof(v_patch->'bin_id')<>'string'
+         or (v_patch->>'bin_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='match_scan' then
+      if v_action->>'subject_table'<>'invoice_scans' or (select count(*) from jsonb_object_keys(v_patch))<>3
+         or not (v_patch?&array['line_index','wine_id','expected_line'])
+         or exists(select 1 from jsonb_object_keys(v_patch) k where k not in ('line_index','wine_id','expected_line'))
+         or jsonb_typeof(v_patch->'line_index')<>'number'
+         or (v_patch->>'line_index')::numeric<>trunc((v_patch->>'line_index')::numeric)
+         or (v_patch->>'line_index')::numeric not between 0 and 499
+         or jsonb_typeof(v_patch->'wine_id')<>'string'
+         or (v_patch->>'wine_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+         or not public.invoice_line_items_valid(jsonb_build_array(v_patch->'expected_line')) then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='link_lineage' then
+      if v_action->>'subject_table'<>'wines' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'lineage_id') or jsonb_typeof(v_patch->'lineage_id')<>'string'
+         or (v_patch->>'lineage_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='dismiss' then
+      if v_action->>'subject_table' not in ('inventory_items','invoice_scans','wines')
+         or (select count(*) from jsonb_object_keys(v_patch))<>0 then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    else raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001'; end if;
+    v_index:=v_index+1;
+  end loop;
+  if exists(
+    select 1 from (
+      select (a->>'subject_table')||':'||(a->>'subject_id')||
+             case when a->>'action_type'='match_scan' then ':'||(a->'patch'->>'line_index') else '' end as k,
+             count(*) from jsonb_array_elements(p_actions) a group by 1 having count(*)>1
+    ) duplicates
+  ) then raise exception 'C04_RECONCILE_DUPLICATE_SUBJECT' using errcode='P0001'; end if;
+
+  -- Existing idempotency rows lock before their subjects, matching undo.
+  -- New batches have no row yet and serialize on the later unique insert.
+  select * into v_existing from public.reconcile_batches b
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id for update;
+  v_existing_found:=found;
+
+  -- Shared identity mutations lock exact-site rows in scan -> wine ->
+  -- inventory order. match_scan wine targets are wine locks too even though
+  -- their subject_table is invoice_scans.
+  perform 1 from public.invoice_scans s join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='invoice_scans'
+  ) q on q.id=s.id
+   where s.restaurant_id=p_restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join (
+    select (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='wines'
+    union
+    select (a->'patch'->>'wine_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'action_type'='match_scan'
+  ) q on q.id=w.id
+   where w.restaurant_id=p_restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='inventory_items'
+  ) q on q.id=ii.id
+   where ii.restaurant_id=p_restaurant_id order by ii.id for update of ii;
+
+  if v_existing_found then
+    if v_existing.restaurant_id is distinct from p_restaurant_id
+       or v_existing.created_by is distinct from v_actor
+       or v_existing.action_count is distinct from jsonb_array_length(p_actions)
+       or v_existing.undone_at is not null then
+      raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+    end if;
+    v_index:=0;
+    for v_action in select value from jsonb_array_elements(p_actions) loop
+      select * into v_record from public.reconcile_actions a
+       where a.batch_id=p_idempotency_key and a.restaurant_id=p_restaurant_id
+         and a.ordinal=v_index;
+      if not found or v_record.action_type is distinct from v_action->>'action_type'
+         or v_record.subject_table is distinct from v_action->>'subject_table'
+         or v_record.subject_id is distinct from (v_action->>'subject_id')::uuid then
+        raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+      end if;
+      v_patch:=v_action->'patch';
+      if (v_record.action_type='place_bin' and v_record.new_state->>'bin_id' is distinct from v_patch->>'bin_id')
+         or (v_record.action_type='link_lineage' and v_record.new_state->>'lineage_id' is distinct from v_patch->>'lineage_id')
+         or (v_record.action_type='dismiss' and (v_record.prior_state<>'{}'::jsonb or v_record.new_state<>'{}'::jsonb))
+         or (v_record.action_type='match_scan' and (
+           v_record.prior_state->'final_line_items'->((v_patch->>'line_index')::integer) is distinct from v_patch->'expected_line'
+           or v_record.new_state->'final_line_items'->((v_patch->>'line_index')::integer)->>'wine_id' is distinct from v_patch->>'wine_id'
+         )) then raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001'; end if;
+      v_index:=v_index+1;
+    end loop;
+    return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_existing.action_count,'status','accepted');
+  end if;
+
+  insert into public.reconcile_batches(id,restaurant_id,created_by,action_count)
+  values(p_idempotency_key,p_restaurant_id,v_actor,0);
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    v_patch:=v_action->'patch'; v_subject_id:=(v_action->>'subject_id')::uuid;
+    if v_action->>'action_type'='place_bin' then
+      v_bin_id:=(v_patch->>'bin_id')::uuid;
+      select jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)
+        into v_prior from public.inventory_items ii
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id;
+      select b.code into v_bin_code from public.bins b
+       where b.id=v_bin_id and b.restaurant_id=p_restaurant_id and b.retired_at is null;
+      if v_prior is null or v_bin_code is null or v_prior->'bin_id'<>'null'::jsonb then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_new:=jsonb_build_object('bin_id',v_bin_id,'bin_location',v_bin_code);
+      update public.inventory_items ii set bin_id=v_bin_id,bin_location=v_bin_code
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id and ii.bin_id is null;
+      if not found then raise exception 'reconcile_subject_conflict' using errcode='P0001'; end if;
+    elsif v_action->>'action_type'='match_scan' then
+      v_line_index:=(v_patch->>'line_index')::integer; v_wine_id:=(v_patch->>'wine_id')::uuid;
+      select s.final_line_items into v_lines from public.invoice_scans s
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id and s.committed_at is null;
+      if v_lines is null or jsonb_typeof(v_lines)<>'array' or jsonb_array_length(v_lines)<=v_line_index
+         or v_lines->v_line_index is distinct from v_patch->'expected_line'
+         or not exists(select 1 from public.wines w where w.id=v_wine_id and w.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_prior:=jsonb_build_object('final_line_items',v_lines);
+      v_lines:=jsonb_set(v_lines,array[v_line_index::text],(v_patch->'expected_line')||jsonb_build_object('wine_id',v_wine_id),false);
+      v_new:=jsonb_build_object('final_line_items',v_lines);
+      update public.invoice_scans s set final_line_items=v_lines
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id;
+    elsif v_action->>'action_type'='link_lineage' then
+      v_lineage_id:=(v_patch->>'lineage_id')::uuid;
+      select jsonb_build_object('lineage_id',w.lineage_id) into v_prior from public.wines w
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id;
+      if v_prior is null or not exists(select 1 from public.wine_lineages l
+        where l.id=v_lineage_id and l.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_new:=jsonb_build_object('lineage_id',v_lineage_id);
+      update public.wines w set lineage_id=v_lineage_id
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id;
+    else
+      if (v_action->>'subject_table'='inventory_items' and not exists(select 1 from public.inventory_items x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='invoice_scans' and not exists(select 1 from public.invoice_scans x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='wines' and not exists(select 1 from public.wines x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id)) then
+        raise exception 'reconcile_subject_not_found' using errcode='P0002';
+      end if;
+      v_prior:='{}'::jsonb; v_new:='{}'::jsonb;
+    end if;
+    insert into public.reconcile_actions(
+      batch_id,restaurant_id,action_type,subject_table,subject_id,ordinal,prior_state,new_state
+    ) values (
+      p_idempotency_key,p_restaurant_id,v_action->>'action_type',v_action->>'subject_table',
+      v_subject_id,v_index,v_prior,v_new
+    );
+    v_index:=v_index+1;
+  end loop;
+  update public.reconcile_batches b set action_count=v_index
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id;
+  return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_index,'status','accepted');
+exception
+  when invalid_text_representation or numeric_value_out_of_range then
+    raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode='42501';
+  when unique_violation then
+    raise exception 'reconcile_batch_conflict' using errcode='23505';
+  when sqlstate 'P0002' then
+    get stacked diagnostics v_error = message_text;
+    if v_error = 'reconcile_subject_not_found' then
+      raise exception 'reconcile_subject_not_found' using errcode='P0002';
+    end if;
+    raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+  when sqlstate 'P0001' then
+    get stacked diagnostics v_error = message_text;
+    case v_error
+      when 'C04_RECONCILE_BATCH_INVALID' then
+        raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+      when 'C04_RECONCILE_ACTION_INVALID' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      when 'C04_RECONCILE_DUPLICATE_SUBJECT' then
+        raise exception 'C04_RECONCILE_DUPLICATE_SUBJECT' using errcode='P0001';
+      when 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' then
+        raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+      when 'reconcile_subject_conflict' then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      else
+        raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+    end case;
+  when others then
+    raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create or replace function public.undo_reconcile_batch(p_batch_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid());
+  v_batch public.reconcile_batches%rowtype;
+  v_action public.reconcile_actions%rowtype;
+  v_now timestamptz;
+  v_error text;
+begin
+  select * into v_batch from public.reconcile_batches b
+   where b.id=p_batch_id
+     and public.current_site_role_at_least(b.restaurant_id,'manager')
+   for update;
+  if not found or v_actor is null then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_batch.undone_at is not null then raise exception 'reconcile_batch_already_undone' using errcode='P0001'; end if;
+  perform 1 from public.reconcile_actions a
+   where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+   order by a.ordinal for update;
+  perform 1 from public.invoice_scans s join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='invoice_scans' and a.subject_id=s.id
+   where s.restaurant_id=v_batch.restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='wines' and a.subject_id=w.id
+   where w.restaurant_id=v_batch.restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='inventory_items' and a.subject_id=ii.id
+   where ii.restaurant_id=v_batch.restaurant_id order by ii.id for update of ii;
+  for v_action in select * from public.reconcile_actions a
+    where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+      and a.ordinal<v_batch.action_count
+    order by a.ordinal desc
+  loop
+    if v_action.action_type='place_bin' then
+      if not exists(select 1 from public.inventory_items ii where ii.id=v_action.subject_id
+        and ii.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.inventory_items ii set
+        bin_id=(v_action.prior_state->>'bin_id')::uuid,
+        bin_location=v_action.prior_state->>'bin_location'
+      where ii.id=v_action.subject_id and ii.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='match_scan' then
+      if not exists(select 1 from public.invoice_scans s where s.id=v_action.subject_id
+        and s.restaurant_id=v_batch.restaurant_id
+        and s.final_line_items=v_action.new_state->'final_line_items') then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.invoice_scans s set final_line_items=v_action.prior_state->'final_line_items'
+       where s.id=v_action.subject_id and s.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='link_lineage' then
+      if not exists(select 1 from public.wines w where w.id=v_action.subject_id
+        and w.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('lineage_id',w.lineage_id)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.wines w set lineage_id=(v_action.prior_state->>'lineage_id')::uuid
+       where w.id=v_action.subject_id and w.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type<>'dismiss' then
+      raise exception 'reconcile_action_invalid' using errcode='P0001';
+    end if;
+  end loop;
+  v_now:=statement_timestamp();
+  update public.reconcile_batches b set undone_at=v_now,undone_by=v_actor
+   where b.id=p_batch_id and b.restaurant_id=v_batch.restaurant_id and b.undone_at is null;
+  if not found then raise exception 'reconcile_batch_conflict' using errcode='P0001'; end if;
+  return jsonb_build_object('batchId',p_batch_id,'actionCount',v_batch.action_count,'status','undone','undoneAt',v_now);
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0001' then
+    get stacked diagnostics v_error = message_text;
+    case v_error
+      when 'reconcile_batch_already_undone' then
+        raise exception 'reconcile_batch_already_undone' using errcode='P0001';
+      when 'reconcile_subject_changed' then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      when 'reconcile_action_invalid' then
+        raise exception 'reconcile_action_invalid' using errcode='P0001';
+      when 'reconcile_batch_conflict' then
+        raise exception 'reconcile_batch_conflict' using errcode='P0001';
+      else
+        raise exception 'C04_RECONCILE_UNDO_REFUSED' using errcode='P0001';
+    end case;
+  when others then
+    raise exception 'C04_RECONCILE_UNDO_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+do $c04_0159_forward_postcondition$
+begin
+  if exists (
+    select 1
+      from (values
+        (
+          'public.accept_reconcile_batch(uuid,jsonb,uuid)'::text,
+          'a0a2c184d486303e02e0cfbaf8b53cc516c89dc54811e0d85679dddb2a7cff36'::text,
+          '["p_restaurant_id", "p_actions", "p_idempotency_key"]'::pg_catalog.jsonb
+        ),
+        (
+          'public.undo_reconcile_batch(uuid)'::text,
+          '99619be5de0e9c6cc79dbb17167e3483c7352e1f7a950260438d7a61340a95de'::text,
+          '["p_batch_id"]'::pg_catalog.jsonb
+        )
+      ) expected(identity, body_sha256, argument_names)
+      left join pg_catalog.pg_proc p
+        on p.oid = pg_catalog.to_regprocedure(expected.identity)
+     where p.oid is null
+        or pg_catalog.encode(
+             pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')),
+             'hex'
+           ) is distinct from expected.body_sha256
+        or pg_catalog.pg_get_userbyid(p.proowner) is distinct from 'postgres'
+        or p.prolang is distinct from (
+             select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+           )
+        or p.prorettype is distinct from pg_catalog.to_regtype('pg_catalog.jsonb')
+        or p.prokind is distinct from 'f'
+        or p.provolatile is distinct from 'v'
+        or p.prosecdef is distinct from true
+        or p.proisstrict is distinct from false
+        or p.proretset is distinct from false
+        or p.proparallel is distinct from 'u'
+        or p.proleakproof is distinct from false
+        or p.procost is distinct from 100::real
+        or p.prorows is distinct from 0::real
+        or p.pronargdefaults is distinct from 0
+        or p.provariadic is distinct from 0::pg_catalog.oid
+        or p.prosupport is distinct from 0::pg_catalog.oid
+        or p.proconfig is distinct from array['search_path=""']::text[]
+        or pg_catalog.to_jsonb(p.proacl) is distinct from
+             '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+        or pg_catalog.to_jsonb(p.proargnames) is distinct from expected.argument_names
+        or p.proargmodes is not null
+        or p.proallargtypes is not null
+        or p.protrftypes is not null
+        or p.proargdefaults is not null
+        or p.prosqlbody is not null
+        or p.probin is not null
+  ) then
+    raise exception 'C04_0159_FORWARD_POSTCONDITION_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c04_0159_forward_postcondition$;
+
+-- === 0160_wine_section_assignment_boundary.sql ===
+-- 0160_wine_section_assignment_boundary.sql
+--
+-- Add the closed whole-wine section-assignment boundary used by the legacy
+-- single and batch HTTP routes. This migration does not add placement
+-- hierarchy, history, cost access, or physical-inventory behavior.
+
+do $c04_0160_preflight$
+begin
+  if pg_catalog.to_regclass('public.wines') is null
+     or pg_catalog.to_regclass('public.inventory_items') is null
+     or pg_catalog.to_regprocedure(
+       'public.current_site_role_at_least(uuid,public.membership_role)'
+     ) is null then
+    raise exception 'C04_0160_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  if not exists (
+       select 1
+         from pg_catalog.pg_attribute a
+        where a.attrelid = pg_catalog.to_regclass('public.inventory_items')
+          and a.attname = 'section'
+          and a.attnum > 0
+          and not a.attisdropped
+     ) then
+    raise exception 'C04_0160_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'assign_wine_sections_private'
+  ) then
+    raise exception 'C04_0160_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+end;
+$c04_0160_preflight$;
+
+create function public.assign_wine_sections_private(
+  p_restaurant_id uuid,
+  p_wine_ids uuid[],
+  p_section text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid;
+  v_section text;
+  v_requested_count integer;
+  v_distinct_count integer;
+  v_locked_count integer := 0;
+  v_wine_id uuid;
+begin
+  v_actor := (select auth.uid());
+  if v_actor is null
+     or not public.current_site_role_at_least(p_restaurant_id, 'manager') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_section := nullif(pg_catalog.btrim(p_section), '');
+  v_requested_count := pg_catalog.cardinality(p_wine_ids);
+  if p_wine_ids is null
+     or v_requested_count not between 1 and 200
+     or exists (
+       select 1 from pg_catalog.unnest(p_wine_ids) requested(wine_id)
+        where requested.wine_id is null
+     )
+     or (v_section is not null and pg_catalog.char_length(v_section) > 100) then
+    raise exception 'section_assignment_invalid' using errcode = 'P04V1';
+  end if;
+
+  select pg_catalog.count(distinct requested.wine_id)::integer
+    into v_distinct_count
+    from pg_catalog.unnest(p_wine_ids) requested(wine_id);
+  if v_distinct_count <> v_requested_count then
+    raise exception 'section_assignment_wine_set_refused' using errcode = 'P04W1';
+  end if;
+
+  -- Stable exact-site wine locks serialize overlapping assignments and match
+  -- the 0158 bottle-receiving lock without blocking FK KEY SHARE readers.
+  for v_wine_id in
+    select w.id
+      from public.wines w
+     where w.restaurant_id = p_restaurant_id
+       and w.id = any(p_wine_ids)
+     order by w.id
+     for no key update
+  loop
+    v_locked_count := v_locked_count + 1;
+  end loop;
+
+  if v_locked_count <> v_requested_count then
+    raise exception 'section_assignment_wine_set_refused' using errcode = 'P04W1';
+  end if;
+
+  -- One set update is both the inventory-row lock and the complete write.
+  -- The existing BEFORE UPDATE trigger owns updated_at advancement.
+  update public.inventory_items ii
+     set section = v_section
+   where ii.restaurant_id = p_restaurant_id
+     and ii.wine_id = any(p_wine_ids);
+
+  return pg_catalog.jsonb_build_object(
+    'requestedWineCount', v_requested_count,
+    'section', v_section
+  );
+end;
+$function$;
+
+comment on function public.assign_wine_sections_private(uuid,uuid[],text) is
+  'Atomic whole-wine section assignment; requested-count receipt, no CAS or cost access.';
+
+revoke all on function public.assign_wine_sections_private(uuid,uuid[],text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.assign_wine_sections_private(uuid,uuid[],text)
+  to authenticated;
+alter function public.assign_wine_sections_private(uuid,uuid[],text) owner to postgres;
+
+do $c04_0160_postflight$
+declare
+  v_function pg_catalog.pg_proc%rowtype;
+  v_overload_count integer;
+begin
+  select p.* into strict v_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.assign_wine_sections_private(uuid,uuid[],text)'
+   );
+  select pg_catalog.count(*) into v_overload_count
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname = 'assign_wine_sections_private';
+
+  if v_overload_count <> 1
+     or pg_catalog.encode(
+       pg_catalog.sha256(pg_catalog.convert_to(v_function.prosrc, 'UTF8')),
+       'hex'
+     ) <> 'de52e8ee719623d8f102f371051a47a12128145ba97f59892eb89dfd18b68e81'
+     or pg_catalog.pg_get_userbyid(v_function.proowner) <> 'postgres'
+     or v_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_function.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_function.prokind <> 'f'
+     or v_function.provolatile <> 'v'
+     or not v_function.prosecdef
+     or v_function.proisstrict
+     or v_function.proretset
+     or v_function.proparallel <> 'u'
+     or v_function.proleakproof
+     or v_function.procost <> 100::real
+     or v_function.prorows <> 0::real
+     or v_function.pronargdefaults <> 0
+     or v_function.provariadic <> 0::pg_catalog.oid
+     or v_function.prosupport <> 0::pg_catalog.oid
+     or v_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_function.proargnames) is distinct from
+       '["p_restaurant_id", "p_wine_ids", "p_section"]'::pg_catalog.jsonb
+     or v_function.proargmodes is not null
+     or v_function.proallargtypes is not null
+     or v_function.protrftypes is not null
+     or v_function.proargdefaults is not null
+     or v_function.prosqlbody is not null
+     or v_function.probin is not null
+     or pg_catalog.to_jsonb(v_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb then
+    raise exception 'C04_0160_POSTFLIGHT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c04_0160_postflight$;
+
+-- === 0161_bottle_location_receiving.sql ===
+-- 0161_bottle_location_receiving.sql
+--
+-- Add the location-required, one-sealed-bottle receiving boundary. The
+-- durable receipt is the business-operation anchor; the existing scan cache
+-- and cost-bearing bottle_inventory_save command are not part of this RPC.
+
+do $c06_0161_preflight$
+begin
+  if public.current_inventory_contract_version() <> 2
+     or pg_catalog.to_regclass('public.inventory_command_receipts') is null
+     or pg_catalog.to_regclass('public.inventory_items') is null
+     or pg_catalog.to_regclass('public.wines') is null
+     or pg_catalog.to_regclass('public.bins') is null
+     or pg_catalog.to_regprocedure(
+       'public.current_site_role_at_least(uuid,public.membership_role)'
+     ) is null
+     or pg_catalog.to_regrole('postgres') is null
+     or pg_catalog.to_regrole('authenticated') is null then
+    raise exception 'C06_0161_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'receive_bottle_at_location_private'
+  ) then
+    raise exception 'C06_0161_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+
+  if (select pg_catalog.count(*)
+        from pg_catalog.pg_constraint c
+       where c.conrelid = pg_catalog.to_regclass('public.inventory_command_receipts')
+         and c.conname in (
+           'inventory_command_receipts_completion_pair',
+           'inventory_command_receipts_result_object',
+           'inventory_command_receipts_command_version_check',
+           'inventory_command_receipts_command_type_check',
+           'inventory_command_receipts_scope_kind_check',
+           'inventory_command_receipts_batch_entry_count_check',
+           'inventory_command_receipts_versioned_shape_check'
+         )
+         and c.contype = 'c'
+         and c.convalidated) <> 7
+     or pg_catalog.has_table_privilege(
+       'authenticated', 'public.inventory_command_receipts', 'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or pg_catalog.has_table_privilege(
+       'anon', 'public.inventory_command_receipts', 'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or pg_catalog.has_table_privilege(
+       'service_role', 'public.inventory_command_receipts', 'INSERT,UPDATE,DELETE'
+     ) then
+    raise exception 'C06_0161_RECEIPT_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c06_0161_preflight$;
+
+lock table public.inventory_command_receipts in access exclusive mode nowait;
+
+do $c06_0161_locked_preflight$
+begin
+  if exists (
+    select 1
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'receive_bottle_at_location_private'
+  ) or exists (
+    select 1
+      from public.inventory_command_receipts r
+     where r.command_type = 'bottle_location_receive'
+  ) then
+    raise exception 'C06_0161_LOCKED_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c06_0161_locked_preflight$;
+
+alter table public.inventory_command_receipts
+  drop constraint inventory_command_receipts_command_version_check,
+  drop constraint inventory_command_receipts_command_type_check,
+  drop constraint inventory_command_receipts_versioned_shape_check,
+  add constraint inventory_command_receipts_command_version_check
+    check (command_version in (1, 2, 3)),
+  add constraint inventory_command_receipts_command_type_check check (
+    command_type in (
+      'open', 'pour', 'spill', 'discard', 'close', 'reconcile_batch', 'undo',
+      'bottle_inventory_save', 'bottle_location_receive'
+    )
+  ),
+  add constraint inventory_command_receipts_versioned_shape_check check (
+    (
+      command_version = 1
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type in ('open', 'pour', 'spill', 'discard', 'close', 'undo')
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 2
+      and command_type = 'reconcile_batch'
+      and scope_kind = 'exact_bottle_batch'
+      and wine_id is null
+      and batch_entry_count > 0
+    )
+    or (
+      command_version = 3
+      and command_type = 'bottle_inventory_save'
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+    or (
+      command_version = 3
+      and command_type = 'bottle_location_receive'
+      and scope_kind = 'single_wine'
+      and wine_id is not null
+      and batch_entry_count is null
+    )
+  );
+
+create function public.receive_bottle_at_location_private(
+  p_restaurant_id uuid,
+  p_operation_id uuid,
+  p_wine_id uuid,
+  p_section text,
+  p_bin_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_section text;
+  v_request jsonb;
+  v_receipt public.inventory_command_receipts%rowtype;
+  v_claimed uuid;
+  v_bin_code text;
+  v_inventory_item_id uuid;
+  v_result jsonb;
+begin
+  if v_actor is null
+     or not public.current_site_role_at_least(p_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_section := pg_catalog.btrim(p_section);
+  if p_restaurant_id is null
+     or p_operation_id is null
+     or p_wine_id is null
+     or p_section is null
+     or v_section = ''
+     or pg_catalog.char_length(v_section) > 200
+     or p_bin_id is null then
+    raise exception 'bottle_location_receive_invalid' using errcode = 'P05V1';
+  end if;
+
+  v_request := pg_catalog.jsonb_build_object(
+    'version', 3,
+    'kind', 'bottle_location_receive',
+    'wine_id', p_wine_id,
+    'section', v_section,
+    'bin_id', p_bin_id,
+    'quantity', 1
+  );
+
+  -- Replay is checked before mutable wine/bin state. Historical JSON remains
+  -- authoritative after a legitimate wine merge, bin rename, or retirement.
+  select * into v_receipt
+    from public.inventory_command_receipts r
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id
+   for update;
+  if found then
+    if v_receipt.actor_user_id is distinct from v_actor
+       or v_receipt.command_version is distinct from 3
+       or v_receipt.command_type is distinct from 'bottle_location_receive'
+       or v_receipt.scope_kind is distinct from 'single_wine'
+       or v_receipt.batch_entry_count is not null
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'bottle_location_operation_conflict' using errcode = 'P05C1';
+    end if;
+    if v_receipt.completed_at is null
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload) is distinct from 'object'
+       or (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(v_receipt.result_payload)) <> 10
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'version') is distinct from 'number'
+       or v_receipt.result_payload ->> 'version' is distinct from '1'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'kind') is distinct from 'string'
+       or v_receipt.result_payload ->> 'kind' is distinct from 'bottle_location_receive'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'status') is distinct from 'string'
+       or v_receipt.result_payload ->> 'status' is distinct from 'committed'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'operationId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'operationId' is distinct from p_operation_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'inventoryItemId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'inventoryItemId'
+            !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'wineId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'wineId' is distinct from p_wine_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'section') is distinct from 'string'
+       or v_receipt.result_payload ->> 'section' is distinct from v_section
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'binId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'binId' is distinct from p_bin_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'binCode') is distinct from 'string'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'quantity') is distinct from 'number'
+       or v_receipt.result_payload ->> 'quantity' is distinct from '1' then
+      raise exception 'bottle_location_operation_incomplete' using errcode = 'P05I1';
+    end if;
+    return v_receipt.result_payload || pg_catalog.jsonb_build_object('replayed', true);
+  end if;
+
+  -- Match the established physical-command and merge order: wine, receipt,
+  -- then location. NO KEY UPDATE serializes writers without blocking FK reads.
+  perform 1
+    from public.wines w
+   where w.id = p_wine_id
+     and w.restaurant_id = p_restaurant_id
+   for no key update;
+  if not found then
+    raise exception 'bottle_location_wine_not_found' using errcode = 'P05W1';
+  end if;
+
+  insert into public.inventory_command_receipts (
+    restaurant_id, operation_id, actor_user_id, wine_id, command_type,
+    request_payload, command_version, scope_kind, batch_entry_count
+  ) values (
+    p_restaurant_id, p_operation_id, v_actor, p_wine_id,
+    'bottle_location_receive', v_request, 3, 'single_wine', null
+  )
+  on conflict (restaurant_id, operation_id) do nothing
+  returning operation_id into v_claimed;
+
+  if v_claimed is null then
+    select * into v_receipt
+      from public.inventory_command_receipts r
+     where r.restaurant_id = p_restaurant_id
+       and r.operation_id = p_operation_id
+     for update;
+    if not found
+       or v_receipt.actor_user_id is distinct from v_actor
+       or v_receipt.command_version is distinct from 3
+       or v_receipt.command_type is distinct from 'bottle_location_receive'
+       or v_receipt.scope_kind is distinct from 'single_wine'
+       or v_receipt.batch_entry_count is not null
+       or v_receipt.request_payload is distinct from v_request then
+      raise exception 'bottle_location_operation_conflict' using errcode = 'P05C1';
+    end if;
+    if v_receipt.completed_at is null
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload) is distinct from 'object'
+       or (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(v_receipt.result_payload)) <> 10
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'version') is distinct from 'number'
+       or v_receipt.result_payload ->> 'version' is distinct from '1'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'kind') is distinct from 'string'
+       or v_receipt.result_payload ->> 'kind' is distinct from 'bottle_location_receive'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'status') is distinct from 'string'
+       or v_receipt.result_payload ->> 'status' is distinct from 'committed'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'operationId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'operationId' is distinct from p_operation_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'inventoryItemId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'inventoryItemId'
+            !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'wineId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'wineId' is distinct from p_wine_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'section') is distinct from 'string'
+       or v_receipt.result_payload ->> 'section' is distinct from v_section
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'binId') is distinct from 'string'
+       or v_receipt.result_payload ->> 'binId' is distinct from p_bin_id::text
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'binCode') is distinct from 'string'
+       or pg_catalog.jsonb_typeof(v_receipt.result_payload -> 'quantity') is distinct from 'number'
+       or v_receipt.result_payload ->> 'quantity' is distinct from '1' then
+      raise exception 'bottle_location_operation_incomplete' using errcode = 'P05I1';
+    end if;
+    return v_receipt.result_payload || pg_catalog.jsonb_build_object('replayed', true);
+  end if;
+
+  select b.code into v_bin_code
+    from public.bins b
+   where b.id = p_bin_id
+     and b.restaurant_id = p_restaurant_id
+     and b.retired_at is null
+   for share;
+  if not found then
+    raise exception 'bottle_location_bin_unavailable' using errcode = 'P05B1';
+  end if;
+
+  insert into public.inventory_items (
+    wine_id, restaurant_id, invoice_scan_id, quantity, unit_cost, currency,
+    format, section, bin_id, bin_location, added_via
+  ) values (
+    p_wine_id, p_restaurant_id, null, 1, 0, null,
+    null, v_section, p_bin_id, v_bin_code, 'bottle_scan'::public.added_via
+  )
+  returning id into v_inventory_item_id;
+
+  v_result := pg_catalog.jsonb_build_object(
+    'version', 1,
+    'kind', 'bottle_location_receive',
+    'status', 'committed',
+    'operationId', p_operation_id,
+    'inventoryItemId', v_inventory_item_id,
+    'wineId', p_wine_id,
+    'section', v_section,
+    'binId', p_bin_id,
+    'binCode', v_bin_code,
+    'quantity', 1
+  );
+
+  update public.inventory_command_receipts r
+     set result_payload = v_result,
+         completed_at = pg_catalog.statement_timestamp()
+   where r.restaurant_id = p_restaurant_id
+     and r.operation_id = p_operation_id
+     and r.command_version = 3
+     and r.command_type = 'bottle_location_receive'
+     and r.result_payload is null
+     and r.completed_at is null;
+  if not found then
+    raise exception 'bottle_location_operation_incomplete' using errcode = 'P05I1';
+  end if;
+
+  return v_result || pg_catalog.jsonb_build_object('replayed', false);
+end;
+$function$;
+
+comment on function public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid) is
+  'Idempotent staff receive of one new sealed bottle into one exact active site bin.';
+
+revoke all on function public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)
+  to authenticated;
+alter function public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)
+  owner to postgres;
+
+do $c06_0161_postflight$
+declare
+  v_function pg_catalog.pg_proc%rowtype;
+  v_overload_count integer;
+  v_receipt_definition text;
+begin
+  select p.* into strict v_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)'
+   );
+  select pg_catalog.count(*) into v_overload_count
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname = 'receive_bottle_at_location_private';
+  select pg_catalog.pg_get_constraintdef(c.oid, true) into strict v_receipt_definition
+    from pg_catalog.pg_constraint c
+   where c.conrelid = pg_catalog.to_regclass('public.inventory_command_receipts')
+     and c.conname = 'inventory_command_receipts_versioned_shape_check';
+
+  if v_overload_count <> 1
+     or pg_catalog.encode(
+       pg_catalog.sha256(pg_catalog.convert_to(v_function.prosrc, 'UTF8')),
+       'hex'
+     ) <> '6a24736e1a19541d567081f9cec72f32e4c72af371f6d62f0c8015480750af03'
+     or pg_catalog.pg_get_userbyid(v_function.proowner) <> 'postgres'
+     or v_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_function.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_function.prokind <> 'f'
+     or v_function.provolatile <> 'v'
+     or not v_function.prosecdef
+     or v_function.proisstrict
+     or v_function.proretset
+     or v_function.proparallel <> 'u'
+     or v_function.proleakproof
+     or v_function.procost <> 100::real
+     or v_function.prorows <> 0::real
+     or v_function.pronargdefaults <> 0
+     or v_function.provariadic <> 0::pg_catalog.oid
+     or v_function.prosupport <> 0::pg_catalog.oid
+     or v_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_function.proargnames) is distinct from
+       '["p_restaurant_id", "p_operation_id", "p_wine_id", "p_section", "p_bin_id"]'::pg_catalog.jsonb
+     or v_function.proargmodes is not null
+     or v_function.proallargtypes is not null
+     or v_function.protrftypes is not null
+     or v_function.proargdefaults is not null
+     or v_function.prosqlbody is not null
+     or v_function.probin is not null
+     or pg_catalog.to_jsonb(v_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.strpos(v_receipt_definition, 'bottle_inventory_save') = 0
+     or pg_catalog.strpos(v_receipt_definition, 'bottle_location_receive') = 0
+     or (select pg_catalog.count(*)
+           from pg_catalog.pg_constraint c
+          where c.conrelid = pg_catalog.to_regclass('public.inventory_command_receipts')
+            and c.conname in (
+              'inventory_command_receipts_completion_pair',
+              'inventory_command_receipts_result_object',
+              'inventory_command_receipts_command_version_check',
+              'inventory_command_receipts_command_type_check',
+              'inventory_command_receipts_scope_kind_check',
+              'inventory_command_receipts_batch_entry_count_check',
+              'inventory_command_receipts_versioned_shape_check'
+            )
+            and c.contype = 'c'
+            and c.convalidated) <> 7
+     or pg_catalog.has_table_privilege(
+       'authenticated', 'public.inventory_command_receipts', 'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or pg_catalog.has_table_privilege(
+       'anon', 'public.inventory_command_receipts', 'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or pg_catalog.has_table_privilege(
+       'service_role', 'public.inventory_command_receipts', 'INSERT,UPDATE,DELETE'
+     ) then
+    raise exception 'C06_0161_POSTFLIGHT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c06_0161_postflight$;
+
+-- === 0162_bin_code_inventory_mirror.sql ===
+-- 0162_bin_code_inventory_mirror.sql
+--
+-- Keep the current inventory display label synchronized with its exact bin.
+-- Authorization remains on the existing bins mutation; this trigger grants no
+-- new caller authority and rewrites no historical record.
+
+do $c07_0162_preflight$
+declare
+  v_column_count integer;
+begin
+  if pg_catalog.to_regclass('public.bins') is null
+     or pg_catalog.to_regclass('public.inventory_items') is null
+     or pg_catalog.to_regrole('postgres') is null
+     or pg_catalog.to_regrole('anon') is null
+     or pg_catalog.to_regrole('authenticated') is null
+     or pg_catalog.to_regrole('service_role') is null then
+    raise exception 'C07_0162_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  select pg_catalog.count(*) into v_column_count
+    from pg_catalog.pg_attribute a
+   where (a.attrelid, a.attname, a.atttypid, a.attnotnull) in (
+     (pg_catalog.to_regclass('public.bins'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.bins'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.bins'), 'code',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.inventory_items'), 'bin_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.inventory_items'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.inventory_items'), 'bin_location',
+       pg_catalog.to_regtype('pg_catalog.text'), false)
+   )
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  if v_column_count <> 6
+     or not exists (
+       select 1
+         from pg_catalog.pg_constraint c
+        where c.conrelid = pg_catalog.to_regclass('public.inventory_items')
+          and c.confrelid = pg_catalog.to_regclass('public.bins')
+          and c.contype = 'f'
+          and c.convalidated
+          and c.conkey = array[(
+            select a.attnum
+              from pg_catalog.pg_attribute a
+             where a.attrelid = pg_catalog.to_regclass('public.inventory_items')
+               and a.attname = 'bin_id'
+               and a.attnum > 0
+               and not a.attisdropped
+          )]::smallint[]
+          and c.confkey = array[(
+            select a.attnum
+              from pg_catalog.pg_attribute a
+             where a.attrelid = pg_catalog.to_regclass('public.bins')
+               and a.attname = 'id'
+               and a.attnum > 0
+               and not a.attisdropped
+          )]::smallint[]
+     ) then
+    raise exception 'C07_0162_REQUIRED_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+       select 1
+         from pg_catalog.pg_proc p
+         join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname = 'mirror_bin_code_to_inventory_items'
+     )
+     or exists (
+       select 1
+         from pg_catalog.pg_trigger t
+        where t.tgrelid = pg_catalog.to_regclass('public.bins')
+          and t.tgname = 'bins_mirror_code_to_inventory_items'
+          and not t.tgisinternal
+     ) then
+    raise exception 'C07_0162_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+end;
+$c07_0162_preflight$;
+
+create function public.mirror_bin_code_to_inventory_items()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  update public.inventory_items as item
+     set bin_location = new.code
+   where item.bin_id = new.id
+     and item.restaurant_id = new.restaurant_id;
+  return new;
+end;
+$function$;
+
+comment on function public.mirror_bin_code_to_inventory_items() is
+  'Closed trigger function that mirrors an exact-site bin rename onto current inventory labels.';
+
+revoke all on function public.mirror_bin_code_to_inventory_items()
+  from public, anon, authenticated, service_role;
+alter function public.mirror_bin_code_to_inventory_items() owner to postgres;
+
+create trigger bins_mirror_code_to_inventory_items
+after update of code on public.bins
+for each row
+when (new.code is distinct from old.code)
+execute function public.mirror_bin_code_to_inventory_items();
+
+do $c07_0162_postflight$
+declare
+  v_function pg_catalog.pg_proc%rowtype;
+  v_trigger pg_catalog.pg_trigger%rowtype;
+  v_code_attnum smallint;
+  v_search_path text;
+  v_trigger_definition text;
+begin
+  select p.* into strict v_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.mirror_bin_code_to_inventory_items()'
+   );
+  select t.* into strict v_trigger
+    from pg_catalog.pg_trigger t
+   where t.tgrelid = pg_catalog.to_regclass('public.bins')
+     and t.tgname = 'bins_mirror_code_to_inventory_items'
+     and not t.tgisinternal;
+  select a.attnum into strict v_code_attnum
+    from pg_catalog.pg_attribute a
+   where a.attrelid = pg_catalog.to_regclass('public.bins')
+     and a.attname = 'code'
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  v_search_path := pg_catalog.current_setting('search_path');
+  begin
+    perform pg_catalog.set_config('search_path', '', true);
+    v_trigger_definition := pg_catalog.pg_get_triggerdef(v_trigger.oid, false);
+  exception when others then
+    perform pg_catalog.set_config('search_path', v_search_path, true);
+    raise;
+  end;
+  perform pg_catalog.set_config('search_path', v_search_path, true);
+
+  if (select pg_catalog.count(*)
+        from pg_catalog.pg_proc p
+        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname = 'mirror_bin_code_to_inventory_items') <> 1
+     or pg_catalog.encode(
+       pg_catalog.sha256(pg_catalog.convert_to(v_function.prosrc, 'UTF8')), 'hex'
+     ) <> '39d03433e9ccd05bb77e01c9f313acb8e271a8cd923c3e92776187c3f8d639f9'
+     or pg_catalog.pg_get_userbyid(v_function.proowner) <> 'postgres'
+     or v_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_function.prorettype <> pg_catalog.to_regtype('pg_catalog.trigger')
+     or v_function.prokind <> 'f'
+     or v_function.provolatile <> 'v'
+     or not v_function.prosecdef
+     or v_function.proisstrict
+     or v_function.proretset
+     or v_function.proparallel <> 'u'
+     or v_function.proleakproof
+     or v_function.procost <> 100::real
+     or v_function.prorows <> 0::real
+     or v_function.pronargdefaults <> 0
+     or v_function.provariadic <> 0::pg_catalog.oid
+     or v_function.prosupport <> 0::pg_catalog.oid
+     or v_function.proconfig is distinct from array['search_path=""']::text[]
+     or v_function.proargnames is not null
+     or v_function.proargmodes is not null
+     or v_function.proallargtypes is not null
+     or v_function.protrftypes is not null
+     or v_function.proargdefaults is not null
+     or v_function.prosqlbody is not null
+     or v_function.probin is not null
+     or pg_catalog.to_jsonb(v_function.proacl) is distinct from
+       '["postgres=X/postgres"]'::pg_catalog.jsonb
+     or v_trigger.tgfoid <> v_function.oid
+     or v_trigger.tgtype <> 17
+     or v_trigger.tgenabled <> 'O'
+     or v_trigger.tgdeferrable
+     or v_trigger.tginitdeferred
+     or v_trigger.tgnargs <> 0
+     or v_trigger.tgattr::text <> v_code_attnum::text
+     or v_trigger_definition <> 'CREATE TRIGGER bins_mirror_code_to_inventory_items AFTER UPDATE OF code ON public.bins FOR EACH ROW WHEN ((new.code IS DISTINCT FROM old.code)) EXECUTE FUNCTION public.mirror_bin_code_to_inventory_items()'
+     or pg_catalog.has_function_privilege(
+       'anon', 'public.mirror_bin_code_to_inventory_items()', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'authenticated', 'public.mirror_bin_code_to_inventory_items()', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'service_role', 'public.mirror_bin_code_to_inventory_items()', 'EXECUTE'
+     ) then
+    raise exception 'C07_0162_POSTFLIGHT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c07_0162_postflight$;
+
+-- === 0163_stalled_invoice_scan_expiry.sql ===
+-- 0163_stalled_invoice_scan_expiry.sql
+--
+-- Expire only abandoned invoice extraction work through one closed, current-
+-- authority boundary. Ordered scan locks and the separate final UPDATE are
+-- intentionally two SQL statements so READ COMMITTED refreshes the job view
+-- after a lock wait.
+
+do $c08_0163_preflight$
+declare
+  v_column_count integer;
+  v_job_type_definition text;
+  v_job_status_definition text;
+  v_updated_at_function pg_catalog.pg_proc%rowtype;
+  v_updated_at_acl_admitted boolean;
+begin
+  if pg_catalog.to_regclass('public.invoice_scans') is null
+     or pg_catalog.to_regclass('public.background_jobs') is null
+     or pg_catalog.to_regprocedure(
+       'public.current_site_role_at_least(uuid,public.membership_role)'
+     ) is null
+     or pg_catalog.to_regprocedure('public.set_updated_at()') is null
+     or pg_catalog.to_regrole('postgres') is null
+     or pg_catalog.to_regrole('anon') is null
+     or pg_catalog.to_regrole('authenticated') is null
+     or pg_catalog.to_regrole('service_role') is null then
+    raise exception 'C08_0163_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  select p.* into strict v_updated_at_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.set_updated_at()');
+
+  -- Supabase production may materialize the default PUBLIC function grant as
+  -- five explicit, equivalent EXECUTE tuples. Admit only that exact profile
+  -- or PostgreSQL's NULL default ACL; all other ACL drift still fails closed.
+  v_updated_at_acl_admitted := v_updated_at_function.proacl is null or (
+    (select pg_catalog.count(*)
+       from pg_catalog.aclexplode(v_updated_at_function.proacl)) = 5
+    and not exists (
+      select 1
+        from pg_catalog.aclexplode(v_updated_at_function.proacl) acl
+       where acl.grantor <> v_updated_at_function.proowner
+          or acl.privilege_type <> 'EXECUTE'
+          or acl.is_grantable
+          or acl.grantee not in (
+            0,
+            v_updated_at_function.proowner,
+            pg_catalog.to_regrole('anon'),
+            pg_catalog.to_regrole('authenticated'),
+            pg_catalog.to_regrole('service_role')
+          )
+    )
+    and (select pg_catalog.count(distinct acl.grantee)
+           from pg_catalog.aclexplode(v_updated_at_function.proacl) acl) = 5
+  );
+
+  select pg_catalog.count(*) into v_column_count
+    from pg_catalog.pg_attribute a
+   where (a.attrelid, a.attname, a.atttypid, a.attnotnull) in (
+     (pg_catalog.to_regclass('public.invoice_scans'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.invoice_scans'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.invoice_scans'), 'status',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.invoice_scans'), 'committed_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), false),
+     (pg_catalog.to_regclass('public.invoice_scans'), 'status_reason',
+       pg_catalog.to_regtype('pg_catalog.text'), false),
+     (pg_catalog.to_regclass('public.invoice_scans'), 'updated_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), true),
+     (pg_catalog.to_regclass('public.background_jobs'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.background_jobs'), 'job_type',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.background_jobs'), 'subject_table',
+       pg_catalog.to_regtype('pg_catalog.text'), false),
+     (pg_catalog.to_regclass('public.background_jobs'), 'subject_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.background_jobs'), 'status',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.background_jobs'), 'claimed_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), false)
+   )
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  select pg_catalog.pg_get_constraintdef(c.oid, false)
+    into v_job_type_definition
+    from pg_catalog.pg_constraint c
+   where c.conrelid = pg_catalog.to_regclass('public.background_jobs')
+     and c.conname = 'background_jobs_job_type_check'
+     and c.contype = 'c'
+     and c.convalidated;
+  select pg_catalog.pg_get_constraintdef(c.oid, false)
+    into v_job_status_definition
+    from pg_catalog.pg_constraint c
+   where c.conrelid = pg_catalog.to_regclass('public.background_jobs')
+     and c.conname = 'background_jobs_status_check'
+     and c.contype = 'c'
+     and c.convalidated;
+
+  if v_column_count <> 12
+     or v_job_type_definition is null
+     or pg_catalog.strpos(v_job_type_definition, 'invoice_extract') = 0
+     or v_job_status_definition is null
+     or pg_catalog.strpos(v_job_status_definition, 'queued') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'processing') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'retrying') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'succeeded') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'failed') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'cancelled') = 0
+     or pg_catalog.strpos(v_job_status_definition, 'dead') = 0
+     or pg_catalog.encode(
+       pg_catalog.sha256(
+         pg_catalog.convert_to(v_updated_at_function.prosrc, 'UTF8')
+       ),
+       'hex'
+     ) <> '3c6d6c41d6262a20e7c102dbd49bb3383bd86a4138c8a3ab6b9b04a1ec2420a5'
+     or pg_catalog.pg_get_userbyid(v_updated_at_function.proowner) <> 'postgres'
+     or v_updated_at_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_updated_at_function.prorettype <>
+       pg_catalog.to_regtype('pg_catalog.trigger')
+     or v_updated_at_function.prokind <> 'f'
+     or v_updated_at_function.provolatile <> 'v'
+     or not v_updated_at_function.prosecdef
+     or v_updated_at_function.proisstrict
+     or v_updated_at_function.proretset
+     or v_updated_at_function.proparallel <> 'u'
+     or v_updated_at_function.proleakproof
+     or v_updated_at_function.procost <> 100::real
+     or v_updated_at_function.prorows <> 0::real
+     or v_updated_at_function.pronargs <> 0
+     or v_updated_at_function.pronargdefaults <> 0
+     or v_updated_at_function.provariadic <> 0::pg_catalog.oid
+     or v_updated_at_function.prosupport <> 0::pg_catalog.oid
+     or v_updated_at_function.proargtypes::text <> ''
+     or v_updated_at_function.proallargtypes is not null
+     or v_updated_at_function.proargmodes is not null
+     or v_updated_at_function.proargnames is not null
+     or v_updated_at_function.proargdefaults is not null
+     or v_updated_at_function.proconfig is distinct from
+       array['search_path=public']::text[]
+     or not v_updated_at_acl_admitted
+     or v_updated_at_function.prosqlbody is not null
+     or v_updated_at_function.probin is not null
+     or (select pg_catalog.count(*)
+           from pg_catalog.pg_index i
+           join pg_catalog.pg_class c on c.oid = i.indexrelid
+          where (
+            (i.indrelid = pg_catalog.to_regclass('public.invoice_scans')
+             and c.relname in (
+               'invoice_scans_restaurant_id_idx', 'invoice_scans_status_idx'
+             ))
+            or (i.indrelid = pg_catalog.to_regclass('public.background_jobs')
+                and c.relname = 'background_jobs_subject_idx')
+          )
+            and i.indisvalid
+            and i.indisready) <> 3
+     or not exists (
+       select 1
+         from pg_catalog.pg_trigger t
+        where t.tgrelid = pg_catalog.to_regclass('public.invoice_scans')
+          and t.tgname = 'invoice_scans_set_updated_at'
+          and not t.tgisinternal
+          and t.tgtype = 19
+          and t.tgenabled = 'O'
+          and t.tgfoid = pg_catalog.to_regprocedure('public.set_updated_at()')
+          and t.tgattr::text = ''
+          and t.tgqual is null
+          and t.tgnargs = 0
+          and pg_catalog.encode(t.tgargs, 'hex') = ''
+     ) then
+    raise exception 'C08_0163_REQUIRED_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  if exists (
+       select 1
+         from pg_catalog.pg_proc p
+         join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname = 'expire_stalled_invoice_scans'
+     ) then
+    raise exception 'C08_0163_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+end;
+$c08_0163_preflight$;
+
+create function public.expire_stalled_invoice_scans(p_restaurant_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_now timestamptz;
+  v_locked_scan_ids uuid[];
+  v_expired_count integer;
+begin
+  if v_actor is null
+     or p_restaurant_id is null
+     or not public.current_site_role_at_least(p_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  end if;
+
+  v_now := pg_catalog.statement_timestamp();
+
+  select coalesce(
+           pg_catalog.array_agg(locked.id order by locked.id),
+           array[]::uuid[]
+         )
+    into v_locked_scan_ids
+    from (
+      select s.id
+        from public.invoice_scans s
+       where s.restaurant_id = p_restaurant_id
+         and s.status = 'processing'
+         and s.committed_at is null
+         and s.updated_at < v_now - interval '15 minutes'
+       order by s.id
+       for update
+    ) as locked;
+
+  with expired as (
+    update public.invoice_scans as s
+       set status = 'failed',
+           status_reason = 'stalled'
+     where s.id = any(v_locked_scan_ids)
+       and s.restaurant_id = p_restaurant_id
+       and s.status = 'processing'
+       and s.committed_at is null
+       and s.updated_at < v_now - interval '15 minutes'
+       and not exists (
+         select 1
+           from public.background_jobs as job
+          where job.restaurant_id = s.restaurant_id
+            and job.job_type = 'invoice_extract'
+            and job.subject_table = 'invoice_scans'
+            and job.subject_id = s.id
+            and (
+              job.status in ('queued', 'retrying')
+              or (
+                job.status = 'processing'
+                and job.claimed_at >= v_now - interval '5 minutes'
+              )
+            )
+       )
+     returning s.id
+  )
+  select pg_catalog.count(*)::integer
+    into v_expired_count
+    from expired;
+
+  return pg_catalog.jsonb_build_object(
+    'version', 1,
+    'expiredCount', v_expired_count
+  );
+end;
+$function$;
+
+comment on function public.expire_stalled_invoice_scans(uuid) is
+  'Expires exact-site stale processing scans only when no matching extraction job is active; requires current staff authority and READ COMMITTED.';
+
+revoke all on function public.expire_stalled_invoice_scans(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.expire_stalled_invoice_scans(uuid)
+  to authenticated;
+alter function public.expire_stalled_invoice_scans(uuid) owner to postgres;
+
+do $c08_0163_postflight$
+declare
+  v_function pg_catalog.pg_proc%rowtype;
+begin
+  select p.* into strict v_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.expire_stalled_invoice_scans(uuid)'
+   );
+
+  if (select pg_catalog.count(*)
+        from pg_catalog.pg_proc p
+        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname = 'expire_stalled_invoice_scans') <> 1
+     or pg_catalog.encode(
+       pg_catalog.sha256(pg_catalog.convert_to(v_function.prosrc, 'UTF8')),
+       'hex'
+     ) <> 'bd01b007ef6b2bc0b37b3e7126f938f8ae10d5600b7499ccd941abd5efa0b8a1'
+     or pg_catalog.pg_get_userbyid(v_function.proowner) <> 'postgres'
+     or v_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_function.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_function.prokind <> 'f'
+     or v_function.provolatile <> 'v'
+     or not v_function.prosecdef
+     or v_function.proisstrict
+     or v_function.proretset
+     or v_function.proparallel <> 'u'
+     or v_function.proleakproof
+     or v_function.procost <> 100::real
+     or v_function.prorows <> 0::real
+     or v_function.pronargs <> 1
+     or v_function.pronargdefaults <> 0
+     or v_function.provariadic <> 0::pg_catalog.oid
+     or v_function.prosupport <> 0::pg_catalog.oid
+     or v_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_function.proargnames) is distinct from
+       '["p_restaurant_id"]'::pg_catalog.jsonb
+     or v_function.proargmodes is not null
+     or v_function.proallargtypes is not null
+     or v_function.protrftypes is not null
+     or v_function.proargdefaults is not null
+     or v_function.prosqlbody is not null
+     or v_function.probin is not null
+     or pg_catalog.to_jsonb(v_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb then
+    raise exception 'C08_0163_POSTFLIGHT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c08_0163_postflight$;
+
+-- === 0164_import_revert_cleanup.sql ===
+-- 0164_import_revert_cleanup.sql
+--
+-- Retain catalog and history while making inventory reversal, eligible exact
+-- LWIN-pair cleanup, and batch/session status one atomic operation.
+
+do $c09_0164_preflight$
+declare
+  v_apply_function pg_catalog.pg_proc%rowtype;
+  v_apply_private_function pg_catalog.pg_proc%rowtype;
+  v_batch_function pg_catalog.pg_proc%rowtype;
+  v_session_function pg_catalog.pg_proc%rowtype;
+  v_role_function pg_catalog.pg_proc%rowtype;
+  v_updated_at_function pg_catalog.pg_proc%rowtype;
+  v_delete_function pg_catalog.pg_proc%rowtype;
+  v_column_count integer;
+  v_updated_at_acl_admitted boolean;
+begin
+  if pg_catalog.to_regclass('public.import_batches') is null
+     or pg_catalog.to_regclass('public.import_batch_rows') is null
+     or pg_catalog.to_regclass('public.import_sessions') is null
+     or pg_catalog.to_regclass('public.wines') is null
+     or pg_catalog.to_regclass('public.inventory_items') is null
+     or pg_catalog.to_regclass('public.open_bottles') is null
+     or pg_catalog.to_regprocedure(
+       'public.current_site_role_at_least(uuid,public.membership_role)'
+     ) is null
+     or pg_catalog.to_regprocedure('public.set_updated_at()') is null
+     or pg_catalog.to_regprocedure(
+       'public.import_batch_rows_reflect_inventory_delete()'
+     ) is null
+     or pg_catalog.to_regprocedure(
+       'public.apply_import_batch_chunk(uuid,integer)'
+     ) is null
+     or pg_catalog.to_regprocedure(
+       'public.apply_import_batch_chunk_pre_0157(uuid,integer)'
+     ) is null
+     or pg_catalog.to_regprocedure('public.revert_import_batch(uuid)') is null
+     or pg_catalog.to_regprocedure('public.revert_import_session(uuid)') is null
+     or pg_catalog.to_regrole('postgres') is null
+     or pg_catalog.to_regrole('anon') is null
+     or pg_catalog.to_regrole('authenticated') is null
+     or pg_catalog.to_regrole('service_role') is null then
+    raise exception 'C09_0164_REQUIRED_BASELINE_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+       select 1
+         from pg_catalog.pg_proc p
+         join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in (
+            'revert_import_batch_core_private',
+            'revert_import_batch_private'
+          )
+     ) then
+    raise exception 'C09_0164_TARGET_IDENTITY_OCCUPIED' using errcode = 'P0001';
+  end if;
+
+  select p.* into strict v_batch_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.revert_import_batch(uuid)');
+  select p.* into strict v_session_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.revert_import_session(uuid)');
+  select p.* into strict v_apply_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.apply_import_batch_chunk(uuid,integer)'
+   );
+  select p.* into strict v_apply_private_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.apply_import_batch_chunk_pre_0157(uuid,integer)'
+   );
+  select p.* into strict v_role_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.current_site_role_at_least(uuid,public.membership_role)'
+   );
+  select p.* into strict v_updated_at_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.set_updated_at()');
+  select p.* into strict v_delete_function
+    from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.import_batch_rows_reflect_inventory_delete()'
+   );
+
+  -- Supabase production may materialize the default PUBLIC function grant as
+  -- five explicit, equivalent EXECUTE tuples. Admit only that exact profile
+  -- or PostgreSQL's NULL default ACL; all other ACL drift still fails closed.
+  v_updated_at_acl_admitted := v_updated_at_function.proacl is null or (
+    (select pg_catalog.count(*)
+       from pg_catalog.aclexplode(v_updated_at_function.proacl)) = 5
+    and not exists (
+      select 1
+        from pg_catalog.aclexplode(v_updated_at_function.proacl) acl
+       where acl.grantor <> v_updated_at_function.proowner
+          or acl.privilege_type <> 'EXECUTE'
+          or acl.is_grantable
+          or acl.grantee not in (
+            0,
+            v_updated_at_function.proowner,
+            pg_catalog.to_regrole('anon'),
+            pg_catalog.to_regrole('authenticated'),
+            pg_catalog.to_regrole('service_role')
+          )
+    )
+    and (select pg_catalog.count(distinct acl.grantee)
+           from pg_catalog.aclexplode(v_updated_at_function.proacl) acl) = 5
+  );
+
+  select pg_catalog.count(*) into v_column_count
+    from pg_catalog.pg_attribute a
+   where (a.attrelid, a.attname, a.atttypid, a.attnotnull) in (
+     (pg_catalog.to_regclass('public.import_batches'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_batches'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_batches'), 'status',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.import_batches'), 'reverted_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), false),
+     (pg_catalog.to_regclass('public.import_batches'), 'reverted_by',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.import_batches'), 'session_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.import_batches'), 'chunk_index',
+       pg_catalog.to_regtype('pg_catalog.int4'), false),
+     (pg_catalog.to_regclass('public.import_batches'), 'created_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'batch_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'apply_status',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'),
+       'applied_inventory_item_id', pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'applied_wine_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'updated_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), true),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'lwin_id',
+       pg_catalog.to_regtype('pg_catalog.text'), false),
+     (pg_catalog.to_regclass('public.import_batch_rows'), 'lwin_score',
+       pg_catalog.to_regtype('pg_catalog.float4'), false),
+     (pg_catalog.to_regclass('public.import_sessions'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_sessions'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.import_sessions'), 'status',
+       pg_catalog.to_regtype('pg_catalog.text'), true),
+     (pg_catalog.to_regclass('public.wines'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.wines'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.wines'), 'lwin_id',
+       pg_catalog.to_regtype('pg_catalog.text'), false),
+     (pg_catalog.to_regclass('public.wines'), 'lwin_match_score',
+       pg_catalog.to_regtype('pg_catalog.float4'), false),
+     (pg_catalog.to_regclass('public.wines'), 'updated_at',
+       pg_catalog.to_regtype('pg_catalog.timestamptz'), true),
+     (pg_catalog.to_regclass('public.inventory_items'), 'id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.inventory_items'), 'restaurant_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.inventory_items'), 'wine_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), true),
+     (pg_catalog.to_regclass('public.open_bottles'), 'source_inventory_item_id',
+       pg_catalog.to_regtype('pg_catalog.uuid'), false)
+   )
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  if v_column_count <> 29
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_apply_function.prosrc, 'UTF8')
+     ), 'hex') <> '3b84ef448e44560db50067e35091cb0f4a96f170f0a696be3eaac3661e25116b'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_apply_private_function.prosrc, 'UTF8')
+     ), 'hex') <> 'dbdaef5364b676c09dd4670da5a5c4d27c99aaefeea76db2817fc48f85ea7710'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_batch_function.prosrc, 'UTF8')
+     ), 'hex') <> '23b230a852f5cfa86fca557d3a190a8eec02e719ab7cd93ed49969ec93659c07'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_session_function.prosrc, 'UTF8')
+     ), 'hex') <> '119a2ca01ebdb5af1553f738fb7b68c03076680336085d831ff95cfe8fbab884'
+     or pg_catalog.pg_get_userbyid(v_batch_function.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_session_function.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_apply_function.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_apply_private_function.proowner) <> 'postgres'
+     or not v_batch_function.prosecdef
+     or not v_session_function.prosecdef
+     or not v_apply_function.prosecdef
+     or v_apply_private_function.prosecdef
+     or v_batch_function.provolatile <> 'v'
+     or v_session_function.provolatile <> 'v'
+     or v_apply_function.provolatile <> 'v'
+     or v_apply_private_function.provolatile <> 'v'
+     or v_apply_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_apply_private_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_apply_function.prorettype <> pg_catalog.to_regtype('pg_catalog.record')
+     or v_apply_private_function.prorettype <>
+       pg_catalog.to_regtype('pg_catalog.record')
+     or not v_apply_function.proretset
+     or not v_apply_private_function.proretset
+     or v_apply_function.pronargdefaults <> 1
+     or v_apply_private_function.pronargdefaults <> 1
+     or pg_catalog.pg_get_expr(v_apply_function.proargdefaults, 0, false) <> '100'
+     or pg_catalog.pg_get_expr(
+       v_apply_private_function.proargdefaults, 0, false
+     ) <> '50'
+     or pg_catalog.to_jsonb(v_apply_function.proargnames) is distinct from
+       '["p_batch_id", "p_limit", "row_id", "row_number", "outcome", "inventory_item_id", "error_message", "error_code"]'::pg_catalog.jsonb
+     or v_batch_function.prorettype <> pg_catalog.to_regtype('pg_catalog.int4')
+     or v_session_function.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_batch_function.proconfig is distinct from array['search_path=""']::text[]
+     or v_session_function.proconfig is distinct from array['search_path=""']::text[]
+     or v_apply_function.proconfig is distinct from array['search_path=""']::text[]
+     or v_apply_private_function.proconfig is distinct from
+       array['search_path=public']::text[]
+     or pg_catalog.to_jsonb(v_batch_function.proargnames) is distinct from
+       '["p_batch_id"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_session_function.proargnames) is distinct from
+       '["p_session_id"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_batch_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_session_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_apply_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_apply_private_function.proacl) is distinct from
+       '["postgres=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_role_function.prosrc, 'UTF8')
+     ), 'hex') <> '6a01649ad58aebb820b6119b79381e69ae579269996ab7af5456fbf75ef322f2'
+     or pg_catalog.pg_get_userbyid(v_role_function.proowner) <> 'postgres'
+     or v_role_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'sql'
+     )
+     or v_role_function.provolatile <> 's'
+     or not v_role_function.prosecdef
+     or v_role_function.prorettype <> pg_catalog.to_regtype('pg_catalog.bool')
+     or v_role_function.pronargs <> 2
+     or v_role_function.pronargdefaults <> 0
+     or v_role_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_role_function.proacl) is distinct from
+       '["postgres=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_updated_at_function.prosrc, 'UTF8')
+     ), 'hex') <> '3c6d6c41d6262a20e7c102dbd49bb3383bd86a4138c8a3ab6b9b04a1ec2420a5'
+     or pg_catalog.pg_get_userbyid(v_updated_at_function.proowner) <> 'postgres'
+     or v_updated_at_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_updated_at_function.prorettype <>
+       pg_catalog.to_regtype('pg_catalog.trigger')
+     or v_updated_at_function.provolatile <> 'v'
+     or not v_updated_at_function.prosecdef
+     or v_updated_at_function.proconfig is distinct from
+       array['search_path=public']::text[]
+     or not v_updated_at_acl_admitted
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_delete_function.prosrc, 'UTF8')
+     ), 'hex') <> '5ce2c8fade26354ddbdfa097e1dab15cd3e0837bf8ac986ac321b40f863242fd'
+     or pg_catalog.pg_get_userbyid(v_delete_function.proowner) <> 'postgres'
+     or v_delete_function.prolang <> (
+       select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+     )
+     or v_delete_function.prorettype <> pg_catalog.to_regtype('pg_catalog.trigger')
+     or v_delete_function.provolatile <> 'v'
+     or v_delete_function.prosecdef
+     or v_delete_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_delete_function.proacl) is distinct from
+       '["postgres=X/postgres"]'::pg_catalog.jsonb
+     or not exists (
+       select 1
+         from pg_catalog.pg_constraint c
+        where c.conrelid = pg_catalog.to_regclass('public.import_batch_rows')
+          and c.conname = 'import_batch_rows_applied_has_inventory_id'
+          and c.contype = 'c'
+          and c.convalidated
+          and pg_catalog.pg_get_expr(c.conbin, c.conrelid, false) =
+            '((apply_status <> ''applied''::text) OR (applied_inventory_item_id IS NOT NULL))'
+     )
+     or not exists (
+       select 1
+         from pg_catalog.pg_constraint c
+        where c.conrelid = pg_catalog.to_regclass('public.import_batch_rows')
+          and c.conname = 'import_batch_rows_batch_restaurant_fkey'
+          and c.contype = 'f'
+          and c.convalidated
+          and c.confrelid = pg_catalog.to_regclass('public.import_batches')
+          and c.confdeltype = 'c'
+          and c.conkey = array[
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.conrelid and a.attname = 'batch_id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.conrelid and a.attname = 'restaurant_id')
+          ]::smallint[]
+          and c.confkey = array[
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.confrelid and a.attname = 'id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.confrelid and a.attname = 'restaurant_id')
+          ]::smallint[]
+     )
+     or not exists (
+       select 1
+         from pg_catalog.pg_constraint c
+        where c.conrelid = pg_catalog.to_regclass('public.open_bottles')
+          and c.conname = 'open_bottles_source_inventory_item_tenant_wine_fkey'
+          and c.contype = 'f'
+          and c.convalidated
+          and c.confdeltype = 'r'
+          and c.condeferrable
+          and c.condeferred
+          and c.confrelid = pg_catalog.to_regclass('public.inventory_items')
+          and c.conkey = array[
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.conrelid and a.attname = 'source_inventory_item_id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.conrelid and a.attname = 'restaurant_id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.conrelid and a.attname = 'wine_id')
+          ]::smallint[]
+          and c.confkey = array[
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.confrelid and a.attname = 'id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.confrelid and a.attname = 'restaurant_id'),
+            (select a.attnum from pg_catalog.pg_attribute a
+              where a.attrelid = c.confrelid and a.attname = 'wine_id')
+          ]::smallint[]
+     )
+     or not exists (
+       select 1
+         from pg_catalog.pg_index i
+         join pg_catalog.pg_class x on x.oid = i.indexrelid
+        where i.indrelid = pg_catalog.to_regclass('public.open_bottles')
+          and x.relname = 'open_bottles_source_inventory_item_id_idx'
+          and i.indisvalid
+          and i.indisready
+          and i.indisunique = false
+          and i.indkey::text = (
+            select a.attnum::text from pg_catalog.pg_attribute a
+             where a.attrelid = i.indrelid
+               and a.attname = 'source_inventory_item_id'
+          )
+          and pg_catalog.pg_get_expr(i.indpred, i.indrelid, false) =
+            '(source_inventory_item_id IS NOT NULL)'
+     )
+     or (select pg_catalog.count(*)
+           from pg_catalog.pg_trigger t
+          where (
+            (t.tgrelid = pg_catalog.to_regclass('public.wines')
+             and t.tgname = 'wines_set_updated_at'
+             and t.tgfoid = v_updated_at_function.oid
+             and t.tgtype = 19)
+            or
+            (t.tgrelid = pg_catalog.to_regclass('public.import_batch_rows')
+             and t.tgname = 'import_batch_rows_set_updated_at'
+             and t.tgfoid = v_updated_at_function.oid
+             and t.tgtype = 19)
+            or
+            (t.tgrelid = pg_catalog.to_regclass('public.inventory_items')
+             and t.tgname = 'inventory_items_reflect_import_delete'
+             and t.tgfoid = v_delete_function.oid
+             and t.tgtype = 11)
+          )
+            and not t.tgisinternal
+            and t.tgenabled = 'O'
+            and t.tgattr::text = ''
+            and t.tgqual is null
+            and t.tgnargs = 0
+            and pg_catalog.encode(t.tgargs, 'hex') = ''
+     ) <> 3 then
+    raise exception 'C09_0164_REQUIRED_BASELINE_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c09_0164_preflight$;
+
+create or replace function public.apply_import_batch_chunk(
+  p_batch_id uuid,
+  p_limit integer default 100
+) returns table(
+  row_id uuid,
+  row_number integer,
+  outcome text,
+  inventory_item_id uuid,
+  error_message text,
+  error_code text
+)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+declare
+  v_restaurant_id uuid;
+  v_status text;
+  v_row record;
+begin
+  if p_limit is null or p_limit not between 1 and 100 then
+    raise exception 'C04_IMPORT_CHUNK_INVALID' using errcode = 'P0001';
+  end if;
+
+  select b.restaurant_id
+    into v_restaurant_id
+    from public.import_batches b
+   where b.id = p_batch_id;
+  if v_restaurant_id is null
+     or not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'import-mutation:' || v_restaurant_id::text,
+      0
+    )
+  );
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select b.status
+    into v_status
+    from public.import_batches b
+   where b.id = p_batch_id
+     and b.restaurant_id = v_restaurant_id
+   for update;
+  if not found
+     or not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  for v_row in
+    select *
+      from public.apply_import_batch_chunk_pre_0157(p_batch_id, p_limit)
+  loop
+    row_id := v_row.row_id;
+    row_number := v_row.row_number;
+    outcome := case
+      when v_row.outcome in ('applied', 'blocked', 'error') then v_row.outcome
+      else 'error'
+    end;
+    inventory_item_id := case
+      when v_row.outcome = 'applied' then v_row.inventory_item_id
+      else null
+    end;
+    error_code := case
+      when v_row.outcome = 'blocked' then 'missing_unit_cost'
+      when v_row.outcome = 'error' then 'row_apply_failed'
+      else null
+    end;
+    error_message := error_code;
+    return next;
+  end loop;
+
+  update public.import_batches b
+     set status = case
+       when b.status = 'reverted' then 'reverted'
+       when not exists (
+         select 1 from public.import_batch_rows r
+          where r.batch_id = p_batch_id
+            and not (r.apply_status = 'applied' or r.resolution = 'exclude')
+       ) then 'completed'
+       when exists (
+         select 1 from public.import_batch_rows r
+          where r.batch_id = p_batch_id
+            and r.apply_status = 'applied'
+       ) then 'applying'
+       else 'created'
+     end
+   where b.id = p_batch_id
+     and b.restaurant_id = v_restaurant_id;
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode = '42501';
+  when sqlstate '25000' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  when sqlstate 'P0004' then
+    raise exception 'import_batch_conflict' using errcode = 'P0004';
+  when others then
+    raise exception 'C04_IMPORT_APPLY_REFUSED' using errcode = 'P0001';
+end;
+$function$;
+
+create function public.revert_import_batch_core_private(
+  p_batch_id uuid,
+  p_reverting_batch_ids uuid[]
+) returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_restaurant_id uuid;
+  v_session_id uuid;
+  v_status text;
+  v_canonical_scope uuid[];
+  v_inventory_ids uuid[] := array[]::uuid[];
+  v_reverted_count integer := 0;
+  v_inventory_count integer := 0;
+  v_updated_count integer := 0;
+  v_deleted_count integer := 0;
+  v_lwin_cleared integer := 0;
+begin
+  if v_actor is null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select b.restaurant_id, b.session_id
+    into v_restaurant_id, v_session_id
+    from public.import_batches b
+   where b.id = p_batch_id;
+  if not found
+     or not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  end if;
+
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'import-mutation:' || v_restaurant_id::text,
+      0
+    )
+  );
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  end if;
+
+  select b.restaurant_id, b.session_id, b.status
+    into v_restaurant_id, v_session_id, v_status
+    from public.import_batches b
+   where b.id = p_batch_id
+     and b.restaurant_id = v_restaurant_id
+   for update;
+  if not found then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  end if;
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  end if;
+  if v_status = 'reverted' then
+    raise exception 'import_batch_already_reverted' using errcode = 'P04I1';
+  end if;
+
+  if p_reverting_batch_ids is null
+     or pg_catalog.array_ndims(p_reverting_batch_ids) <> 1
+     or pg_catalog.array_lower(p_reverting_batch_ids, 1) <> 1
+     or pg_catalog.cardinality(p_reverting_batch_ids) < 1
+     or pg_catalog.array_position(p_reverting_batch_ids, null) is not null
+     or not (p_batch_id = any(p_reverting_batch_ids)) then
+    raise exception 'C09_IMPORT_REVERT_SCOPE_INVALID' using errcode = 'P0001';
+  end if;
+
+  select pg_catalog.array_agg(scope.batch_id order by scope.batch_id)
+    into v_canonical_scope
+    from (
+      select distinct u.batch_id
+        from pg_catalog.unnest(p_reverting_batch_ids) as u(batch_id)
+    ) as scope;
+  if p_reverting_batch_ids is distinct from v_canonical_scope
+     or exists (
+       select 1
+         from pg_catalog.unnest(p_reverting_batch_ids) as u(batch_id)
+         left join public.import_batches b on b.id = u.batch_id
+        where b.id is null
+           or b.restaurant_id <> v_restaurant_id
+           or (
+             pg_catalog.cardinality(p_reverting_batch_ids) > 1
+             and (v_session_id is null or b.session_id is distinct from v_session_id)
+           )
+     ) then
+    raise exception 'C09_IMPORT_REVERT_SCOPE_INVALID' using errcode = 'P0001';
+  end if;
+
+  perform r.id
+    from public.import_batch_rows r
+   where r.batch_id = p_batch_id
+     and r.restaurant_id = v_restaurant_id
+     and r.apply_status = 'applied'
+   order by r.id
+   for update;
+
+  select pg_catalog.count(*)::integer,
+         pg_catalog.count(distinct r.applied_inventory_item_id)::integer,
+         coalesce(
+           pg_catalog.array_agg(r.applied_inventory_item_id order by r.id),
+           array[]::uuid[]
+         )
+    into v_reverted_count, v_inventory_count, v_inventory_ids
+    from public.import_batch_rows r
+   where r.batch_id = p_batch_id
+     and r.restaurant_id = v_restaurant_id
+     and r.apply_status = 'applied';
+
+  perform w.id
+    from public.wines w
+   where w.restaurant_id = v_restaurant_id
+     and w.id in (
+       select r.applied_wine_id
+         from public.import_batch_rows r
+        where r.batch_id = p_batch_id
+          and r.restaurant_id = v_restaurant_id
+          and r.apply_status = 'applied'
+          and r.applied_wine_id is not null
+     )
+   order by w.id
+   for update;
+
+  perform i.id
+    from public.inventory_items i
+   where i.restaurant_id = v_restaurant_id
+     and i.id = any(v_inventory_ids)
+   order by i.id
+   for update;
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  end if;
+
+  if exists (
+       select 1
+         from public.import_batch_rows claimed
+        where claimed.apply_status = 'applied'
+          and claimed.applied_inventory_item_id = any(v_inventory_ids)
+        group by claimed.applied_inventory_item_id
+       having pg_catalog.count(*) > 1
+     ) then
+    raise exception 'import_source_conflict' using errcode = 'P04I2';
+  end if;
+
+  if exists (
+       select 1
+         from public.import_batch_rows r
+        where r.batch_id = p_batch_id
+          and r.restaurant_id = v_restaurant_id
+          and r.apply_status = 'applied'
+          and (
+            r.applied_wine_id is null
+            or not exists (
+              select 1
+                from public.wines w
+               where w.id = r.applied_wine_id
+                 and w.restaurant_id = v_restaurant_id
+            )
+            or not exists (
+              select 1
+                from public.inventory_items i
+               where i.id = r.applied_inventory_item_id
+                 and i.restaurant_id = v_restaurant_id
+                 and i.wine_id = r.applied_wine_id
+            )
+          )
+     ) then
+    raise exception 'C09_IMPORT_REVERT_BASELINE_INVALID' using errcode = 'P0001';
+  end if;
+
+  if exists (
+       select 1
+         from public.open_bottles ob
+        where ob.source_inventory_item_id = any(v_inventory_ids)
+     ) then
+    raise exception 'physical_bottle_dependency' using errcode = 'P04D3';
+  end if;
+
+  with cleared as (
+    update public.wines w
+       set lwin_id = null,
+           lwin_match_score = null
+     where w.restaurant_id = v_restaurant_id
+       and exists (
+         select 1
+           from public.import_batch_rows r
+          where r.batch_id = p_batch_id
+            and r.restaurant_id = v_restaurant_id
+            and r.apply_status = 'applied'
+            and r.applied_wine_id = w.id
+            and r.lwin_id is not null
+            and r.lwin_score is not null
+            and r.lwin_score >= 0.6
+            and r.updated_at = w.updated_at
+            and r.lwin_id = w.lwin_id
+            and r.lwin_score = w.lwin_match_score
+       )
+       and not exists (
+         select 1
+           from public.import_batch_rows competing
+          where competing.restaurant_id = v_restaurant_id
+            and competing.applied_wine_id = w.id
+            and competing.apply_status = 'applied'
+            and competing.lwin_id = w.lwin_id
+            and competing.lwin_score = w.lwin_match_score
+            and not (competing.batch_id = any(p_reverting_batch_ids))
+       )
+     returning w.id
+  )
+  select pg_catalog.count(*)::integer
+    into v_lwin_cleared
+    from cleared;
+
+  update public.import_batch_rows r
+     set apply_status = 'reverted',
+         applied_inventory_item_id = null,
+         updated_at = pg_catalog.statement_timestamp()
+   where r.batch_id = p_batch_id
+     and r.restaurant_id = v_restaurant_id
+     and r.apply_status = 'applied';
+  get diagnostics v_updated_count = row_count;
+  if v_updated_count <> v_reverted_count then
+    raise exception 'C09_IMPORT_REVERT_ROW_COUNT_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  delete from public.inventory_items i
+   where i.restaurant_id = v_restaurant_id
+     and i.id = any(v_inventory_ids);
+  get diagnostics v_deleted_count = row_count;
+  if v_deleted_count <> v_inventory_count then
+    raise exception 'C09_IMPORT_REVERT_INVENTORY_COUNT_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  update public.import_batches b
+     set status = 'reverted',
+         reverted_at = pg_catalog.statement_timestamp(),
+         reverted_by = v_actor
+   where b.id = p_batch_id
+     and b.restaurant_id = v_restaurant_id
+     and b.status <> 'reverted';
+  if not found then
+    raise exception 'C09_IMPORT_REVERT_BATCH_FENCE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'version', 1,
+    'batchId', p_batch_id,
+    'status', 'reverted',
+    'revertedItemCount', v_reverted_count,
+    'orphanWinesDeleted', 0,
+    'lwinStampsCleared', v_lwin_cleared
+  );
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode = '42501';
+  when sqlstate '25000' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  when sqlstate 'P0002' then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  when sqlstate 'P04I1' then
+    raise exception 'import_batch_already_reverted' using errcode = 'P04I1';
+  when sqlstate 'P04I2' then
+    raise exception 'import_source_conflict' using errcode = 'P04I2';
+  when sqlstate 'P04D3' then
+    raise exception 'physical_bottle_dependency' using errcode = 'P04D3';
+  when others then
+    raise exception 'C04_IMPORT_REVERT_REFUSED' using errcode = 'P0001';
+end;
+$function$;
+
+create function public.revert_import_batch_private(p_batch_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+begin
+  return public.revert_import_batch_core_private(
+    p_batch_id,
+    array[p_batch_id]::uuid[]
+  );
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode = '42501';
+  when sqlstate '25000' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  when sqlstate 'P0002' then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  when sqlstate 'P04I1' then
+    raise exception 'import_batch_already_reverted' using errcode = 'P04I1';
+  when sqlstate 'P04I2' then
+    raise exception 'import_source_conflict' using errcode = 'P04I2';
+  when sqlstate 'P04D3' then
+    raise exception 'physical_bottle_dependency' using errcode = 'P04D3';
+  when others then
+    raise exception 'C04_IMPORT_REVERT_REFUSED' using errcode = 'P0001';
+end;
+$function$;
+
+create or replace function public.revert_import_batch(p_batch_id uuid)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+declare
+  v_result jsonb;
+begin
+  v_result := public.revert_import_batch_core_private(
+    p_batch_id,
+    array[p_batch_id]::uuid[]
+  );
+  return (v_result ->> 'revertedItemCount')::integer;
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode = '42501';
+  when sqlstate '25000' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  when sqlstate 'P0002' then
+    raise exception 'import_batch_not_found' using errcode = 'P0002';
+  when sqlstate 'P04I1' then
+    raise exception 'import_batch_already_reverted' using errcode = 'P0001';
+  when sqlstate 'P04I2' then
+    raise exception 'import_source_conflict' using errcode = 'P0001';
+  when sqlstate 'P04D3' then
+    raise exception 'physical_bottle_dependency' using errcode = 'P0001';
+  when others then
+    raise exception 'C04_IMPORT_REVERT_REFUSED' using errcode = 'P0001';
+end;
+$function$;
+
+create or replace function public.revert_import_session(p_session_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_restaurant_id uuid;
+  v_batch record;
+  v_scope uuid[] := array[]::uuid[];
+  v_result jsonb;
+  v_results jsonb := '[]'::jsonb;
+  v_reverted_batches integer := 0;
+  v_reverted_items integer := 0;
+begin
+  if v_actor is null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select s.restaurant_id
+    into v_restaurant_id
+    from public.import_sessions s
+   where s.id = p_session_id;
+  if not found
+     or not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'import-mutation:' || v_restaurant_id::text,
+      0
+    )
+  );
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+
+  perform 1
+    from public.import_sessions s
+   where s.id = p_session_id
+     and s.restaurant_id = v_restaurant_id
+   for update;
+  if not found then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+
+  perform b.id
+    from public.import_batches b
+   where b.session_id = p_session_id
+     and b.restaurant_id = v_restaurant_id
+   order by coalesce(b.chunk_index, 0) desc, b.created_at desc, b.id desc
+   for update;
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+
+  select coalesce(
+           pg_catalog.array_agg(b.id order by b.id),
+           array[]::uuid[]
+         )
+    into v_scope
+    from public.import_batches b
+   where b.session_id = p_session_id
+     and b.restaurant_id = v_restaurant_id
+     and b.status <> 'reverted';
+
+  perform r.id
+    from public.import_batch_rows r
+   where r.restaurant_id = v_restaurant_id
+     and r.batch_id = any(v_scope)
+     and r.apply_status = 'applied'
+   order by r.id
+   for update;
+
+  perform w.id
+    from public.wines w
+   where w.restaurant_id = v_restaurant_id
+     and w.id in (
+       select r.applied_wine_id
+         from public.import_batch_rows r
+        where r.restaurant_id = v_restaurant_id
+          and r.batch_id = any(v_scope)
+          and r.apply_status = 'applied'
+          and r.applied_wine_id is not null
+     )
+   order by w.id
+   for update;
+
+  perform i.id
+    from public.inventory_items i
+   where i.restaurant_id = v_restaurant_id
+     and i.id in (
+       select r.applied_inventory_item_id
+         from public.import_batch_rows r
+        where r.restaurant_id = v_restaurant_id
+          and r.batch_id = any(v_scope)
+          and r.apply_status = 'applied'
+     )
+   order by i.id
+   for update;
+
+  if not public.current_site_role_at_least(v_restaurant_id, 'staff') then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  end if;
+
+  if exists (
+       select 1
+         from public.import_batch_rows candidate
+         join public.import_batch_rows claimed
+           on claimed.applied_inventory_item_id = candidate.applied_inventory_item_id
+          and claimed.apply_status = 'applied'
+        where candidate.restaurant_id = v_restaurant_id
+          and candidate.batch_id = any(v_scope)
+          and candidate.apply_status = 'applied'
+        group by candidate.applied_inventory_item_id
+       having pg_catalog.count(distinct claimed.id) > 1
+     ) then
+    raise exception 'import_source_conflict' using errcode = 'P04I2';
+  end if;
+
+  if exists (
+       select 1
+         from public.import_batch_rows r
+         join public.open_bottles ob
+           on ob.source_inventory_item_id = r.applied_inventory_item_id
+        where r.restaurant_id = v_restaurant_id
+          and r.batch_id = any(v_scope)
+          and r.apply_status = 'applied'
+     ) then
+    raise exception 'physical_bottle_dependency' using errcode = 'P04D3';
+  end if;
+
+  for v_batch in
+    select b.id, b.status, b.chunk_index
+      from public.import_batches b
+     where b.session_id = p_session_id
+       and b.restaurant_id = v_restaurant_id
+     order by coalesce(b.chunk_index, 0) desc, b.created_at desc, b.id desc
+  loop
+    if v_batch.status = 'reverted' then
+      v_results := v_results || pg_catalog.jsonb_build_object(
+        'batchId', v_batch.id,
+        'chunkIndex', v_batch.chunk_index,
+        'skipped', true,
+        'reason', 'already_reverted'
+      );
+      continue;
+    end if;
+
+    v_result := public.revert_import_batch_core_private(v_batch.id, v_scope);
+    v_results := v_results || pg_catalog.jsonb_build_object(
+      'batchId', v_batch.id,
+      'chunkIndex', v_batch.chunk_index,
+      'skipped', false,
+      'status', 'reverted',
+      'revertedItemCount', (v_result ->> 'revertedItemCount')::integer,
+      'orphanWinesDeleted', 0,
+      'lwinStampsCleared', (v_result ->> 'lwinStampsCleared')::integer
+    );
+    v_reverted_batches := v_reverted_batches + 1;
+    v_reverted_items := v_reverted_items
+      + (v_result ->> 'revertedItemCount')::integer;
+  end loop;
+
+  update public.import_sessions s
+     set status = 'reverted',
+         updated_at = pg_catalog.statement_timestamp()
+   where s.id = p_session_id
+     and s.restaurant_id = v_restaurant_id;
+  if not found then
+    raise exception 'C09_IMPORT_SESSION_FENCE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'version', 1,
+    'sessionId', p_session_id,
+    'status', 'reverted',
+    'batches', v_results,
+    'revertedBatchCount', v_reverted_batches,
+    'blockedBatchCount', 0,
+    'revertedItemCount', v_reverted_items
+  );
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode = '42501';
+  when sqlstate '25000' then
+    raise exception 'read_committed_required' using errcode = '25000';
+  when sqlstate 'P0002' then
+    raise exception 'import_session_not_found' using errcode = 'P0002';
+  when sqlstate 'P04I2' then
+    raise exception 'import_source_conflict' using errcode = 'P04I2';
+  when sqlstate 'P04D3' then
+    raise exception 'physical_bottle_dependency' using errcode = 'P04D3';
+  when others then
+    raise exception 'C04_IMPORT_SESSION_REVERT_REFUSED' using errcode = 'P0001';
+end;
+$function$;
+
+comment on function public.apply_import_batch_chunk(uuid, integer) is
+  'Existing import apply contract serialized with revert by an exact-site transaction lock.';
+comment on function public.revert_import_batch_core_private(uuid, uuid[]) is
+  'Atomic retained-catalog import revert core; the private scope names the exact batches reverting in the caller transaction.';
+comment on function public.revert_import_batch_private(uuid) is
+  'Typed retained-catalog batch revert with strict version-1 cost-free receipt.';
+comment on function public.revert_import_batch(uuid) is
+  'Legacy integer compatibility wrapper over the atomic retained-catalog batch revert core.';
+comment on function public.revert_import_session(uuid) is
+  'All-or-nothing retained-catalog session revert with globally ordered wine and inventory lock unions.';
+
+revoke all on function public.apply_import_batch_chunk(uuid, integer)
+  from public, anon, authenticated, service_role;
+grant execute on function public.apply_import_batch_chunk(uuid, integer)
+  to authenticated;
+revoke all on function public.revert_import_batch_core_private(uuid, uuid[])
+  from public, anon, authenticated, service_role;
+revoke all on function public.revert_import_batch_private(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.revert_import_batch_private(uuid)
+  to authenticated;
+revoke all on function public.revert_import_batch(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.revert_import_batch(uuid)
+  to authenticated;
+revoke all on function public.revert_import_session(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.revert_import_session(uuid)
+  to authenticated;
+
+alter function public.apply_import_batch_chunk(uuid, integer) owner to postgres;
+alter function public.revert_import_batch_core_private(uuid, uuid[]) owner to postgres;
+alter function public.revert_import_batch_private(uuid) owner to postgres;
+alter function public.revert_import_batch(uuid) owner to postgres;
+alter function public.revert_import_session(uuid) owner to postgres;
+
+do $c09_0164_postflight$
+declare
+  v_apply pg_catalog.pg_proc%rowtype;
+  v_core pg_catalog.pg_proc%rowtype;
+  v_typed pg_catalog.pg_proc%rowtype;
+  v_legacy pg_catalog.pg_proc%rowtype;
+  v_session pg_catalog.pg_proc%rowtype;
+begin
+  select p.* into strict v_apply from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.apply_import_batch_chunk(uuid,integer)'
+   );
+  select p.* into strict v_core from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure(
+     'public.revert_import_batch_core_private(uuid,uuid[])'
+   );
+  select p.* into strict v_typed from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.revert_import_batch_private(uuid)');
+  select p.* into strict v_legacy from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.revert_import_batch(uuid)');
+  select p.* into strict v_session from pg_catalog.pg_proc p
+   where p.oid = pg_catalog.to_regprocedure('public.revert_import_session(uuid)');
+
+  if (select pg_catalog.count(*)
+        from pg_catalog.pg_proc p
+        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname in (
+           'apply_import_batch_chunk',
+           'revert_import_batch_core_private',
+           'revert_import_batch_private',
+           'revert_import_batch',
+           'revert_import_session'
+         )) <> 5
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_apply.prosrc, 'UTF8')
+     ), 'hex') <> '4954adc09249cb6af38c6c0c93bf6c142d2751a298263c3cc20e4a1fb7ab2472'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_core.prosrc, 'UTF8')
+     ), 'hex') <> 'c445c55fba355718e92d5ed7d76fb8d2e77b4c44c57e340f2d40804ff4518fe0'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_typed.prosrc, 'UTF8')
+     ), 'hex') <> '7a5084f1a21865fd41d9bba9825edc430e8899dfbd75f7a9ad0e5d0bb6b48806'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_legacy.prosrc, 'UTF8')
+     ), 'hex') <> '87ef93a7d110bf29d67eac1813ed94cce6382914db36feb9429c04dde7415b87'
+     or pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to(v_session.prosrc, 'UTF8')
+     ), 'hex') <> '628a355a722c36590869bf1e06d95766abcf0a386e0b578effb93c7048b479ae'
+     or pg_catalog.pg_get_userbyid(v_core.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_apply.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_typed.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_legacy.proowner) <> 'postgres'
+     or pg_catalog.pg_get_userbyid(v_session.proowner) <> 'postgres'
+     or not v_apply.prosecdef
+     or not v_core.prosecdef or not v_typed.prosecdef
+     or not v_legacy.prosecdef or not v_session.prosecdef
+     or v_apply.provolatile <> 'v'
+     or v_core.provolatile <> 'v' or v_typed.provolatile <> 'v'
+     or v_legacy.provolatile <> 'v' or v_session.provolatile <> 'v'
+     or v_apply.prorettype <> pg_catalog.to_regtype('pg_catalog.record')
+     or not v_apply.proretset
+     or v_apply.pronargdefaults <> 1
+     or pg_catalog.pg_get_expr(v_apply.proargdefaults, 0, false) <> '100'
+     or pg_catalog.to_jsonb(v_apply.proargnames) is distinct from
+       '["p_batch_id", "p_limit", "row_id", "row_number", "outcome", "inventory_item_id", "error_message", "error_code"]'::pg_catalog.jsonb
+     or v_core.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_typed.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_legacy.prorettype <> pg_catalog.to_regtype('pg_catalog.int4')
+     or v_session.prorettype <> pg_catalog.to_regtype('pg_catalog.jsonb')
+     or v_apply.proconfig is distinct from array['search_path=""']::text[]
+     or v_core.proconfig is distinct from array['search_path=""']::text[]
+     or v_typed.proconfig is distinct from array['search_path=""']::text[]
+     or v_legacy.proconfig is distinct from array['search_path=""']::text[]
+     or v_session.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_apply.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_core.proacl) is distinct from
+       '["postgres=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_typed.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_legacy.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.to_jsonb(v_session.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.has_function_privilege(
+       'anon', 'public.revert_import_batch_core_private(uuid,uuid[])', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'authenticated', 'public.revert_import_batch_core_private(uuid,uuid[])', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'service_role', 'public.revert_import_batch_core_private(uuid,uuid[])', 'EXECUTE'
+     )
+     or not pg_catalog.has_function_privilege(
+       'authenticated', 'public.apply_import_batch_chunk(uuid,integer)', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'anon', 'public.apply_import_batch_chunk(uuid,integer)', 'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'service_role', 'public.apply_import_batch_chunk(uuid,integer)', 'EXECUTE'
+     ) then
+    raise exception 'C09_0164_POSTFLIGHT_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c09_0164_postflight$;

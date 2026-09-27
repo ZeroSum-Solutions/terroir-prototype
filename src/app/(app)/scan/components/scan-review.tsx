@@ -20,12 +20,15 @@ interface ScanReviewProps {
   distributor: string;
   invoiceNumber: string | null;
   invoiceDate: string | null;
+  expectedUpdatedAt: string;
   accuracy: number | null;
   itemCount: number;
   createdAt: string;
-  items: LineItem[];
+  items: ReviewLineItem[];
   hasImage: boolean;
 }
+
+type ReviewLineItem = LineItem & { wine_id?: string };
 
 function formatMoneyLocal(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -36,6 +39,7 @@ export function ScanReview({
   distributor,
   invoiceNumber,
   invoiceDate,
+  expectedUpdatedAt,
   accuracy,
   itemCount,
   createdAt,
@@ -43,7 +47,7 @@ export function ScanReview({
   hasImage,
 }: ScanReviewProps) {
   const router = useRouter();
-  const [items, setItems] = useState<LineItem[]>(initialItems);
+  const [items, setItems] = useState<ReviewLineItem[]>(initialItems);
   const [edits, setEdits] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
@@ -78,7 +82,7 @@ export function ScanReview({
     (itemId: string, field: LineItemField, value: string | number | null) => {
       setItems((prev) =>
         prev.map((it) =>
-          it.id === itemId ? ({ ...it, [field]: value } as LineItem) : it
+          it.id === itemId ? ({ ...it, [field]: value } as ReviewLineItem) : it
         )
       );
       setEdits((prev) => ({ ...prev, [`${itemId}:${field}`]: true }));
@@ -96,7 +100,14 @@ export function ScanReview({
       const res = await fetch(`/api/scans/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, edits }),
+        body: JSON.stringify({
+          expectedUpdatedAt,
+          distributor,
+          invoiceNumber,
+          invoiceDate,
+          items,
+          edits,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -109,7 +120,7 @@ export function ScanReview({
     } finally {
       setIsSaving(false);
     }
-  }, [id, items, edits, isSaving, router]);
+  }, [id, expectedUpdatedAt, distributor, invoiceNumber, invoiceDate, items, edits, isSaving, router]);
   const handleCommit = useCallback(async () => {
     if (isCommitting || items.length === 0) return;
     if (!window.confirm(`Commit ${items.length} wines to inventory? This will create inventory records.`)) return;

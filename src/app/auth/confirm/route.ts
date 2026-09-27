@@ -1,4 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cookies } from "next/headers";
+import {
+  REPROVISION_REQUIRED,
+  setDeviceLockCookie,
+} from "@/domains/offline/device-lock";
 import { AUTH_LINK_ERROR, appUrl, loginUrl } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,11 +30,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       type: "recovery",
       token_hash: tokenHash,
     });
     if (error) return authLinkFailure();
+    if (data?.session) {
+      setDeviceLockCookie(await cookies(), REPROVISION_REQUIRED);
+    }
   } catch {
     return authLinkFailure();
   }

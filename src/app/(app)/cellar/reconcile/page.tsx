@@ -5,6 +5,14 @@ import { ArrowLeft, History } from "lucide-react";
 import { getAuthContext } from "@/lib/auth-context";
 import { ReconcileList } from "../reconcile-list";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import {
+  getInventoryContractVersion,
+  listActivePhysicalBottles,
+} from "@/domains/pours/physical-bottle-command";
+import {
+  buildPhysicalReconcileItems,
+  type PhysicalReconcileItem,
+} from "@/domains/cellar/reconcile-contract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,15 +40,29 @@ export default async function ReconcilePage() {
     redirect("/cellar");
   }
 
-  // Fetch open bottles for reconciliation (same query as cellar/page.tsx)
-  const { data: openBottleRows } = await supabase.rpc(
-    "list_open_bottle_items",
-    { p_restaurant_id: restaurantId },
-  );
-
-  const reconcileItems: OpenBottleRow[] = (
-    (openBottleRows ?? []) as OpenBottleRow[]
-  ).filter((i) => i.open_remaining_ml !== null);
+  const inventoryContractVersion = await getInventoryContractVersion(supabase);
+  let reconcileItems: OpenBottleRow[] | PhysicalReconcileItem[];
+  if (inventoryContractVersion === 2) {
+    const bottles = await listActivePhysicalBottles(supabase, restaurantId);
+    const wineIds = Array.from(new Set(bottles.map((bottle) => bottle.wineId)));
+    const { data: wineRows, error: wineError } = wineIds.length
+      ? await supabase
+          .from("wines")
+          .select("id, producer, name, vintage")
+          .eq("restaurant_id", restaurantId)
+          .in("id", wineIds)
+      : { data: [], error: null };
+    if (wineError) throw wineError;
+    reconcileItems = buildPhysicalReconcileItems(bottles, wineRows ?? []);
+  } else {
+    const { data: openBottleRows } = await supabase.rpc(
+      "list_open_bottle_items",
+      { p_restaurant_id: restaurantId },
+    );
+    reconcileItems = ((openBottleRows ?? []) as OpenBottleRow[]).filter(
+      (item) => item.open_remaining_ml !== null,
+    );
+  }
 
   // Fetch reconcile variance threshold from config
   const { data: configRow } = await supabase
@@ -91,6 +113,7 @@ export default async function ReconcilePage() {
         varianceThresholdOz={varianceThresholdOz}
         restaurantId={restaurantId}
         userId={user.id}
+        inventoryContractVersion={inventoryContractVersion}
       />
     </section>
   );

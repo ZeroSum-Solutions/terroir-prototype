@@ -3,6 +3,16 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidateAutoEightysixedWines } from "@/lib/api/auto-eightysix-revalidation";
 import type { Database } from "@/types/database";
+import {
+  executeCompletedInventoryReplay,
+  executeInventoryCommand,
+  InventoryCommandError,
+  isLegacyInventoryCommandRetired,
+} from "./inventory-command";
+import {
+  executePhysicalBottleCommand,
+  getInventoryContractVersion,
+} from "./physical-bottle-command";
 
 export class PourNoInventoryError extends Error {
   constructor() {
@@ -25,10 +35,10 @@ export class PourNotFoundError extends Error {
   }
 }
 
-export class PourAlreadyClosedError extends Error {
+export class PourNotReversibleError extends Error {
   constructor() {
-    super("Bottle is already closed.");
-    this.name = "PourAlreadyClosedError";
+    super("Cannot safely undo this pour; ask a manager to reconcile.");
+    this.name = "PourNotReversibleError";
   }
 }
 
@@ -42,40 +52,46 @@ export class PourRpcError extends Error {
 
 export type RecordPourInput = {
   supabase: SupabaseClient<Database>;
+  operationId: string;
   restaurantId: string;
   wineId: string;
+  openBottleId?: string;
   ml: number;
   kind: "pour" | "spill";
   note?: string;
+  preservationMethod?: string;
 };
 
 export async function recordPour(input: RecordPourInput) {
-  const { supabase, restaurantId, wineId, ml, kind, note } = input;
+  const {
+    supabase,
+    operationId,
+    restaurantId,
+    wineId,
+    openBottleId,
+    ml,
+    kind,
+    note,
+    preservationMethod,
+  } = input;
   const sinceTs = new Date().toISOString();
-
-  const { data, error } = await supabase.rpc("record_pour", {
-    p_wine_id: wineId,
-    p_ml: ml,
-    p_kind: kind,
-    p_note: (note ?? null) as unknown as string,
-  });
-
-  if (error) {
-    if (
-      error.code === "P0001" &&
-      String(error.message ?? "").includes("TERROIR_OUT_OF_STOCK")
-    ) {
-      throw new PourNoInventoryError();
-    }
-    if (error.code === "42501") {
-      throw new PourForbiddenError();
-    }
-    console.error("record_pour failed:", error);
-    Sentry.captureException(error, {
-      tags: { surface: "pour", phase: "record_pour-rpc" },
-      extra: { wine_id: wineId, ml, kind },
-    });
-    throw new PourRpcError("Pour failed.", { cause: error });
+  const contractVersion = await getInventoryContractVersion(supabase);
+  const usePhysicalCommand = contractVersion === 2 && openBottleId !== undefined;
+  const result = usePhysicalCommand
+    ? await executePhysicalBottleCommand({
+        supabase,
+        operationId,
+        restaurantId,
+        command: kind,
+        wineId,
+        openBottleId,
+        ml,
+        note,
+        preservationMethod,
+      })
+    : await executeLegacyPour();
+  if (!result.openBottle) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
   }
 
   revalidatePath("/availability");
@@ -87,18 +103,106 @@ export async function recordPour(input: RecordPourInput) {
     sinceTs,
   });
 
-  return data;
+  return {
+    openBottle: result.openBottle,
+    replayed: result.replayed,
+    eventId: usePhysicalCommand ? result.pourEventIds[0] : null,
+  };
+
+  async function executeLegacyPour() {
+    if (openBottleId !== undefined) {
+      throw new InventoryCommandError("invalid_inventory_command");
+    }
+    const legacyInput = {
+      supabase,
+      operationId,
+      restaurantId,
+      command: kind,
+      wineId,
+      ml,
+      note,
+      preservationMethod,
+    };
+    return contractVersion === 2
+      ? executeCompletedInventoryReplay(legacyInput, { wineId })
+      : executeInventoryCommand(legacyInput);
+  }
+}
+
+export async function openBottle(input: {
+  supabase: SupabaseClient<Database>;
+  operationId: string;
+  restaurantId: string;
+  wineId: string;
+  preservationMethod: string;
+}) {
+  const contractVersion = await getInventoryContractVersion(input.supabase);
+  const legacyInput = {
+    supabase: input.supabase,
+    operationId: input.operationId,
+    restaurantId: input.restaurantId,
+    command: "open" as const,
+    wineId: input.wineId,
+    preservationMethod: input.preservationMethod,
+  };
+  let result;
+  if (contractVersion === 1) {
+    result = await executeInventoryCommand(legacyInput);
+  } else {
+    try {
+      result = await executeCompletedInventoryReplay(legacyInput, { wineId: input.wineId });
+    } catch (error) {
+      if (!isLegacyInventoryCommandRetired(error)) throw error;
+      result = await executePhysicalBottleCommand(legacyInput);
+    }
+  }
+  if (!result.openBottle) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
+  }
+  revalidatePath("/cellar/open");
+  return { openBottle: result.openBottle, replayed: result.replayed };
 }
 
 export type UndoLastPourInput = {
   supabase: SupabaseClient<Database>;
   restaurantId: string;
   wineId: string;
+  contractVersion?: 1 | 2;
+  operationId?: string;
+  expectedOpenBottleId?: string;
+  reversalOfEventId?: string;
+  correctionReason?: "mistaken_report";
+  operatorConfirmsSameBottlePresent?: boolean;
 };
 
 export async function undoLastPour(input: UndoLastPourInput) {
-  const { supabase, restaurantId, wineId } = input;
+  const { supabase, restaurantId, wineId, contractVersion = 1 } = input;
   const sinceTs = new Date().toISOString();
+
+  if (contractVersion === 2) {
+    if (!input.operationId || !input.expectedOpenBottleId ||
+      !input.reversalOfEventId) {
+      throw new InventoryCommandError("invalid_physical_command");
+    }
+    const result = await executePhysicalBottleCommand({
+      supabase,
+      operationId: input.operationId,
+      restaurantId,
+      command: "undo",
+      wineId,
+      expectedOpenBottleId: input.expectedOpenBottleId,
+      reversalOfEventId: input.reversalOfEventId,
+      correctionReason: input.correctionReason,
+      operatorConfirmsSameBottlePresent:
+        input.operatorConfirmsSameBottlePresent,
+    });
+    await finishUndo(result.openBottle.wine_id);
+    return {
+      openBottle: result.openBottle,
+      eventId: result.pourEventIds[0],
+      replayed: result.replayed,
+    };
+  }
 
   const { data, error } = await supabase.rpc("undo_last_pour", {
     p_wine_id: wineId,
@@ -111,39 +215,75 @@ export async function undoLastPour(input: UndoLastPourInput) {
     if (error.code === "42501") {
       throw new PourForbiddenError();
     }
-    console.error("undo_last_pour failed:", error);
-    Sentry.captureException(error, {
-      tags: { surface: "pour", phase: "undo_last_pour-rpc" },
-      extra: { wine_id: wineId },
-    });
+    if (error.message?.includes("undo_inventory_command_not_reversible")) {
+      throw new PourNotReversibleError();
+    }
+    try {
+      Sentry.captureException(new Error("Undo RPC failed"), {
+        tags: { surface: "pour", phase: "undo_last_pour-rpc" },
+      });
+    } catch {
+      // Monitoring must not replace the intended domain error.
+    }
     throw new PourRpcError("Undo failed.", { cause: error });
   }
 
-  revalidatePath("/availability");
+  await finishUndo(wineId);
+  return { openBottle: data, eventId: null, replayed: false };
 
-  await revalidateAutoEightysixedWines({
-    supabase,
-    restaurantId,
-    touchedWineIds: [wineId],
-    sinceTs,
-  });
-
-  return data;
+  async function finishUndo(touchedWineId: string) {
+    revalidatePath("/availability");
+    await revalidateAutoEightysixedWines({
+      supabase,
+      restaurantId,
+      touchedWineIds: [touchedWineId],
+      sinceTs,
+    });
+  }
 }
 
 export type CloseOpenBottleInput = {
   supabase: SupabaseClient<Database>;
+  operationId: string;
   restaurantId: string;
   bottleId: string;
+  wineId?: string;
+  contractVersion?: 1 | 2;
+  expectedOpenedAt?: string;
+  actualRemainingMl: number;
+  writtenOffMl?: number;
+  reasonCodeId?: string;
 };
 
 export async function closeOpenBottle(input: CloseOpenBottleInput) {
-  const { supabase, restaurantId, bottleId } = input;
+  const {
+    supabase,
+    operationId,
+    restaurantId,
+    bottleId,
+    expectedOpenedAt,
+    wineId,
+    contractVersion = 1,
+    actualRemainingMl,
+    writtenOffMl,
+    reasonCodeId,
+  } = input;
 
+  if (contractVersion === 2 && wineId !== undefined) {
+    if (!wineId) throw new InventoryCommandError("invalid_physical_command");
+    const result = await executePhysicalBottleCommand({
+      supabase, operationId, restaurantId, command: "close", wineId,
+      openBottleId: bottleId, actualRemainingMl, writtenOffMl, reasonCodeId,
+    });
+    revalidateClosePaths();
+    return { closeout: result.closeout!, replayed: result.replayed };
+  }
+  if (!expectedOpenedAt) throw new InventoryCommandError("invalid_inventory_command");
   const { data: bottle, error: fetchError } = await supabase
     .from("open_bottles")
-    .select("id, wine_id, remaining_ml, closed_at, restaurant_id")
+    .select("id, wine_id, restaurant_id")
     .eq("id", bottleId)
+    .eq("restaurant_id", restaurantId)
     .single();
 
   if (
@@ -160,32 +300,99 @@ export async function closeOpenBottle(input: CloseOpenBottleInput) {
     throw new PourForbiddenError();
   }
 
-  if (bottle.closed_at) {
-    throw new PourAlreadyClosedError();
-  }
-
-  const closedAt = new Date().toISOString();
-  const { error: pourError } = await supabase.rpc("record_pour", {
-    p_wine_id: bottle.wine_id,
-    p_ml: bottle.remaining_ml,
-    p_kind: "spill",
-    p_note: "Bottle closed (discard remaining)",
-  });
-
-  if (pourError) {
-    console.error("Failed to close bottle via record_pour:", pourError);
-    Sentry.captureException(pourError, {
-      tags: { surface: "open-bottles", phase: "close" },
-      extra: { bottle_id: bottleId, wine_id: bottle.wine_id },
-    });
-    throw new PourRpcError("Failed to close bottle.", { cause: pourError });
+  const legacyInput = {
+    supabase,
+    operationId,
+    restaurantId,
+    command: "close" as const,
+    wineId: bottle.wine_id,
+    expectedOpenBottleId: bottleId,
+    expectedOpenedAt,
+    actualRemainingMl,
+    writtenOffMl,
+    reasonCodeId,
+  };
+  const result = contractVersion === 2
+    ? await executeCompletedInventoryReplay(legacyInput, {
+      expectedOpenBottleId: bottleId,
+      expectedOpenedAt,
+    })
+    : await executeInventoryCommand(legacyInput);
+  if (!result.closeout) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
   }
 
   revalidatePath("/cellar/open");
+  revalidatePath("/cellar");
+  revalidatePath("/insights");
 
-  return {
-    id: bottle.id,
-    wine_id: bottle.wine_id,
-    closed_at: closedAt,
+  return { closeout: result.closeout, replayed: result.replayed };
+}
+
+export type DiscardOpenBottleInput = {
+  supabase: SupabaseClient<Database>;
+  operationId: string;
+  restaurantId: string;
+  bottleId: string;
+  wineId?: string;
+  contractVersion?: 1 | 2;
+  expectedOpenedAt?: string;
+};
+
+export async function discardOpenBottle(input: DiscardOpenBottleInput) {
+  const { supabase, operationId, restaurantId, bottleId, expectedOpenedAt,
+    wineId, contractVersion = 1 } = input;
+  if (contractVersion === 2 && wineId !== undefined) {
+    if (!wineId) throw new InventoryCommandError("invalid_physical_command");
+    const result = await executePhysicalBottleCommand({
+      supabase, operationId, restaurantId, command: "discard", wineId,
+      openBottleId: bottleId,
+    });
+    revalidateClosePaths();
+    return {
+      closed: result.openBottle,
+      replayed: result.replayed,
+      eventId: result.pourEventIds[0],
+    };
+  }
+  if (!expectedOpenedAt) throw new InventoryCommandError("invalid_inventory_command");
+  const { data: bottle, error: fetchError } = await supabase
+    .from("open_bottles")
+    .select("id, wine_id, restaurant_id")
+    .eq("id", bottleId)
+    .eq("restaurant_id", restaurantId)
+    .single();
+
+  if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
+  if (!bottle) throw new PourNotFoundError("Bottle not found.");
+
+  const legacyInput = {
+    supabase,
+    operationId,
+    restaurantId,
+    command: "discard" as const,
+    wineId: bottle.wine_id,
+    expectedOpenBottleId: bottleId,
+    expectedOpenedAt,
   };
+  const result = contractVersion === 2
+    ? await executeCompletedInventoryReplay(legacyInput, {
+      expectedOpenBottleId: bottleId,
+      expectedOpenedAt,
+    })
+    : await executeInventoryCommand(legacyInput);
+  if (!result.openBottle) {
+    throw new InventoryCommandError("invalid_inventory_command_result");
+  }
+
+  revalidatePath("/cellar/open");
+  revalidatePath("/cellar");
+  revalidatePath("/insights");
+  return { closed: result.openBottle, replayed: result.replayed, eventId: null };
+}
+
+function revalidateClosePaths() {
+  revalidatePath("/cellar/open");
+  revalidatePath("/cellar");
+  revalidatePath("/insights");
 }

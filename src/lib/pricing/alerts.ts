@@ -7,8 +7,8 @@
  *
  * Mirrors src/lib/drink-window/alerts.ts pattern (BND-039) so both
  * intelligence layers behave consistently. Architect-review finding 7
- * (predicate drift): the snooze filter MUST be in one place — applied
- * here at the SQL layer AND verified by the in-memory deviation filter.
+ * (predicate drift): the snooze filter MUST be in one place. Protected
+ * snooze state is read through the typed strategy reader and filtered here.
  *
  * Filters:
  *   • is_eightysixed = false (no point alerting on sold-out wines)
@@ -21,6 +21,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import {
+  readInventoryCosts,
+  readRestaurantPricingDefaults,
+  readWinePricingStrategy,
+} from "@/lib/staff-cost/protected-readers";
 import {
   getBottleStatus,
   getGlassStatus,
@@ -102,28 +107,24 @@ export async function fetchPricingAlerts(
 ): Promise<PricingAlertRow[]> {
   // Get the restaurant defaults first so we know the targets when wines
   // don't have per-wine overrides.
-  const { data: restaurant, error: restErr } = await supabase
-    .from("restaurants")
-    .select("default_target_pour_cost_pct, default_target_markup_ratio")
-    .eq("id", restaurantId)
-    .single();
-  if (restErr) throw restErr;
+  const restaurant = await readRestaurantPricingDefaults(supabase, restaurantId);
+  if (restaurant?.restaurant_id !== restaurantId) {
+    throw new Error("Restaurant pricing defaults protected read was incomplete.");
+  }
 
   const restaurantPourCostTarget = restaurant?.default_target_pour_cost_pct ?? null;
   const restaurantMarkupTarget = restaurant?.default_target_markup_ratio ?? null;
 
-  // Pull wines with pricing-review-eligible state. Snooze filter at SQL
-  // layer (architect finding 7).
-  const nowIso = new Date().toISOString();
+  // Pull direct-safe pricing-review candidates. Protected snooze state is
+  // joined from the strategy reader below.
   const { data: wines, error: wineErr } = await supabase
     .from("wines")
     .select(
-      "id, name, producer, vintage, varietal, region, retail_median, size_ml, pricing_target_pour_cost_pct, pricing_target_markup_ratio, pricing_dismissed_until",
+      "id, name, producer, vintage, varietal, region, retail_median, size_ml",
     )
     .eq("restaurant_id", restaurantId)
     .eq("is_eightysixed", false)
-    .not("retail_median", "is", null)
-    .or(`pricing_dismissed_until.is.null,pricing_dismissed_until.lt.${nowIso}`);
+    .not("retail_median", "is", null);
   if (wineErr) throw wineErr;
   if (!wines || wines.length === 0) return [];
 
@@ -167,27 +168,66 @@ export async function fetchPricingAlerts(
     return lists?.restaurant_id === restaurantId;
   });
 
+  const strategies = (
+    await Promise.all(
+      Array.from({ length: Math.ceil(wineIds.length / 500) }, (_, index) =>
+        readWinePricingStrategy(
+          supabase,
+          restaurantId,
+          wineIds.slice(index * 500, (index + 1) * 500),
+        ),
+      ),
+    )
+  ).flat();
+  const strategyByWine = new Map(strategies.map((row) => [row.wine_id, row]));
+  if (
+    strategyByWine.size !== strategies.length ||
+    wineIds.some((wineId) => !strategyByWine.has(wineId))
+  ) {
+    throw new Error("Wine pricing strategy protected read was incomplete.");
+  }
+
   // Pull invoice cost (most-recent inventory_items.unit_cost per wine) so
   // we can compute pour cost % against the actual cost basis. Median
   // retail is fine for markup ratio, but pour cost needs cost-per-bottle.
   const invRows = await inChunks<{
-    wine_id: string | null;
-    unit_cost: number | null;
-    added_at: string | null;
+    id: string;
+    wine_id: string;
+    added_at: string;
   }>(wineIds, (chunk) =>
     supabase
       .from("inventory_items")
-      .select("wine_id, unit_cost, added_at")
+      .select("id, wine_id, added_at")
       .eq("restaurant_id", restaurantId)
       .in("wine_id", chunk)
       .order("added_at", { ascending: false }),
   );
 
+  const protectedCosts = (
+    await Promise.all(
+      Array.from({ length: Math.ceil(wineIds.length / 500) }, (_, index) =>
+        readInventoryCosts(
+          supabase,
+          restaurantId,
+          wineIds.slice(index * 500, (index + 1) * 500),
+        ),
+      ),
+    )
+  ).flat();
+  const costByInventoryId = new Map(
+    protectedCosts.map((row) => [row.inventory_item_id, row.unit_cost]),
+  );
+  if (
+    costByInventoryId.size !== protectedCosts.length ||
+    invRows.some((row) => !costByInventoryId.has(row.id))
+  ) {
+    throw new Error("Inventory cost protected read was incomplete.");
+  }
+
   const costByWine = new Map<string, number>();
-  for (const row of invRows ?? []) {
-    if (!row.wine_id || row.unit_cost == null) continue;
+  for (const row of invRows) {
     if (!costByWine.has(row.wine_id)) {
-      costByWine.set(row.wine_id, row.unit_cost);
+      costByWine.set(row.wine_id, costByInventoryId.get(row.id)!);
     }
   }
 
@@ -199,15 +239,16 @@ export async function fetchPricingAlerts(
   for (const item of eligibleItems) {
     const wine = wineById.get(item.wine_id);
     if (!wine) continue;
-    if (isSnoozeActive(wine.pricing_dismissed_until)) continue; // defense-in-depth
+    const strategy = strategyByWine.get(wine.id)!;
+    if (isSnoozeActive(strategy.pricing_dismissed_until)) continue;
 
     const cost = costByWine.get(wine.id);
     const targetPourCostPct = resolvePourCostTarget(
-      wine.pricing_target_pour_cost_pct,
+      strategy.pricing_target_pour_cost_pct,
       restaurantPourCostTarget,
     );
     const targetMarkupRatio = resolveMarkupTarget(
-      wine.pricing_target_markup_ratio,
+      strategy.pricing_target_markup_ratio,
       restaurantMarkupTarget,
     );
 

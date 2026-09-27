@@ -104,19 +104,66 @@ recorded. The required critical subset fails on any skip.
 | Concern | Home |
 |---|---|
 | Architecture and DB boundaries | `docs/ARCHITECTURE.md` — canonical |
+| Local stack startup and conservation safety | `docs/runbooks/local-stack.md` (canonical) |
+| Future product and data requirements | `docs/plans/2026-09-20-terroir-product-data-requirements.md`; draft planning source, not implementation authority until owner-approved requirements enter the source ledger |
+| Current requirement assertions | `app_spec.txt` `<core_features>` — machine-read generator input; currently 328 assertions |
 | Code conventions, verified | `docs/CONVENTIONS.md` |
 | Design contract | `DESIGN.md` (root). `docs/design/*` are archived predecessors — do not build from them |
 | Completion status | `docs/feature-ledger.json` — the only authority |
 | Operational procedures | `docs/runbooks/` (see its README index) |
 | Active plans and specs | `docs/plans/` — `_archive/` is history, not backlog |
 
-**Do not trust for current status:** `app_spec.txt` and `claude-progress.txt` — both
-at the **repo root**, not in `docs/_archive/`. Both are frozen historical records, both
-contain drifted claims (including a dead env var name), and both are retained as
-evidence only.
+**Do not infer completion from source prose.** `app_spec.txt` `<core_features>` is the
+current machine-read source for 328 requirement identities, but the generated
+`docs/feature-ledger.json` owns their completion metadata and status. Active means the
+assertion is in contract scope, not that the whole workflow is complete.
 
-**Do not move them into `docs/_archive/`.** They read like stale documents because they
-are, but they are *machine-read*, not prose: `scripts/verify-feature-ledger.mjs` sets
+## Current implementation checkpoints
+
+The pushed branch includes the bounded exact-bottle Open/Pour application checkpoint
+at `44d046d5` and the guarded local-runtime checkpoints at `d35a9dae` and
+`3532f13e`. These are partial implementations, not completion claims. The current
+physical-bottle and database contracts are owned by
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#database-contracts); local startup,
+port selection, and live-test conservation are owned by
+[`docs/runbooks/local-stack.md`](docs/runbooks/local-stack.md).
+
+Migration 0154's exact 22-path source checkpoint is saved and pushed at `29b06e78`.
+Its isolated V6 rehearsal and immutable-range security review passed. This does not
+activate it: the retained local stack is still at schema 0152 with physical contract
+version 1, and all nine measured raw-cost exposures remain open.
+
+The working tree contains an uncommitted effective service-event reader packet. Its
+presence does not make it shipped, and it still needs a service-role view grant before
+positive live proof. The measured-closeout V2 packet is saved and pushed at
+`e9a49e5d`; its 100/100 focused checks, native independent verification, and bounded
+Opus source review passed, as did its immutable-range security review. See the current
+[MacBook handoff](.claude/handoffs/macbook-transfer.md#current-transfer-ledger) for
+the transfer ledger. Do not mark C04, D1, C06, or Phase B complete from these
+checkpoints.
+
+C03 has a locally implemented
+TER-CF-297 context-lookup leaf, an accepted bounded deterministic TER-CF-291 through
+TER-CF-293 private projection-store leaf, and a bounded local session-boundary leaf
+with 153 passing focused unit and contract tests. Real-browser verification, the public
+offline shell, positive eligibility, and the whole C03 workflow remain incomplete. C06
+has 18 accepted physical-bottle source assertions (`TER-CF-298` through
+`TER-CF-315`) and canonical transition plans. Its committed Open/Pour checkpoint is
+only one part of that transition; contract version 2 is not active and source
+promotion does not complete C06.
+The three C14 pilot-measurement assertions (`TER-CF-318` through `TER-CF-320`) are
+active, but no measurement capture/export runtime exists and source promotion does not
+complete C14. The pure nine-path calculation/export leaf cannot complete it alone.
+Working authorized capture/export may complete the software criterion without real
+four-week pilot observations; those observations gate only Q7 outcome claims.
+The nine C08 fixture/manual POS-corroboration assertions remain active; pure Toast
+modules alone do not complete those workflows. Non-core `app_spec.txt`
+prose can retain historical or drifted claims (including a dead env var name).
+`claude-progress.txt` is a frozen historical record and does not determine current
+scope or status. Both remain at the **repo root**, not in `docs/_archive/`.
+
+**Do not move them into `docs/_archive/`.** They are retained at fixed machine-read
+paths: `scripts/verify-feature-ledger.mjs` sets
 `SOURCE_FILE = "app_spec.txt"`, and `src/lib/feature-ledger/verify-feature-ledger.test.ts`
 resolves both repo-root-relative. Moving either reds `pnpm verify:feature-ledger`, which
 is part of the one required merge check. This has already happened: they were moved to

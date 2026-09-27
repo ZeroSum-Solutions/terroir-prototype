@@ -1,43 +1,48 @@
 import { describe, expect, it, vi } from "vitest";
-import { STALLED_AFTER_MS, STALLED_REASON, expireStalledScans } from "./stalled-scans";
+import { expireStalledScans } from "./stalled-scans";
 
-vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
-
-/**
- * POST /api/scan creates the ledger row as "processing" before extraction
- * and updates it after. If the process dies in between (a deploy, a crash,
- * a killed request) the row stays "processing" forever — production's demo
- * tenant had one exactly like that, spinning since the day it was created.
- * The scans page now settles such rows honestly before it lists them.
- */
-function stubSupabase(result: { data: unknown; error: unknown }) {
-  const calls: Record<string, unknown[]> = { update: [], eq: [], lt: [], select: [] };
-  const node: Record<string, unknown> = {};
-  for (const m of ["eq", "lt", "select"]) node[m] = vi.fn((...a: unknown[]) => { calls[m].push(a); return node; });
-  node.then = (res: (v: unknown) => void, rej?: (e: unknown) => void) => Promise.resolve(result).then(res, rej);
-  const supabase = { from: vi.fn(() => ({ update: vi.fn((p: unknown) => { calls.update.push([p]); return node; }) })) };
-  return { supabase, calls };
+function client(data: unknown, error: unknown = null) {
+  return { rpc: vi.fn().mockResolvedValue({ data, error }), from: vi.fn() };
 }
 
-describe("expireStalledScans", () => {
-  const now = new Date("2026-09-02T12:00:00.000Z");
-
-  it("marks only this tenant's processing rows older than the cutoff as failed/stalled, and reports how many", async () => {
-    const { supabase, calls } = stubSupabase({ data: [{ id: "a" }, { id: "b" }], error: null });
-    const n = await expireStalledScans({ supabase: supabase as never, restaurantId: "r1", now });
-    expect(n).toBe(2);
-    expect(supabase.from).toHaveBeenCalledWith("invoice_scans");
-    expect(calls.update[0]).toEqual([{ status: "failed", status_reason: STALLED_REASON }]);
-    expect(calls.eq).toEqual([["restaurant_id", "r1"], ["status", "processing"]]);
-    expect(calls.lt).toEqual([["created_at", new Date(now.getTime() - STALLED_AFTER_MS).toISOString()]]);
+describe("expireStalledScans authorized receipt", () => {
+  it.each([0, 1, 37])("returns a verified count of %i from one exact-site RPC", async (count) => {
+    const supabase = client({ version: 1, expiredCount: count });
+    await expect(expireStalledScans({ supabase: supabase as never, restaurantId: "site-1" })).resolves.toBe(count);
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith("expire_stalled_invoice_scans", {
+      p_restaurant_id: "site-1",
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("a database error never blocks the page: reports zero and moves on", async () => {
-    const { supabase } = stubSupabase({ data: null, error: { message: "boom" } });
-    await expect(expireStalledScans({ supabase: supabase as never, restaurantId: "r1", now })).resolves.toBe(0);
+  it.each([
+    null, undefined, [], 0, "0", {},
+    { version: 1 }, { expiredCount: 0 },
+    { version: 2, expiredCount: 0 },
+    { version: "1", expiredCount: 0 },
+    { version: 1, expiredCount: "0" },
+    { version: 1, expiredCount: -1 },
+    { version: 1, expiredCount: 0.5 },
+    { version: 1, expiredCount: Number.MAX_SAFE_INTEGER + 1 },
+    { version: 1, expiredCount: Number.NaN },
+    { version: 1, expiredCount: Number.POSITIVE_INFINITY },
+    { version: 1, expiredCount: 0, raw: "unexpected" },
+  ])("refuses malformed receipt %# instead of reporting zero", async (data) => {
+    const supabase = client(data);
+    await expect(expireStalledScans({ supabase: supabase as never, restaurantId: "site-1" })).rejects.toThrow("Invalid stalled-scan expiry receipt");
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("the cutoff is fifteen minutes: no legitimate synchronous scan lives that long", () => {
-    expect(STALLED_AFTER_MS).toBe(15 * 60 * 1000);
+  it.each(["42501", "42883", "XX000"])("preserves database failure %s instead of silently succeeding", async (code) => {
+    const error = { code, message: "private database detail" };
+    const supabase = client({ version: 1, expiredCount: 0 }, error);
+    await expect(expireStalledScans({ supabase: supabase as never, restaurantId: "site-1" })).rejects.toBe(error);
+  });
+
+  it("propagates transport failure", async () => {
+    const error = new Error("Network unavailable");
+    const supabase = client(null);
+    supabase.rpc.mockRejectedValue(error);
+    await expect(expireStalledScans({ supabase: supabase as never, restaurantId: "site-1" })).rejects.toBe(error);
   });
 });

@@ -7,19 +7,18 @@ import { buildCellarBinData } from "./bin-data";
 import { normalizeSections, type CellarSection } from "./sections";
 import { wineRowImages, type CellarWineRow } from "./types";
 import { theoreticalRemaining } from "@/lib/partial-bottles/math";
-import { isCellarHealthSegment } from "@/lib/cellar-health/classify";
-
+import { resolveSitePricingAccess } from "@/lib/api/site-capability";
+import { fetchCellarInventoryRows } from "./inventory-data";
+import { fetchCellarProtectedData, reconcileCellarProtectedData } from "./protected-data";
+import { getInventoryContractVersion, listActivePhysicalBottles, summarizePhysicalBottlesByWine } from "@/domains/pours/physical-bottle-command";
+import { buildPhysicalReconcileItems, type PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
+import type { GridData } from "./grid-types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-import type { GridData } from "./grid-types";
-
 export const metadata: Metadata = { title: "Cellar" };
-
 const FETCH_PAGE_SIZE = 1000;
 
-// PostgREST caps a single response at db.max_rows (1000 — see
-// supabase/config.toml); unpaginated reads silently truncate on large
+// PostgREST caps a response at db.max_rows (1000); unpaginated reads silently truncate large
 // cellars (the OPP-3 lesson — see src/lib/cellar-health/recompute.ts,
 // which paginates the same wines/inventory_items tables for this exact
 // reason). Every potentially-large cellar read pages to exhaustion.
@@ -62,38 +61,35 @@ async function fetchAll<T>(
 export default async function CellarPage() {
   const auth = (await getAuthContext())!; // AppLayout redirects when null
   const { supabase, restaurantId, restaurantName, userRole, user } = auth;
+  const pricingAccess = await resolveSitePricingAccess(supabase, restaurantId);
+  const inventoryRowsPromise = fetchCellarInventoryRows(supabase, restaurantId);
+  const protectedDataPromise = fetchCellarProtectedData(supabase, restaurantId, pricingAccess);
 
   const [
     wineRows,
     inventoryRows,
+    protectedData,
     { data: binRows, error: binError },
     { data: openBottleRows },
-    { data: directOpenBottleRows, error: directOpenError },
+    inventoryContractVersion,
+    activePhysicalBottles,
     { data: reasonCodeRows, error: reasonCodeError },
-    { data: healthRows, error: healthError },
     { data: configRow },
-    { data: restaurantRow },
+    { data: restaurantRow, error: restaurantError },
   ] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("wines")
         .select(
-          "id, name, producer, vintage, varietal, region, country, lineage_id, size_ml, is_eightysixed, eightysixed_at, drink_window_start, drink_window_end, peak_year, rating, rating_source, review_excerpt, serving_temp_min, serving_temp_max, serving_temp_label, decant_minutes, retail_min, retail_max, retail_median, retail_retailer_count, retail_refreshed_at, pricing_target_pour_cost_pct, pricing_target_markup_ratio, pricing_dismissed_until, tasting_notes, hero_image_url, manual_overrides, colour, canonical_wines(xwines_catalog(image_url, image_kind))",
+          "id, name, producer, vintage, varietal, region, country, lineage_id, size_ml, is_eightysixed, eightysixed_at, drink_window_start, drink_window_end, peak_year, rating, rating_source, review_excerpt, serving_temp_min, serving_temp_max, serving_temp_label, decant_minutes, retail_min, retail_max, retail_median, retail_retailer_count, retail_refreshed_at, tasting_notes, hero_image_url, manual_overrides, colour, canonical_wines(xwines_catalog(image_url, image_kind))",
         )
         .eq("restaurant_id", restaurantId)
         .order("name", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("inventory_items")
-        .select("wine_id, bin_id, bin_location, quantity, unit_cost, added_at, section")
-        .eq("restaurant_id", restaurantId)
-        .order("added_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    inventoryRowsPromise,
+    protectedDataPromise,
     supabase
       .from("bins")
       .select("id, code, zone, capacity, retired_at")
@@ -102,21 +98,14 @@ export default async function CellarPage() {
       .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
     supabase.rpc("list_open_bottle_items", { p_restaurant_id: restaurantId }),
-    supabase
-      .from("open_bottles")
-      .select("id, wine_id, remaining_ml, opened_at, opened_by, preservation_method")
-      .eq("restaurant_id", restaurantId)
-      .is("closed_at", null),
+    getInventoryContractVersion(supabase),
+    listActivePhysicalBottles(supabase, restaurantId),
     supabase
       .from("reason_codes")
       .select("id, label, category")
       .eq("restaurant_id", restaurantId)
       .eq("active", true)
       .order("label", { ascending: true }),
-    supabase
-      .from("cellar_health")
-      .select("wine_id, segment")
-      .eq("restaurant_id", restaurantId),
     supabase
       .from("cellar_config")
       .select("*")
@@ -126,20 +115,27 @@ export default async function CellarPage() {
     supabase
       .from("restaurants")
       .select(
-        "auto_eightysix_from_inventory, eightysix_ml_threshold, eightysix_strategy, default_target_pour_cost_pct, default_target_markup_ratio",
+        "auto_eightysix_from_inventory, eightysix_ml_threshold, eightysix_strategy",
       )
       .eq("id", restaurantId)
       .single(),
   ]);
 
-  if (binError || directOpenError || reasonCodeError || healthError) {
-    throw binError ?? directOpenError ?? reasonCodeError ?? healthError;
+  if (binError || reasonCodeError || restaurantError) {
+    throw binError ?? reasonCodeError ?? restaurantError;
   }
 
-  const activeBottleIds = (directOpenBottleRows ?? []).map((bottle) => bottle.id);
-  const earliestOpen = (directOpenBottleRows ?? [])
-    .map((bottle) => bottle.opened_at)
-    .sort()[0];
+  const { inventoryCostById, pricingStrategyByWine, pricingDefaults, healthByWine } =
+    reconcileCellarProtectedData(
+      protectedData,
+      pricingAccess,
+      restaurantId,
+      wineRows.map((row) => row.id),
+      inventoryRows.map((row) => row.id),
+    );
+
+  const activeBottleIds = activePhysicalBottles.map((bottle) => bottle.id);
+  const earliestOpen = activePhysicalBottles.map((bottle) => bottle.openedAt).sort()[0];
   const { data: pourEventRows, error: pourEventError } = activeBottleIds.length
     ? await supabase
         .from("pour_events")
@@ -228,8 +224,9 @@ export default async function CellarPage() {
     prev.sealed += item.quantity ?? 0;
     if (!prev.bin && item.bin_location) prev.bin = item.bin_location;
     if (!prev.section && item.section) prev.section = item.section;
-    if (prev.latestCost == null && item.unit_cost != null) {
-      prev.latestCost = item.unit_cost;
+    const unitCost = inventoryCostById.get(item.id);
+    if (pricingAccess.canReadCost && prev.latestCost == null && unitCost != null) {
+      prev.latestCost = unitCost;
     }
     inventoryByWine.set(item.wine_id, prev);
   }
@@ -240,26 +237,16 @@ export default async function CellarPage() {
     openByWine.set(ob.wine_id, ob);
   }
 
-  const directOpenByWine = new Map(
-    (directOpenBottleRows ?? []).map((bottle) => [bottle.wine_id, bottle]),
-  );
-  const directOpenById = new Map(
-    (directOpenBottleRows ?? []).map((bottle) => [bottle.id, bottle]),
-  );
+  const physicalBottlesByWine = summarizePhysicalBottlesByWine(activePhysicalBottles);
+  const directOpenById = new Map(activePhysicalBottles.map((bottle) => [bottle.id, bottle]));
   const drainingPoursByBottle = new Map<string, number[]>();
   for (const event of pourEventRows ?? []) {
     if (!event.open_bottle_id) continue;
     const bottle = directOpenById.get(event.open_bottle_id);
-    if (!bottle || event.occurred_at < bottle.opened_at) continue;
+    if (!bottle || event.occurred_at < bottle.openedAt) continue;
     const pours = drainingPoursByBottle.get(event.open_bottle_id) ?? [];
     drainingPoursByBottle.set(event.open_bottle_id, [...pours, event.ml_delta]);
   }
-  const healthByWine = new Map(
-    (healthRows ?? []).flatMap((row) =>
-      isCellarHealthSegment(row.segment) ? [[row.wine_id, row.segment] as const] : [],
-    ),
-  );
-
   // OPP-1 (wave 0) — duplicate suspects: same lineage + vintage + format
   // pairs are merge candidates (EV-1.2). Computed here so the list can chip
   // them and the drawer can offer the merge.
@@ -314,8 +301,12 @@ export default async function CellarPage() {
       inventoryByWine.get(w.id) ?? { sealed: 0, bin: null, section: null, latestCost: null };
     const binData = binDataByWine[w.id];
     const ob = openByWine.get(w.id);
-    const directOpen = directOpenByWine.get(w.id);
+    const physicalSummary = physicalBottlesByWine.get(w.id);
+    const activeBottles = physicalSummary?.bottles ?? [];
+    const directOpen = activeBottles.length === 1 ? activeBottles[0] : null;
+    const activeOpenMl = physicalSummary?.activeOpenMl ?? 0;
     const price = priceByWine.get(w.id);
+    const pricingStrategy = pricingStrategyByWine.get(w.id);
     return {
       wine_id: w.id,
       name: w.name,
@@ -342,18 +333,20 @@ export default async function CellarPage() {
       glass_pour_ml: ob?.glass_pour_ml ?? price?.pourMl ?? null,
       pour_size_mode: ob?.pour_size_mode ?? null,
       size_ml: ob?.size_ml ?? null,
-      open_remaining_ml:
-        directOpen?.remaining_ml ?? ob?.open_remaining_ml ?? null,
-      opened_at: directOpen?.opened_at ?? ob?.opened_at ?? null,
+      open_remaining_ml: activeOpenMl,
+      opened_at: directOpen?.openedAt ?? ob?.opened_at ?? null,
       open_bottle_id: directOpen?.id ?? null,
-      preservation_method: (directOpen?.preservation_method ?? "none") as CellarWineRow["preservation_method"],
-      opened_by: directOpen?.opened_by ?? null,
+      preservation_method: directOpen?.preservationMethod ?? "none",
+      opened_by: null,
       theoretical_remaining_ml: directOpen
         ? theoreticalRemaining(
-            w.size_ml,
+            directOpen.nominalCapacityMl ?? w.size_ml,
             drainingPoursByBottle.get(directOpen.id) ?? [],
           )
         : null,
+      activeBottleCount: activeBottles.length,
+      activeOpenMl,
+      activeBottles,
       closeout_reason_codes: (reasonCodeRows ?? [])
         .filter((reason) => ["spoilage", "adjustment"].includes(reason.category))
         .map((reason) => ({
@@ -385,32 +378,34 @@ export default async function CellarPage() {
       retail_median: w.retail_median,
       retail_retailer_count: w.retail_retailer_count,
       retail_refreshed_at: w.retail_refreshed_at,
-      pricing_target_pour_cost_pct: w.pricing_target_pour_cost_pct,
-      pricing_target_markup_ratio: w.pricing_target_markup_ratio,
-      pricing_dismissed_until: w.pricing_dismissed_until,
+      pricing_target_pour_cost_pct: pricingStrategy?.pricing_target_pour_cost_pct ?? null,
+      pricing_target_markup_ratio: pricingStrategy?.pricing_target_markup_ratio ?? null,
+      pricing_dismissed_until: pricingStrategy?.pricing_dismissed_until ?? null,
       current_bottle_price: price?.bottle ?? null,
       current_glass_price: price?.glass ?? null,
       current_list_name: price?.listName ?? null,
       current_other_list_count: price?.otherListCount ?? 0,
-      current_unit_cost: inv.latestCost,
-      restaurant_default_target_pour_cost_pct:
-        restaurantRow?.default_target_pour_cost_pct ?? null,
-      restaurant_default_target_markup_ratio:
-        restaurantRow?.default_target_markup_ratio ?? null,
+      ...(pricingAccess.canReadCost ? { current_unit_cost: inv.latestCost } : {}),
+      restaurant_default_target_pour_cost_pct: pricingDefaults?.default_target_pour_cost_pct ?? null,
+      restaurant_default_target_markup_ratio: pricingDefaults?.default_target_markup_ratio ?? null,
     };
   });
+
+  const wineById = new Map((wineRows ?? []).map((wine) => [wine.id, wine]));
 
   // Reconcile modal feed: only rows with a currently-open bottle. The
   // ReconcileList component already filters internally, but doing it
   // here keeps the prop simple.
-  const reconcileItems: OpenBottleRow[] = ((openBottleRows ?? []) as OpenBottleRow[]).filter(
-    (i) => i.open_remaining_ml !== null,
-  );
+  const reconcileItems: OpenBottleRow[] | PhysicalReconcileItem[] =
+    inventoryContractVersion === 2
+      ? buildPhysicalReconcileItems(activePhysicalBottles, wineRows ?? [])
+      : ((openBottleRows ?? []) as OpenBottleRow[]).filter(
+          (item) => item.open_remaining_ml !== null,
+        );
 
   // Bin grid view data (kept from the prior /cellar page so the Grid
   // toggle continues to work).
   // BND-200 / PERF — Map-based lookup replaces O(n*m) .find()
-  const wineById = new Map((wineRows ?? []).map((w) => [w.id, w]));
   const gridData: GridData = {};
   for (const item of inventoryRows ?? []) {
     if (!item.bin_location || !item.wine_id) continue;
@@ -467,9 +462,13 @@ export default async function CellarPage() {
       autoEightysixEnabled={restaurantRow?.auto_eightysix_from_inventory ?? false}
       autoEightysixThresholdMl={restaurantRow?.eightysix_ml_threshold ?? 148}
       eightysixStrategy={eightysixStrategy}
-      defaultTargetPourCostPct={restaurantRow?.default_target_pour_cost_pct ?? null}
-      defaultTargetMarkupRatio={restaurantRow?.default_target_markup_ratio ?? null}
+      defaultTargetPourCostPct={pricingDefaults?.default_target_pour_cost_pct ?? null}
+      defaultTargetMarkupRatio={pricingDefaults?.default_target_markup_ratio ?? null}
+      canReadCost={pricingAccess.canReadCost}
+      canReadMargin={pricingAccess.canReadMargin}
+      canManagePricing={pricingAccess.canManagePricing}
       role={userRole}
+      inventoryContractVersion={inventoryContractVersion}
     />
   );
 }

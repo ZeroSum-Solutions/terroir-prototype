@@ -52,7 +52,7 @@ async function getPourInsights(request: NextRequest) {
     }
 
     const pourQuery = supabase
-      .from("pour_events")
+      .from("effective_service_pour_events")
       .select(
         "wine_id, ml_delta, kind, occurred_at, wines!inner(id, name, producer, vintage)",
       )
@@ -85,7 +85,21 @@ async function getPourInsights(request: NextRequest) {
     if (inventoryError) throw inventoryError;
     if (listItemsError) throw listItemsError;
 
-    const pourEvents = pourEventsRaw ?? [];
+    const pourEvents = (pourEventsRaw ?? []).map((event) => {
+      if (
+        event.wine_id === null ||
+        event.ml_delta === null ||
+        event.kind === null ||
+        event.occurred_at === null
+      ) throw new Error("Invalid effective service event.");
+      return {
+        ...event,
+        wine_id: event.wine_id,
+        ml_delta: event.ml_delta,
+        kind: event.kind,
+        occurred_at: event.occurred_at,
+      };
+    });
 
     // --- Pour volume by section ---
     const wineSection = new Map<string, string>();

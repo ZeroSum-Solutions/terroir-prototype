@@ -6,8 +6,8 @@
  * staging) or its resource gone (production since #116 — the endpoint no
  * longer resolves) every invoice scan died at the first stage, and the
  * vision models that already read bottle labels were never asked. This
- * stage tries Azure first (multi-page fan-out with one span per page, then
- * a merge), and on `not_configured` or `upstream_error` hands the pages to
+ * stage tries Azure first (multi-page fan-out with one compatibility boundary
+ * per page, then a merge), and on `not_configured` or `upstream_error` hands the pages to
  * `extractFromImages` instead — visibly: Sentry gets a warning each time,
  * and the persisted `ocr_text` says `source: "vision"` with no raw text.
  *
@@ -48,8 +48,8 @@ function fallbackEnabled(): boolean {
 
 export async function readInvoicePages(pages: InvoicePage[]): Promise<InvoiceReadStage> {
   try {
-    // M1-1: one span per page so a multi-page invoice's OCR fan-out is
-    // visible per-page, not just as a single lump sum.
+    // Preserve one compatibility boundary per page without remote timing;
+    // Promise.all still keeps the multi-page OCR fan-out parallel.
     const ocrResults = await Promise.all(
       pages.map((page, pageIndex) =>
         withScanSpan(

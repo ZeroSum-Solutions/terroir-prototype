@@ -18,6 +18,7 @@ function makeSupabase(options?: {
   // two calls differently.
   winesByCall?: Array<Array<Record<string, unknown>>>;
   openBottles?: Array<Record<string, unknown>>;
+  openAggregates?: Array<Record<string, unknown>>;
   inventory?: Array<Record<string, unknown>>;
   fuzzy?: Array<{ wine_id: string; score: number }>;
   fuzzyError?: { message: string } | null;
@@ -58,7 +59,9 @@ function makeSupabase(options?: {
       rpc: vi.fn(async (name: string) =>
         name === "search_wines_fuzzy"
           ? { data: options?.fuzzy ?? [], error: options?.fuzzyError ?? null }
-          : { data: options?.openBottles ?? [], error: null },
+          : name === "list_open_bottle_aggregates"
+            ? { data: options?.openAggregates ?? [], error: null }
+            : { data: options?.openBottles ?? [], error: null },
       ),
     },
     calls,
@@ -197,21 +200,34 @@ describe("GET /api/wines/search", () => {
     });
   });
 
-  it("filter=open keeps only wines with an open bottle remaining", async () => {
+  it("filter=open includes authorized cellar-only and zero-mL active bottles", async () => {
     const { supabase } = makeSupabase({
-      wines: [{ id: "wine-open" }, { id: "wine-sealed" }],
-      openBottles: [
-        { wine_id: "wine-open", open_remaining_ml: 400, size_ml: 750 },
-        { wine_id: "wine-sealed", open_remaining_ml: 0, size_ml: 750 },
+      wines: [
+        { id: "wine-cellar-only" },
+        { id: "wine-empty-active" },
+        { id: "wine-sealed" },
+      ],
+      // No compatibility/list-item rows: these wines are in the authorized
+      // cellar but have never been added to a wine list.
+      openBottles: [],
+      openAggregates: [
+        { wine_id: "wine-cellar-only", active_bottle_count: 2, open_remaining_ml: 900 },
+        { wine_id: "wine-empty-active", active_bottle_count: 1, open_remaining_ml: 0 },
       ],
     });
     mockRequireMembership.mockResolvedValue({ supabase, restaurantId: "r1" });
     const response = await GET(
-      new NextRequest("http://localhost/api/wines/search?filter=open"),
+      new NextRequest("http://localhost/api/wines/search?q=cellar&filter=open"),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([{ id: "wine-open" }]);
-    expect(supabase.rpc).toHaveBeenCalledWith("list_open_bottle_items", {
+    expect(await response.json()).toEqual([
+      { id: "wine-cellar-only" },
+      { id: "wine-empty-active" },
+    ]);
+    expect(supabase.rpc).toHaveBeenCalledWith("list_open_bottle_aggregates", {
+      p_restaurant_id: "r1",
+    });
+    expect(supabase.rpc).not.toHaveBeenCalledWith("list_open_bottle_items", {
       p_restaurant_id: "r1",
     });
   });
@@ -237,6 +253,54 @@ describe("GET /api/wines/search", () => {
     // wine-low: 100 + 1*750 = 850 < 1500 → low. wine-stocked: 4500 → not low.
     // wine-no-list has no list item (no size_ml) → excluded, matching /cellar.
     expect(await response.json()).toEqual([{ id: "wine-low" }]);
+  });
+
+  it("filter=low consumes one summed aggregate row for multiple active bottles", async () => {
+    const { supabase } = makeSupabase({
+      wines: [{ id: "wine-multi-open" }],
+      openBottles: [
+        {
+          wine_id: "wine-multi-open",
+          active_bottle_count: 2,
+          open_remaining_ml: 1_000,
+          size_ml: 750,
+        },
+      ],
+      inventory: [{ wine_id: "wine-multi-open", quantity: 0 }],
+    });
+    mockRequireMembership.mockResolvedValue({ supabase, restaurantId: "r1" });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/wines/search?filter=low"),
+    );
+
+    expect(response.status).toBe(200);
+    // The RPC contract is one aggregate row per wine. Two physical bottles
+    // still produce exactly one wine result; the summed 1,000 mL is low.
+    expect(await response.json()).toEqual([{ id: "wine-multi-open" }]);
+  });
+
+  it("filter=low excludes summed active volume at the exact two-bottle boundary", async () => {
+    const { supabase } = makeSupabase({
+      wines: [{ id: "wine-boundary" }],
+      openBottles: [
+        {
+          wine_id: "wine-boundary",
+          active_bottle_count: 2,
+          open_remaining_ml: 1_500,
+          size_ml: 750,
+        },
+      ],
+      inventory: [{ wine_id: "wine-boundary", quantity: 0 }],
+    });
+    mockRequireMembership.mockResolvedValue({ supabase, restaurantId: "r1" });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/wines/search?filter=low"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
   });
 
   it("rejects an unknown filter value", async () => {

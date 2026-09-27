@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -55,19 +56,17 @@ describe.skipIf(!hasLiveDb)("search_wines_fuzzy (SCAN-06, MANDATORY)", { timeout
   let outsiderClient: SupabaseClient<Database>;
   let restaurantId: string;
   let otherRestaurantId: string;
-  const userIds: string[] = [];
+  const identities = new LiveDbFixtureIdentityTracker();
   const stamp = Date.now();
   const password = "test-password-1234";
 
   async function makeMember(restaurant: string, label: string) {
     const email = `fuzzy-${label}-${stamp}@example.test`;
-    const { data: u, error: uErr } = await admin.auth.admin.createUser({
+    const u = await identities.createUser(admin, {
       email,
       password,
       email_confirm: true,
     });
-    if (uErr || !u.user) throw uErr ?? new Error("failed to create user");
-    userIds.push(u.user.id);
 
     const { error: mErr } = await admin
       .from("memberships")
@@ -146,10 +145,10 @@ describe.skipIf(!hasLiveDb)("search_wines_fuzzy (SCAN-06, MANDATORY)", { timeout
     if (!admin) return;
     for (const id of [restaurantId, otherRestaurantId].filter(Boolean)) {
       await admin.from("wines").delete().eq("restaurant_id", id);
-      await admin.from("memberships").delete().eq("restaurant_id", id);
-      await admin.from("restaurants").delete().eq("id", id);
     }
-    for (const id of userIds) await admin.auth.admin.deleteUser(id);
+    await identities.cleanup(admin, {
+      restaurantIds: [restaurantId, otherRestaurantId].filter(Boolean),
+    });
   });
 
   it("REGRESSION: 'Fredric savart' found nothing before and finds Savart now", async () => {

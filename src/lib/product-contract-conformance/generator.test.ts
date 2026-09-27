@@ -37,8 +37,17 @@ function fixture() {
     [182, "POST /api/cellar"],
     [183, "PATCH /api/cellar/[id]"],
     [212, "All write endpoints"],
+    [288, "POST /api/integrations/pos/toast/imports"],
+    [289, "GET /api/integrations/pos/toast/reconciliation"],
+    [290, "POST /api/integrations/pos/toast/observations/[id]/interpretations"],
+    [297, "GET /api/offline-context"],
+    [311, "POST /api/open-bottles"],
+    [312, "POST /api/open-bottles/close"],
+    [313, "POST /api/open-bottles/[id]/close"],
+    [314, "POST /api/pour/undo"],
+    [315, "POST /api/reconcile"],
   ]);
-  const items = Array.from({ length: 269 }, (_, index) => {
+  const items = Array.from({ length: 328 }, (_, index) => {
     const sourceOrder = index + 1;
     const id = `TER-CF-${String(sourceOrder).padStart(3, "0")}`;
     const actor =
@@ -56,7 +65,7 @@ function fixture() {
   });
   write(root, "docs/feature-ledger.json", {
     schemaVersion: 2,
-    featureCount: 269,
+    featureCount: 328,
     items,
   });
   write(
@@ -190,17 +199,28 @@ describe("product contract conformance generator", () => {
     const root = fixture();
     expect(run(root, "--write").status).toBe(0);
     const generated = output(root);
-    expect(generated.scope.activeFeatureLedgerCount).toBe(269);
+    expect(generated.scope.activeFeatureLedgerCount).toBe(328);
     expect(generated.requirements.map((item: { requirementId: string }) => item.requirementId)).toEqual(
-      Array.from({ length: 38 }, (_, index) => `TER-CF-${180 + index}`),
+      [
+        ...Array.from({ length: 38 }, (_, index) => `TER-CF-${180 + index}`),
+        "TER-CF-288",
+        "TER-CF-289",
+        "TER-CF-290",
+        "TER-CF-297",
+        "TER-CF-311",
+        "TER-CF-312",
+        "TER-CF-313",
+        "TER-CF-314",
+        "TER-CF-315",
+      ],
     );
 
     const ledger = JSON.parse(readFileSync(join(root, "docs/feature-ledger.json"), "utf8"));
-    ledger.items[268].id = "TER-CF-999";
+    ledger.items[296].id = "TER-CF-999";
     write(root, "docs/feature-ledger.json", ledger);
     const result = run(root, "--write");
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-269");
+    expect(result.stderr).toContain("active feature ledger IDs must remain TER-CF-001 through TER-CF-328");
   });
 
   it("keeps cross-cutting claims weak with an explicit proof assessment", () => {

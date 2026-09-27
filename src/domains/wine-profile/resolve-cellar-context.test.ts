@@ -5,14 +5,20 @@
 // PUBLISHED price only. A wrong derivation upstream makes computeBadges lie
 // with perfect fidelity.
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 import {
   composeBadges,
   deriveCellarFacts,
   isSellingFormat,
+  resolveCellarContext,
   type CellarFacts,
   type InventoryRow,
   type ListRow,
 } from "./resolve-cellar-context";
+
+const WINE_ID = "22222222-2222-4222-8222-222222222222";
+const INVENTORY_ID = "33333333-3333-4333-8333-333333333333";
 
 const lot = (overrides: Partial<InventoryRow> = {}): InventoryRow => ({
   quantity: 6,
@@ -41,6 +47,77 @@ const derive = (input: Partial<Parameters<typeof deriveCellarFacts>[0]> = {}) =>
     sizeMl: 750,
     ...input,
   });
+
+function cellarClient(lastPour: { data: unknown; error: unknown } = { data: null, error: null }) {
+  const selected: Record<string, string> = {};
+  const filters: Array<{ table: string; column: string; value: unknown }> = [];
+  const responses: Record<string, { data: unknown; error: unknown }> = {
+    inventory_items: {
+      data: [{
+        id: INVENTORY_ID,
+        quantity: 2,
+        unit_cost: 100,
+        added_at: "2026-08-01T10:00:00.000Z",
+        bin_location: "A2",
+        section: null,
+        format: "750ml",
+      }],
+      error: null,
+    },
+    effective_service_pour_events: lastPour,
+    wine_list_items: {
+      data: [{
+        bottle_price: 35,
+        hidden: false,
+        is_available: true,
+        wine_list_sections: {
+          wine_lists: { is_published: true, archived: false },
+        },
+      }],
+      error: null,
+    },
+    cellar_config: { data: { health_dead_stock_days: 90 }, error: null },
+  };
+  const client = {
+    from: (table: string) => {
+      const query = {
+        select: (columns: string) => {
+          selected[table] = columns;
+          return query;
+        },
+        eq: (column: string, value: unknown) => {
+          filters.push({ table, column, value });
+          return query;
+        },
+        order: () => query,
+        limit: () => query,
+        maybeSingle: () => Promise.resolve(responses[table]),
+        then: (resolve: (value: unknown) => unknown) =>
+          Promise.resolve(responses[table]).then(resolve),
+      };
+      return query;
+    },
+    rpc: (name: string) => {
+      if (name !== "read_inventory_costs") {
+        throw new Error(`Unexpected RPC: ${name}`);
+      }
+      return {
+        range: async () => ({
+          data: [{
+            inventory_item_id: INVENTORY_ID,
+            wine_id: WINE_ID,
+            invoice_scan_id: null,
+            unit_cost: 100,
+            currency: "USD",
+            added_at: "2026-08-01T10:00:00+00:00",
+          }],
+          error: null,
+        }),
+      };
+    },
+  } as unknown as SupabaseClient<Database>;
+  return { client, selected, filters };
+}
 
 describe("selling format", () => {
   it("treats a lot with no recorded format as the selling format", () => {
@@ -89,6 +166,38 @@ describe("cost basis", () => {
   });
 });
 
+describe("cost query authority", () => {
+  it("does not select or derive cost unless both read grants are explicit", async () => {
+    for (const access of [
+      undefined,
+      { canReadCost: false, canReadMargin: false },
+      { canReadCost: true, canReadMargin: false },
+      { canReadCost: false, canReadMargin: true },
+    ]) {
+      const { client, selected } = cellarClient();
+      const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750, access);
+
+      expect(selected.inventory_items).not.toContain("unit_cost");
+      expect(facts.weightedUnitCost).toBeNull();
+      expect(facts.bottleCount).toBe(2);
+      expect(facts.locations).toEqual(["A2"]);
+      expect(facts.publishedBottlePrice).toBe(35);
+      expect(facts.listedAndOrderable).toBe(true);
+    }
+  });
+
+  it("selects and derives cost when both read grants are explicit", async () => {
+    const { client, selected } = cellarClient();
+    const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750, {
+      canReadCost: true,
+      canReadMargin: true,
+    });
+
+    expect(selected.inventory_items).not.toContain("unit_cost");
+    expect(facts.weightedUnitCost).toBe(100);
+  });
+});
+
 describe("the published price", () => {
   it("reads only rows a guest can order from", () => {
     const facts = derive({
@@ -123,6 +232,32 @@ describe("the published price", () => {
 });
 
 describe("dates and locations", () => {
+  it("uses the latest effective legacy-compatible pour for depletion", async () => {
+    const { client, selected, filters } = cellarClient({
+      data: { occurred_at: "2026-09-21T12:34:56.000Z", event_contract: 1 },
+      error: null,
+    });
+
+    const facts = await resolveCellarContext(client, "restaurant", WINE_ID, 750);
+
+    expect(facts.lastDepletionAt).toBe("2026-09-21");
+    expect(selected.effective_service_pour_events).toBe("occurred_at");
+    expect(selected.pour_events).toBeUndefined();
+    expect(filters).toContainEqual({
+      table: "effective_service_pour_events",
+      column: "restaurant_id",
+      value: "restaurant",
+    });
+  });
+
+  it("fails closed when the effective depletion timestamp is unknown", async () => {
+    const { client } = cellarClient({ data: { occurred_at: null }, error: null });
+
+    await expect(resolveCellarContext(client, "restaurant", WINE_ID, 750)).rejects.toThrow(
+      "Invalid effective service event",
+    );
+  });
+
   it("takes the latest put-away as a plain date", () => {
     const facts = derive({
       inventory: [lot({ added_at: "2026-03-01T10:00:00.000Z" }), lot({ added_at: "2026-08-14T23:30:00.000Z" })],

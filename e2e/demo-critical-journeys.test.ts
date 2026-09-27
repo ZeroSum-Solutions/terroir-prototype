@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { makeScan } from "../src/test/fixtures/invoices/scans";
 import { extractAuthEmailLink, waitForMailpitEmail } from "./auth-e2e-config";
 import { assertNoSeriousA11yViolations } from "./a11y";
 
@@ -23,34 +22,73 @@ test.describe("mobile demo critical journeys", () => {
     "Requires localhost Supabase credentials and DEV_BYPASS_EMAIL.",
   );
 
-  test("invoice upload reaches review and save confirmation at 390px", async ({ page }) => {
-    const scan = makeScan();
+  test("invoice upload reaches review, save, and commit confirmation at 390px", async ({ page }) => {
+    const seededScanId = "de100004-0000-4000-8000-000000000001";
     let scanRequests = 0;
     let saveRequests = 0;
+    let commitRequests = 0;
     await page.route("**/api/scan", async (route) => {
       scanRequests += 1;
       expect(route.request().method()).toBe("POST");
       expect(route.request().headers()["idempotency-key"]).toBeTruthy();
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(scan) });
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 1,
+          kind: "invoice_scan_upload",
+          scanId: seededScanId,
+          status: "queued",
+          itemCount: 0,
+        }),
+      });
     });
-    await page.route("**/api/inventory/save-scan", async (route) => {
+    await page.route(`**/api/scans/${seededScanId}`, async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.continue();
+        return;
+      }
       saveRequests += 1;
-      expect(route.request().method()).toBe("POST");
-      expect(route.request().headers()["idempotency-key"]).toBeTruthy();
+      const payload = route.request().postDataJSON() as Record<string, unknown>;
+      expect(payload).toEqual(expect.objectContaining({
+        expectedUpdatedAt: expect.any(String),
+        distributor: expect.any(String),
+        items: expect.any(Array),
+        edits: expect.any(Object),
+      }));
+      expect(payload.items).toHaveLength(4);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ scanId: "e2e-scan", itemCount: 2, wineCount: 2 }),
+        body: JSON.stringify({
+          scanId: seededScanId,
+          status: "complete",
+          itemCount: 4,
+          updated: true,
+        }),
+      });
+    });
+    await page.route(`**/api/scans/${seededScanId}/commit`, async (route) => {
+      commitRequests += 1;
+      expect(route.request().method()).toBe("POST");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          scanId: seededScanId,
+          itemCount: 4,
+          wineCount: 4,
+        }),
       });
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await loginWithLocalFixture(page);
     const seededImage = await page.request.get(
-      "/api/scans/de100004-0000-4000-8000-000000000001/image",
+      `/api/scans/${seededScanId}/image`,
     );
     expect(seededImage.status(), await seededImage.text()).toBe(200);
-    await page.goto("/scan/de100004-0000-4000-8000-000000000001");
+    await page.goto(`/scan/${seededScanId}`);
     await expect(page.getByRole("heading", { name: "Review scan" })).toBeVisible();
     await expect(page.getByLabel("Wine name").first()).toHaveValue(
       "Burgundy Pinot Noir Lot 001",
@@ -73,18 +111,25 @@ test.describe("mobile demo critical journeys", () => {
       ),
     });
 
-    await expect(page.getByRole("heading", { name: "Invoice scan results" })).toBeVisible();
-    await expect(page.getByLabel("Supplier")).toHaveValue("Test Distributor");
-    await expect(page.getByLabel("Producer").first()).toHaveValue("Domaine Drouhin");
-    await assertNoSeriousA11yViolations(page, "/scan invoice results");
-    const save = page.getByRole("button", { name: "Save to Inventory" });
+    await expect(page).toHaveURL(new RegExp(`/scan/${seededScanId}$`));
+    await expect(page.getByRole("heading", { name: "Review scan" })).toBeVisible();
+    await expect(page.getByLabel("Wine name").first()).toHaveValue(
+      "Burgundy Pinot Noir Lot 001",
+    );
+    await assertNoSeriousA11yViolations(page, "/scan/[id] queued upload review");
+    const save = page.getByRole("button", { name: "Save Edits" });
     expect(await controlHeight(save)).toBeGreaterThanOrEqual(44);
     await save.click();
-    await expect(page.getByRole("status")).toContainText(
-      "Saved 2 items to inventory (2 distinct wines)",
-    );
+    await expect(page.getByText("Edits saved.", { exact: true })).toBeVisible();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Commit to Inventory" }).click();
+    await expect(page.getByText(
+      "4 items committed to inventory (4 distinct wines).",
+      { exact: true },
+    )).toBeVisible();
     expect(scanRequests).toBe(1);
     expect(saveRequests).toBe(1);
+    expect(commitRequests).toBe(1);
     await expectNoDocumentOverflow(page);
   });
 
@@ -290,9 +335,18 @@ test.describe("mobile demo critical journeys", () => {
 
       const signOutResponse = await page.request.post(
         "http://127.0.0.1:3000/auth/signout",
-        { maxRedirects: 0 },
+        {
+          headers: {
+            Origin: "http://127.0.0.1:3000",
+            "sec-fetch-site": "same-origin",
+          },
+          maxRedirects: 0,
+        },
       );
       expect(signOutResponse.status()).toBe(303);
+      expect(
+        new URL(signOutResponse.headers().location ?? "http://127.0.0.1:3000").pathname,
+      ).toBe("/login");
       await page.goto("http://127.0.0.1:3000/login");
       await expect(page.getByRole("heading", { name: /Sign in/i })).toBeVisible();
       await assertNoSeriousA11yViolations(page, "/login sign-in");

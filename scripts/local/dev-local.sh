@@ -30,6 +30,53 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 1
 fi
 
+# Next 16.2.12 resolves an explicit -p/--port before PORT, then defaults to
+# 3000. Resolve the same value before reading credentials so the app origin and
+# the forwarded Next command cannot silently name different loopback ports.
+CLI_PORT=""
+CLI_PORT_SEEN=0
+ARGS=("$@")
+for ((index = 0; index < ${#ARGS[@]}; index += 1)); do
+  argument="${ARGS[$index]}"
+  [ "$argument" = "--" ] && break
+  case "$argument" in
+    -p|--port)
+      index=$((index + 1))
+      [ "$index" -lt "${#ARGS[@]}" ] || {
+        echo "dev-local: REFUSING — $argument requires one port value." >&2
+        exit 2
+      }
+      candidate_port="${ARGS[$index]}"
+      ;;
+    --port=*) candidate_port="${argument#--port=}" ;;
+    -p?*) candidate_port="${argument#-p}" ;;
+    *) continue ;;
+  esac
+  if [ "$CLI_PORT_SEEN" -eq 1 ]; then
+    echo "dev-local: REFUSING — multiple port flags are ambiguous." >&2
+    exit 2
+  fi
+  CLI_PORT="$candidate_port"
+  CLI_PORT_SEEN=1
+done
+
+if [ "$CLI_PORT_SEEN" -eq 1 ]; then
+  APP_PORT="$CLI_PORT"
+else
+  APP_PORT="${PORT:-3000}"
+fi
+case "$APP_PORT" in
+  ""|*[!0-9]*)
+    echo "dev-local: REFUSING — port must be an integer from 1 through 65535." >&2
+    exit 2
+    ;;
+esac
+if [ "${#APP_PORT}" -gt 5 ] || [ "$((10#$APP_PORT))" -lt 1 ] || [ "$((10#$APP_PORT))" -gt 65535 ]; then
+  echo "dev-local: REFUSING — port must be an integer from 1 through 65535." >&2
+  exit 2
+fi
+APP_PORT="$((10#$APP_PORT))"
+
 echo "dev-local: reading local stack credentials from supabase status ..."
 STATUS_JSON="$(npx supabase status -o json 2>/dev/null)" || {
   echo "dev-local: could not read supabase status — is the local stack running? (npx supabase start)" >&2
@@ -70,7 +117,7 @@ NEXT_PUBLIC_SUPABASE_URL="$API_URL" source scripts/local/assert-local-db.sh
 # and the recovery link lands on /login?error=link. That looked exactly like a
 # broken password reset and was really a two-spellings-of-loopback mismatch
 # that only ever existed locally, because CI already pins this.
-APP_URL="http://127.0.0.1:3000"
+APP_URL="http://127.0.0.1:${APP_PORT}"
 
 # Isolated worktrees do not carry the hosted dotenv file. Supply a local-only
 # signing key so restaurant switching works there too. An explicit shell key

@@ -2,12 +2,36 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import { BIN_ID, makeSupabase, PARAMS, patchRequest } from "./route.test-helpers";
 
-const mockRequireRole = vi.fn();
+const authMocks = vi.hoisted(() => ({
+  routeRequireRole: vi.fn(),
+  getUser: vi.fn(),
+  rpc: vi.fn(),
+  actualRequireRole: undefined as
+    | typeof import("@/lib/api/auth").requireRole
+    | undefined,
+}));
 const mockCaptureException = vi.fn();
 
-vi.mock("@/lib/api/auth", () => ({
-  requireRole: (...args: unknown[]) => mockRequireRole(...args),
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: { getUser: authMocks.getUser },
+    rpc: (...args: unknown[]) => authMocks.rpc(...args),
+  })),
 }));
+vi.mock("@/lib/api/shadow-site-access", () => ({
+  observeShadowSiteAccess: vi.fn(async () => ({ state: "denied" })),
+}));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ get: () => undefined })),
+}));
+vi.mock("@/lib/api/auth", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/api/auth")>();
+  authMocks.actualRequireRole = original.requireRole;
+  return {
+    ...original,
+    requireRole: (...args: unknown[]) => authMocks.routeRequireRole(...args),
+  };
+});
 vi.mock("@sentry/nextjs", () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
@@ -15,7 +39,7 @@ vi.mock("@sentry/nextjs", () => ({
 const { PATCH } = await import("./route");
 
 function allowManager(supabase: ReturnType<typeof makeSupabase>) {
-  mockRequireRole.mockResolvedValue({
+  authMocks.routeRequireRole.mockResolvedValue({
     supabase,
     restaurantId: "restaurant-a",
     user: { id: "user-a" },
@@ -23,33 +47,11 @@ function allowManager(supabase: ReturnType<typeof makeSupabase>) {
   });
 }
 
-const RENAMED_BIN = {
-  id: BIN_ID,
-  code: "R-04",
-  zone: null,
-  capacity: null,
-  priority: 0,
-  sort_order: 0,
-  retired_at: null,
-};
-const CURRENT_BIN = {
-  code: "R-03",
-  zone: "Old zone",
-  capacity: 8,
-  priority: 1,
-  retired_at: null,
-};
-
-function expectSafeCapture(
-  call: number,
-  message: string,
-  phase: string,
-) {
-  expect(mockCaptureException).toHaveBeenNthCalledWith(
-    call,
-    expect.objectContaining({ message }),
+function expectSafeCapture() {
+  expect(mockCaptureException).toHaveBeenCalledWith(
+    expect.objectContaining({ message: "Bin update failed." }),
     {
-      tags: { surface: "bins", phase },
+      tags: { surface: "bins", phase: "update" },
       extra: { restaurantId: "restaurant-a", binId: BIN_ID },
     },
   );
@@ -72,23 +74,45 @@ describe("PATCH /api/bins/[id]", () => {
     "uses the manager role gate and stops before database access (%s)",
     async (status) => {
       const supabase = makeSupabase({});
-      mockRequireRole.mockResolvedValue(
+      authMocks.routeRequireRole.mockResolvedValue(
         NextResponse.json({ error: "denied" }, { status }),
       );
 
       const response = await PATCH(patchRequest({ priority: 3 }), PARAMS());
 
       expect(response.status).toBe(status);
-      expect(mockRequireRole).toHaveBeenCalledWith(["owner", "manager"]);
+      expect(authMocks.routeRequireRole).toHaveBeenCalledWith([
+        "owner",
+        "manager",
+      ]);
       expect(supabase.from).not.toHaveBeenCalled();
     },
   );
+
+  it("denies through the actual auth helper when the lifecycle-aware reader returns no current membership", async () => {
+    // This proves the HTTP helper consumes the closed reader fail-closed. The
+    // database contract, not this mock, proves revoked rows are excluded.
+    authMocks.getUser.mockResolvedValue({
+      data: { user: { id: "revoked-user" } },
+    });
+    authMocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    const response = await authMocks.actualRequireRole?.(["owner", "manager"]);
+
+    expect(response).toBeInstanceOf(NextResponse);
+    expect((response as NextResponse).status).toBe(403);
+    expect(authMocks.rpc).toHaveBeenCalledWith(
+      "read_current_operational_memberships",
+      { p_user_id: "revoked-user" },
+    );
+  });
 
   it.each([
     ["invalid JSON", "{not json"],
     ["empty body", {}],
     ["unknown fields", { restaurant_id: "restaurant-b" }],
     ["blank code", { code: "   " }],
+    ["oversized code", { code: "x".repeat(51) }],
     ["oversized zone", { zone: "x".repeat(101) }],
     ["non-positive capacity", { capacity: -1 }],
     ["fractional priority", { priority: 2.5 }],
@@ -115,7 +139,7 @@ describe("PATCH /api/bins/[id]", () => {
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("updates with explicit id and tenant scope", async () => {
+  it("updates non-code fields with explicit id and tenant scope", async () => {
     const updated = {
       id: BIN_ID,
       code: "A-01",
@@ -149,13 +173,50 @@ describe("PATCH /api/bins/[id]", () => {
     expect(supabase.from).toHaveBeenCalledTimes(1);
   });
 
+  it("renames with one tenant-scoped bins update and no inventory call", async () => {
+    const updated = {
+      id: BIN_ID,
+      code: "R-04",
+      zone: null,
+      capacity: 12,
+      priority: 2,
+      sort_order: 0,
+      retired_at: null,
+    };
+    const supabase = makeSupabase({
+      bins: [{ data: updated, error: null }],
+    });
+    allowManager(supabase);
+
+    const response = await PATCH(
+      patchRequest({ code: "  R-04  ", capacity: 12, priority: 2 }),
+      PARAMS(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(updated);
+    expect(supabase.operations.bins).toEqual([
+      [
+        ["update", { code: "R-04", capacity: 12, priority: 2 }],
+        ["eq", "id", BIN_ID],
+        ["eq", "restaurant_id", "restaurant-a"],
+        [
+          "select",
+          "id, code, zone, capacity, priority, sort_order, retired_at",
+        ],
+      ],
+    ]);
+    expect(supabase.operations.inventory_items).toBeUndefined();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
   it("returns 404 when the explicit tenant scope finds no bin", async () => {
     const supabase = makeSupabase({
       bins: [{ data: null, error: null }],
     });
     allowManager(supabase);
 
-    const response = await PATCH(patchRequest({ priority: 3 }), PARAMS());
+    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
 
     expect(response.status).toBe(404);
     expect(supabase.operations.bins[0]).toContainEqual([
@@ -163,62 +224,14 @@ describe("PATCH /api/bins/[id]", () => {
       "restaurant_id",
       "restaurant-a",
     ]);
+    expect(supabase.operations.inventory_items).toBeUndefined();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
   });
 
-  it("mirrors a changed code to tenant-scoped inventory rows", async () => {
-    const updated = {
-      id: BIN_ID,
-      code: "R-04",
-      zone: "Reds",
-      capacity: 12,
-      priority: 0,
-      sort_order: 0,
-      retired_at: null,
-    };
-    const supabase = makeSupabase({
-      bins: [
-        { data: { code: "R-03" }, error: null },
-        { data: updated, error: null },
-      ],
-      inventory_items: [{ data: null, error: null }],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(
-      patchRequest({ code: "  R-04  " }),
-      PARAMS(),
-    );
-
-    expect(response.status).toBe(200);
-    expect(supabase.operations.bins[0]).toEqual([
-      ["select", "code, zone, capacity, priority, retired_at"],
-      ["eq", "id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-    ]);
-    expect(supabase.operations.bins[1]).toEqual([
-      ["update", { code: "R-04" }],
-      ["eq", "id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-      ["eq", "code", "R-03"],
-      [
-        "select",
-        "id, code, zone, capacity, priority, sort_order, retired_at",
-      ],
-    ]);
-    expect(supabase.operations.inventory_items[0]).toEqual([
-      ["update", { bin_location: "R-04" }],
-      ["eq", "bin_id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-    ]);
-  });
-
-  it("maps duplicate codes to duplicate_bin_code without mirroring", async () => {
+  it("maps duplicate codes to duplicate_bin_code without a second query", async () => {
     const error = { code: "23505", message: "duplicate secret detail" };
     const supabase = makeSupabase({
-      bins: [
-        { data: { code: "R-03" }, error: null },
-        { data: null, error },
-      ],
+      bins: [{ data: null, error }],
     });
     allowManager(supabase);
 
@@ -226,166 +239,32 @@ describe("PATCH /api/bins/[id]", () => {
 
     expect(response.status).toBe(409);
     expect((await response.json()).error.code).toBe("duplicate_bin_code");
-    expect(supabase.from).toHaveBeenCalledTimes(2);
+    expect(supabase.operations.inventory_items).toBeUndefined();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when a rename pre-read cannot find a tenant bin", async () => {
-    const supabase = makeSupabase({
-      bins: [{ data: null, error: null }],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
-
-    expect(response.status).toBe(404);
-    expect(supabase.operations.bins[0]).toEqual([
-      ["select", "code, zone, capacity, priority, retired_at"],
-      ["eq", "id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-    ]);
-    expect(supabase.from).toHaveBeenCalledTimes(1);
-  });
-
-  it("redacts a rename pre-read failure from logs and Sentry", async () => {
-    const error = { code: "XX000", message: "password=lookup-secret" };
-    const supabase = makeSupabase({
-      bins: [{ data: null, error }],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
-
-    expect(response.status).toBe(500);
-    expect(console.error).toHaveBeenCalledTimes(1);
-    expect(console.error).toHaveBeenCalledWith("Bin code lookup failed.");
-    expectSafeCapture(1, "Bin code lookup failed.", "read-code");
-    expect(mockCaptureException).not.toHaveBeenCalledWith(error, expect.anything());
-    expectTelemetryRedacted("lookup-secret");
-  });
-
-  it("returns a conflict when the optimistic old-code predicate misses", async () => {
-    const supabase = makeSupabase({
-      bins: [
-        { data: { code: "R-03" }, error: null },
-        { data: null, error: null },
-      ],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
-
-    expect(response.status).toBe(409);
-    expect((await response.json()).error.code).toBe("bin_changed");
-    expect(supabase.operations.bins[1]).toContainEqual([
-      "eq",
-      "code",
-      "R-03",
-    ]);
-    expect(supabase.from).toHaveBeenCalledTimes(2);
-  });
-
-  it("redacts and captures an update failure", async () => {
+  it("redacts and captures an atomic rename failure", async () => {
     const error = { code: "XX000", message: "password=secret" };
     const supabase = makeSupabase({
       bins: [{ data: null, error }],
     });
     allowManager(supabase);
 
-    const response = await PATCH(patchRequest({ priority: 3 }), PARAMS());
+    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
     const text = await response.text();
 
     expect(response.status).toBe(500);
     expect(text).not.toContain("secret");
     expect(console.error).toHaveBeenCalledTimes(1);
     expect(console.error).toHaveBeenCalledWith("Bin update failed.");
-    expectSafeCapture(1, "Bin update failed.", "update");
-    expect(mockCaptureException).not.toHaveBeenCalledWith(error, expect.anything());
-    expectTelemetryRedacted("password=secret");
-  });
-
-  it("returns a redacted 500 when the legacy-code mirror fails", async () => {
-    const mirrorError = { code: "XX000", message: "password=secret" };
-    const supabase = makeSupabase({
-      bins: [
-        { data: CURRENT_BIN, error: null },
-        { data: RENAMED_BIN, error: null },
-        { data: { id: BIN_ID }, error: null },
-      ],
-      inventory_items: [{ data: null, error: mirrorError }],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(
-      patchRequest({
-        code: "R-04",
-        zone: null,
-        capacity: null,
-        priority: 2,
-        retired_at: null,
-      }),
-      PARAMS(),
-    );
-    const text = await response.text();
-
-    expect(response.status).toBe(500);
-    expect(text).not.toContain("secret");
-    expect(supabase.operations.inventory_items[0]).toEqual([
-      ["update", { bin_location: "R-04" }],
-      ["eq", "bin_id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-    ]);
-    expect(console.error).toHaveBeenCalledTimes(1);
-    expect(console.error).toHaveBeenCalledWith("Bin code mirror failed.");
-    expectSafeCapture(1, "Bin code mirror failed.", "mirror-code");
+    expectSafeCapture();
     expect(mockCaptureException).not.toHaveBeenCalledWith(
-      mirrorError,
+      error,
       expect.anything(),
     );
     expectTelemetryRedacted("password=secret");
-    expect(supabase.operations.bins[2]).toEqual([
-      [
-        "update",
-        {
-          code: "R-03",
-          zone: "Old zone",
-          capacity: 8,
-          priority: 1,
-          retired_at: null,
-        },
-      ],
-      ["eq", "id", BIN_ID],
-      ["eq", "restaurant_id", "restaurant-a"],
-      ["eq", "code", "R-04"],
-      ["is", "zone", null],
-      ["is", "capacity", null],
-      ["eq", "priority", 2],
-      ["is", "retired_at", null],
-      ["select", "id"],
-    ]);
-  });
-
-  it("captures a rollback predicate miss after a mirror failure", async () => {
-    const mirrorError = { code: "XX000", message: "mirror secret" };
-    const supabase = makeSupabase({
-      bins: [
-        { data: { code: "R-03" }, error: null },
-        { data: RENAMED_BIN, error: null },
-        { data: null, error: null },
-      ],
-      inventory_items: [{ data: null, error: mirrorError }],
-    });
-    allowManager(supabase);
-
-    const response = await PATCH(patchRequest({ code: "R-04" }), PARAMS());
-    const text = await response.text();
-
-    expect(response.status).toBe(500);
-    expect(text).not.toContain("mirror secret");
-    expect(console.error).toHaveBeenNthCalledWith(1, "Bin code mirror failed.");
-    expect(console.error).toHaveBeenNthCalledWith(2, "Bin code rollback failed.");
-    expectSafeCapture(1, "Bin code mirror failed.", "mirror-code");
-    expectSafeCapture(2, "Bin code rollback failed.", "rollback-code");
-    expectTelemetryRedacted("secret");
+    expect(supabase.operations.inventory_items).toBeUndefined();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
   });
 });

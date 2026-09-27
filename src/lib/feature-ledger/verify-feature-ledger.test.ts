@@ -1,16 +1,23 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
 import {
-  createInitialLedger,
   deriveCriterion,
   metadataForRequirement,
   parseCoreFeatures,
   validateCompletionRules,
   verifyFeatureLedger,
 } from "../../../scripts/verify-feature-ledger.mjs";
+import {
+  APPROVED_SOURCE_REPLACEMENTS,
+  createInitialLedger,
+  generateFeatureLedger,
+} from "../../../scripts/generate-feature-ledger.mjs";
 
 const SPEC = `<project_specification>
   <prerequisites>
@@ -29,6 +36,17 @@ const SPEC = `<project_specification>
 
 const PLAN = "### TER-010: Complete authentication";
 const TEST_COMPLETION_RULES = [[1, 3, "TER-010", "identity"]];
+const C14_SOURCE_TEXTS = [
+  "System captures authorized, provenance-bound lookup-task, standard-pour, and count-labor evidence with explicit versioned baseline and pilot windows, explicit versioned provisional-export intervals of any duration, stable attempt identities, integer-microsecond durations, and retained rejected and failed evidence; only a real Q7 success claim requires a closed pilot window spanning at least 2419200000000 microseconds",
+  "System computes fixed Q7 metrics as at least 90 percent of trained-cohort lookup units completed within 10 seconds, at least 90 percent of captured standard-pour attempts completed within 3 seconds after wine selection, and pilot count labor no more than half of its matched baseline, preserving every eligible denominator and failure and preventing synthetic or provisional evidence from claiming a real four-week result",
+  "System exports one deterministic authorization-scoped baseline and pilot CSV with fixed record order and only cohort-gated full-cohort Q7 primary summaries, generic failure totals, and coarse qualifications, keeping actor, mode, stratum, coverage, terminal-outcome, threshold-miss, quality, comparison-unit, and count-diagnostic values private",
+];
+const C14_ANCHOR_SOURCE_HASH =
+  "83dd041b3837e6485e328f6da56cdbf52d185d1be71fca189c73fb908fd09cb0";
+const C14_ANCHOR_LEDGER_HASH =
+  "95cb41da20570a2cbeace625aea6740e4fd9a9039431e4f3f883fcf9ab35df8e";
+const hashJson = (value: unknown) =>
+  createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const createTestLedger = () => createInitialLedger(SPEC, 3);
 const verifyTestLedger = (
   ledger: ReturnType<typeof createInitialLedger>,
@@ -111,6 +129,23 @@ describe("metadataForRequirement", () => {
     [57, "TER-028", "bottle-scanning"],
     [180, "TER-023", "operations"],
     [269, "TER-005", "quality-engineering"],
+    [273, "TER-041", "pour-reconciliation"],
+    [274, "TER-012", "tenant-access"],
+    [281, "TER-014", "authorization"],
+    [282, "TER-047", "pos-integrations"],
+    [290, "TER-047", "pos-integrations"],
+    [291, "TER-048", "offline-lookup"],
+    [297, "TER-048", "offline-lookup"],
+    [298, "TER-041", "physical-bottle-inventory"],
+    [315, "TER-041", "physical-bottle-inventory"],
+    [316, "TER-049", "csv-identity-review"],
+    [317, "TER-049", "csv-identity-review"],
+    [318, "TER-050", "pilot-measurement"],
+    [320, "TER-050", "pilot-measurement"],
+    [321, "TER-014", "authorization"],
+    [324, "TER-014", "authorization"],
+    [325, "TER-014", "authorization"],
+    [328, "TER-014", "authorization"],
   ])("maps TER-CF-%s to its completion contract", (order, spec, owner) => {
     expect(metadataForRequirement(order)).toEqual({
       completionSpec: spec,
@@ -118,8 +153,8 @@ describe("metadataForRequirement", () => {
     });
   });
 
-  it("rejects requirements outside the authoritative 269", () => {
-    expect(() => metadataForRequirement(270)).toThrow(
+  it("rejects requirements outside the authoritative 328", () => {
+    expect(() => metadataForRequirement(329)).toThrow(
       "no completion metadata",
     );
   });
@@ -162,6 +197,7 @@ describe("createInitialLedger", () => {
         decision: "all_enumerated_features_active",
         approvedBy: "product_owner",
         approvedOn: "2026-07-23",
+        expandedOn: "2026-09-26",
       },
       items: [
         {
@@ -196,15 +232,152 @@ describe("createInitialLedger", () => {
   });
 });
 
+describe("generateFeatureLedger", () => {
+  const specFor = (assertions: string[]) => `<project_specification>
+  <core_features>
+    <inventory>
+${assertions.map((assertion) => `      - ${assertion}`).join("\n")}
+    </inventory>
+  </core_features>
+</project_specification>`;
+  const rules = (count: number) => [[1, count, "TER-010", "identity"]];
+  const original = [
+    "User can sign in",
+    "API returns 401 without a session",
+    "System records inventory",
+  ];
+
+  it("preserves IDs and status while recomputing reviewed metadata", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const updatedRules = [[1, 4, "TER-020", "data-platform"]];
+    const generated = generateFeatureLedger({
+      source: specFor([...original, "System records a stable operation"]),
+      previousLedger,
+      approvedFeatureCount: 4,
+      completionRules: updatedRules,
+      replacements: [],
+    });
+
+    expect(generated.items.map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-001",
+      "TER-CF-002",
+      "TER-CF-003",
+      "TER-CF-004",
+    ]);
+    expect(generated.items[0]).toMatchObject({
+      id: "TER-CF-001",
+      status: "active",
+      completionSpec: "TER-020",
+      evidenceOwner: "data-platform",
+    });
+    expect(
+      verifyFeatureLedger(specFor([...original, "System records a stable operation"]), generated, "### TER-020: Data", {
+        approvedFeatureCount: 4,
+        completionRules: updatedRules,
+      }),
+    ).toEqual([]);
+  });
+
+  it("refuses changed source text without an explicit ID mapping", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([original[0], "API returns 403 without access", original[2]]),
+        previousLedger,
+        approvedFeatureCount: 3,
+        completionRules: rules(3),
+        replacements: [],
+      }),
+    ).toThrow("changed or was removed without an explicit replacement: TER-CF-002");
+  });
+
+  it("applies an explicit source replacement without changing its ID", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const replacement = "API returns 403 without access";
+    const generated = generateFeatureLedger({
+      source: specFor([original[0], replacement, original[2]]),
+      previousLedger,
+      approvedFeatureCount: 3,
+      completionRules: rules(3),
+      replacements: [{
+        id: "TER-CF-002",
+        domain: "inventory",
+        fromSourceText: original[1],
+        toSourceText: replacement,
+      }],
+    });
+
+    expect(generated.items[1]).toMatchObject({
+      id: "TER-CF-002",
+      sourceText: replacement,
+      actor: "API",
+      action: "returns 403 without access",
+    });
+  });
+
+  it("rejects duplicate source assertions", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([...original, original[0]]),
+        previousLedger,
+        approvedFeatureCount: 4,
+        completionRules: rules(4),
+        replacements: [],
+      }),
+    ).toThrow("duplicate source assertion");
+  });
+
+  it("is idempotent after generation", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    const source = specFor([...original, "System records a stable operation"]);
+    const options = {
+      source,
+      approvedFeatureCount: 4,
+      completionRules: rules(4),
+      replacements: [],
+    };
+    const first = generateFeatureLedger({ ...options, previousLedger });
+    expect(generateFeatureLedger({ ...options, previousLedger: first })).toEqual(first);
+  });
+
+  it("refuses to move an existing assertion to a different source order", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([original[1], original[0], original[2]]),
+        previousLedger,
+        approvedFeatureCount: 3,
+        completionRules: rules(3),
+        replacements: [],
+      }),
+    ).toThrow("existing assertion TER-CF-002 moved from source order 2 to 1");
+  });
+
+  it("rejects a malformed previous ID before allocating an appended ID", () => {
+    const previousLedger = createInitialLedger(specFor(original), 3, rules(3));
+    previousLedger.items[2].id = "TER-CF-NaN";
+    expect(() =>
+      generateFeatureLedger({
+        source: specFor([...original, "System records a stable operation"]),
+        previousLedger,
+        approvedFeatureCount: 4,
+        completionRules: rules(4),
+        replacements: [],
+      }),
+    ).toThrow("invalid previous ID: TER-CF-NaN");
+  });
+});
+
 describe("verifyFeatureLedger", () => {
   it("accepts a complete ledger that matches its source", () => {
     expect(verifyTestLedger(createTestLedger())).toEqual([]);
   });
 
-  it("keeps 269 as the default approved source count", () => {
+  it("keeps 328 as the default approved source count", () => {
     expect(
       verifyFeatureLedger(SPEC, createTestLedger(), PLAN).join("\n"),
-    ).toContain("source feature count must remain 269");
+    ).toContain("source feature count must remain 328");
   });
 
   it.each([
@@ -249,6 +422,16 @@ describe("verifyFeatureLedger", () => {
         ledger.items[1].id = "TER-CF-999";
       },
       expected: "id must remain TER-CF-002",
+    },
+    {
+      name: "stable ID reassignment with the complete ID set retained",
+      mutate: (ledger: ReturnType<typeof createInitialLedger>) => {
+        [ledger.items[0].id, ledger.items[1].id] = [
+          ledger.items[1].id,
+          ledger.items[0].id,
+        ];
+      },
+      expected: "items[0].id must remain TER-CF-001",
     },
     {
       name: "missing required fields",
@@ -325,6 +508,86 @@ describe("verifyFeatureLedger", () => {
       "completionSpec TER-010 is absent",
     );
   });
+
+  it("rejects unknown top-level, budget, and item provenance fields", () => {
+    const ledger = createTestLedger() as ReturnType<typeof createInitialLedger> & Record<string, unknown>;
+    ledger.provenanceNote = "injected";
+    (ledger.budgetResolution as typeof ledger.budgetResolution & Record<string, unknown>).note = "injected";
+    (ledger.items[0] as typeof ledger.items[0] & Record<string, unknown>).injectedProvenance = "injected";
+    const errors = verifyTestLedger(ledger).join("\n");
+    expect(errors).toContain("ledger.provenanceNote is not allowed");
+    expect(errors).toContain("budgetResolution.note is not allowed");
+    expect(errors).toContain("items[0].injectedProvenance is not allowed");
+  });
+
+  it("rejects duplicate source assertions at verifier level", () => {
+    const duplicate = SPEC.replace(
+      "User can view inventory",
+      "User can sign in",
+    );
+    expect(verifyFeatureLedger(duplicate, createTestLedger(), PLAN, {
+      approvedFeatureCount: 3,
+      completionRules: TEST_COMPLETION_RULES,
+    }).join("\n")).toContain("duplicate source assertion at source order 3");
+  });
+});
+
+describe("feature ledger generator CLI", () => {
+  const copyFixture = () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "terroir-ledger-check-"));
+    fs.mkdirSync(path.join(root, "docs/plans"), { recursive: true });
+    for (const file of [
+      "app_spec.txt",
+      "docs/feature-ledger.json",
+      "docs/plans/2026-07-20-terroir-completion-spec.md",
+    ]) {
+      fs.copyFileSync(path.resolve(file), path.join(root, file));
+    }
+    return root;
+  };
+
+  it("checks canonical bytes and rejects injected metadata", () => {
+    const root = copyFixture();
+    try {
+      const script = path.resolve("scripts/generate-feature-ledger.mjs");
+      expect(spawnSync(process.execPath, [script, "--check"], { cwd: root }).status).toBe(0);
+
+      const ledgerPath = path.join(root, "docs/feature-ledger.json");
+      const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+      ledger.items[0].injectedProvenance = "fabricated";
+      fs.writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+      const rejected = spawnSync(process.execPath, [script, "--check"], {
+        cwd: root,
+        encoding: "utf8",
+      });
+      expect(rejected.status).toBe(1);
+      expect(rejected.stderr).toContain("generated feature ledger is stale");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("verifies generated content before replacing the checked-in ledger", () => {
+    const root = copyFixture();
+    try {
+      const ledgerPath = path.join(root, "docs/feature-ledger.json");
+      const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+      ledger.items[0].status = "done";
+      const invalid = `${JSON.stringify(ledger, null, 2)}\n`;
+      fs.writeFileSync(ledgerPath, invalid);
+
+      const result = spawnSync(
+        process.execPath,
+        [path.resolve("scripts/generate-feature-ledger.mjs"), "--write"],
+        { cwd: root, encoding: "utf8" },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("generated ledger failed verification");
+      expect(fs.readFileSync(ledgerPath, "utf8")).toBe(invalid);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("checked-in feature ledger", () => {
@@ -337,8 +600,8 @@ describe("checked-in feature ledger", () => {
     fs.readFileSync(path.resolve("docs/feature-ledger.json"), "utf8"),
   );
 
-  it("accounts for all 269 real features without verifier errors", () => {
-    expect(ledger.items).toHaveLength(269);
+  it("accounts for all 328 real features without verifier errors", () => {
+    expect(ledger.items).toHaveLength(328);
     expect(verifyFeatureLedger(source, ledger, plan)).toEqual([]);
   });
 
@@ -353,6 +616,191 @@ describe("checked-in feature ledger", () => {
       expect(item.observableOutcome).toBe(item.sourceText);
       expect(item.evidenceOwner).not.toBe("unassigned");
     }
+  });
+
+  it("promotes the physical service command without renumbering it", () => {
+    expect(ledger.items[150]).toMatchObject({
+      id: "TER-CF-151",
+      sourceOrder: 151,
+      sourceText:
+        "Fresh physical open, pour, spill, close, discard, and undo writes use execute_physical_bottle_command; completed version-1 receipts remain replay-only",
+      completionSpec: "TER-041",
+      evidenceOwner: "pour-reconciliation",
+    });
+  });
+
+  it("retains all twenty amended IDs while replacing version-1 promises", () => {
+    expect(APPROVED_SOURCE_REPLACEMENTS.map(({ id }) => id)).toEqual([
+      "TER-CF-142", "TER-CF-143", "TER-CF-146", "TER-CF-147", "TER-CF-148",
+      "TER-CF-150", "TER-CF-151", "TER-CF-152", "TER-CF-153", "TER-CF-157",
+      "TER-CF-159", "TER-CF-160", "TER-CF-161", "TER-CF-164", "TER-CF-192",
+      "TER-CF-193", "TER-CF-244", "TER-CF-245", "TER-CF-263", "TER-CF-273",
+    ]);
+    expect(APPROVED_SOURCE_REPLACEMENTS).toContainEqual({
+      id: "TER-CF-244",
+      domain: "database_constraints_and_functions",
+      fromSourceText:
+        "System treats execute_inventory_command as the canonical database entry point for new bottle-opening, pour, spill and close callers and retains record_pour only for legacy compatibility",
+      toSourceText:
+        "Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired",
+    });
+    expect(ledger.items[243]).toMatchObject({
+      id: "TER-CF-244",
+      sourceOrder: 244,
+      sourceText:
+        "Version 2 uses the physical scalar and batch RPCs; execute_inventory_command is completed-version-1 replay-only and all other legacy writers are retired",
+      completionSpec: "TER-020",
+      evidenceOwner: "data-platform",
+    });
+  });
+
+  it("appends the approved C04 Slice 1 contract without claiming enforcement", () => {
+    expect(ledger.items.slice(273, 281).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `TER-CF-${274 + index}`),
+    );
+    expect(ledger.items[278]).toMatchObject({
+      id: "TER-CF-279",
+      sourceText:
+        "System computes effective site access in shadow mode while legacy membership helpers remain authoritative",
+      completionSpec: "TER-014",
+      evidenceOwner: "authorization",
+    });
+    expect(ledger.items[279].sourceText).toContain(
+      "shadow effective-site access denies revoked or expired site or workspace membership",
+    );
+    expect(ledger.items.slice(273, 281).map((item: { sourceText: string }) => item.sourceText).join("\n"))
+      .not.toContain("takes effect on the next request");
+  });
+
+  it("appends the approved C08 Slice A contract without claiming live activation", () => {
+    expect(ledger.items.slice(281, 290).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 9 }, (_, index) => `TER-CF-${282 + index}`),
+    );
+    expect(ledger.items[281]).toMatchObject({
+      id: "TER-CF-282",
+      completionSpec: "TER-047",
+      evidenceOwner: "pos-integrations",
+    });
+    expect(ledger.items[282].sourceText).toContain(
+      "live activation and any public webhook route disabled",
+    );
+    expect(ledger.items.slice(281, 290).map((item: { sourceText: string }) => item.sourceText).join("\n"))
+      .not.toContain("live-active connection");
+  });
+
+  it("appends lookup-only requirements without granting cached server authority", () => {
+    expect(ledger.items.slice(290, 297).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 7 }, (_, index) => `TER-CF-${291 + index}`),
+    );
+    expect(ledger.items[290]).toMatchObject({
+      completionSpec: "TER-048", evidenceOwner: "offline-lookup", status: "active",
+    });
+    expect(ledger.items[291].sourceText).toContain("without treating");
+    expect(ledger.items[294].sourceText).toContain("when both local writes fail");
+    expect(ledger.items[295].sourceText).toContain("all authorized placements");
+    expect(ledger.items[296].actor).toBe("GET /api/offline-context");
+    expect(plan).toContain("all seven requirements remain unimplemented");
+  });
+
+  it("appends the eighteen physical-bottle requirements as one reviewed interval", () => {
+    expect(ledger.items.slice(297, 315).map((item: { id: string }) => item.id)).toEqual(
+      Array.from({ length: 18 }, (_, index) => `TER-CF-${298 + index}`),
+    );
+    expect(ledger.items[297]).toMatchObject({
+      domain: "physical_bottle_inventory",
+      completionSpec: "TER-041",
+      evidenceOwner: "physical-bottle-inventory",
+    });
+    expect(ledger.items[300].sourceText).toContain("all-or-none batch");
+    expect(ledger.items[314].actor).toBe("POST /api/reconcile");
+  });
+
+  it("appends the approved C09 CSV identity-review contract without claiming implementation", () => {
+    expect(ledger.items.slice(315, 317).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-316",
+      "TER-CF-317",
+    ]);
+    expect(ledger.items[315]).toMatchObject({
+      domain: "csv_identity_review",
+      actor: "User",
+      status: "active",
+      completionSpec: "TER-049",
+      evidenceOwner: "csv-identity-review",
+    });
+    expect(ledger.items[316]).toMatchObject({
+      domain: "csv_identity_review",
+      actor: "System",
+      status: "active",
+      completionSpec: "TER-049",
+      evidenceOwner: "csv-identity-review",
+    });
+    expect(ledger.items[315].sourceText).toContain("including an empty set");
+    expect(ledger.items[316].sourceText).toContain("optional display-only");
+  });
+
+  it("appends the approved C14 measurement contract without claiming implementation", () => {
+    expect(ledger.items.slice(317, 320).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-318",
+      "TER-CF-319",
+      "TER-CF-320",
+    ]);
+    for (const [index, sourceText] of C14_SOURCE_TEXTS.entries()) {
+      expect(ledger.items[317 + index]).toMatchObject({
+        domain: "pilot_measurement_capability",
+        actor: "System",
+        sourceText,
+        status: "active",
+        completionSpec: "TER-050",
+        evidenceOwner: "pilot-measurement",
+      });
+    }
+    expect(plan).toContain("### TER-050: Deliver pilot measurement capability");
+    expect(plan).toContain("do not require real four-week pilot observations");
+  });
+
+  it("appends the accepted C04 authority contract without claiming implementation", () => {
+    expect(ledger.items.slice(320, 324).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-321",
+      "TER-CF-322",
+      "TER-CF-323",
+      "TER-CF-324",
+    ]);
+    for (const item of ledger.items.slice(320, 324)) {
+      expect(item).toMatchObject({
+        domain: "site_capability_authority",
+        actor: "System",
+        status: "active",
+        completionSpec: "TER-014",
+        evidenceOwner: "authorization",
+      });
+    }
+    expect(ledger.items[320].sourceText).toContain("cost.read, margin.read, and pricing.manage");
+    expect(ledger.items[321].sourceText).toContain("plain BEFORE UPDATE triggers use IS DISTINCT FROM");
+    expect(ledger.items[322].sourceText).toContain("SQLSTATE 23505");
+    expect(ledger.items[323].sourceText).toContain("additive migration A");
+  });
+
+  it("appends the full staff-cost requirements without marking the seal complete", () => {
+    expect(ledger.items.slice(324).map((item: { id: string }) => item.id)).toEqual([
+      "TER-CF-325", "TER-CF-326", "TER-CF-327", "TER-CF-328",
+    ]);
+    for (const item of ledger.items.slice(324)) {
+      expect(item).toMatchObject({
+        domain: "site_capability_authority", actor: "System", status: "active",
+        completionSpec: "TER-014", evidenceOwner: "authorization",
+      });
+    }
+    expect(ledger.items[324].sourceText).toContain("without the exact current read grant");
+    expect(ledger.items[325].sourceText).toContain("cost-free receipts, atomic replay and stale refusal");
+    expect(ledger.items[326].sourceText).toContain("historical and future shapes are denied or database-constrained");
+    expect(ledger.items[327].sourceText).toContain("one additive database, complete application, and contract-ACL chain");
+  });
+
+  it("preserves the complete first 317 source and ledger objects from 006330bb", () => {
+    expect(hashJson(parseCoreFeatures(source).slice(0, 317))).toBe(
+      C14_ANCHOR_SOURCE_HASH,
+    );
+    expect(hashJson(ledger.items.slice(0, 317))).toBe(C14_ANCHOR_LEDGER_HASH);
   });
 
   it("matches the reviewed completion-spec distribution", () => {
@@ -370,9 +818,9 @@ describe("checked-in feature ledger", () => {
     expect(counts).toEqual({
       "TER-005": 13,
       "TER-010": 13,
-      "TER-012": 1,
+      "TER-012": 6,
       "TER-013": 2,
-      "TER-014": 4,
+      "TER-014": 15,
       "TER-015": 7,
       "TER-020": 49,
       "TER-023": 7,
@@ -385,10 +833,14 @@ describe("checked-in feature ledger", () => {
       "TER-034": 1,
       "TER-035": 2,
       "TER-040": 28,
-      "TER-041": 25,
+      "TER-041": 47,
       "TER-042": 37,
       "TER-043": 3,
       "TER-044": 15,
+      "TER-047": 9,
+      "TER-048": 7,
+      "TER-049": 2,
+      "TER-050": 3,
     });
   });
 

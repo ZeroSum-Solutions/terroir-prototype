@@ -1,8 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BottleScanResult, Scan } from "@/lib/scanner/types";
-
+import { bottleResult, invoiceResult, navigatorWithImmediateLocks, queuedInvoiceReceipt, TEST_RESTAURANT_ID, TEST_USER_ID } from "./scanner.test-fixtures";
 // Scanner navigates to /import when a cellar spreadsheet is dropped on the
 // scanner (a spreadsheet is not a scannable document). These tests render it
 // outside an App Router context, where the real useRouter throws.
@@ -13,7 +12,7 @@ vi.mock("next/navigation", () => ({
 
 import { takeHandoffFile } from "@/app/(app)/import/spreadsheet-handoff";
 vi.mock("@/lib/context/restaurant", () => ({
-  useRestaurant: () => ({ restaurantId: "restaurant-1" }),
+  useRestaurant: () => ({ restaurantId: TEST_RESTAURANT_ID }),
 }));
 
 const csvMocks = vi.hoisted(() => ({ downloadCsv: vi.fn() }));
@@ -43,70 +42,22 @@ vi.mock("./views/processing-view", async (importOriginal) => {
 
 const { Scanner } = await import("./scanner");
 const { stageForProgress } = await import("./views/processing-view");
-
-const invoiceResult: Scan = {
-  source: {
-    distributor: "Test Distributor",
-    invoiceNo: "INV-1",
-    invoiceDate: "2026-08-20",
-    parsedAt: "2026-08-20T12:00:00.000Z",
-  },
-  items: [
-    {
-      id: "item-1",
-      name: "Test Wine",
-      producer: "Test Producer",
-      vintage: 2022,
-      varietal: "Pinot Noir",
-      region: "Willamette Valley",
-      qty: 1,
-      unitCost: 24,
-      currency: "USD",
-      format: "750ml",
-      confidence: 0.95,
-    },
-  ],
-  edits: {},
-  quality: {
-    avgConfidence: 0.95,
-    lowConfidenceItems: 0,
-    totalItems: 1,
-    manualFallbackTriggered: false,
-  },
-};
-
-const bottleResult: BottleScanResult = {
-  candidates: [
-    {
-      name: "Test Pinot Noir",
-      producer: "Test Producer",
-      vintage: 2022,
-      varietal: "Pinot Noir",
-      region: "Willamette Valley",
-      country: "United States",
-      format: null,
-      confidence: 0.95,
-      lowFields: [],
-      notes: null,
-    },
-  ],
-  parsedAt: "2026-08-20T12:00:00.000Z",
-};
-
 let container: HTMLDivElement;
 let root: Root | null;
 
 beforeEach(async () => {
+  mockRouterPush.mockClear();
   processingRenderHistory.renders.length = 0;
   csvMocks.downloadCsv.mockReset();
   csvMocks.downloadCsv.mockImplementation(() => undefined);
   vi.stubGlobal("Storage", MemoryStorage);
   vi.stubGlobal("localStorage", new MemoryStorage());
+  vi.stubGlobal("navigator", navigatorWithImmediateLocks());
   localStorage.clear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root?.render(<Scanner />));
+  await act(async () => root?.render(<Scanner userId={TEST_USER_ID} />));
 });
 
 afterEach(() => {
@@ -197,13 +148,13 @@ describe("Scanner cancellation lifecycle", () => {
 
     expect(requests).toHaveLength(2);
     expect(requests.map((request) => request.url)).toEqual(["/api/scan", "/api/scan"]);
-    expect(requests[0].key).toBeTruthy();
-    expect(requests[1].key).toBeTruthy();
+    expect(requests[0].key).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
+    expect(requests[1].key).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
     expect(requests[1].key).not.toBe(requests[0].key);
   });
 
   it("ignores a bottle result decoded after cancellation", async () => {
-    const json = deferred<BottleScanResult>();
+    const json = deferred<typeof bottleResult>();
     let signal: AbortSignal | undefined;
     vi.stubGlobal("fetch", vi.fn((_url: string | URL | Request, init?: RequestInit) => {
       signal = init?.signal ?? undefined;
@@ -226,7 +177,7 @@ describe("Scanner cancellation lifecycle", () => {
   });
 
   it("ignores a successful invoice result decoded after cancellation", async () => {
-    const json = deferred<Scan>();
+    const json = deferred<typeof queuedInvoiceReceipt>();
     let signal: AbortSignal | undefined;
     vi.stubGlobal("fetch", vi.fn((_url: string | URL | Request, init?: RequestInit) => {
       signal = init?.signal ?? undefined;
@@ -240,7 +191,7 @@ describe("Scanner cancellation lifecycle", () => {
     setItem.mockClear();
 
     await act(async () => {
-      json.resolve(invoiceResult);
+      json.resolve(queuedInvoiceReceipt);
       await json.promise;
       await Promise.resolve();
     });
@@ -299,7 +250,7 @@ describe("Scanner cancellation lifecycle", () => {
     await selectReadyFile(new File(["second"], "second.jpg", { type: "image/jpeg" }));
 
     await act(async () => {
-      first.resolve(responseWithJson(Promise.resolve(invoiceResult)));
+      first.resolve(responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202));
       await first.promise;
       await Promise.resolve();
     });
@@ -324,37 +275,32 @@ describe("Scanner cancellation lifecycle", () => {
     await selectReadyFile(new File(["second"], "second.jpg", { type: "image/jpeg" }));
 
     await act(async () => {
-      first.resolve(responseWithJson(Promise.resolve(invoiceResult)));
+      first.resolve(responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202));
       await first.promise;
       await Promise.resolve();
-      second.resolve(responseWithJson(Promise.resolve(invoiceResult)));
+      second.resolve(responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202));
       await second.promise;
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Invoice scan results");
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).toHaveBeenCalledWith(`/scan/${queuedInvoiceReceipt.scanId}`);
     expect(container.textContent).not.toContain("Couldn’t read");
   });
 });
 
 describe("Scanner progress reset", () => {
-  it("starts a second invoice attempt at upload and zero estimated progress", async () => {
+  it("starts an invoice retry at upload and zero estimated progress", async () => {
     const second = deferred<Response>();
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)))
+      .mockRejectedValueOnce(new Error("network unavailable"))
       .mockReturnValueOnce(second.promise);
     vi.stubGlobal("fetch", fetchMock);
-    Object.defineProperty(window, "confirm", {
-      configurable: true,
-      value: vi.fn(() => true),
-    });
 
     await selectReadyFile(new File(["first"], "first.jpg", { type: "image/jpeg" }));
-    expect(container.textContent).toContain("Invoice scan results");
-    await clickButton("Clear");
-    await clickButton("Discard scan");
+    expect(container.textContent).toContain("Couldn’t read the invoice");
     processingRenderHistory.renders.length = 0;
-    await selectReadyFile(new File(["second"], "second.jpg", { type: "image/jpeg" }));
+    await clickButton("Retry invoice scan");
 
     expect(processingRenderHistory.renders[0]).toEqual({
       progress: 0,
@@ -405,7 +351,7 @@ describe("Scanner initialMode", () => {
     // the beforeEach root would keep invoice mode. Mount fresh.
     act(() => root?.unmount());
     root = createRoot(container);
-    await act(async () => root?.render(<Scanner initialMode="bottle" />));
+    await act(async () => root?.render(<Scanner userId={TEST_USER_ID} initialMode="bottle" />));
     expect(container.textContent).toContain("Scan a bottle label");
     expect(container.textContent).not.toContain("Scan an invoice");
   });
@@ -426,7 +372,7 @@ describe("Scanner initialMode", () => {
     );
     act(() => root?.unmount());
     root = createRoot(container);
-    await act(async () => root?.render(<Scanner initialMode="bottle" />));
+    await act(async () => root?.render(<Scanner userId={TEST_USER_ID} initialMode="bottle" />));
     expect(container.textContent).toContain("Scan a bottle label");
     expect(container.textContent).not.toContain("Invoice scan results");
     // The persisted scan is preserved, not deleted — a plain /scan visit
@@ -446,7 +392,7 @@ describe("Scanner initialMode", () => {
     );
     act(() => root?.unmount());
     root = createRoot(container);
-    await act(async () => root?.render(<Scanner initialMode="bottle" />));
+    await act(async () => root?.render(<Scanner userId={TEST_USER_ID} initialMode="bottle" />));
 
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve(responseWithJson(Promise.resolve(bottleResult))),
@@ -472,7 +418,7 @@ describe("Scanner initialMode", () => {
     );
     act(() => root?.unmount());
     root = createRoot(container);
-    await act(async () => root?.render(<Scanner initialMode="bottle" />));
+    await act(async () => root?.render(<Scanner userId={TEST_USER_ID} initialMode="bottle" />));
     expect(container.textContent).toContain("Scan a bottle label");
 
     await clickButton("Invoice");
@@ -487,7 +433,7 @@ describe("Scanner initialMode", () => {
     );
     act(() => root?.unmount());
     root = createRoot(container);
-    await act(async () => root?.render(<Scanner />));
+    await act(async () => root?.render(<Scanner userId={TEST_USER_ID} />));
     expect(container.textContent).toContain("Invoice scan results");
   });
 });
@@ -612,17 +558,21 @@ describe("Scanner client-side upload guards", () => {
   });
 
   it("still allows a single PDF through client-side validation", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await selectReadyFile(new File(["invoice"], "invoice.pdf", { type: "application/pdf" }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Invoice scan results");
+    expect(mockRouterPush).toHaveBeenCalledWith(`/scan/${queuedInvoiceReceipt.scanId}`);
   });
 
   it("still allows multiple photographed pages (not PDFs) through client-side validation", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await selectReadyFiles([
@@ -631,7 +581,7 @@ describe("Scanner client-side upload guards", () => {
     ]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Invoice scan results");
+    expect(mockRouterPush).toHaveBeenCalledWith(`/scan/${queuedInvoiceReceipt.scanId}`);
   });
 
   it("retries a recoverable network error with the FULL originally-selected batch, not just the first file", async () => {
@@ -659,13 +609,15 @@ describe("Scanner client-side upload guards", () => {
   });
 
   it("a camera-captured JPEG reaches processing through the camera input specifically", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      responseWithJson(Promise.resolve(queuedInvoiceReceipt), 202),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await selectCameraFile(new File(["camera capture"], "camera-capture.jpg", { type: "image/jpeg" }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Invoice scan results");
+    expect(mockRouterPush).toHaveBeenCalledWith(`/scan/${queuedInvoiceReceipt.scanId}`);
   });
 
   it("shows a specific, visible error when the scan request never resolves (dropped/stalled connection)", async () => {
@@ -706,27 +658,60 @@ describe("Scanner client-side upload guards", () => {
 
 describe("Scanner save and export feedback", () => {
   it("announces an invoice save failure with alert semantics", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)))
-      .mockRejectedValueOnce(new Error("save blocked"));
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error("save blocked"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButton("Save to Inventory");
 
     const alert = findRegion("alert", "save blocked");
     expect(alert.querySelector('svg[class*="triangle-alert"]')?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("announces a CSV export failure without reporting success", async () => {
+  it("does not acknowledge a wrong-kind invoice save receipt", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(
-      responseWithJson(Promise.resolve(invoiceResult)),
+      responseWithJson(Promise.resolve({
+        version: 1,
+        kind: "bottle_inventory_save",
+        wineId: "22222222-2222-4222-8222-222222222222",
+        status: "committed",
+        itemCount: 1,
+      })),
     ));
+    await restorePersistedInvoice();
+
+    await clickButton("Save to Inventory");
+
+    findRegion("alert", "Save outcome is uncertain");
+    expect(container.textContent).not.toContain("Saved 1 items to inventory");
+  });
+
+  it("does not acknowledge a wrong-kind bottle save receipt", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(responseWithJson(Promise.resolve(bottleResult)))
+      .mockResolvedValueOnce(responseWithJson(Promise.resolve({
+        version: 1,
+        kind: "invoice_inventory_save",
+        scanId: "11111111-1111-4111-8111-111111111111",
+        status: "committed",
+        itemCount: 1,
+        wineCount: 1,
+      }))));
+    await clickButton("Bottle");
+    await selectReadyFile(new File(["label"], "label.jpg", { type: "image/jpeg" }));
+
+    await clickButton("Confirm & save");
+
+    findRegion("alert", "Save outcome is uncertain");
+    expect(container.textContent).toContain("Bottle save needs recovery");
+  });
+
+  it("announces a CSV export failure without reporting success", async () => {
     csvMocks.downloadCsv.mockImplementation(() => {
       throw new Error("export blocked");
     });
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButtonByTitle("Export as CSV");
 
     const alert = findRegion("alert", "export blocked");
@@ -735,11 +720,7 @@ describe("Scanner save and export feedback", () => {
   });
 
   it("announces a successful CSV export politely", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(
-      responseWithJson(Promise.resolve(invoiceResult)),
-    ));
-
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButtonByTitle("Export as CSV");
 
     const status = findRegion("status", "Exported 1 wines to CSV");
@@ -749,15 +730,17 @@ describe("Scanner save and export feedback", () => {
 
   it("announces the persistent saved-result text without including its actions", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)))
       .mockResolvedValueOnce(responseWithJson(Promise.resolve({
-        scanId: "saved-scan-1",
+        version: 1,
+        kind: "invoice_inventory_save",
+        scanId: "11111111-1111-4111-8111-111111111111",
+        status: "committed",
         itemCount: 2,
         wineCount: 2,
       })));
     vi.stubGlobal("fetch", fetchMock);
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButton("Save to Inventory");
 
     const status = findRegion("status", "Saved 2 items to inventory");
@@ -768,14 +751,11 @@ describe("Scanner save and export feedback", () => {
   });
 
   it("announces an accuracy export failure without reporting success", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(
-      responseWithJson(Promise.resolve(invoiceResult)),
-    ));
     vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
       throw new Error("accuracy export blocked");
     });
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButtonByTitle("Export accuracy JSON (source + items + per-field edits)");
 
     findRegion("alert", "accuracy export blocked");
@@ -783,15 +763,12 @@ describe("Scanner save and export feedback", () => {
   });
 
   it("reports accuracy-export cleanup failures instead of announcing success", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(
-      responseWithJson(Promise.resolve(invoiceResult)),
-    ));
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:accuracy-report");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {
       throw new Error("accuracy cleanup blocked");
     });
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
     await clickButtonByTitle("Export accuracy JSON (source + items + per-field edits)");
 
     findRegion("alert", "accuracy cleanup blocked");
@@ -832,7 +809,13 @@ describe("Scanner double-submit guard", () => {
 
     await act(async () => {
       saveDeferred.resolve(
-        responseWithJson(Promise.resolve({ wineId: "wine-1" })),
+        responseWithJson(Promise.resolve({
+          version: 1,
+          kind: "bottle_inventory_save",
+          wineId: "22222222-2222-4222-8222-222222222222",
+          status: "committed",
+          itemCount: 1,
+        })),
       );
       await Promise.resolve();
       await Promise.resolve();
@@ -841,13 +824,10 @@ describe("Scanner double-submit guard", () => {
 
   it("sends exactly one invoice save request when Save to Inventory is double-clicked in the same tick", async () => {
     const saveDeferred = deferred<Response>();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(responseWithJson(Promise.resolve(invoiceResult)))
-      .mockReturnValue(saveDeferred.promise);
+    const fetchMock = vi.fn().mockReturnValue(saveDeferred.promise);
     vi.stubGlobal("fetch", fetchMock);
 
-    await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
+    await restorePersistedInvoice();
 
     const saveButton = buttonNamed("Save to Inventory");
     await act(async () => {
@@ -863,7 +843,14 @@ describe("Scanner double-submit guard", () => {
     await act(async () => {
       saveDeferred.resolve(
         responseWithJson(
-          Promise.resolve({ scanId: "scan-1", itemCount: 1, wineCount: 1 }),
+          Promise.resolve({
+            version: 1,
+            kind: "invoice_inventory_save",
+            scanId: "11111111-1111-4111-8111-111111111111",
+            status: "committed",
+            itemCount: 1,
+            wineCount: 1,
+          }),
         ),
       );
       await Promise.resolve();
@@ -899,16 +886,29 @@ describe("Scanner — a cellar spreadsheet is the right file at the wrong door",
     expect(takeHandoffFile()).toBe(csv);
   });
 
-  it("does not navigate for an ordinary invoice image", async () => {
+  it("does not route an ordinary invoice image to the import workflow", async () => {
     mockRouterPush.mockClear();
     takeHandoffFile();
+    const request = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn(() => request.promise));
 
     await selectReadyFile(new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }));
 
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalledWith("/import");
     expect(takeHandoffFile()).toBeNull();
   });
 });
+
+async function restorePersistedInvoice() {
+  const { rawText: _rawText, ...persistable } = invoiceResult;
+  localStorage.setItem(
+    "terroir:current-scan",
+    JSON.stringify({ version: 2, data: persistable }),
+  );
+  act(() => root?.unmount());
+  root = createRoot(container);
+  await act(async () => root?.render(<Scanner userId={TEST_USER_ID} />));
+}
 
 async function selectReadyFile(file: File) {
   await selectReadyFiles([file]);
@@ -980,10 +980,10 @@ function progressbar(): HTMLElement {
   return element;
 }
 
-function responseWithJson<T>(json: Promise<T>): Response {
+function responseWithJson<T>(json: Promise<T>, status = 200): Response {
   return {
-    ok: true,
-    status: 200,
+    ok: status >= 200 && status < 300,
+    status,
     json: () => json,
   } as Response;
 }

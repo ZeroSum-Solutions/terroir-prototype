@@ -38,7 +38,7 @@ export function SortableSectionItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: section.id });
+  } = useSortable({ id: section.id, disabled: busy });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -62,6 +62,8 @@ export function SortableSectionItem({
           <input
             type="text"
             value={editName}
+            aria-label={`New name for ${section.name}`}
+            disabled={busy}
             onChange={(e) => onChangeEditName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") onCommitEdit(section.id);
@@ -73,7 +75,7 @@ export function SortableSectionItem({
           <button
             type="button"
             onClick={() => onCommitEdit(section.id)}
-            disabled={!editName.trim()}
+            disabled={busy || !editName.trim()}
             aria-label="Save rename"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ready-ink hover:bg-ready-wash disabled:opacity-40 focus-ring"
           >
@@ -82,6 +84,7 @@ export function SortableSectionItem({
           <button
             type="button"
             onClick={onCancelEdit}
+            disabled={busy}
             aria-label="Cancel rename"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-grey hover:bg-wash focus-ring"
           >
@@ -101,6 +104,7 @@ export function SortableSectionItem({
               aria-label={`Drag to reorder ${section.name}`}
               aria-describedby={reorderHelpId}
               aria-keyshortcuts="ArrowUp ArrowDown"
+              disabled={busy}
               onKeyDown={(event) => {
                 if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
                 event.preventDefault();

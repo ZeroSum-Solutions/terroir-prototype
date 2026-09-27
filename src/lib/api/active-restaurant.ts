@@ -17,6 +17,10 @@ import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Database } from "@/types/database";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  REPROVISION_REQUIRED,
+  setDeviceLockCookie,
+} from "@/domains/offline/device-lock";
 
 const COOKIE_NAME = "active_restaurant_id";
 const COOKIE_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 days
@@ -106,6 +110,7 @@ export async function setActiveRestaurant(
     path: "/",
     maxAge: COOKIE_MAX_AGE_S,
   });
+  setDeviceLockCookie(store, REPROVISION_REQUIRED);
   return { ok: true };
 }
 

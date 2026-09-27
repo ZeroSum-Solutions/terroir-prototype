@@ -15,10 +15,14 @@ export function OverpaidFlagButton({
   const [isPending, startTransition] = useTransition();
   const toggle = useCallback(() => {
     startTransition(async () => {
-      await fetch("/api/wines/" + wineId + "/overpaid", { method: "POST" });
+      await fetch("/api/wines/" + wineId + "/overpaid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flag: !flagged }),
+      });
       router.refresh();
     });
-  }, [wineId, router]);
+  }, [wineId, flagged, router]);
   return (
     React.createElement("button", {
       type: "button",

@@ -1,203 +1,367 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextResponse } from "next/server";
-import {
-  BOTTLE_ID,
-  makeAuthenticatedClient,
-  REASON_ID,
-  request,
-  WINE_ID,
-} from "./route.test-helpers";
+import { NextResponse, type NextRequest } from "next/server";
 
 const mockRequireMembership = vi.fn();
 vi.mock("@/lib/api/auth", () => ({
   requireMembership: (...args: unknown[]) => mockRequireMembership(...args),
 }));
-
 const mockRevalidate = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidate }));
-const mockCaptureException = vi.fn();
-vi.mock("@sentry/nextjs", () => ({ captureException: mockCaptureException }));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const { POST } = await import("./route");
 
-function allow(authenticatedClient: ReturnType<typeof makeAuthenticatedClient>["client"]) {
+const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
+const RESTAURANT_ID = "22222222-2222-4222-8222-222222222222";
+const WINE_ID = "55555555-5555-4555-8555-555555555555";
+const HISTORICAL_WINE_ID = "44444444-4444-4444-8444-444444444444";
+const BOTTLE_ID = "66666666-6666-4666-8666-666666666666";
+const REASON_ID = "77777777-7777-4777-8777-777777777777";
+const OPENED_AT = "2026-09-23T12:00:00.000Z";
+
+function makeSupabase(options: {
+  contractVersion?: 1 | 2;
+  replayed?: boolean;
+  rpcError?: { code?: string; message?: string } | null;
+  bottle?: null | {
+    id: string;
+    wine_id: string;
+    opened_at: string;
+    closed_at: string | null;
+    restaurant_id: string;
+  };
+} = {}) {
+  const bottle = options.bottle === undefined
+    ? {
+        id: BOTTLE_ID,
+        wine_id: WINE_ID,
+        opened_at: OPENED_AT,
+        closed_at: null,
+        restaurant_id: RESTAURANT_ID,
+      }
+    : options.bottle;
+  const commandResponse = {
+    data: options.rpcError
+      ? null
+      : {
+          operation_id: OPERATION_ID,
+          command: "close",
+          pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+          replayed: options.replayed ?? false,
+          open_bottle: {
+            id: BOTTLE_ID,
+            restaurant_id: RESTAURANT_ID,
+            wine_id: WINE_ID,
+            remaining_ml: 0,
+            opened_at: OPENED_AT,
+            closed_at: "2026-09-23T13:00:00.000Z",
+          },
+          closeout: {
+            id: "closeout-1",
+            restaurant_id: RESTAURANT_ID,
+            open_bottle_id: BOTTLE_ID,
+            wine_id: WINE_ID,
+            opened_at: OPENED_AT,
+            actual_remaining_ml: 570,
+          },
+        },
+    error: options.rpcError ?? null,
+  };
+  const rpc = vi.fn((name: string) => Promise.resolve(
+    name === "current_inventory_contract_version"
+      ? { data: options.contractVersion ?? 1, error: null }
+      : commandResponse,
+  ));
+  const from = vi.fn(() => ({
+    select: () => {
+      const chain = {
+        eq: () => chain,
+        single: async () => ({
+          data: bottle,
+          error: bottle ? null : { code: "PGRST116" },
+        }),
+      };
+      return chain;
+    },
+  }));
+  return { rpc, from };
+}
+
+function allow(supabase: ReturnType<typeof makeSupabase>) {
   mockRequireMembership.mockResolvedValue({
-    supabase: authenticatedClient,
-    restaurantId: "r-A",
-    user: { id: "u-close" },
+    supabase,
+    restaurantId: RESTAURANT_ID,
+    user: { id: "user-a" },
     role: "staff",
   });
 }
 
-describe("POST /api/open-bottles/close", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+function request(
+  body: unknown = {
+    open_bottle_id: BOTTLE_ID,
+    expected_opened_at: OPENED_AT,
+    actual_remaining_ml: 570,
+    written_off_ml: 30,
+    reason_code_id: REASON_ID,
+  },
+  operationId: string | null = OPERATION_ID,
+) {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (operationId) headers.set("Idempotency-Key", operationId);
+  return new Request("http://localhost/api/open-bottles/close", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  }) as unknown as NextRequest;
+}
 
-  it("returns the membership response before reading the body", async () => {
+describe("POST /api/open-bottles/close", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("keeps authentication first", async () => {
     mockRequireMembership.mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     );
-
-    expect((await POST(request({}))).status).toBe(401);
+    expect((await POST(request({}, null))).status).toBe(401);
   });
 
-  it("keeps shape validation and requires exactly one bottle selector", async () => {
-    const { client, rpc } = makeAuthenticatedClient();
-    allow(client);
+  it("requires both a valid operation UUID and exact lifecycle version", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
 
-    const missingSelector = await POST(request({ actual_remaining_ml: 0 }));
-    const duplicateSelector = await POST(request({
+    const missingKey = await POST(request(undefined, null));
+    const wineOnly = await POST(request({
       wine_id: WINE_ID,
-      open_bottle_id: BOTTLE_ID,
-      actual_remaining_ml: 0,
+      actual_remaining_ml: 570,
     }));
-    const nonInteger = await POST(request({
-      wine_id: WINE_ID,
-      actual_remaining_ml: 1.5,
-    }));
-
-    expect(missingSelector.status).toBe(400);
-    expect(duplicateSelector.status).toBe(400);
-    expect(nonInteger.status).toBe(400);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("preserves open_bottle_id callers while using the authenticated RPC mutation", async () => {
-    const { client, from, rpc } = makeAuthenticatedClient();
-    allow(client);
-
-    const response = await POST(request({
+    const missingVersion = await POST(request({
       open_bottle_id: BOTTLE_ID,
       actual_remaining_ml: 570,
     }));
 
-    expect(response.status).toBe(201);
-    expect(from).toHaveBeenCalledWith("open_bottles");
-    expect(rpc).toHaveBeenCalledWith("close_open_bottle", expect.objectContaining({
-      p_wine_id: WINE_ID,
-    }));
+    expect(missingKey.status).toBe(400);
+    expect((await missingKey.json()).error.code).toBe("invalid_idempotency_key");
+    expect(wineOnly.status).toBe(400);
+    expect(missingVersion.status).toBe(400);
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
-  it("EV-10.2: returns stable 422 before the RPC when a write-off omits its reason", async () => {
-    const { client, rpc } = makeAuthenticatedClient();
-    allow(client);
+  it("forwards the exact lifecycle and keeps the 201 closeout envelope", async () => {
+    const supabase = makeSupabase({ replayed: true });
+    allow(supabase);
+    const response = await POST(request());
 
-    const response = await POST(request({
+    expect(response.status).toBe(201);
+    expect((await response.json()).closeout).toMatchObject({
+      open_bottle_id: BOTTLE_ID,
       wine_id: WINE_ID,
+    });
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "close",
+        p_wine_id: WINE_ID,
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+        p_actual_remaining_ml: 570,
+        p_written_off_ml: 30,
+        p_reason_code_id: REASON_ID,
+      }),
+    );
+  });
+
+  it("rejects a write-off without a reason before the RPC", async () => {
+    const supabase = makeSupabase();
+    allow(supabase);
+    const response = await POST(request({
+      open_bottle_id: BOTTLE_ID,
+      expected_opened_at: OPENED_AT,
       actual_remaining_ml: 570,
       written_off_ml: 30,
     }));
-
     expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "writeoff_reason_required",
-        message: "A reason code is required for a write-off.",
-      },
-    });
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("closes atomically through the authenticated RPC and returns its closeout", async () => {
-    const { client, rpc, closeout } = makeAuthenticatedClient();
-    allow(client);
-
-    const response = await POST(request({
-      wine_id: WINE_ID,
-      actual_remaining_ml: 570,
-      written_off_ml: 30,
-      reason_code_id: REASON_ID,
-    }));
-
-    expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ closeout });
-    expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("close_open_bottle", {
-      p_wine_id: WINE_ID,
-      p_actual_remaining_ml: 570,
-      p_written_off_ml: 30,
-      p_reason_code_id: REASON_ID,
-    });
-    expect(mockRevalidate).toHaveBeenCalledWith("/cellar");
-    expect(mockRevalidate).toHaveBeenCalledWith("/insights");
+    expect((await response.json()).error.code).toBe("writeoff_reason_required");
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
   it.each([
-    ["open_bottle_not_found", 404, "open_bottle_not_found"],
-    ["writeoff_reason_required", 422, "writeoff_reason_required"],
+    ["open_bottle_changed", 409, "open_bottle_changed"],
+    ["inventory_operation_actor_conflict", 409, "idempotency_conflict"],
     ["invalid_reason_code", 422, "invalid_reason_code"],
     ["invalid_writeoff_amount", 422, "invalid_writeoff_amount"],
     ["invalid_actual_remaining", 422, "invalid_actual_remaining"],
-    ["forbidden", 403, "forbidden"],
-  ])("maps RPC error %s to HTTP %i with stable code %s", async (message, status, code) => {
-    const { client } = makeAuthenticatedClient({ rpcError: { message } });
-    allow(client);
-
-    const response = await POST(request({
-      wine_id: WINE_ID,
-      actual_remaining_ml: 570,
-      written_off_ml: message === "invalid_writeoff_amount" ? 571 : 0,
-      reason_code_id: message === "invalid_writeoff_amount" ? REASON_ID : undefined,
-    }));
-
+    ["wine_size_unknown", 422, "wine_size_unknown"],
+  ])("maps %s to %i/%s", async (message, status, code) => {
+    const supabase = makeSupabase({ rpcError: { code: "P0001", message } });
+    allow(supabase);
+    const response = await POST(request());
     expect(response.status).toBe(status);
     expect((await response.json()).error.code).toBe(code);
   });
 
-  it("gives a clear forbidden message when the RPC rejects the bottle as out of tenant", async () => {
-    const { client } = makeAuthenticatedClient({ rpcError: { message: "forbidden" } });
-    allow(client);
-
-    const response = await POST(request({
-      wine_id: WINE_ID,
-      actual_remaining_ml: 570,
-      written_off_ml: 0,
-    }));
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: {
-        code: "forbidden",
-        message:
-          "This bottle isn't in your restaurant. Refresh the page and try again.",
-      },
-    });
+  it("returns a stable 404 when the scoped bottle lookup misses", async () => {
+    const supabase = makeSupabase({ bottle: null });
+    allow(supabase);
+    const response = await POST(request());
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe("open_bottle_not_found");
+    expect(supabase.rpc).not.toHaveBeenCalledWith("execute_inventory_command", expect.anything());
   });
 
-  it("returns 422 when the write-off exceeds the actual remainder", async () => {
-    const { client, rpc } = makeAuthenticatedClient({
-      rpcError: { message: "invalid_writeoff_amount" },
-    });
-    allow(client);
-
+  it("uses the strict physical body and performs no bottle authority pre-read", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    const physical = physicalCloseResult();
+    supabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "current_inventory_contract_version"
+        ? { data: 2, error: null }
+        : { data: physical, error: null },
+    ));
+    allow(supabase);
     const response = await POST(request({
-      wine_id: WINE_ID,
-      actual_remaining_ml: 200,
-      written_off_ml: 201,
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID,
+      actual_remaining_ml: 570, written_off_ml: 30,
       reason_code_id: REASON_ID,
     }));
-
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.code).toBe("invalid_writeoff_amount");
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(201);
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith("execute_physical_bottle_command",
+      expect.objectContaining({ p_command: "close", p_wine_id: WINE_ID,
+        p_open_bottle_id: BOTTLE_ID, p_actual_remaining_ml: 570 }));
+    expect((await POST(request({
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, expected_opened_at: OPENED_AT,
+      actual_remaining_ml: 570, written_off_ml: 0,
+    }))).status).toBe(400);
   });
 
-  it("sanitizes unknown RPC errors", async () => {
-    const { client } = makeAuthenticatedClient({
-      rpcError: { code: "XX000", message: "provider-secret" },
-    });
-    allow(client);
+  it("accepts the strict legacy body under contract 2 for a completed replay", async () => {
+    const supabase = makeSupabase({ contractVersion: 2, replayed: true });
+    allow(supabase);
 
-    const response = await POST(request({
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect((await response.json()).closeout).toMatchObject({
+      open_bottle_id: BOTTLE_ID,
       wine_id: WINE_ID,
-      actual_remaining_ml: 570,
-    }));
-
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
-      error: { code: "internal_error", message: "Failed to close bottle." },
     });
-    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "execute_inventory_command",
+      expect.objectContaining({
+        p_operation_id: OPERATION_ID,
+        p_command: "close",
+        p_expected_open_bottle_id: BOTTLE_ID,
+        p_expected_opened_at: OPENED_AT,
+      }),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("accepts a merged-wine legacy close replay without binding mutable wine identity", async () => {
+    const supabase = makeSupabase({ contractVersion: 2 });
+    supabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "current_inventory_contract_version"
+        ? { data: 2, error: null }
+        : {
+            data: {
+              operation_id: OPERATION_ID,
+              command: "close",
+              pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+              replayed: true,
+              open_bottle: {
+                id: BOTTLE_ID,
+                restaurant_id: RESTAURANT_ID,
+                wine_id: HISTORICAL_WINE_ID,
+                remaining_ml: 0,
+                opened_at: OPENED_AT,
+                closed_at: "2026-09-23T13:00:00.000Z",
+              },
+              closeout: {
+                id: "closeout-1",
+                restaurant_id: RESTAURANT_ID,
+                wine_id: HISTORICAL_WINE_ID,
+                open_bottle_id: BOTTLE_ID,
+                opened_at: OPENED_AT,
+                actual_remaining_ml: 570,
+              },
+            },
+            error: null,
+          },
+    ));
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("Idempotency-Replayed")).toBe("true");
+    expect((await response.json()).closeout.wine_id).toBe(HISTORICAL_WINE_ID);
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("returns 409 for a fresh legacy close under contract 2 without physical fallback", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      rpcError: { code: "P0001", message: "legacy_inventory_command_retired" },
+    });
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("legacy_inventory_command_retired");
+    expect(response.headers.get("Idempotency-Replayed")).toBe("false");
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
+  });
+
+  it("keeps a non-retirement legacy close error terminal under contract 2", async () => {
+    const supabase = makeSupabase({
+      contractVersion: 2,
+      rpcError: { code: "P0001", message: "inventory_operation_actor_conflict" },
+    });
+    allow(supabase);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("idempotency_conflict");
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      "execute_physical_bottle_command",
+      expect.anything(),
+    );
   });
 });
+
+function physicalCloseResult() {
+  return {
+    operation_id: OPERATION_ID, command: "close", replayed: false,
+    pour_event_ids: ["88888888-8888-4888-8888-888888888888"],
+    open_bottle: {
+      id: BOTTLE_ID, restaurant_id: RESTAURANT_ID, wine_id: WINE_ID,
+      remaining_ml: 0, nominal_capacity_ml: 750, opened_at: OPENED_AT,
+      closed_at: "2026-09-23T13:00:00.000Z", preservation_method: "argon",
+      source_inventory_item_id: "99999999-9999-4999-8999-999999999999",
+      source_provenance: "known", identity_contract: 2,
+      identity_origin: "native", state_version: 2,
+    },
+    closeout: {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", restaurant_id: RESTAURANT_ID,
+      wine_id: WINE_ID, open_bottle_id: BOTTLE_ID, preservation_method: "argon",
+      opened_at: OPENED_AT, closed_at: "2026-09-23T13:00:00.000Z",
+      theoretical_remaining_ml: 600, actual_remaining_ml: 570,
+      variance_ml: -30, written_off_ml: 30, reason_code_id: REASON_ID,
+      event_contract: 2,
+    },
+  };
+}

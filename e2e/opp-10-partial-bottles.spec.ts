@@ -107,6 +107,7 @@ test.describe("@opp-10 partial-bottle close-out loop", () => {
   test("EV-10.1/10.2/10.3: preserve, close with variance, and drill through yield", async ({ page }) => {
     await login(page);
     const opened = await page.request.post("/api/open-bottles", {
+      headers: { "Idempotency-Key": crypto.randomUUID() },
       data: { wine_id: wineId, preservation_method: "coravin" },
     });
     expect(opened.status(), await opened.text()).toBe(201);

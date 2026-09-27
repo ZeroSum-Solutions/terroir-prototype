@@ -1,46 +1,40 @@
-// The revert success panel's copy. This used to be a module-private helper
-// inside import-client.tsx, observable only by rendering BatchStep and
-// driving a revert through mocked fetch.
 import { describe, expect, it } from "vitest";
-import { summarizeRevertResult, type RevertResult } from "./revert-summary";
+import {
+  parseRevertResult,
+  summarizeRevertResult,
+  type RevertResult,
+} from "./revert-summary";
 
-function result(overrides: Partial<RevertResult> = {}): RevertResult {
-  return {
-    revertedCount: 3,
-    orphanWinesDeleted: 1,
-    lwinStampsCleared: 2,
-    cleanupTruncated: false,
-    orphanCleanupSkipped: false,
-    cleanupFailures: 0,
-    ...overrides,
-  };
-}
+const result: RevertResult = {
+  revertedCount: 3,
+  orphanWinesDeleted: 0,
+  lwinStampsCleared: 2,
+};
+
+describe("parseRevertResult", () => {
+  it("accepts the exact compatible retained-catalog response", () => {
+    expect(parseRevertResult(result)).toEqual(result);
+  });
+
+  it.each([
+    null,
+    { ...result, extra: true },
+    { ...result, revertedCount: -1 },
+    { ...result, orphanWinesDeleted: 1 },
+    { ...result, lwinStampsCleared: 0.5 },
+  ])("rejects malformed or partial-success response %#", (value) => {
+    expect(parseRevertResult(value)).toBeNull();
+  });
+});
 
 describe("summarizeRevertResult", () => {
-  it("reports the three counts and nothing else on a clean revert", () => {
-    const copy = summarizeRevertResult(result());
+  it("reports committed counts and makes catalog retention explicit", () => {
+    const copy = summarizeRevertResult(result);
     expect(copy).toContain("Removed 3 inventory row(s)");
-    expect(copy).toContain("deleted 1 wine(s)");
-    expect(copy).toContain("cleared 2 wine-catalog (LWIN) link(s)");
+    expect(copy).toContain("cleared 2 eligible wine-catalog (LWIN) link(s)");
+    expect(copy).toContain("Wine catalog entries and import history were retained");
+    expect(copy).not.toContain("deleted");
+    expect(copy).not.toContain("partial");
     expect(copy).not.toContain("runbook");
-  });
-
-  it("composes every partial-cleanup notice instead of dropping all but one", () => {
-    const copy = summarizeRevertResult(
-      result({ cleanupTruncated: true, orphanCleanupSkipped: true, cleanupFailures: 4 }),
-    );
-    expect(copy).toContain("Orphan-wine cleanup was skipped");
-    expect(copy).toContain("didn't finish in time");
-    expect(copy).toContain("Some cleanup steps failed");
-  });
-
-  it("says nothing about failures when the count is zero", () => {
-    expect(summarizeRevertResult(result({ cleanupFailures: 0 }))).not.toContain("Some cleanup steps failed");
-  });
-
-  it("never suggests reverting again — the batch is already reverted", () => {
-    const copy = summarizeRevertResult(result({ cleanupTruncated: true }));
-    expect(copy.toLowerCase()).not.toContain("try again");
-    expect(copy.toLowerCase()).not.toContain("revert again");
   });
 });

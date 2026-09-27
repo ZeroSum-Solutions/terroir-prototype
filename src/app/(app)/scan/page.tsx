@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getAuthContext } from "@/lib/auth-context";
 import { Scanner } from "./scanner";
 import type { RecentScan, ScanMode } from "@/lib/scanner/types";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import { fetchRecentScans } from "@/domains/scanning/recent-scans";
 
 export const metadata: Metadata = { title: "Scan" };
 
@@ -20,35 +22,9 @@ export default async function ScannerPage({
 
   if (auth) {
     const { supabase, restaurantId } = auth;
-
-    const { data: scans } = await supabase
-      .from("invoice_scans")
-      .select("id, distributor_name, item_count, accuracy_score, created_at, final_line_items, raw_image_path")
-      .eq("restaurant_id", restaurantId)
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-      recentScans = (scans ?? []).map((s) => {
-        // Compute total from final_line_items
-        const items = (s.final_line_items ?? []) as Array<{
-          qty: number;
-          unitCost: number;
-        }>;
-        const total = items.reduce(
-          (sum, it) => sum + (it.qty ?? 0) * (it.unitCost ?? 0),
-          0,
-        );
-        return {
-          id: s.id,
-          parsedAt: s.created_at,
-          distributor: s.distributor_name,
-          items: s.item_count,
-          total,
-          accuracy: Math.round((s.accuracy_score ?? 0) * 100),
-          hasImage: !!s.raw_image_path,
-        };
-      });
+    const canReadCost = await resolveSiteCostReadAccess(supabase, restaurantId);
+    recentScans = await fetchRecentScans(supabase, restaurantId, canReadCost);
   }
 
-  return <Scanner recentScans={recentScans} initialMode={initialMode} />;
+  return <Scanner userId={auth?.user.id ?? null} recentScans={recentScans} initialMode={initialMode} />;
 }

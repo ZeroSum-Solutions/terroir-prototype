@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * M1-1 — unit coverage for the client-side scan latency marks. Runs
- * under vitest's happy-dom environment, whose `performance` is Node's
- * real `perf_hooks.performance` (a full User Timing implementation), so
- * `markScanStage`/`reportScanStage` are exercised against the real API,
- * not a stub.
- */
+/** Local-only scan timing against the real User Timing implementation. */
 
 const loggerInfo = vi.hoisted(() => vi.fn());
 vi.mock("@sentry/nextjs", () => ({
@@ -22,7 +16,7 @@ beforeEach(() => {
 });
 
 describe("markScanStage / reportScanStage", () => {
-  it("measures a marked stage and reports its duration to Sentry.logger", async () => {
+  it("measures a marked stage without exporting it", async () => {
     markScanStage("prep", "start");
     await new Promise((resolve) => setTimeout(resolve, 5));
     markScanStage("prep", "end");
@@ -31,15 +25,7 @@ describe("markScanStage / reportScanStage", () => {
 
     expect(duration).not.toBeNull();
     expect(duration).toBeGreaterThanOrEqual(0);
-    expect(loggerInfo).toHaveBeenCalledWith(
-      "scan.client.prep",
-      expect.objectContaining({
-        scanId: "scan-123",
-        stage: "prep",
-        durationMs: duration,
-        fileCount: 2,
-      }),
-    );
+    expect(loggerInfo).not.toHaveBeenCalled();
   });
 
   it("returns null and logs nothing when the stage was never marked", () => {
@@ -72,19 +58,13 @@ describe("markScanStage / reportScanStage", () => {
     await new Promise((resolve) => setTimeout(resolve, 2));
     markScanStage("capture", "end");
     reportScanStage("scan-1", "capture");
-    loggerInfo.mockClear();
-
     markScanStage("capture", "start");
     await new Promise((resolve) => setTimeout(resolve, 20));
     markScanStage("capture", "end");
     const secondDuration = reportScanStage("scan-2", "capture");
 
     expect(secondDuration).not.toBeNull();
-    expect(loggerInfo).toHaveBeenCalledTimes(1);
-    expect(loggerInfo).toHaveBeenCalledWith(
-      "scan.client.capture",
-      expect.objectContaining({ scanId: "scan-2" }),
-    );
+    expect(loggerInfo).not.toHaveBeenCalled();
   });
 
   it("never throws even if performance is unavailable", () => {

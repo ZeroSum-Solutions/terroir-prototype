@@ -41,6 +41,24 @@ describe("pickRowChip — one chip per row, most urgent fact wins", () => {
     ).toEqual({ label: "Low stock", tone: "attention" });
   });
 
+  it("uses summed active volume at the configurable low-stock boundary", () => {
+    // app_spec <physical_bottle_inventory>: aggregate readers sum duplicate
+    // bottles. One sealed 750 mL bottle plus two full active bottles is
+    // exactly three bottles of liquid, so threshold 3 is not low.
+    expect(
+      pickRowChip(
+        row({
+          sealed_count: 1,
+          open_remaining_ml: 750,
+          activeBottleCount: 2,
+          activeOpenMl: 1_500,
+        }),
+        3,
+        YEAR,
+      ),
+    ).toEqual({ label: "2 open · 50.7 oz", tone: "neutral" });
+  });
+
   it("final year of the window gets its own label", () => {
     expect(
       pickRowChip(row({ drink_window_start: 2010, drink_window_end: 2026 }), undefined, YEAR),
@@ -84,5 +102,13 @@ describe("bottlesOnHand", () => {
     expect(bottlesOnHand({ sealed_count: 3, open_remaining_ml: 200 })).toBe(4);
     expect(bottlesOnHand({ sealed_count: 3, open_remaining_ml: 0 })).toBe(3);
     expect(bottlesOnHand({ sealed_count: 0, open_remaining_ml: null })).toBe(0);
+  });
+
+  it("counts every active physical bottle when the exact count is present", () => {
+    expect(bottlesOnHand({
+      sealed_count: 3,
+      open_remaining_ml: 200,
+      activeBottleCount: 2,
+    })).toBe(5);
   });
 });

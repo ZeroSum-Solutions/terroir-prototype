@@ -12,6 +12,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
 import { reserveLwinCatalogRow } from "@/test/fixtures/reserve-lwin-catalog-row";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -74,6 +75,7 @@ describe.skipIf(!hasLiveDb)("P2 resolve_wine_variants_bulk: cross-tenant contain
   // `Date.now() % N` hit one of the 211,512 seeded rows on ~1 run in 40 (23505).
   let d9LwinId = "";
   let baronLwinId = "";
+  const identities = new LiveDbFixtureIdentityTracker();
 
 
   beforeAll(async () => {
@@ -99,20 +101,18 @@ describe.skipIf(!hasLiveDb)("P2 resolve_wine_variants_bulk: cross-tenant contain
     const run = Date.now();
     const password = "P2-RWVB-Tenant-Test-123!";
 
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `p2-rwvb-tenant-a-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create user A");
     userAId = userA.user.id;
 
-    const { data: userB, error: userBErr } = await admin.auth.admin.createUser({
+    const userB = await identities.createUser(admin, {
       email: `p2-rwvb-tenant-b-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userBErr || !userB) throw userBErr ?? new Error("failed to create user B");
     userBId = userB.user.id;
 
     const { error: memAErr } = await admin.from("memberships").insert({ user_id: userAId, restaurant_id: restaurantA, role: "staff" } as never);
@@ -132,13 +132,11 @@ describe.skipIf(!hasLiveDb)("P2 resolve_wine_variants_bulk: cross-tenant contain
       .from("canonical_wines")
       .select("id")
       .or("producer.like.P2 RWVB%,producer.like.P2 Concurrent%,producer.like.P2 D9%,producer.like.Chateau Pichon Longueville%");
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
     if (canonRows && canonRows.length > 0) {
       await admin.from("canonical_wines").delete().in("id", (canonRows as { id: string }[]).map((r) => r.id));
     }
     await admin.from("lwin_catalog").delete().in("lwin_id", [d9LwinId, baronLwinId].filter(Boolean));
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
-    if (userBId) await admin.auth.admin.deleteUser(userBId);
   });
 
   it("tenant A's resolve_wine_variants_bulk targeting tenant B's restaurant_id fails via RLS, not a manual check", async () => {

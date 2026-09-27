@@ -22,7 +22,6 @@ import {
   RejectedLwinRowsFieldSchema,
   RowOverridesFieldSchema,
 } from "@/domains/import/request-schemas";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -103,16 +102,6 @@ async function postBatches(request: NextRequest) {
       : Errors.unsupportedMediaType(uploadCheck.message);
   }
 
-  // Same pattern as the /revert route's own createServiceRoleClient() call:
-  // a null client (misconfigured environment) is passed straight through to
-  // confirmImportBatch, which threads it to revertImportBatch on the
-  // self-revert path a create-time race can trigger (selfRevertAndRetry) —
-  // never a reason to fail the confirm itself.
-  const serviceClient = createServiceRoleClient();
-  if (!serviceClient) {
-    console.error("confirm route: service-role client unavailable; self-revert orphan-wine cleanup will be skipped for this confirm");
-  }
-
   const buffer = Buffer.from(await file.arrayBuffer());
   const result = await confirmImportBatch(supabase, restaurantId, user.id, file.name, buffer, {
     sessionId,
@@ -123,7 +112,6 @@ async function postBatches(request: NextRequest) {
     rejectedLwinRows,
     approvedLwinRows,
     acknowledgedMissingProducerRows,
-    serviceClient,
   });
 
   if (!result.ok) {

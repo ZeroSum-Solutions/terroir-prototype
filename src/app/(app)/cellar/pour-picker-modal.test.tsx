@@ -98,6 +98,7 @@ describe("PourPickerModal accessible drafts", () => {
 });
 
 const bottle: OpenBottleRow = {
+  active_bottle_count: 1,
   wine_id: "wine-1",
   wine_list_item_id: "item-1",
   producer: "Test Producer",

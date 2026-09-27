@@ -14,9 +14,9 @@ export type BatchSummary = {
 export type BatchRow = {
   id: string;
   row_number: number;
-  raw: Record<string, string | null>;
+  producer: string | null;
+  name: string | null;
   row_state: "valid" | "error";
-  validation_errors: { field: string; message: string }[];
   lwin_status: "matched" | "unmatched";
   lwin_id: string | null;
   /** Item 2 (per-row LWIN match visibility): the server (GET /api/import/
@@ -25,7 +25,6 @@ export type BatchRow = {
   lwin_score: number | null;
   cost_status: "present" | "missing";
   resolution: "auto" | "pending" | "include" | "exclude";
-  manual_unit_cost: number | null;
   apply_status: "not_applied" | "applied" | "reverted";
 };
 

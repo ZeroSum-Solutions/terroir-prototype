@@ -92,15 +92,27 @@ Playwright runs with zero retries. The required CI journey subset also fails if
 any selected test skips, so a missing local fixture cannot pass as coverage.
 
 [`docs/feature-ledger.json`](docs/feature-ledger.json) is the sole authoritative
-completion and status ledger for all 269 active core requirements. Run
+completion and status ledger for all 315 currently enumerated core requirements. Run
 `pnpm verify:feature-ledger` after changing the ledger or its source requirements;
 CI runs the same verification before the typecheck, lint, and test gates. Never
-hand-edit the ledger.
+hand-edit the ledger. An active ledger entry defines contract scope, not completed
+behavior. C04 has a bounded, server-private
+[workspace/site shadow observation](docs/ARCHITECTURE.md#shadow-access-observation),
+but legacy restaurant membership remains the sole authorization authority;
+capability cutover, cost enforcement, and expanded roles remain incomplete. C03 has
+bounded context-lookup, private projection-store, and local session-boundary leaves.
+The session boundary has 153 passing focused unit and contract tests, but real-browser
+verification, the public offline shell, and the full offline workflow remain incomplete.
+The pure Toast modules do not complete the nine C08 fixture/manual POS-corroboration
+workflows.
 
-The original requirement inventory ([`app_spec.txt`](app_spec.txt)) and the session
-diary ([`claude-progress.txt`](claude-progress.txt)) both live at the **repo root**.
-They are historical evidence only, both contain drifted claims, and neither determines
-completion status.
+The `<core_features>` assertions in [`app_spec.txt`](app_spec.txt) are the current
+machine-read source for those 315 ledger identities. The generator combines them with
+the completion metadata rules; the generated ledger, not `app_spec.txt`, determines
+completion status. Prose elsewhere in `app_spec.txt` can retain historical context or
+drifted claims. The session diary ([`claude-progress.txt`](claude-progress.txt)) is
+historical evidence only and does not determine current scope or status. Both files
+live at the **repo root**.
 
 **Do not move them into `docs/_archive/`.** They are machine-read, not prose:
 `scripts/verify-feature-ledger.mjs` sets `SOURCE_FILE = "app_spec.txt"` and
@@ -152,6 +164,7 @@ application modules in `src/lib/`, and database migrations in
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md) is the working contract — read it before your first edit.
+- [`docs/plans/2026-09-20-terroir-product-data-requirements.md`](docs/plans/2026-09-20-terroir-product-data-requirements.md) consolidates the proposed restaurant and personal-collector product and data requirements. It is a planning source, not proof of implementation.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) owns module and database boundaries.
 - [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) owns verified code conventions.
 - [`docs/runbooks/README.md`](docs/runbooks/README.md) indexes the operational runbooks.
