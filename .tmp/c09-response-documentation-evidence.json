@@ -1,0 +1,158 @@
+{
+  "base": "10537217bd96929af8ec45f6a5704c3ce056b324",
+  "changed_surfaces": [
+    "behavior",
+    "interface",
+    "code_location"
+  ],
+  "change_manifest": [
+    {
+      "status": "M",
+      "path": "docs/plans/2026-07-20-terroir-completion-spec.md",
+      "surfaces": [
+        "behavior",
+        "interface",
+        "code_location"
+      ]
+    },
+    {
+      "status": "A",
+      "path": "src/adapters/llm/typesafe-jev-response.test.ts",
+      "surfaces": [
+        "behavior",
+        "interface",
+        "code_location"
+      ]
+    },
+    {
+      "status": "A",
+      "path": "src/adapters/llm/typesafe-jev-response.ts",
+      "surfaces": [
+        "behavior",
+        "interface",
+        "code_location"
+      ]
+    },
+    {
+      "status": "M",
+      "path": "src/adapters/llm/typesafe-jev.test.ts",
+      "surfaces": [
+        "behavior",
+        "interface",
+        "code_location"
+      ]
+    },
+    {
+      "status": "M",
+      "path": "src/adapters/llm/typesafe-jev.ts",
+      "surfaces": [
+        "behavior",
+        "interface",
+        "code_location"
+      ]
+    }
+  ],
+  "duplicate_truth": {
+    "status": "single-owner",
+    "owners": [
+      {
+        "surface": "behavior",
+        "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review"
+      },
+      {
+        "surface": "interface",
+        "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review"
+      },
+      {
+        "surface": "code_location",
+        "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review"
+      }
+    ]
+  },
+  "document_reviews": [
+    {
+      "document": "docs/plans/2026-07-20-terroir-completion-spec.md",
+      "preimage": {
+        "kind": "git",
+        "sha256": "4a86d295d97716d6830063e6199db7160dcabbc0beb8752964a4efc7acf4a6ab"
+      },
+      "current_sha256": "c1b975d8ddfd72b12ff782f6a88c5426ed2dc809fc7d4c1be1605509f36b3515",
+      "unchecked_markdown": [
+        {
+          "classification": "non-runnable",
+          "kind": "non-shell-fence",
+          "language": "text",
+          "line": 130,
+          "source_sha256": "80db621ec220047d68b3dd9eb5b968494015868d090e4e6bfe96dd03e9fef7be"
+        },
+        {
+          "classification": "non-runnable",
+          "kind": "non-shell-fence",
+          "language": "yaml",
+          "line": 828,
+          "source_sha256": "c9154c62cb1e6cbf19c62751e874284c42306b0adea01f716e85edb951cd8e63"
+        }
+      ],
+      "commands": []
+    }
+  ],
+  "entries": [
+    {
+      "surface": "behavior",
+      "source": {
+        "change_paths": [
+          "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "src/adapters/llm/typesafe-jev-response.test.ts",
+          "src/adapters/llm/typesafe-jev-response.ts",
+          "src/adapters/llm/typesafe-jev.test.ts",
+          "src/adapters/llm/typesafe-jev.ts"
+        ],
+        "canonical_evidence": {
+          "path": "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "heading": "TER-049: Deliver bounded CSV identity review"
+        }
+      },
+      "disposition": "updated",
+      "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review",
+      "document": "docs/plans/2026-07-20-terroir-completion-spec.md"
+    },
+    {
+      "surface": "interface",
+      "source": {
+        "change_paths": [
+          "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "src/adapters/llm/typesafe-jev-response.test.ts",
+          "src/adapters/llm/typesafe-jev-response.ts",
+          "src/adapters/llm/typesafe-jev.test.ts",
+          "src/adapters/llm/typesafe-jev.ts"
+        ],
+        "canonical_evidence": {
+          "path": "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "heading": "TER-049: Deliver bounded CSV identity review"
+        }
+      },
+      "disposition": "updated",
+      "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review",
+      "document": "docs/plans/2026-07-20-terroir-completion-spec.md"
+    },
+    {
+      "surface": "code_location",
+      "source": {
+        "change_paths": [
+          "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "src/adapters/llm/typesafe-jev-response.test.ts",
+          "src/adapters/llm/typesafe-jev-response.ts",
+          "src/adapters/llm/typesafe-jev.test.ts",
+          "src/adapters/llm/typesafe-jev.ts"
+        ],
+        "canonical_evidence": {
+          "path": "docs/plans/2026-07-20-terroir-completion-spec.md",
+          "heading": "TER-049: Deliver bounded CSV identity review"
+        }
+      },
+      "disposition": "updated",
+      "canonical_owner": "docs/plans/2026-07-20-terroir-completion-spec.md#TER-049: Deliver bounded CSV identity review",
+      "document": "docs/plans/2026-07-20-terroir-completion-spec.md"
+    }
+  ]
+}
