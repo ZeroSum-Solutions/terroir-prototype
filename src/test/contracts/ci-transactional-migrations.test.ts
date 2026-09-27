@@ -32,6 +32,24 @@ describe("transactional CI migration bootstrap", () => {
     expect(cutover).toContain("0158-production-postflight.sql");
   });
 
+  it("proves retired contracts before cutover and the current app afterward", () => {
+    const workflow = read(".github/workflows/ci.yml");
+    const legacyStep = workflow.indexOf("name: Legacy-contract live tests");
+    const cutoverStep = workflow.indexOf(
+      "name: Apply physical and operational cutover migrations",
+    );
+    const currentStep = workflow.indexOf("name: Test", cutoverStep);
+    expect(legacyStep).toBeGreaterThan(-1);
+    expect(cutoverStep).toBeGreaterThan(legacyStep);
+    expect(currentStep).toBeGreaterThan(cutoverStep);
+    expect(workflow).toContain(
+      "--exclude src/domains/pours/inventory-commands-live.test.ts",
+    );
+    expect(workflow).toContain(
+      "src/domains/pours/physical-bottle-phase-a-live.test.ts",
+    );
+  });
+
   it("is restricted to the disposable CI project", () => {
     expect(script).toContain('if [ "${CI:-}" != "true" ]');
     expect(script).toContain("terroir-vw-local");
