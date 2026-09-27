@@ -157,9 +157,14 @@ jobs:
       - name: Legacy-contract live tests
         # These suites prove the exact contract that 0156 intentionally
         # retires or seals. They must run at 0155 and must not be silently
-        # reinterpreted as current-schema tests.
+        # reinterpreted as current-schema tests. Coverage is captured as one
+        # fragment; thresholds are graded only after it is merged with the
+        # final-schema suite below.
         run: |
-          pnpm exec vitest run \
+          VITEST_DEFER_COVERAGE_THRESHOLDS=1 pnpm exec vitest run --coverage \
+            --reporter=default \
+            --reporter=blob \
+            --outputFile.blob=.vitest-reports/legacy-contract.json \
             src/domains/cellar/wine-ownership-write-policies.test.ts \
             src/domains/identity/merge.test.ts \
             src/domains/pours/inventory-command-lock-compatibility-live.test.ts \
@@ -172,14 +177,23 @@ jobs:
       - name: Test
         # The full current application runs after the cutover. Exclude only
         # the five schema-bound suites proved immediately above; every other
-        # mandatory live-DB suite runs here against the final schema.
+        # mandatory live-DB suite runs here against the final schema. Its
+        # coverage is merged with the legacy fragment before grading.
         run: |
-          pnpm exec vitest run --coverage \
+          VITEST_DEFER_COVERAGE_THRESHOLDS=1 pnpm exec vitest run --coverage \
+            --reporter=default \
+            --reporter=blob \
+            --outputFile.blob=.vitest-reports/current-schema.json \
             --exclude src/domains/cellar/wine-ownership-write-policies.test.ts \
             --exclude src/domains/identity/merge.test.ts \
             --exclude src/domains/pours/inventory-command-lock-compatibility-live.test.ts \
             --exclude src/domains/pours/inventory-commands-live.test.ts \
             --exclude src/domains/pours/physical-bottle-phase-a-live.test.ts
+
+      - name: Merge and enforce coverage
+        # The unchanged thresholds apply to the union of both schema phases.
+        # A missing fragment or failed test phase prevents this step entirely.
+        run: pnpm exec vitest --coverage --merge-reports=.vitest-reports
 
       - name: Build
         # Catches build-only failures that typecheck/lint/tests don't:

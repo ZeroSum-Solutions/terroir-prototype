@@ -44,15 +44,23 @@ describe("transactional CI migration bootstrap", () => {
       "name: Apply physical and operational cutover migrations",
     );
     const currentStep = workflow.indexOf("name: Test", cutoverStep);
+    const coverageStep = workflow.indexOf("name: Merge and enforce coverage");
     expect(bootstrapStep).toBeGreaterThan(-1);
     expect(legacyStep).toBeGreaterThan(bootstrapStep);
     expect(cutoverStep).toBeGreaterThan(legacyStep);
     expect(currentStep).toBeGreaterThan(cutoverStep);
+    expect(coverageStep).toBeGreaterThan(currentStep);
     expect(workflow).toContain(
       "--exclude src/domains/pours/inventory-commands-live.test.ts",
     );
     expect(workflow).toContain(
       "src/domains/pours/physical-bottle-phase-a-live.test.ts",
+    );
+    expect(workflow.match(/VITEST_DEFER_COVERAGE_THRESHOLDS=1/g)).toHaveLength(2);
+    expect(workflow).toContain("--outputFile.blob=.vitest-reports/legacy-contract.json");
+    expect(workflow).toContain("--outputFile.blob=.vitest-reports/current-schema.json");
+    expect(workflow).toContain(
+      "pnpm exec vitest --coverage --merge-reports=.vitest-reports",
     );
   });
 

@@ -65,7 +65,11 @@ export default defineConfig({
       // Set at/just below what the suite actually achieves today (see
       // docs/plans/*-untested-mutation-logic.md), so this gate is a real
       // floor, not a target the repo already fails or a no-op ceiling.
-      thresholds: {
+      // CI runs five retired-schema suites before the physical cutover and
+      // the current suite after it. Each phase writes a blob with coverage;
+      // neither fragment is complete enough to grade alone. Only the final
+      // merge omits this flag and enforces the unchanged combined thresholds.
+      thresholds: process.env.VITEST_DEFER_COVERAGE_THRESHOLDS === "1" ? undefined : {
         "src/lib/reconcile-ledger/**": {
           statements: 94,
           branches: 84,
