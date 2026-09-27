@@ -60,6 +60,14 @@ attaches to the base seeder's three users rather than creating its own, because
 stray tenant is precisely what makes "most recent membership" lookups
 non-deterministic.
 
+On the current schema, a normal refresh intentionally omits direct
+`open_bottles` and legacy `pour_events` writes; migration 0156 seals those tables
+and physical activity must go through the application RPCs. The full-E2E
+workflow alone enables `PRODSHAPE_LEGACY_PHYSICAL_FIXTURE=1` while its disposable
+database is held at migration 0155, then applies migrations 0156–0164 and their
+production preflight/postflight assertions before Playwright starts. Do not use
+that flag against a current-schema stack.
+
 Teardown removes the restaurant (everything tenant-scoped cascades), both storage
 prefixes, and the identity-spine rows the fixture created — but only the
 `canonical_wines` rows nothing else still points at, because that table is shared

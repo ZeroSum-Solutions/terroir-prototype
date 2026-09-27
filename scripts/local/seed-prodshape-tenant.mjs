@@ -85,6 +85,8 @@ const TEARDOWN = args.has("--teardown");
 // scripts/local/dev-local.sh and scratchpad/e2e-run.sh do.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const LEGACY_PHYSICAL_FIXTURE =
+  process.env.PRODSHAPE_LEGACY_PHYSICAL_FIXTURE === "1";
 
 /** The demo tenant. Its default-ness is what this script must not disturb. */
 const DEMO_RESTAURANT_ID =
@@ -104,6 +106,7 @@ const UUID_PREFIX = {
   list: "de200005",
   section: "de200006",
   item: "de200007",
+  pour: "de200009",
   cellarConfig: "de20000a",
   bin: "de20000d",
 };
@@ -416,35 +419,51 @@ function buildRows(heroUrl, userIds) {
     }
   }
 
-  const openBottles = Array.from({ length: 8 }, (_, idx) => {
-    const i = idx + 1;
-    const wine = wines[idx * 9];
-    return {
-      id: uuid(UUID_PREFIX.openBottle, i),
-      wine_id: wine.id,
-      restaurant_id: RESTAURANT_ID,
-      // Clamped: a partial bottle cannot hold more than the bottle does —
-      // open_bottles carries a CHECK against the wine's own size_ml, and the
-      // fixture's 375ml halves are well under the unclamped spread.
-      remaining_ml: Math.min(wine.size_ml - 50, 150 + ((i * 53) % 500)),
-      opened_at: dayOffset(i % 9),
-      opened_by: userIds.staff ?? userIds.owner ?? null,
-      source_inventory_item_id: inventoryItems[idx * 9]?.id ?? null,
-      preservation_method: "none",
-      identity_contract: 2,
-      identity_origin: "migrated_active",
-      nominal_capacity_ml: wine.size_ml,
-      source_provenance: "known",
-      opening_operation_id: null,
-      state_version: 0,
-      closed_at: null,
-    };
-  });
+  // The full-E2E workflow loads these legacy rows at migration 0155, then
+  // proves the real 0156 cutover. Current schemas correctly forbid direct
+  // service-role writes to the physical ledger, so normal local refreshes
+  // omit these rows and exercise physical activity through application RPCs.
+  const openBottles = LEGACY_PHYSICAL_FIXTURE
+    ? Array.from({ length: 8 }, (_, idx) => {
+        const i = idx + 1;
+        const wine = wines[idx * 9];
+        return {
+          id: uuid(UUID_PREFIX.openBottle, i),
+          wine_id: wine.id,
+          restaurant_id: RESTAURANT_ID,
+          // Clamped: a partial bottle cannot hold more than the bottle does —
+          // open_bottles carries a CHECK against the wine's own size_ml, and the
+          // fixture's 375ml halves are well under the unclamped spread.
+          remaining_ml: Math.min(wine.size_ml - 50, 150 + ((i * 53) % 500)),
+          opened_at: dayOffset(i % 9),
+          opened_by: userIds.staff ?? userIds.owner ?? null,
+          source_inventory_item_id: inventoryItems[idx * 9]?.id ?? null,
+          closed_at: null,
+        };
+      })
+    : [];
 
-  // Contract v2 retires direct legacy event writes. The production-shaped
-  // tenant keeps migrated active bottles for partial-bottle UI coverage; the
-  // command/E2E fixtures own executable physical pour history.
-  const pourEvents = [];
+  const pourEvents = LEGACY_PHYSICAL_FIXTURE
+    ? Array.from({ length: 60 }, (_, idx) => {
+        const i = idx + 1;
+        const wine = wines[idx % 40];
+        const kind =
+          i % 13 === 0 ? "new_bottle" : i % 17 === 0 ? "spill" : "pour";
+        return {
+          id: uuid(UUID_PREFIX.pour, i),
+          wine_id: wine.id,
+          restaurant_id: RESTAURANT_ID,
+          ml_delta:
+            kind === "new_bottle" ? -wine.size_ml : kind === "spill" ? 60 : 150,
+          kind,
+          actor_user_id:
+            i % 5 === 0 ? (userIds.manager ?? null) : (userIds.staff ?? null),
+          occurred_at: dayOffset(i % 60),
+          note: null,
+          open_bottle_id: null,
+        };
+      })
+    : [];
 
   return {
     restaurant,
@@ -623,7 +642,9 @@ async function seed() {
   await upsertRows(supabase, "wine_lists", rows.lists);
   await upsertRows(supabase, "wine_list_sections", rows.wineListSections);
   await upsertRows(supabase, "wine_list_items", rows.listItems);
-  await upsertRows(supabase, "open_bottles", rows.openBottles);
+  await upsertRows(supabase, "open_bottles", rows.openBottles, {
+    onConflict: "wine_id,restaurant_id",
+  });
   await upsertRows(supabase, "pour_events", rows.pourEvents);
 
   // Same call the base seeder makes and for the same reason: these wines are
