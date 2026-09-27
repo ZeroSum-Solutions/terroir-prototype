@@ -1,16 +1,18 @@
 # Handoff: MacBook transfer
-status: source-checkpoint-pending-publication
+status: source-checkpoint-published-release-held
 date: 2026-09-27
 branch: feat/production-readiness-20260923
-last-verified-head: fe9ba7c103770f7bf6a932db9175888fe307e0b1
+published-source-checkpoint: e970cc8bde19a53e08be55345daeaf0bf7fa6a2e
 
 ## Active Task
 
 The owner requests a safe stopping point, a successful `main` merge, removal of
 stale worktrees, and a mobile-testable release. Merge authorization now exists;
-release prerequisites still apply. At this document's update, the branch has
-uncommitted work after the head above. Publication and merge are not yet claimed.
-Coordinate writers before changing this checkout or its local database.
+release prerequisites still apply. The source checkpoint above is committed,
+pushed, and verified against GitHub. The five stale worktrees are removed after
+preserving their exact histories on remote archive branches. `main` has NOT been
+updated and the new application is NOT deployed. Coordinate writers before
+changing this checkout or its local database.
 
 ## Goal
 
@@ -51,7 +53,8 @@ receipt replaces this checkpoint status.
 The latest full unit run passed 5,589 tests, failed zero and skipped 182; it is not full live-database
 coverage. Bin PATCH, import-revert HTTP callers and stalled-scan housekeeping
 still need final live application-boundary proof. Raw-cost/Storage cutover and
-the final immutable-range security/release checks remain open. Credential access
+the full-branch security/release checks remain open. The exact source-checkpoint
+diff passed a redacted secret scan; that is not full security approval. Credential access
 for hosted inspection/application was unavailable at this checkpoint; do not
 work around it with `.env.local`, copied secrets or weaker gates.
 
@@ -70,8 +73,9 @@ git status --short --branch
 git rev-parse HEAD
 ```
 
-Compare that SHA with the coordinator's final publication receipt. A clone taken
-before publication will not contain the current dirty-tree work. Never overwrite
+The branch contains source checkpoint `e970cc8b`; later commits may synchronize
+upstream workflows or update this handoff. Verify the checkpoint is an ancestor
+with `git merge-base --is-ancestor e970cc8b HEAD`. Never overwrite
 an existing checkout to make it match. Dependencies, credentials, retained local
 databases and raw evidence do not travel through GitHub.
 
@@ -83,10 +87,55 @@ verify the actual hosted migration state and safe old-code compatibility, then
 complete required CI/security gates before merge. Verify deployed SHA and health
 afterwards; an earlier green health response is insufficient.
 
-Remove worktrees only after checking each tree's dirty files, unique commits,
-active processes and retained evidence. Keep unmerged work and database/proof
-directories. The isolated demo's owned services stopped successfully; its two
+The five stale worktrees were checked for dirty files, unique commits, active
+working-directory references and ignored evidence before ordinary, non-force
+removal. Only the primary checkout remains registered. Keep the archive branches
+below and retained database/proof directories. The isolated demo's owned services stopped successfully; its two
 synthetic database clones and evidence remain intentionally retained on the mini.
+
+### Worktree recovery receipts
+
+All branches below are pushed to `origin`; exact remote SHAs were verified before
+removal. They preserve historical worktree provenance, not additional release
+candidates. Their source patches are already represented in the feature history.
+
+| Remote recovery branch | Exact commit |
+|---|---|
+| `archive/worktree-c03-eligibility-qa-20260924` | `a720890d6a8d8992845410f2fec2c18ec96ee508` |
+| `archive/worktree-c09-response-docs-20260924` | `20a0bdc345783026dfeae6211fc663cd688e0f71` |
+| `archive/worktree-c12-docproof-20260923` | `187cff3ba16b2b752d03752755afa375f8e2a4b3` |
+| `archive/worktree-c14-docs-qa-20260924` | `d128cdf7975fb85e3b32603e591d11ce6e65afc2` |
+| `archive/worktree-production-qa-20260923` | `5f4416cc576187650fcedbf6251e23dec7732430` |
+
+Ignored screenshots, generated fixtures and documentation evidence were moved to
+`/Users/zero/.claude/goal-state/terroir-restaurant-demo-20260927/worktree-artifacts/stale-worktrees/`,
+under each original worktree basename. Those raw artifacts remain mini-only.
+Removed dependency/build caches are reproducible; no retained database was deleted.
+
+### What can be tested now
+
+Open https://terroir-web-production.up.railway.app/ in a phone browser. The public
+login screen was checked at 390 × 844 without horizontal overflow; both production
+and staging health endpoints reported database connectivity and release
+`e31c16494ba49d83fe1304358923bf7bfeabf6c7`. This is the older release, not the new
+source checkpoint. No authenticated production journey or native mobile release
+was verified. The portable local demo remains deliberately execution-disabled.
+
+### Exact release continuation
+
+1. Unlock ZS Vault. It was still locked at the cleanup checkpoint. Do not source
+   production `.env.local` or bypass the credential boundary.
+2. Inspect the hosted migration ledger and objects using the production migration
+   runbook. Establish backup/restore evidence and old-code compatibility before
+   applying any required migrations; do not blindly apply the whole range.
+3. Complete raw-table/Storage staff-cost protection and atomic site-authority
+   checks. Clear final live HTTP gaps and canonical zero-critical-skip database,
+   browser, build, CI and full-branch security gates.
+4. Merge through protected `main` only after those gates pass, then verify both
+   deployed SHAs, health and an authenticated phone-sized restaurant journey.
+
+Do not enable automatic merge while these gates are outstanding. The native goal
+remains blocked; this cleanup does not mark the application or demo complete.
 
 Selected independent reports are preserved in
 [the checkpoint evidence](../../docs/evidence/restaurant-demo-20260927/README.md).
