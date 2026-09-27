@@ -92,9 +92,17 @@ if rg -n -i '^[[:space:]]*(begin|commit)[[:space:]]*;' supabase/migrations/[0-9]
 fi
 
 expected=0
+ceiling=${CI_MIGRATION_CEILING:-}
+if [ -n "$ceiling" ] && ! printf '%s' "$ceiling" | grep -Eq '^[0-9]{4}$'; then
+  echo "ci-start-supabase: invalid CI_MIGRATION_CEILING '$ceiling'" >&2
+  exit 2
+fi
 for file in supabase/migrations/[0-9]*.sql; do
   base=$(basename "$file" .sql)
   version=${base%%_*}
+  if [ -n "$ceiling" ] && [ "$version" -gt "$ceiling" ]; then
+    break
+  fi
   name=${base#${version}_}
   docker exec -i "$db_container" psql -X -v ON_ERROR_STOP=1 \
     --single-transaction -q -U postgres -d postgres -f - \
@@ -108,6 +116,9 @@ actual=$(docker exec "$db_container" psql -X -U postgres -d postgres -Atc \
 latest=$(docker exec "$db_container" psql -X -U postgres -d postgres -Atc \
   "select max(version) from supabase_migrations.schema_migrations")
 source_latest=$(basename "$(find supabase/migrations -maxdepth 1 -type f -name '[0-9]*.sql' | sort | tail -1)" | cut -d_ -f1)
+if [ -n "$ceiling" ]; then
+  source_latest=$ceiling
+fi
 
 if [ "$actual" != "$expected" ] || [ "$latest" != "$source_latest" ]; then
   echo "ci-start-supabase: migration ledger mismatch expected=$expected actual=$actual latest=$latest source=$source_latest" >&2

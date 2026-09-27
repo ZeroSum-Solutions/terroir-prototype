@@ -19,6 +19,13 @@ config({ path: ".env.local" });
 const args = new Set(process.argv.slice(2));
 const CONFIRM = args.has("--confirm");
 const TEARDOWN = args.has("--teardown");
+const PHYSICAL_CONTRACT = process.env.LOCAL_SEED_PHYSICAL_CONTRACT ?? "2";
+if (PHYSICAL_CONTRACT !== "1" && PHYSICAL_CONTRACT !== "2") {
+  console.error(
+    `Refusing LOCAL_SEED_PHYSICAL_CONTRACT=${PHYSICAL_CONTRACT}; expected 1 or 2.`,
+  );
+  process.exit(1);
+}
 
 // No hardcoded fallback: this repo's local stack and other local Supabase
 // stacks on this machine use different ports, and a fallback here risked
@@ -558,10 +565,12 @@ function buildRows(userIds = DRY_USER_IDS) {
       source_inventory_item_id: inventoryItems[idx]?.id ?? null,
       closed_at: null,
       preservation_method: "none",
-      identity_contract: 2,
-      identity_origin: "migrated_active",
-      nominal_capacity_ml: wine.size_ml,
-      source_provenance: "known",
+      identity_contract: Number(PHYSICAL_CONTRACT),
+      identity_origin:
+        PHYSICAL_CONTRACT === "1" ? "legacy_slot" : "migrated_active",
+      nominal_capacity_ml: PHYSICAL_CONTRACT === "1" ? null : wine.size_ml,
+      source_provenance:
+        PHYSICAL_CONTRACT === "1" ? "legacy_unknown" : "known",
       opening_operation_id: null,
       state_version: 0,
     };

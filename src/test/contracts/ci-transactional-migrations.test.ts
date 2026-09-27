@@ -5,6 +5,7 @@ const read = (path: string) => readFileSync(path, "utf8");
 
 describe("transactional CI migration bootstrap", () => {
   const script = read("scripts/local/ci-start-supabase.sh");
+  const cutover = read("scripts/local/ci-apply-cutover-migrations.sh");
   const seed = read("scripts/seed-local-supabase.mjs");
 
   it("is the only Supabase startup used by both database CI workflows", () => {
@@ -24,6 +25,11 @@ describe("transactional CI migration bootstrap", () => {
     expect(script).toContain("refusing non-empty migration target");
     expect(script).toContain("a forward migration owns a conflicting transaction");
     expect(script).toContain("CREATE INDEX CONCURRENTLY cannot use the required transaction");
+    expect(script).toContain("CI_MIGRATION_CEILING");
+    expect(cutover).toContain("--single-transaction");
+    expect(cutover).toContain("expected 0155");
+    expect(cutover).toContain("0156-production-preflight.sql");
+    expect(cutover).toContain("0158-production-postflight.sql");
   });
 
   it("is restricted to the disposable CI project", () => {
@@ -31,6 +37,8 @@ describe("transactional CI migration bootstrap", () => {
     expect(script).toContain("terroir-vw-local");
     expect(script).toContain("unexpected project id");
     expect(script).not.toContain(".env.local");
+    expect(cutover).toContain('if [ "${CI:-}" != "true" ]');
+    expect(cutover).toContain("terroir-vw-local");
   });
 
   it("keeps the production-shaped seed inside the 0157 metadata allowlist", () => {
@@ -56,7 +64,7 @@ describe("transactional CI migration bootstrap", () => {
   it("seeds sealed physical history only through the exact local database", () => {
     expect(seed).toContain('const dbContainer = "supabase_db_terroir-vw-local"');
     expect(seed).toContain("set local session_replication_role = replica");
-    expect(seed).toContain("identity_origin: \"migrated_active\"");
+    expect(seed).toContain('? "legacy_slot" : "migrated_active"');
     expect(seed).toContain("event_contract: 1");
     expect(seed).not.toContain(
       'upsertRows(supabase, "pour_events", rows.pourEvents)',

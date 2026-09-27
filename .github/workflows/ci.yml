@@ -114,7 +114,11 @@ jobs:
         # starts with LOCK TABLE and therefore requires an outer transaction.
         # This CI-only launcher starts an empty disposable stack, then applies
         # each exact migration plus its ledger row in one transaction.
-        run: scripts/local/ci-start-supabase.sh
+        # Stop at the last additive migration for the legacy-contract live
+        # suites. The cutover migrations intentionally retire those RPCs and
+        # seal direct service-role writes; they are applied immediately after
+        # the legacy suite and before build/current-schema/E2E verification.
+        run: CI_MIGRATION_CEILING=0155 scripts/local/ci-start-supabase.sh
 
       - name: Export local Supabase env for tests and E2E
         run: |
@@ -140,7 +144,7 @@ jobs:
           echo "DEV_BYPASS_EMAIL=owner+local@terroir.test" >> "$GITHUB_ENV"
 
       - name: Seed local Supabase for tests and E2E
-        run: pnpm run supabase:seed:local:apply
+        run: LOCAL_SEED_PHYSICAL_CONTRACT=1 pnpm run supabase:seed:local:apply
 
 
       - name: Test
@@ -155,6 +159,9 @@ jobs:
         # gate (vitest.config.ts) rides along instead of re-running the
         # whole suite a second time.
         run: pnpm run coverage
+
+      - name: Apply physical and operational cutover migrations
+        run: scripts/local/ci-apply-cutover-migrations.sh
 
       - name: Build
         # Catches build-only failures that typecheck/lint/tests don't:
