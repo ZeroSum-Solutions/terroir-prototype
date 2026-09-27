@@ -180,11 +180,13 @@ test.describe("G1-4 CSV import journey", () => {
     // success panel's own reported counts instead: this wine was freshly
     // created by this batch's own apply (an unmatched-LWIN "Include
     // anyway" row) with no other reference once its inventory is gone, so
-    // orphan-wine cleanup deletes it too — one inventory row removed, one
-    // wine deleted.
+    // Inventory is removed while the catalog identity remains available for
+    // history and a future re-import.
     await expect(page.getByRole("heading", { name: "Import reverted" })).toBeVisible();
     await expect(page.getByText(/Removed 1 inventory row\(s\)/)).toBeVisible();
-    await expect(page.getByText(/deleted 1 wine\(s\)/)).toBeVisible();
+    await expect(
+      page.getByText("Wine catalog entries and import history were retained."),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("heading", { name: "Import cellar" })).toBeVisible();
@@ -198,6 +200,13 @@ test.describe("G1-4 CSV import journey", () => {
         return items?.length ?? 0;
       })
       .toBe(0);
+
+    const { data: retainedWine } = await admin
+      .from("wines")
+      .select("id")
+      .eq("id", (wineRow as { id: string }).id)
+      .single();
+    expect(retainedWine?.id).toBe((wineRow as { id: string }).id);
 
     await expectNoDocumentOverflow(page);
   });

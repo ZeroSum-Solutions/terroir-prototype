@@ -85,6 +85,8 @@ const TEARDOWN = args.has("--teardown");
 // scripts/local/dev-local.sh and scratchpad/e2e-run.sh do.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const LEGACY_PHYSICAL_FIXTURE =
+  process.env.PRODSHAPE_LEGACY_PHYSICAL_FIXTURE === "1";
 
 /** The demo tenant. Its default-ness is what this script must not disturb. */
 const DEMO_RESTAURANT_ID =
@@ -223,7 +225,7 @@ function buildWines(heroUrl) {
       pricing_target_markup_ratio: null,
       pricing_target_pour_cost_pct: null,
       overpaid_flag: false,
-      enrichment_metadata: {},
+      enrichment_metadata: null,
       manual_overrides: [],
       is_eightysixed: i % 61 === 0,
       eightysixed_at: i % 61 === 0 ? dayOffset(i % 14) : null,
@@ -289,26 +291,32 @@ function buildRows(heroUrl, userIds) {
 
   const scans = Array.from({ length: 14 }, (_, idx) => {
     const i = idx + 1;
+    const scanId = uuid(UUID_PREFIX.scan, i);
     const lineItems = Array.from({ length: 5 }, (_, j) => {
       const wine = wines[(idx * 5 + j) % wines.length];
+      const qty = 1 + ((i + j) % 5);
       return {
+        id: `prodshape-${i}-${j + 1}`,
         producer: wine.producer,
         name: wine.name,
         vintage: wine.vintage,
-        qty: 1 + ((i + j) % 5),
+        varietal: wine.varietal ?? "",
+        region: wine.region ?? "",
+        qty,
         unitCost: wine.__cost,
+        lineTotal: cents(qty * wine.__cost),
         currency: "USD",
         format: wine.size_ml === 1500 ? "magnum" : wine.size_ml === 375 ? "half" : "750ml",
         confidence: 0.79 + ((i + j) % 18) / 100,
       };
     });
     return {
-      id: uuid(UUID_PREFIX.scan, i),
+      id: scanId,
       restaurant_id: RESTAURANT_ID,
       distributor_name: `Prodshape Distributor ${1 + (i % 4)}`,
       invoice_number: `PRODSHAPE-${String(i).padStart(4, "0")}`,
       invoice_date: dateOffset(i * 5 + 2),
-      raw_image_path: `${RESTAURANT_ID}/prodshape/invoice-${i}.jpg`,
+      raw_image_path: `${RESTAURANT_ID}/${scanId}.jpg`,
       extra_image_paths: [],
       parsed_line_items: lineItems,
       final_line_items: lineItems,
@@ -416,40 +424,51 @@ function buildRows(heroUrl, userIds) {
     }
   }
 
-  const openBottles = Array.from({ length: 8 }, (_, idx) => {
-    const i = idx + 1;
-    const wine = wines[idx * 9];
-    return {
-      id: uuid(UUID_PREFIX.openBottle, i),
-      wine_id: wine.id,
-      restaurant_id: RESTAURANT_ID,
-      // Clamped: a partial bottle cannot hold more than the bottle does —
-      // open_bottles carries a CHECK against the wine's own size_ml, and the
-      // fixture's 375ml halves are well under the unclamped spread.
-      remaining_ml: Math.min(wine.size_ml - 50, 150 + ((i * 53) % 500)),
-      opened_at: dayOffset(i % 9),
-      opened_by: userIds.staff ?? userIds.owner ?? null,
-      source_inventory_item_id: inventoryItems[idx * 9]?.id ?? null,
-      closed_at: null,
-    };
-  });
+  // The full-E2E workflow loads these legacy rows at migration 0155, then
+  // proves the real 0156 cutover. Current schemas correctly forbid direct
+  // service-role writes to the physical ledger, so normal local refreshes
+  // omit these rows and exercise physical activity through application RPCs.
+  const openBottles = LEGACY_PHYSICAL_FIXTURE
+    ? Array.from({ length: 8 }, (_, idx) => {
+        const i = idx + 1;
+        const wine = wines[idx * 9];
+        return {
+          id: uuid(UUID_PREFIX.openBottle, i),
+          wine_id: wine.id,
+          restaurant_id: RESTAURANT_ID,
+          // Clamped: a partial bottle cannot hold more than the bottle does —
+          // open_bottles carries a CHECK against the wine's own size_ml, and the
+          // fixture's 375ml halves are well under the unclamped spread.
+          remaining_ml: Math.min(wine.size_ml - 50, 150 + ((i * 53) % 500)),
+          opened_at: dayOffset(i % 9),
+          opened_by: userIds.staff ?? userIds.owner ?? null,
+          source_inventory_item_id: inventoryItems[idx * 9]?.id ?? null,
+          closed_at: null,
+        };
+      })
+    : [];
 
-  const pourEvents = Array.from({ length: 60 }, (_, idx) => {
-    const i = idx + 1;
-    const wine = wines[idx % 40];
-    const kind = i % 13 === 0 ? "new_bottle" : i % 17 === 0 ? "spill" : "pour";
-    return {
-      id: uuid(UUID_PREFIX.pour, i),
-      wine_id: wine.id,
-      restaurant_id: RESTAURANT_ID,
-      ml_delta: kind === "new_bottle" ? -wine.size_ml : kind === "spill" ? 60 : 150,
-      kind,
-      actor_user_id: i % 5 === 0 ? userIds.manager ?? null : userIds.staff ?? null,
-      occurred_at: dayOffset(i % 60),
-      note: null,
-      open_bottle_id: null,
-    };
-  });
+  const pourEvents = LEGACY_PHYSICAL_FIXTURE
+    ? Array.from({ length: 60 }, (_, idx) => {
+        const i = idx + 1;
+        const wine = wines[idx % 40];
+        const kind =
+          i % 13 === 0 ? "new_bottle" : i % 17 === 0 ? "spill" : "pour";
+        return {
+          id: uuid(UUID_PREFIX.pour, i),
+          wine_id: wine.id,
+          restaurant_id: RESTAURANT_ID,
+          ml_delta:
+            kind === "new_bottle" ? -wine.size_ml : kind === "spill" ? 60 : 150,
+          kind,
+          actor_user_id:
+            i % 5 === 0 ? (userIds.manager ?? null) : (userIds.staff ?? null),
+          occurred_at: dayOffset(i % 60),
+          note: null,
+          open_bottle_id: null,
+        };
+      })
+    : [];
 
   return {
     restaurant,

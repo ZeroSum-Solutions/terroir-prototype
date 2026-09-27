@@ -68,7 +68,12 @@ describe("transactional CI migration bootstrap", () => {
     expect(capabilityBootstrap).not.toContain("jsonb_build_object(");
     expect(ciCapabilityBootstrap).toContain("refusing non-loopback database");
     expect(ciCapabilityBootstrap).toContain("owner+local@terroir.test");
-    expect(ciCapabilityBootstrap).toContain("expected_entry_count=1");
+    expect(ciCapabilityBootstrap).toContain("de100000-0000-4000-8000-000000000001");
+    expect(ciCapabilityBootstrap).toContain("de200000-0000-4000-8000-000000000001");
+    expect(ciCapabilityBootstrap).toContain('1|2) ;;');
+    expect(ciCapabilityBootstrap).toContain(
+      '-v expected_entry_count="$expected_entry_count"',
+    );
   });
 
   it("is restricted to the disposable CI project", () => {
@@ -111,5 +116,24 @@ describe("transactional CI migration bootstrap", () => {
     expect(seed).not.toContain(
       'upsertRows(supabase, "open_bottles", rows.openBottles',
     );
+  });
+
+  it("cleans sealed live-test history only through exact UUID-scoped targets", () => {
+    const cleanup = read("src/test/local-sealed-fixtures.ts");
+    expect(cleanup).toContain("wineIds?: string[]");
+    for (const table of [
+      "inventory_command_bottle_effects",
+      "pour_events",
+      "bottle_closeouts",
+      "open_bottles",
+      "inventory_command_receipts",
+    ]) {
+      expect(cleanup).toContain(
+        `delete from public.${table} where wine_id = any(array[\${wines}]::uuid[]);`,
+      );
+      expect(cleanup).not.toMatch(
+        new RegExp(`delete from public\\.${table};`),
+      );
+    }
   });
 });
