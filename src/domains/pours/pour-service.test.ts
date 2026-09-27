@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryCommandError } from "./inventory-command";
+import * as physicalBottleCommand from "./physical-bottle-command";
 
 const mockRevalidate = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidate }));
@@ -441,6 +442,32 @@ describe("inventory command services", () => {
     );
   });
 
+  it("rejects a physical adapter result without an open bottle", async () => {
+    const executePhysical = vi
+      .spyOn(physicalBottleCommand, "executePhysicalBottleCommand")
+      .mockResolvedValue({
+        openBottle: null,
+        pourEventIds: [],
+        replayed: false,
+      } as never);
+    const supabase = makeRpcSupabase({ data: null, error: null }, 2);
+
+    try {
+      await expect(recordPour({
+        supabase: supabase as never,
+        operationId: OPERATION_ID,
+        restaurantId: RESTAURANT_ID,
+        wineId: WINE_ID,
+        openBottleId: BOTTLE_ID,
+        ml: 150,
+        kind: "pour",
+      })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
+      expect(executePhysical).toHaveBeenCalledOnce();
+    } finally {
+      executePhysical.mockRestore();
+    }
+  });
+
   it("binds a contract-2 legacy pour replay to the caller-known wine", async () => {
     const supabase = makeRpcSupabase({
       data: completedLegacyReplay("pour", { wineId: HISTORICAL_WINE_ID }),
@@ -717,6 +744,24 @@ const activeBottle = {
 describe("closeOpenBottle", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it.each([
+    ["legacy lifecycle", { expectedOpenedAt: undefined }, "invalid_inventory_command"],
+    ["physical wine identity", {
+      contractVersion: 2 as const,
+      wineId: "",
+      expectedOpenedAt: undefined,
+    }, "invalid_physical_command"],
+  ])("rejects a missing %s before reading or writing", async (_label, overrides, message) => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+
+    await expect(closeOpenBottle({
+      ...closeInput(supabase),
+      ...overrides,
+    })).rejects.toMatchObject({ message });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
   it("forwards the exact lifecycle pair and closeout fields", async () => {
     const supabase = makeCloseSupabase({ bottle: activeBottle });
 
@@ -904,6 +949,53 @@ describe("closeOpenBottle", () => {
 
 describe("discardOpenBottle", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["legacy lifecycle", { expectedOpenedAt: undefined }, "invalid_inventory_command"],
+    ["physical wine identity", {
+      contractVersion: 2 as const,
+      wineId: "",
+      expectedOpenedAt: undefined,
+    }, "invalid_physical_command"],
+  ])("rejects a missing %s before reading or writing", async (_label, overrides, message) => {
+    const supabase = makeCloseSupabase({ bottle: activeBottle });
+
+    await expect(discardOpenBottle({
+      supabase: supabase as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      bottleId: BOTTLE_ID,
+      ...overrides,
+    })).rejects.toMatchObject({ message });
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes a discard fetch failure from a missing bottle", async () => {
+    const fetchError = { code: "XX000", message: "database unavailable" };
+    const failed = makeCloseSupabase({ bottle: null, fetchError });
+    await expect(discardOpenBottle({
+      supabase: failed as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      bottleId: BOTTLE_ID,
+      expectedOpenedAt: OPENED_AT,
+    })).rejects.toBe(fetchError);
+
+    const missing = makeCloseSupabase({
+      bottle: null,
+      fetchError: { code: "PGRST116" },
+    });
+    await expect(discardOpenBottle({
+      supabase: missing as never,
+      operationId: OPERATION_ID,
+      restaurantId: RESTAURANT_ID,
+      bottleId: BOTTLE_ID,
+      expectedOpenedAt: OPENED_AT,
+    })).rejects.toBeInstanceOf(PourNotFoundError);
+    expect(failed.rpc).not.toHaveBeenCalled();
+    expect(missing.rpc).not.toHaveBeenCalled();
+  });
 
   it("uses the locked lifecycle discard command without measurement fields", async () => {
     const supabase = makeCloseSupabase({ bottle: activeBottle });
