@@ -289,6 +289,7 @@ function buildRows(heroUrl, userIds) {
 
   const scans = Array.from({ length: 14 }, (_, idx) => {
     const i = idx + 1;
+    const scanId = uuid(UUID_PREFIX.scan, i);
     const lineItems = Array.from({ length: 5 }, (_, j) => {
       const wine = wines[(idx * 5 + j) % wines.length];
       return {
@@ -303,7 +304,7 @@ function buildRows(heroUrl, userIds) {
       };
     });
     return {
-      id: uuid(UUID_PREFIX.scan, i),
+      id: scanId,
       restaurant_id: RESTAURANT_ID,
       distributor_name: `Prodshape Distributor ${1 + (i % 4)}`,
       invoice_number: `PRODSHAPE-${String(i).padStart(4, "0")}`,
