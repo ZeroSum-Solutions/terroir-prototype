@@ -177,14 +177,10 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const { data: rowsAsB } = await userBClient.from("import_batch_rows").select("id").eq("batch_id", batchId);
     expect(rowsAsB ?? []).toHaveLength(0);
 
-    // User B calling apply on it now fails loudly instead of silently
-    // processing nothing: C17 (0082) added an explicit re-validation
-    // inside apply_import_batch_chunk that raises P0002 when the batch
-    // itself isn't visible to the caller (RLS on import_batches filters
-    // it out for a non-member of restaurant A), turning what used to be
-    // a silent "processed zero rows" no-op into an actionable error —
-    // the same idiom revert_import_batch already uses (see below).
-    await expect(applyImportBatchChunk(userBClient, batchId)).rejects.toMatchObject({ code: "P0002" });
+    // User B calling apply on it fails with PostgreSQL's generic
+    // insufficient-privilege code. The final sealed RPC intentionally
+    // does not reveal whether the foreign batch exists.
+    await expect(applyImportBatchChunk(userBClient, batchId)).rejects.toMatchObject({ code: "42501" });
 
     // Prove that the rejected attempt really did nothing to tenant A's
     // data: as user A, the row is still not_applied.

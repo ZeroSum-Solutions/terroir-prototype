@@ -175,7 +175,9 @@ describe.skipIf(!hasLiveDb)("import hardening 0127/0128 (MANDATORY, live Postgre
       const { error } = await directApply(userClient, batchB);
 
       expect(error?.code).toBe("P0004");
-      expect(error?.message).toMatch(/already has applied rows/i);
+      // The final sealed RPC deliberately exposes only the stable opaque
+      // conflict code, never internal batch state or row details.
+      expect(error?.message).toBe("import_batch_conflict");
       expect(await appliedRowCount(batchB)).toBe(0);
     });
 

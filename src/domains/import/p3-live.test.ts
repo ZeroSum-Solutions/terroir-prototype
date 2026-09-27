@@ -155,17 +155,17 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const batchId = confirmed.batchId;
       await makeAllRowsEligible(batchId);
 
-      // Apply exactly 1,000 of the 1,500 rows (two 500-row RPC calls —
-      // the DB function's own hard clamp — well past PostgREST's 1,000-
-      // row default response cap).
+      // Apply exactly 1,000 of the 1,500 rows through the current sealed
+      // adapter (ten 100-row calls, the final contract's hard clamp) —
+      // well past PostgREST's 1,000-row default response cap.
       // Errors checked (integration critic finding): an unchecked failed
       // apply here under concurrent suite load silently shifted the
       // applied/eligible split and failed the count assertions below for
       // the wrong reason.
-      const apply1 = await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId, p_limit: 500 } as never);
-      expect(apply1.error).toBeNull();
-      const apply2 = await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId, p_limit: 500 } as never);
-      expect(apply2.error).toBeNull();
+      for (let call = 0; call < 10; call += 1) {
+        const applied = await applyImportBatchChunk(userClient, batchId);
+        expect(applied.processed).toHaveLength(100);
+      }
 
       // THE BUG, demonstrated directly: a raw PostgREST .select() over all
       // 1,500 rows is silently truncated to 1,000 by config's max_rows —
@@ -274,8 +274,8 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const batchId2 = await oldConfirm(fixtureDigest());
       expect(batchId1).not.toBe(batchId2); // the bug: two batches for identical content
 
-      await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId1, p_limit: 10 } as never);
-      await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId2, p_limit: 10 } as never);
+      await applyImportBatchChunk(userClient, batchId1);
+      await applyImportBatchChunk(userClient, batchId2);
 
       const { data: wine } = await admin
         .from("wines")

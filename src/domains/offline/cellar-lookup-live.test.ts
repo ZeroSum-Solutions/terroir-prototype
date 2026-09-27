@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadOfflineCellarRows } from "./cellar-lookup";
+import { executePhysicalBottleCommand } from "@/domains/pours/physical-bottle-command";
+import { cleanupLocalPhysicalCommandFixtures } from "@/test/local-physical-command-fixtures";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
 import type { Database } from "@/types/database";
 
@@ -39,8 +41,6 @@ const fixture = {
   lotA1: randomUUID(),
   lotA2: randomUUID(),
   lotB: randomUUID(),
-  bottleA: randomUUID(),
-  bottleB: randomUUID(),
 };
 
 describe.skipIf(!hasLiveDb)(
@@ -50,6 +50,7 @@ describe.skipIf(!hasLiveDb)(
     let admin: SupabaseClient<Database>;
     let actorA: Actor;
     let actorB: Actor;
+    let bottleA: string;
     const actorIds = new Set<string>();
     const restaurantIds = new Set<string>();
     const workspaceIds = new Set<string>();
@@ -156,7 +157,9 @@ describe.skipIf(!hasLiveDb)(
           restaurant_id: actorA.restaurantId,
           wine_id: fixture.wineA,
           bin_id: fixture.binA,
-          quantity: 2,
+          // Opening one physical bottle consumes one sealed unit. Seed six
+          // so the authorized lookup still observes five sealed units.
+          quantity: 3,
           unit_cost: 999,
         },
         {
@@ -172,35 +175,53 @@ describe.skipIf(!hasLiveDb)(
           restaurant_id: actorB.restaurantId,
           wine_id: fixture.wineB,
           bin_id: fixture.binB,
-          quantity: 8,
+          quantity: 9,
           unit_cost: 888,
         },
       ] as never);
       if (inventoryError) throw inventoryError;
 
-      const { error: bottleError } = await admin.from("open_bottles").insert([
-        {
-          id: fixture.bottleA,
-          restaurant_id: actorA.restaurantId,
-          wine_id: fixture.wineA,
-          source_inventory_item_id: fixture.lotA1,
-          opened_by: actorA.id,
-          remaining_ml: 450,
-        },
-        {
-          id: fixture.bottleB,
-          restaurant_id: actorB.restaurantId,
-          wine_id: fixture.wineB,
-          source_inventory_item_id: fixture.lotB,
-          opened_by: actorB.id,
-          remaining_ml: 300,
-        },
-      ] as never);
-      if (bottleError) throw bottleError;
+      const openedA = await executePhysicalBottleCommand({
+        supabase: actorA.client,
+        operationId: randomUUID(),
+        restaurantId: actorA.restaurantId,
+        command: "open",
+        wineId: fixture.wineA,
+        preservationMethod: "none",
+      });
+      bottleA = openedA.openBottle.id;
+      await executePhysicalBottleCommand({
+        supabase: actorA.client,
+        operationId: randomUUID(),
+        restaurantId: actorA.restaurantId,
+        command: "pour",
+        wineId: fixture.wineA,
+        openBottleId: bottleA,
+        ml: 300,
+      });
+
+      const openedB = await executePhysicalBottleCommand({
+        supabase: actorB.client,
+        operationId: randomUUID(),
+        restaurantId: actorB.restaurantId,
+        command: "open",
+        wineId: fixture.wineB,
+        preservationMethod: "none",
+      });
+      await executePhysicalBottleCommand({
+        supabase: actorB.client,
+        operationId: randomUUID(),
+        restaurantId: actorB.restaurantId,
+        command: "pour",
+        wineId: fixture.wineB,
+        openBottleId: openedB.openBottle.id,
+        ml: 450,
+      });
     });
 
     afterAll(async () => {
       if (!admin) return;
+      await cleanupLocalPhysicalCommandFixtures(supabaseUrl!, [...restaurantIds]);
       if (restaurantIds.size > 0) {
         const { error } = await admin.from("restaurants").delete()
           .in("id", [...restaurantIds]);
@@ -225,10 +246,6 @@ describe.skipIf(!hasLiveDb)(
           "id",
           [fixture.lotA1, fixture.lotA2, fixture.lotB],
         ),
-        admin.from("open_bottles").select("id").in(
-          "id",
-          [fixture.bottleA, fixture.bottleB],
-        ),
         admin.from("restaurants").select("id").in("id", [...restaurantIds]),
       ]);
       for (const check of checks) {
@@ -252,7 +269,7 @@ describe.skipIf(!hasLiveDb)(
           label: "C03-A",
           sealedQuantity: 5,
         }],
-        activeOpenBottleId: fixture.bottleA,
+        activeOpenBottleId: bottleA,
         remainingMl: 450,
       })]);
       const keys = collectKeys(rows);

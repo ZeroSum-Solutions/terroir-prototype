@@ -13,6 +13,7 @@
 // NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY aren't set, the same
 // convention e2e/reconcile-queue.test.ts and its siblings use for
 // live-fixture tests that can't run on a bare CI runner.
+import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -158,14 +159,16 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("rejects a crafted job whose restaurant_id does not own its subject scan, before any read or write of the other tenant's data", async () => {
+      const scanBId = randomUUID();
       const { data: scanB, error: scanBErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanBId,
           restaurant_id: restaurantB,
           distributor_name: "Cross-Tenant Distributor",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantB}/scan-crafted.jpg`,
+          raw_image_path: `${restaurantB}/${scanBId}.jpg`,
           status: "processing",
         } as never)
         .select("*")
@@ -221,7 +224,8 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("processing restaurant A's own job never reads or mutates restaurant B's rows", async () => {
-      const pathA = `${restaurantA}/scan-legit.jpg`;
+      const scanAId = randomUUID();
+      const pathA = `${restaurantA}/${scanAId}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("invoice-images")
         .upload(pathA, Buffer.from("fake-jpeg-bytes"), { contentType: "image/jpeg", upsert: true });
@@ -231,6 +235,7 @@ describe.skipIf(!hasLiveDb)(
       const { data: scanA, error: scanAErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanAId,
           restaurant_id: restaurantA,
           distributor_name: "Tenant A Distributor",
           parsed_line_items: [],
@@ -243,14 +248,16 @@ describe.skipIf(!hasLiveDb)(
       if (scanAErr || !scanA) throw scanAErr ?? new Error("failed to insert scan A");
 
       // Untouched control row belonging to restaurant B.
+      const scanBId = randomUUID();
       const { data: scanB, error: scanBErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanBId,
           restaurant_id: restaurantB,
           distributor_name: "Tenant B Control Row",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantB}/scan-control.jpg`,
+          raw_image_path: `${restaurantB}/${scanBId}.jpg`,
           status: "processing",
         } as never)
         .select("*")
@@ -351,21 +358,23 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("a job whose subject already persisted a result does not re-invoke the extraction service (no double Anthropic call)", async () => {
+      const scanId = randomUUID();
       const { data: scan, error } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanId,
           restaurant_id: restaurantA,
           distributor_name: "Already Complete Distributor",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantA}/already-complete.jpg`,
+          raw_image_path: `${restaurantA}/${scanId}.jpg`,
           status: "complete", // persisted by a (simulated) prior attempt
           item_count: 3,
         } as never)
         .select("id")
         .single();
       if (error || !scan) throw error ?? new Error("failed to insert already-complete scan");
-      const scanId = (scan as { id: string }).id;
+      expect((scan as { id: string }).id).toBe(scanId);
 
       const staffA = await staffSession(supabase, restaurantA, identities);
       const enqueueResult = await enqueueInvoiceExtractJob({ supabase: staffA.client, restaurantId: restaurantA, scanId });
@@ -379,7 +388,8 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("aborts WITHOUT calling the extraction service when another worker has already stolen the claim (closes the double-bill window on reclaim)", async () => {
-      const pathA = `${restaurantA}/scan-claim-stolen.jpg`;
+      const scanId = randomUUID();
+      const pathA = `${restaurantA}/${scanId}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("invoice-images")
         .upload(pathA, Buffer.from("fake-jpeg-bytes"), { contentType: "image/jpeg", upsert: true });
@@ -389,6 +399,7 @@ describe.skipIf(!hasLiveDb)(
       const { data: scan, error: scanErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanId,
           restaurant_id: restaurantA,
           distributor_name: "Claim Stolen Distributor",
           parsed_line_items: [],
