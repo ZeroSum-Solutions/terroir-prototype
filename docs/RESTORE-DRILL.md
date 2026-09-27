@@ -1,18 +1,23 @@
 # Database restore drill
 
-This is the execution guide for `scripts/restore-drill.mjs`, the automated
-counterpart to the manual walkthrough in
+This is the canonical execution guide for `scripts/restore-drill.mjs`, linked
+by the backup and release-evidence runbook at
 `docs/runbooks/database-backup-restore.md`. It proves that a specific DB
 Backup artifact actually restores: it verifies the artifact, decrypts it
 offline, restores it into a throwaway PostgreSQL container, and diffs exact
 per-table row counts (plus migration version and content checksums) against
 the evidence captured at dump time. Nothing here ever touches production or
 the backup role's connection — the restore target is always a Docker
-container the script starts and destroys on loopback only.
+container the script starts and destroys with networking disabled.
+
+This is a data-restore drill, not a complete permission-recovery drill. The
+script uses `--no-owner --no-privileges`; it does not restore or compare object
+ownership and grants. Its evidence collector excludes extension-owned tables,
+including `cron.job`. Those boundaries apply even when the report says `PASS`.
 
 ## What the workflow now asserts (before running a drill)
 
-`.github/workflows/db-backup.yml` calls `scripts/backup/assert-dump-coverage.mjs`
+The [backup workflow](../.github/workflows/db-backup.yml) calls `scripts/backup/assert-dump-coverage.mjs`
 on every backup run, before the dump is encrypted and uploaded. That script now
 checks two things, both against the same exported PostgreSQL snapshot the dump
 itself was taken from:
@@ -46,56 +51,78 @@ The scratch database is a disposable
 Postgres 17 image, not vanilla `postgres:17`) started fresh by the script and
 torn down when it exits. The vanilla `postgres` image does **not** work here:
 the dump's schema needs `pg_cron`, `pgsodium`/`vault`, and `pg_graphql`
-extension control files that only Supabase's image ships. This repository has
-no committed `supabase/config.toml` yet (see `docs/LOCAL-SUPABASE.md` for the
-seed-data-only local stack that does exist), so the canonical local Supabase
-CLI restore path documented in `docs/runbooks/database-backup-restore.md`
-(port `54322`) is currently unavailable in a general dev environment and can
-also collide with an unrelated project's Supabase stack already listening on
-that port. `scripts/restore-drill.mjs` sidesteps both problems by managing its
-own container end to end rather than depending on `supabase start`.
+extension control files that only Supabase's image ships. The repository does
+have `supabase/config.toml`; its active development stack and ports are documented
+in [the local-stack runbook](runbooks/local-stack.md). The restore script
+does not use, reset, or stop that stack. It owns a separate container and needs
+neither an available localhost database port nor a running Supabase CLI stack.
+
+The scratch container has Docker networking set to `none`, no published ports
+or host bind mounts, and `cron.launch_active_jobs` disabled from startup. The
+script checks those settings before and after restoring. Queries run through
+`docker exec` in that exact container, ignoring ambient database service-file
+and backup-snapshot settings. Restored jobs cannot make external network calls;
+disabled cron jobs cannot alter the data being compared. This is not a sandbox
+for an untrusted backup: accept artifacts only after verifying their provenance.
+
+The startup command preserves the pinned image's `postgres -D /etc/postgresql`
+entry point and adds the cron setting. An image override must be checked for
+that command/configuration contract as well as PostgreSQL-major and extension
+compatibility before using it for a real recovery.
 
 ## Running the drill
 
-1. Find the latest successful run and download its artifact:
+Find the latest successful run and download its artifact:
 
-   ```bash
-   run_id="$(
-     gh run list --repo wiggdevin/terroir --workflow "DB Backup" \
-       --json databaseId,conclusion --jq \
-       '[.[] | select(.conclusion == "success")][0].databaseId'
-   )"
-   gh run download "$run_id" --repo wiggdevin/terroir --dir /path/to/artifact-dir
-   ```
+```bash
+run_id="$(
+  gh run list --repo ZeroSum-Solutions/terroir-prototype --workflow "DB Backup" \
+    --json databaseId,conclusion --jq \
+    '[.[] | select(.conclusion == "success")][0].databaseId'
+)"
+drill_work="$(mktemp -d)"
+chmod 700 "$drill_work"
+gh run download "$run_id" --repo ZeroSum-Solutions/terroir-prototype --dir "$drill_work/artifact"
+```
 
-2. Fetch the offline age identity to a private file (never inline it in an
-   env var value or command argument):
+Fetch the offline age identity to a private file (never inline it in an
+env var value or command argument):
 
-   ```bash
-   umask 077
-   zsvault get terroir_backup_age_identity > /path/to/identity.txt
-   chmod 600 /path/to/identity.txt
-   ```
+```bash
+umask 077
+zsvault get terroir_backup_age_identity > "$drill_work/identity.txt"
+chmod 600 "$drill_work/identity.txt"
+```
 
-3. Run the drill:
+Run the drill:
 
-   ```bash
-   RESTORE_ARTIFACT_DIR=/path/to/artifact-dir \
-   RESTORE_AGE_IDENTITY_FILE=/path/to/identity.txt \
-   RESTORE_REPORT_FILE=/path/to/restore-report.json \
-     node scripts/restore-drill.mjs
-   ```
+```bash
+RESTORE_ARTIFACT_DIR="$drill_work/artifact" \
+RESTORE_AGE_IDENTITY_FILE="$drill_work/identity.txt" \
+RESTORE_REPORT_FILE="$drill_work/report" \
+  node scripts/restore-drill.mjs
+```
 
-4. Delete the identity file and artifact directory when done. The script
-   itself cleans up its own decrypted work directory and scratch container
-   automatically (`RESTORE_KEEP_WORKDIR=1` skips that, for debugging only).
+The `report` file contains JSON. Preserve the redacted report and authenticated artifact metadata in the release
+evidence, then remove the private identity and downloaded artifact from that exact
+temporary directory. Do not remove an active development database or run
+`supabase stop --no-backup` as drill cleanup. The script itself cleans up its own
+decrypted work directory and scratch container automatically
+(`RESTORE_KEEP_WORKDIR=1` skips that, for debugging only).
 
 The script exits non-zero and prints every failure if any table is missing,
 any row count differs, the migration version differs, or any of the ten
 largest tables' content checksums differ. On success it prints a
 `schema.table | source | restored | match` table and writes a JSON report
 (`format_version`, `ok`, `failures`, `tables`, `sequences`,
-`content_checksums`).
+`content_checksums`). `isolation` records the verified network, port, bind-mount,
+and cron boundaries; `permissions_restored` and
+`extension_owned_tables_compared` are `false`. The `artifact` object records
+the manifest and encrypted-artifact SHA-256 digests; authenticate those against
+the GitHub run/artifact and integrity-ledger records before accepting provenance.
+A successful backup
+workflow proves artifact creation, not restoration. A passing synthetic drill
+proves the tested mechanics, not recovery of the latest hosted artifact.
 
 ### Environment variables
 
@@ -107,7 +134,28 @@ largest tables' content checksums differ. On success it prints a
 | `RESTORE_REPORT_FILE` | no | Where to write the JSON comparison report. Defaults to a file inside the (deleted-on-exit) work directory. |
 | `RESTORE_KEEP_WORKDIR` | no | Set to `1` to keep the decrypted material and scratch container after a run, for debugging. |
 
+## Local isolation drill — 2026-09-23
+
+The canonical script passed an encrypted synthetic-artifact rehearsal on
+PostgreSQL 17.6 with seven non-extension tables, exact row counts, sequences,
+migration version, and content checksums matching. The source fixture contained
+a scheduled cron write. The drill observed the cron setting disabled before
+and after restore; it did not compare the restored job or run an armed scheduler
+negative control. An invalid ambient backup snapshot and a nonexistent database service file did
+not affect scratch collection. The process exited `0`.
+
+This was a temporary, locally generated encryption identity and synthetic data,
+not a download or decryption of a current hosted backup. The seven-table comparison
+does not prove the extension-owned cron job contents or owner/grant recovery.
+Release acceptance still needs evidence for its selected real artifact and
+the permissions needed by the application.
+
 ## Drill record: 2026-08-22
+
+This historical record was not reverified by the September 23 rehearsal.
+Retain and inspect its original report and authenticated artifact metadata
+before relying on this older drill for a release decision; this prose alone
+is not proof.
 
 Executed against the latest green scheduled run at the time
 (`32557316027`, `2026-08-22T06:34:18Z`, commit `beeb2d4`). Checksums in the
