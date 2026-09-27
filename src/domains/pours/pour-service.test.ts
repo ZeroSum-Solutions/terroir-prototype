@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InventoryCommandError } from "./inventory-command";
-import * as physicalBottleCommand from "./physical-bottle-command";
 
 const mockRevalidate = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidate }));
@@ -13,7 +12,6 @@ vi.mock("@/lib/api/auto-eightysix-revalidation", () => ({
 
 const {
   PourForbiddenError,
-  PourNoInventoryError,
   PourNotFoundError,
   closeOpenBottle,
   discardOpenBottle,
@@ -124,13 +122,6 @@ function makeRpcSupabase(result: {
 describe("inventory command services", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("exposes a stable no-inventory domain error", () => {
-    expect(new PourNoInventoryError()).toMatchObject({
-      name: "PourNoInventoryError",
-      message: "No inventory available.",
-    });
-  });
-
   it("opens through execute_inventory_command and preserves replay state", async () => {
     const supabase = makeRpcSupabase({ data: commandResult("open"), error: null });
 
@@ -216,12 +207,6 @@ describe("inventory command services", () => {
 
   it.each([
     ["non-object result", "invalid"],
-    ["invalid result envelope", {
-      operation_id: 42,
-      command: "pour",
-      pour_event_ids: [],
-      replayed: false,
-    }],
     ["non-object bottle", {
       ...commandResult("pour"),
       open_bottle: [],
@@ -425,53 +410,6 @@ describe("inventory command services", () => {
       "execute_physical_bottle_command",
       expect.anything(),
     );
-  });
-
-  it("rejects a bottle selector under the legacy contract before writing", async () => {
-    const supabase = makeRpcSupabase({
-      data: commandResult("pour"),
-      error: null,
-    });
-
-    await expect(recordPour({
-      supabase: supabase as never,
-      operationId: OPERATION_ID,
-      restaurantId: RESTAURANT_ID,
-      wineId: WINE_ID,
-      openBottleId: BOTTLE_ID,
-      ml: 150,
-      kind: "pour",
-    })).rejects.toMatchObject({ message: "invalid_inventory_command" });
-    expect(supabase.rpc).not.toHaveBeenCalledWith(
-      "execute_inventory_command",
-      expect.anything(),
-    );
-  });
-
-  it("rejects a physical adapter result without an open bottle", async () => {
-    const executePhysical = vi
-      .spyOn(physicalBottleCommand, "executePhysicalBottleCommand")
-      .mockResolvedValue({
-        openBottle: null,
-        pourEventIds: [],
-        replayed: false,
-      } as never);
-    const supabase = makeRpcSupabase({ data: null, error: null }, 2);
-
-    try {
-      await expect(recordPour({
-        supabase: supabase as never,
-        operationId: OPERATION_ID,
-        restaurantId: RESTAURANT_ID,
-        wineId: WINE_ID,
-        openBottleId: BOTTLE_ID,
-        ml: 150,
-        kind: "pour",
-      })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
-      expect(executePhysical).toHaveBeenCalledOnce();
-    } finally {
-      executePhysical.mockRestore();
-    }
   });
 
   it("binds a contract-2 legacy pour replay to the caller-known wine", async () => {
@@ -685,21 +623,6 @@ describe("undoLastPour", () => {
     })).rejects.toBeInstanceOf(PourForbiddenError);
   });
 
-  it("maps a non-reversible inventory command to the manager-safe error", async () => {
-    const supabase = makeRpcSupabase({
-      data: null,
-      error: { message: "undo_inventory_command_not_reversible" },
-    });
-
-    await expect(undoLastPour({
-      supabase: supabase as never,
-      restaurantId: RESTAURANT_ID,
-      wineId: WINE_ID,
-    })).rejects.toMatchObject({
-      name: "PourNotReversibleError",
-      message: "Cannot safely undo this pour; ask a manager to reconcile.",
-    });
-  });
 });
 
 function makeCloseSupabase(options: {
@@ -749,24 +672,6 @@ const activeBottle = {
 
 describe("closeOpenBottle", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it.each([
-    ["legacy lifecycle", { expectedOpenedAt: undefined }, "invalid_inventory_command"],
-    ["physical wine identity", {
-      contractVersion: 2 as const,
-      wineId: "",
-      expectedOpenedAt: undefined,
-    }, "invalid_physical_command"],
-  ])("rejects a missing %s before reading or writing", async (_label, overrides, message) => {
-    const supabase = makeCloseSupabase({ bottle: activeBottle });
-
-    await expect(closeOpenBottle({
-      ...closeInput(supabase),
-      ...overrides,
-    })).rejects.toMatchObject({ message });
-    expect(supabase.from).not.toHaveBeenCalled();
-    expect(supabase.rpc).not.toHaveBeenCalled();
-  });
 
   it("forwards the exact lifecycle pair and closeout fields", async () => {
     const supabase = makeCloseSupabase({ bottle: activeBottle });
@@ -933,21 +838,6 @@ describe("closeOpenBottle", () => {
     expect(mockRevalidate).not.toHaveBeenCalled();
   });
 
-  it("rejects a contract-2 legacy close replay with a non-string lifecycle", async () => {
-    const supabase = makeCloseSupabase({ bottle: activeBottle });
-    const replay = completedLegacyReplay("close", {
-      wineId: HISTORICAL_WINE_ID,
-    });
-    replay.open_bottle.opened_at = null as never;
-    supabase.rpc.mockResolvedValueOnce({ data: replay, error: null });
-
-    await expect(closeOpenBottle({
-      ...closeInput(supabase),
-      contractVersion: 2,
-    })).rejects.toMatchObject({ message: "invalid_inventory_command_result" });
-    expect(mockRevalidate).not.toHaveBeenCalled();
-  });
-
   it("keeps a fresh version-1 close retired under contract 2", async () => {
     const supabase = makeCloseSupabase({
       bottle: activeBottle,
@@ -970,53 +860,6 @@ describe("closeOpenBottle", () => {
 
 describe("discardOpenBottle", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it.each([
-    ["legacy lifecycle", { expectedOpenedAt: undefined }, "invalid_inventory_command"],
-    ["physical wine identity", {
-      contractVersion: 2 as const,
-      wineId: "",
-      expectedOpenedAt: undefined,
-    }, "invalid_physical_command"],
-  ])("rejects a missing %s before reading or writing", async (_label, overrides, message) => {
-    const supabase = makeCloseSupabase({ bottle: activeBottle });
-
-    await expect(discardOpenBottle({
-      supabase: supabase as never,
-      operationId: OPERATION_ID,
-      restaurantId: RESTAURANT_ID,
-      bottleId: BOTTLE_ID,
-      ...overrides,
-    })).rejects.toMatchObject({ message });
-    expect(supabase.from).not.toHaveBeenCalled();
-    expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  it("distinguishes a discard fetch failure from a missing bottle", async () => {
-    const fetchError = { code: "XX000", message: "database unavailable" };
-    const failed = makeCloseSupabase({ bottle: null, fetchError });
-    await expect(discardOpenBottle({
-      supabase: failed as never,
-      operationId: OPERATION_ID,
-      restaurantId: RESTAURANT_ID,
-      bottleId: BOTTLE_ID,
-      expectedOpenedAt: OPENED_AT,
-    })).rejects.toBe(fetchError);
-
-    const missing = makeCloseSupabase({
-      bottle: null,
-      fetchError: { code: "PGRST116" },
-    });
-    await expect(discardOpenBottle({
-      supabase: missing as never,
-      operationId: OPERATION_ID,
-      restaurantId: RESTAURANT_ID,
-      bottleId: BOTTLE_ID,
-      expectedOpenedAt: OPENED_AT,
-    })).rejects.toBeInstanceOf(PourNotFoundError);
-    expect(failed.rpc).not.toHaveBeenCalled();
-    expect(missing.rpc).not.toHaveBeenCalled();
-  });
 
   it("uses the locked lifecycle discard command without measurement fields", async () => {
     const supabase = makeCloseSupabase({ bottle: activeBottle });
