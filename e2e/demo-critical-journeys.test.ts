@@ -335,9 +335,18 @@ test.describe("mobile demo critical journeys", () => {
 
       const signOutResponse = await page.request.post(
         "http://127.0.0.1:3000/auth/signout",
-        { maxRedirects: 0 },
+        {
+          headers: {
+            Origin: "http://127.0.0.1:3000",
+            "sec-fetch-site": "same-origin",
+          },
+          maxRedirects: 0,
+        },
       );
       expect(signOutResponse.status()).toBe(303);
+      expect(
+        new URL(signOutResponse.headers().location ?? "http://127.0.0.1:3000").pathname,
+      ).toBe("/login");
       await page.goto("http://127.0.0.1:3000/login");
       await expect(page.getByRole("heading", { name: /Sign in/i })).toBeVisible();
       await assertNoSeriousA11yViolations(page, "/login sign-in");
