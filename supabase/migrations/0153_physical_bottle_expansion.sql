@@ -1439,7 +1439,7 @@ where not (pe.event_contract = 2 and pe.kind = 'undo')
   );
 
 revoke all on table public.effective_service_pour_events
-  from public, anon, service_role;
+  from public, anon, authenticated, service_role;
 grant select on table public.effective_service_pour_events
   to authenticated;
 

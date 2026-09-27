@@ -22,7 +22,7 @@ select 1/case when current_database()=:'expected_database'
   and :'target_admitted'='on'
   and :'race_kind' in ('batch','session')
   and :'source_0164_sha256'=
-    'b5416022789c096d9b94245770e543465d74a02f60c847270254e862545294ad'
+    '2d535f329b600c3dfc33b23494532f93c023b1a89c6aad055b8de3a865ee49ff'
   and not exists(select 1 from auth.users
                   where id='16470000-0000-4000-8000-000000000001')
   and not exists(select 1 from public.restaurants

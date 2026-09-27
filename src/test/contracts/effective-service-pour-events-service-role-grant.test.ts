@@ -181,9 +181,14 @@ describe("0155 effective service-event service-role grant source", () => {
     );
   });
 
-  it("preserves the sealed 0153 migration pair byte-for-byte", () => {
+  it("pins the corrected 0153 migration pair byte-for-byte", () => {
+    expect(
+      normalize(read("supabase/migrations/0153_physical_bottle_expansion.sql")),
+    ).toContain(
+      "revoke all on table public.effective_service_pour_events from public, anon, authenticated, service_role; grant select on table public.effective_service_pour_events to authenticated;",
+    );
     expect(sha256(read("supabase/migrations/0153_physical_bottle_expansion.sql"))).toBe(
-      "597369d28c36956399d88bec90a51cfa7ffe21e6a810bbd187d76e8683c661ee",
+      "442cb404fbf30c2a8d97c0effd14e3c12a554fa018e0c19cea9b134fd7f089ce",
     );
     expect(
       sha256(read("supabase/migrations/down/0153_physical_bottle_expansion.down.sql")),

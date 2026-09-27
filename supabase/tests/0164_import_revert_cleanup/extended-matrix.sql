@@ -22,7 +22,7 @@ select 1 / case when current_database()=:'expected_database'
   and current_user='postgres' and session_user='postgres'
   and :'target_admitted'='on'
   and :'source_0164_sha256'=
-    'b5416022789c096d9b94245770e543465d74a02f60c847270254e862545294ad'
+    '2d535f329b600c3dfc33b23494532f93c023b1a89c6aad055b8de3a865ee49ff'
   and pg_catalog.to_regprocedure(
     'public.revert_import_batch_core_private(uuid,uuid[])'
   ) is not null

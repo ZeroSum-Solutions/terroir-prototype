@@ -23,13 +23,13 @@ const sources = Object.fromEntries(
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const expectedHashes = {
   contract: '8f41d6035ac14dea6a930d22f6bbbe717f451febcfcd508bd1e3ddd0faf695ef',
-  up: 'b5416022789c096d9b94245770e543465d74a02f60c847270254e862545294ad',
-  setup: 'ff55865bf31a59a36e1930437c38bf71da8605cdf0ada228b02b6c14d291df0a',
+  up: '2d535f329b600c3dfc33b23494532f93c023b1a89c6aad055b8de3a865ee49ff',
+  setup: '2157bf932eae0403a1035a1cd46bed16726c8380b1bcce21d00f5e7b9576f20f',
   a: '01df63516e23b468ceb74c5c52793664afdb6bdcef4728d49476455e5089b2b5',
   b: '948c3e93928487e50510139d34097db30a46feea6cf82d3c88451b6f8a09720f',
   observe: '8f9d5b9d80597f53a6d8325d7bddef464bd7e177740bb9563e81305f800eae61',
   verify: '219b1e0f25c03ce8924e89c8a5f2ee979e6d2224a4184f2ecedaa8d24152c4f5',
-  cleanup: '7982073748cfc0ae4bce11debc5780956b46ffc33574c5fdc10b621d63399912',
+  cleanup: '4aae98cb0991fbe7a9adbb54f4823682b5ec7f06f94a4d74f90ab97c91a041d2',
   readme: '15b7b15423dd55d1be3fa91a5d1e4be446884bb5cf34e6c5927c2d6f057176c6',
 };
 for (const [name, expected] of Object.entries(expectedHashes)) {

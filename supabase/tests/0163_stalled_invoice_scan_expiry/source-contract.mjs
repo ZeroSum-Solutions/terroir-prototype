@@ -39,14 +39,14 @@ const sources = Object.fromEntries(
 );
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const expectedHashes = {
-  up: '0c64a578bc2253c149bef9a2e1479fbfdefb1e3bf1820f3c4da68e8d46537583',
+  up: 'ed98ab776aca2c509b691709da00c3a698789f613d493c3abb3eb0e902e57475',
   down: '3ec3dc9400fef2d4cf481c1812b151b57a22b5c2572d9e0c0ba45fb959259145',
   acceptedContract: '17582379d555a59596cb1c553c0f45767db1bddd0ac3da6caedb5b045c3e2885',
   migration0157: 'e4107961a846d96a8a58225ee6b030eea734f8778627a2615604bc3b450de8e6',
-  functional: '358a1ba5275a13db53f26aaaab62c5470aabca18e395d1131292a1420a06c930',
+  functional: 'f67503d89fa164970f38b62f37d8b57a9f9346e077148846c6e6e1cfa05cf533',
   repeatable: 'fa33256392fe89ef44315a47fe9b864b50c5d7d201ce6367762792b97f6e5622',
   serializable: 'a3e0fd72fdc92fb124687d11965af6d32ca166b92ca3785e82370019b8bdc188',
-  cycle: '85f457a6d7bb211425e3b5aab70e6cf1c6a7fa0481e3734138601023d4a6bdfc',
+  cycle: '10d63d984f0707fb9a445b2c0211c0c24d12f41a43a8062db2c510c820eb7d4b',
   downBody: '6f137a6f1a29b43fd7839cff066af1a5abdd7a249507c6cb695defe2f3529152',
   downOwner: 'c538aae55d62d7e3831a5fa4ad16ef6ec99aad60b8a2aa18d0afb7792de0ce77',
   downAcl: '03221066c8ff99c524760359c775efe9c3afb648003877d3cafbafa16bee2a4b',
@@ -140,6 +140,9 @@ for (const token of [
   '3c6d6c41d6262a20e7c102dbd49bb3383bd86a4138c8a3ab6b9b04a1ec2420a5',
   "pg_catalog.pg_get_userbyid(v_updated_at_function.proowner) <> 'postgres'",
   "array['search_path=public']::text[]",
+  'v_updated_at_acl_admitted',
+  'pg_catalog.aclexplode(v_updated_at_function.proacl)',
+  'pg_catalog.count(distinct acl.grantee)',
   "t.tgattr::text = ''",
   't.tgqual is null',
   't.tgnargs = 0',

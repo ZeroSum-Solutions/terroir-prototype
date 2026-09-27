@@ -43,4 +43,13 @@ describe("transactional CI migration bootstrap", () => {
       'fields_enriched: ["drink_window", "serving_temp", "retail"]',
     );
   });
+
+  it("keeps seeded invoice images inside the 0157 scan-owned path contract", () => {
+    expect(seed).toContain("const scanId = uuid(UUID_PREFIX.scan, i)");
+    expect(seed).toContain(
+      '`${RESTAURANT_ID}/${scanId}${isMultiPage ? "_page1" : ""}.jpg`',
+    );
+    expect(seed).toContain('`${RESTAURANT_ID}/${scanId}_page2.jpg`');
+    expect(seed).not.toContain("/local-seed/invoice-");
+  });
 });

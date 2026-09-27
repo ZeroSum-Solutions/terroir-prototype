@@ -13,6 +13,7 @@ declare
   v_updated_at_function pg_catalog.pg_proc%rowtype;
   v_delete_function pg_catalog.pg_proc%rowtype;
   v_column_count integer;
+  v_updated_at_acl_admitted boolean;
 begin
   if pg_catalog.to_regclass('public.import_batches') is null
      or pg_catalog.to_regclass('public.import_batch_rows') is null
@@ -84,6 +85,30 @@ begin
    where p.oid = pg_catalog.to_regprocedure(
      'public.import_batch_rows_reflect_inventory_delete()'
    );
+
+  -- Supabase production may materialize the default PUBLIC function grant as
+  -- five explicit, equivalent EXECUTE tuples. Admit only that exact profile
+  -- or PostgreSQL's NULL default ACL; all other ACL drift still fails closed.
+  v_updated_at_acl_admitted := v_updated_at_function.proacl is null or (
+    (select pg_catalog.count(*)
+       from pg_catalog.aclexplode(v_updated_at_function.proacl)) = 5
+    and not exists (
+      select 1
+        from pg_catalog.aclexplode(v_updated_at_function.proacl) acl
+       where acl.grantor <> v_updated_at_function.proowner
+          or acl.privilege_type <> 'EXECUTE'
+          or acl.is_grantable
+          or acl.grantee not in (
+            0,
+            v_updated_at_function.proowner,
+            pg_catalog.to_regrole('anon'),
+            pg_catalog.to_regrole('authenticated'),
+            pg_catalog.to_regrole('service_role')
+          )
+    )
+    and (select pg_catalog.count(distinct acl.grantee)
+           from pg_catalog.aclexplode(v_updated_at_function.proacl) acl) = 5
+  );
 
   select pg_catalog.count(*) into v_column_count
     from pg_catalog.pg_attribute a
@@ -241,7 +266,7 @@ begin
      or not v_updated_at_function.prosecdef
      or v_updated_at_function.proconfig is distinct from
        array['search_path=public']::text[]
-     or v_updated_at_function.proacl is not null
+     or not v_updated_at_acl_admitted
      or pg_catalog.encode(pg_catalog.sha256(
        pg_catalog.convert_to(v_delete_function.prosrc, 'UTF8')
      ), 'hex') <> '5ce2c8fade26354ddbdfa097e1dab15cd3e0837bf8ac986ac321b40f863242fd'

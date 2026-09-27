@@ -11,6 +11,7 @@ declare
   v_job_type_definition text;
   v_job_status_definition text;
   v_updated_at_function pg_catalog.pg_proc%rowtype;
+  v_updated_at_acl_admitted boolean;
 begin
   if pg_catalog.to_regclass('public.invoice_scans') is null
      or pg_catalog.to_regclass('public.background_jobs') is null
@@ -28,6 +29,30 @@ begin
   select p.* into strict v_updated_at_function
     from pg_catalog.pg_proc p
    where p.oid = pg_catalog.to_regprocedure('public.set_updated_at()');
+
+  -- Supabase production may materialize the default PUBLIC function grant as
+  -- five explicit, equivalent EXECUTE tuples. Admit only that exact profile
+  -- or PostgreSQL's NULL default ACL; all other ACL drift still fails closed.
+  v_updated_at_acl_admitted := v_updated_at_function.proacl is null or (
+    (select pg_catalog.count(*)
+       from pg_catalog.aclexplode(v_updated_at_function.proacl)) = 5
+    and not exists (
+      select 1
+        from pg_catalog.aclexplode(v_updated_at_function.proacl) acl
+       where acl.grantor <> v_updated_at_function.proowner
+          or acl.privilege_type <> 'EXECUTE'
+          or acl.is_grantable
+          or acl.grantee not in (
+            0,
+            v_updated_at_function.proowner,
+            pg_catalog.to_regrole('anon'),
+            pg_catalog.to_regrole('authenticated'),
+            pg_catalog.to_regrole('service_role')
+          )
+    )
+    and (select pg_catalog.count(distinct acl.grantee)
+           from pg_catalog.aclexplode(v_updated_at_function.proacl) acl) = 5
+  );
 
   select pg_catalog.count(*) into v_column_count
     from pg_catalog.pg_attribute a
@@ -118,7 +143,7 @@ begin
      or v_updated_at_function.proargdefaults is not null
      or v_updated_at_function.proconfig is distinct from
        array['search_path=public']::text[]
-     or v_updated_at_function.proacl is not null
+     or not v_updated_at_acl_admitted
      or v_updated_at_function.prosqlbody is not null
      or v_updated_at_function.probin is not null
      or (select pg_catalog.count(*)

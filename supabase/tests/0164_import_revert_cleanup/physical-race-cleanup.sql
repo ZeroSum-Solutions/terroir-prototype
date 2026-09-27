@@ -22,7 +22,7 @@ select 1/case when current_database()=:'expected_database'
   and :'target_admitted'='on'
   and :'race_mode' in ('open_first','revert_first')
   and :'source_0164_sha256'=
-    'b5416022789c096d9b94245770e543465d74a02f60c847270254e862545294ad'
+    '2d535f329b600c3dfc33b23494532f93c023b1a89c6aad055b8de3a865ee49ff'
 then 1 else 0 end as c09_0164_physical_cleanup_target;
 
 begin;

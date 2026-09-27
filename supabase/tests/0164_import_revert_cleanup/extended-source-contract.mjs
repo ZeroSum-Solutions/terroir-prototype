@@ -19,9 +19,9 @@ const sources = Object.fromEntries(
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const expectedHashes = {
   contract: '8f41d6035ac14dea6a930d22f6bbbe717f451febcfcd508bd1e3ddd0faf695ef',
-  up: 'b5416022789c096d9b94245770e543465d74a02f60c847270254e862545294ad',
+  up: '2d535f329b600c3dfc33b23494532f93c023b1a89c6aad055b8de3a865ee49ff',
   down: '028cded1c804b769c1a127179f02523a80ae1c968edb6b3ac13af87be2e2f9bb',
-  matrix: '5ffa83373f8c0a5ce71a166fc4bfff50fc260b84a0e65bec183ba139751c2ee2',
+  matrix: '6e9ab0fb9bef64cf46395f64a91ae912cb616700fc5df8593155d552480f955b',
   readme: '251fd64750dc9a5e15f4c42846e65b52aa84e3afc1b574d10d5a71091ffbf2ca',
 };
 for (const [name, expected] of Object.entries(expectedHashes)) {

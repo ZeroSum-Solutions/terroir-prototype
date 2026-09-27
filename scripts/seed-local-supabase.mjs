@@ -300,6 +300,8 @@ function buildRows(userIds = DRY_USER_IDS) {
 
   const scans = Array.from({ length: 60 }, (_, idx) => {
     const i = idx + 1;
+    const scanId = uuid(UUID_PREFIX.scan, i);
+    const isMultiPage = i % 5 === 0;
     const lineItems = Array.from({ length: 4 }, (_, j) => {
       const wine = wines[(idx * 4 + j) % wines.length];
       return {
@@ -317,13 +319,13 @@ function buildRows(userIds = DRY_USER_IDS) {
     });
 
     return {
-      id: uuid(UUID_PREFIX.scan, i),
+      id: scanId,
       restaurant_id: RESTAURANT_ID,
       distributor_name: `Local Distributor ${1 + (i % 8)}`,
       invoice_number: `LOCAL-${String(i).padStart(4, "0")}`,
       invoice_date: dateOffset(i + 3),
-      raw_image_path: `${RESTAURANT_ID}/local-seed/invoice-${i}.jpg`,
-      extra_image_paths: i % 5 === 0 ? [`${RESTAURANT_ID}/local-seed/invoice-${i}-page-2.jpg`] : [],
+      raw_image_path: `${RESTAURANT_ID}/${scanId}${isMultiPage ? "_page1" : ""}.jpg`,
+      extra_image_paths: isMultiPage ? [`${RESTAURANT_ID}/${scanId}_page2.jpg`] : [],
       parsed_line_items: lineItems,
       final_line_items: lineItems.map((item, j) => ({
         ...item,

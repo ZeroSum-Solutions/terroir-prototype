@@ -25,7 +25,7 @@
 select 1 / case when current_database()=:'expected_database'
   and current_user='postgres' and session_user='postgres'
   and :'target_admitted'='on'
-  and :'source_0163_sha256'='0c64a578bc2253c149bef9a2e1479fbfdefb1e3bf1820f3c4da68e8d46537583'
+  and :'source_0163_sha256'='ed98ab776aca2c509b691709da00c3a698789f613d493c3abb3eb0e902e57475'
   and :'source_0163_down_sha256'='3ec3dc9400fef2d4cf481c1812b151b57a22b5c2572d9e0c0ba45fb959259145'
   and pg_catalog.to_regprocedure(
     'public.expire_stalled_invoice_scans(uuid)'

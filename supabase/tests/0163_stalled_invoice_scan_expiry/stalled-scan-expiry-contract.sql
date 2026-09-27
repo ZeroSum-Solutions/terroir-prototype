@@ -23,7 +23,7 @@ select 1 / case when
   and current_user = 'postgres'
   and session_user = 'postgres'
   and :'target_admitted' = 'on'
-  and :'source_0163_sha256' = '0c64a578bc2253c149bef9a2e1479fbfdefb1e3bf1820f3c4da68e8d46537583'
+  and :'source_0163_sha256' = 'ed98ab776aca2c509b691709da00c3a698789f613d493c3abb3eb0e902e57475'
   and pg_catalog.to_regprocedure(
     'public.expire_stalled_invoice_scans(uuid)'
   ) is not null
