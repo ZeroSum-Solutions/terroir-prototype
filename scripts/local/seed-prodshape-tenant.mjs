@@ -308,7 +308,7 @@ function buildRows(heroUrl, userIds) {
       distributor_name: `Prodshape Distributor ${1 + (i % 4)}`,
       invoice_number: `PRODSHAPE-${String(i).padStart(4, "0")}`,
       invoice_date: dateOffset(i * 5 + 2),
-      raw_image_path: `${RESTAURANT_ID}/prodshape/invoice-${i}.jpg`,
+      raw_image_path: `${RESTAURANT_ID}/${scanId}.jpg`,
       extra_image_paths: [],
       parsed_line_items: lineItems,
       final_line_items: lineItems,
