@@ -52,4 +52,17 @@ describe("transactional CI migration bootstrap", () => {
     expect(seed).toContain('`${RESTAURANT_ID}/${scanId}_page2.jpg`');
     expect(seed).not.toContain("/local-seed/invoice-");
   });
+
+  it("seeds sealed physical history only through the exact local database", () => {
+    expect(seed).toContain('const dbContainer = "supabase_db_terroir-vw-local"');
+    expect(seed).toContain("set local session_replication_role = replica");
+    expect(seed).toContain("identity_origin: \"migrated_active\"");
+    expect(seed).toContain("event_contract: 1");
+    expect(seed).not.toContain(
+      'upsertRows(supabase, "pour_events", rows.pourEvents)',
+    );
+    expect(seed).not.toContain(
+      'upsertRows(supabase, "open_bottles", rows.openBottles',
+    );
+  });
 });
