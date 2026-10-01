@@ -19,7 +19,7 @@ export function CellarMasthead({
 }) {
   const tenant = restaurantName?.trim();
   return (
-    <div className="relative -mx-md -mt-lg overflow-hidden px-md pb-lg pt-[132px] max-[359px]:pt-[96px] md:-mx-lg md:-mt-xl md:px-lg md:pb-2xl md:pt-[168px]">
+    <div className="relative -mx-md -mt-lg overflow-hidden px-md pb-md pt-[96px] md:-mx-lg md:-mt-xl md:px-lg md:pb-2xl md:pt-[168px]">
       <Image
         src="/design-refs/cellar-masthead.jpg"
         alt=""

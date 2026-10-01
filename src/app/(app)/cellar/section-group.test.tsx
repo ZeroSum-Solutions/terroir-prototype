@@ -126,6 +126,9 @@ describe("SectionGroup", () => {
       />,
     );
     expect(markup).toContain("No wines in this section.");
+    expect(markup).toContain("Empty");
+    expect(markup).toContain("min-h-11");
+    expect(markup).toContain("sr-only");
   });
 
   it("renders its wines and the section name/count when non-empty", () => {

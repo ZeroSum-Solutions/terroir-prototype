@@ -321,7 +321,7 @@ async function login(page: Page) {
 
 async function openFixtureDrawer(page: Page, name: string, id: string) {
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "auto" }));
-  const search = page.getByPlaceholder("Search name, producer, region…").first();
+  const search = page.getByRole("searchbox", { name: "Filter this cellar" }).first();
   await expect(search).toBeVisible();
   await search.fill(name);
   const row = page.locator(`[data-cellar-row="${id}"]`);

@@ -290,7 +290,7 @@ describe("CellarShell open bottles route", () => {
     // GLOBAL-02 — search is exempt from the one-row rule, sits above it, and
     // is present at every width. The old mobile search icon + overlay are gone.
     const search = container.querySelector<HTMLInputElement>(
-      'input[placeholder="Search name, producer, region…"]',
+      'input[aria-label="Filter this cellar"]',
     )!;
     expect(search.className).toContain("h-11");
     expect(controlRow.contains(search)).toBe(false);

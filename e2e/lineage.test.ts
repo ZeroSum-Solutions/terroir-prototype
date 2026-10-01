@@ -248,7 +248,7 @@ test.describe("@opp-1 vintage lineage", () => {
  * would pass on a stale full list that happens to contain it anyway.
  */
 async function filterCellarToLineage(page: Page, producer: string) {
-  const search = page.getByPlaceholder("Search name, producer, region…");
+  const search = page.getByRole("searchbox", { name: "Filter this cellar" });
   await expect(search).toBeVisible();
   const block = page.locator("[data-lineage-id]", { hasText: producer });
   await expect(async () => {

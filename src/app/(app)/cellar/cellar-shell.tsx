@@ -467,7 +467,6 @@ export function CellarShell({
     </section>
   );
 }
-
 function SearchInput({
   value,
   onChange,
@@ -508,9 +507,10 @@ function SearchInput({
             }
           }
         }}
-        placeholder="Search name, producer, region…"
+        aria-label="Filter this cellar"
+        placeholder="Filter this cellar…"
         autoFocus={autoFocus}
-        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink md:text-control outline-none placeholder:text-grey focus-visible:border-accent focus-ring"
+        className="h-11 w-full rounded-pill border border-edge bg-surface/70 pl-[32px] pr-[36px] text-body-lg text-ink outline-none placeholder:text-grey focus-visible:border-accent focus-ring md:text-control"
       />
       {value ? (
         <button

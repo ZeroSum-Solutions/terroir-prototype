@@ -239,7 +239,7 @@ async function openFixtureDrawer(
 ) {
   if (!page.url().includes("/cellar")) await page.goto("/cellar");
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "auto" }));
-  const search = page.getByPlaceholder("Search name, producer, region…").first();
+  const search = page.getByRole("searchbox", { name: "Filter this cellar" }).first();
   await expect(search).toBeVisible();
   await search.fill("");
   await expect(search).toHaveValue("");
