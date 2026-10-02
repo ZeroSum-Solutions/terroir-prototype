@@ -19,6 +19,42 @@ function baseJob(overrides: Partial<ClaimedInvoiceExtractJob> = {}): ClaimedInvo
   };
 }
 
+const STORED_FAILURE_MESSAGE = "Invoice extraction job failed.";
+
+const recognizedFailureCodes = [
+  "missing_subject",
+  "subject_fetch_failed",
+  "tenant_mismatch_or_missing_subject",
+  "reextract_reset_failed",
+  "reextract_superseded",
+  "failed_reset_failed",
+  "missing_or_mistenanted_image_path",
+  "invalid_invoice_image_paths",
+  "invalid_invoice_page_count",
+  "unsupported_extension",
+  "image_download_failed",
+  "invalid_invoice_page_size",
+  "invalid_invoice_page_mime",
+  "claim_lost_before_extraction",
+  "extraction_threw",
+  "not_configured",
+  "upstream_error",
+  "empty_text",
+  "parse_failed",
+  "validation_failed",
+  "rate_limited",
+  "bad_input",
+  "unknown",
+  "no_wines_extracted",
+] as const;
+
+const rawFailureCases = [
+  { source: "database", code: "subject_fetch_failed", message: "SENTINEL_DB_ROW_DETAIL" },
+  { source: "Storage", code: "image_download_failed", message: "SENTINEL_BUCKET/PATH" },
+  { source: "OCR provider", code: "upstream_error", message: "SENTINEL_OCR_PROVIDER_BODY" },
+  { source: "thrown error", code: "extraction_threw", message: "SENTINEL_THROWN_SECRET" },
+] as const;
+
 /** Captures the update patch and the fencing .eq() chain applied to it. */
 function makeSupabase(returnedRows: unknown[] | null, error: unknown = null) {
   const eqCalls: Array<[string, unknown]> = [];
@@ -102,6 +138,101 @@ describe("fenced completion writes", () => {
     expect(patch.claimed_at).toBeNull();
     expect(patch.claimed_by).toBeNull();
     expect(patch.error_code).toBe("tenant_mismatch_or_missing_subject");
+  });
+
+  it.each(rawFailureCases)(
+    "markJobRetryOrDead redacts raw $source prose",
+    async ({ code, message }) => {
+      const { supabase, getPatch } = makeSupabase([{ id: "job-1" }]);
+
+      await markJobRetryOrDead(supabase as never, baseJob(), { code, message });
+
+      expect(getPatch()).toMatchObject({
+        error_code: code,
+        error_message: STORED_FAILURE_MESSAGE,
+      });
+      expect(JSON.stringify(getPatch())).not.toContain(message);
+    },
+  );
+
+  it.each(rawFailureCases)(
+    "markJobDeadImmediately redacts raw $source prose",
+    async ({ code, message }) => {
+      const { supabase, getPatch } = makeSupabase([{ id: "job-1" }]);
+
+      await markJobDeadImmediately(supabase as never, baseJob(), { code, message });
+
+      expect(getPatch()).toMatchObject({
+        error_code: code,
+        error_message: STORED_FAILURE_MESSAGE,
+      });
+      expect(JSON.stringify(getPatch())).not.toContain(message);
+    },
+  );
+
+  it.each(recognizedFailureCodes)("preserves recognized code %s", async (code) => {
+    const { supabase, getPatch } = makeSupabase([{ id: "job-1" }]);
+
+    await markJobRetryOrDead(supabase as never, baseJob(), {
+      code,
+      message: `SENTINEL_RECOGNIZED_${code}`,
+    });
+
+    expect(getPatch()).toMatchObject({
+      error_code: code,
+      error_message: STORED_FAILURE_MESSAGE,
+    });
+  });
+
+  it.each(["http_503", "arbitrary_dynamic_code"])(
+    "maps unknown code %s to unknown without throwing",
+    async (code) => {
+      const retry = makeSupabase([{ id: "job-1" }]);
+      await expect(
+        markJobRetryOrDead(retry.supabase as never, baseJob(), {
+          code,
+          message: "SENTINEL_UNKNOWN_RETRY",
+        }),
+      ).resolves.toBe(true);
+      expect(retry.getPatch()).toMatchObject({
+        error_code: "unknown",
+        error_message: STORED_FAILURE_MESSAGE,
+      });
+
+      const dead = makeSupabase([{ id: "job-1" }]);
+      await expect(
+        markJobDeadImmediately(dead.supabase as never, baseJob(), {
+          code,
+          message: "SENTINEL_UNKNOWN_DEAD",
+        }),
+      ).resolves.toBe(true);
+      expect(dead.getPatch()).toMatchObject({
+        error_code: "unknown",
+        error_message: STORED_FAILURE_MESSAGE,
+      });
+    },
+  );
+
+  it("markJobRetryOrDead still throws database write errors", async () => {
+    const dbError = { message: "retry write failed" };
+    const { supabase } = makeSupabase(null, dbError);
+    await expect(
+      markJobRetryOrDead(supabase as never, baseJob(), {
+        code: "upstream_error",
+        message: "SENTINEL_RAW_MESSAGE",
+      }),
+    ).rejects.toBe(dbError);
+  });
+
+  it("markJobDeadImmediately still throws database write errors", async () => {
+    const dbError = { message: "dead write failed" };
+    const { supabase } = makeSupabase(null, dbError);
+    await expect(
+      markJobDeadImmediately(supabase as never, baseJob(), {
+        code: "bad_input",
+        message: "SENTINEL_RAW_MESSAGE",
+      }),
+    ).rejects.toBe(dbError);
   });
 
   it("throws on a database error instead of silently swallowing it", async () => {
