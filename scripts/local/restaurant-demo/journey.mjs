@@ -176,7 +176,7 @@ async function receiveBottle(page, expect, ready, wineId, wineName) {
 
 async function selectWine(page, expect, ready, wineId, wineName) {
   await page.goto(`${ready.baseURL}/cellar`);
-  const search = page.getByPlaceholder("Search name, producer, region…");
+  const search = page.getByRole("searchbox", { name: "Filter this cellar", exact: true });
   await expect(search).toBeVisible();
   await search.fill(wineName);
   const row = page.locator(`[data-cellar-row="${wineId}"]`);

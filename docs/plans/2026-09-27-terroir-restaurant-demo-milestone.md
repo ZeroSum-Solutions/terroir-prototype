@@ -302,3 +302,20 @@ placeholder. The pushed and remotely verified application checkpoint remains
 permanent claim about the latest feature-branch tip. The portable source snapshot
 is the commit containing this checkpoint; resolve its exact `HEAD` and verify the
 remote branch ref before reuse.
+
+## Source-only locator repair checkpoint: October 2, 05:50 UTC
+
+Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, the journey's
+single Cellar filter lookup now uses Playwright role `searchbox` with exact accessible
+name `Filter this cellar`, matching the current Cellar UI. A regression requires that
+role-and-name locator and rejects the stale placeholder selector. The regression was
+red before the source change, with two tests passing and one failing. The one-line
+selector repair made all three focused tests pass, and the complete portable source
+suite passed 30 of 30 tests with zero skips. Independent Codex source review passed.
+
+This checkpoint contains no browser or application-runtime execution and makes no
+new journey claim. No Docker service, SQL, credential, dotenv file, failed-target
+restart or adoption, mutation replay, commit, or push occurred. Attempt C remains
+failed, its retained evidence remains authoritative for that run, and the prohibition
+on a fourth launch or replay remains in force. The staff raw-cost privacy failure is
+still open. M1–M5 remain incomplete.

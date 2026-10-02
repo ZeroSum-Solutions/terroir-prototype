@@ -3,10 +3,12 @@
 > **Status: October 2 closeout.** Mobile attempt C is **FAILED**, not pending.
 > It reached a healthy local application after 136 migrations through `0164`, then
 > completed two real receives and the committed receive replay before the journey
-> stopped on a stale Cellar search locator. The package has 29 passing source tests
-> with zero skips, but nobody has reproduced it on the MacBook. The independent
-> staff-cost probe also failed confidentiality. Restaurant-demo milestones M1–M5
-> and production readiness remain incomplete.
+> stopped on a stale Cellar search locator. A source-only repair now targets the
+> current accessible Cellar search contract and the portable suite passes 30 tests
+> with zero skips. Independent review is pending, and no browser journey was rerun.
+> Nobody has reproduced the package on the MacBook. The independent staff-cost
+> probe also failed confidentiality. Restaurant-demo milestones M1–M5 and production
+> readiness remain incomplete.
 
 This is the smallest intended handoff for reproducing the restaurant inventory
 story on a second Mac: receive two bottles, open one, pour four glasses,
@@ -40,6 +42,28 @@ for current scope and the [production migration runbook](production-migrations.m
 for separate release gates. This package tests mobile browser layouts, not a native app.
 
 ## Current evidence boundary
+
+### October 2 source-only locator repair (independent source review passed)
+
+Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, the portable
+journey's single Cellar filter lookup now uses Playwright role `searchbox` with the
+exact accessible name `Filter this cellar`. That matches the current
+[Cellar input](<../../src/app/(app)/cellar/cellar-shell.tsx>) instead of relying on
+the obsolete placeholder `Search name, producer, region…`.
+
+The new regression asserts that the journey contains the current role-and-name
+locator and rejects the stale placeholder selector. Before the source repair, the
+focused test run passed two tests and failed this new regression. After the one-line
+repair, all three focused tests passed. The complete portable source suite then
+passed 30 of 30 tests with zero skips.
+
+These are source-only results. No browser, application runtime, Docker service, SQL,
+credential, dotenv file, failed-target restart or adoption, mutation replay, commit,
+or push was used. Independent Codex source review passed. Attempt C remains
+failed, and its evidence below is unchanged. Do not launch a fourth portable target
+or restart, adopt, reseed, delete, or replay attempts A, B, or C. Any later runtime
+attempt still requires a reviewed locator, a fresh namespace, and the separate raw
+cost privacy seal. M1–M5 remain incomplete.
 
 ### October 2 mobile attempt C
 

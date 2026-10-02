@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseJourneyArgs } from "./journey.mjs";
 
@@ -19,4 +20,11 @@ test("the journey rejects unsupported or ambiguous viewport settings", () => {
     assert.throws(() => parseJourneyArgs([...required, `--viewport-width=${value}`]), /390 or 1200/);
   }
   assert.throws(() => parseJourneyArgs([...required, "--viewport-width=390", "--viewport-width=1200"]), /duplicate argument/);
+});
+
+test("the Cellar lookup uses the current accessible filter contract", async () => {
+  const source = await readFile(new URL("./journey.mjs", import.meta.url), "utf8");
+
+  assert.match(source, /page\.getByRole\("searchbox", \{ name: "Filter this cellar", exact: true \}\)/);
+  assert.doesNotMatch(source, /getByPlaceholder\("Search name, producer, region…"\)/);
 });
