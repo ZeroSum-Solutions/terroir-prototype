@@ -21,11 +21,13 @@ export function parseJourneyArgs(argv) {
     values.set(match[1], match[2]);
   }
   const required = ["ready-json", "project-root", "evidence-dir"];
-  for (const key of values.keys()) assert(required.includes(key), `unknown argument: --${key}`);
+  for (const key of values.keys()) assert([...required, "viewport-width"].includes(key), `unknown argument: --${key}`);
   for (const key of required) assert(values.has(key), `missing argument: --${key}=...`);
   const result = Object.fromEntries(values);
   for (const key of required) assert(path.isAbsolute(result[key]), `${key} must be absolute`);
-  return { readyJson: result["ready-json"], projectRoot: result["project-root"], evidenceDir: result["evidence-dir"], headed };
+  const viewportWidth = Number(result["viewport-width"] ?? 390);
+  assert([390, 1200].includes(viewportWidth), "journey viewport must be 390 or 1200");
+  return { readyJson: result["ready-json"], projectRoot: result["project-root"], evidenceDir: result["evidence-dir"], headed, viewportWidth };
 }
 
 export function safeErrorKind(error) {
@@ -123,6 +125,21 @@ async function capturePost(page, pathname, click) {
   return { request, response, body: request.postDataJSON(), payload: await response.json().catch(() => null), operationId: operationId(request) };
 }
 
+async function verifyCommittedReplay(page, ready, command) {
+  const before = databaseState(ready, command.operationId);
+  const headers = { "Idempotency-Key": command.operationId };
+  for (const key of ["x-expected-user-id", "x-expected-restaurant-id"]) {
+    const value = command.request.headers()[key];
+    if (value) headers[key] = value;
+  }
+  const replay = await page.context().request.post(command.request.url(), { headers, data: command.body });
+  assert.equal(replay.status(), command.response.status());
+  assert.equal(replay.headers()["idempotency-key"], command.operationId);
+  assert.equal(replay.headers()["idempotency-replayed"], "true");
+  assert.deepEqual(await replay.json(), command.payload);
+  assert.deepEqual(databaseState(ready, command.operationId), before, "replay changed committed inventory or history");
+}
+
 async function passwordLogin(page, expect, ready, email, password, expectedActor) {
   await page.goto(`${ready.baseURL}/login?mode=password&next=/cellar`);
   await page.locator("#login-email").fill(email);
@@ -191,7 +208,7 @@ async function main() {
   await mkdir(args.evidenceDir, { mode: 0o700 });
   const resultPath = path.join(args.evidenceDir, "journey-result.json");
   const latchPath = path.join(args.evidenceDir, "mutation-latch.json");
-  const result = { status: "failed", lastCompletedStep: "source-admission", inFlightMutation: null, projectId: ready.projectId, restaurantId: ready.restaurantId, screenshots: [] };
+  const result = { status: "failed", lastCompletedStep: "source-admission", inFlightMutation: null, projectId: ready.projectId, restaurantId: ready.restaurantId, viewportWidth: args.viewportWidth, screenshots: [] };
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   let browser;
   let page;
@@ -209,7 +226,8 @@ async function main() {
     const { chromium, expect: rawExpect } = require("@playwright/test");
     const expect = rawExpect.configure({ timeout: 20_000 });
     browser = await chromium.launch({ headless: !args.headed });
-    const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const journeyViewport = { viewport: { width: args.viewportWidth, height: 844 }, isMobile: args.viewportWidth < 768, hasTouch: args.viewportWidth < 768 };
+    const ownerContext = await browser.newContext(journeyViewport);
     page = await ownerContext.newPage();
     page.setDefaultTimeout(20_000);
     await passwordLogin(page, expect, ready, ready.ownerEmail, ownerPassword, ready.ownerId);
@@ -224,6 +242,8 @@ async function main() {
     assert.notEqual(mainReceives[0].payload.inventoryItemId, mainReceives[1].payload.inventoryItemId);
     result.mainReceiveOperationIds = mainReceives.map((item) => item.operationId);
     result.mainInventoryItemIds = mainReceives.map((item) => item.payload.inventoryItemId);
+    await verifyCommittedReplay(page, ready, mainReceives[0]);
+    result.receiveReplayVerified = true;
     const mainSurface = await selectWine(page, expect, ready, ready.wineId, ready.wineName);
     result.inFlightMutation = "open-main-bottle"; await persist(resultPath, result);
     const opened = await capturePost(page, "/api/open-bottles", () => mainSurface.drawer.getByRole("button", { name: "Open bottle", exact: true }).click());
@@ -248,12 +268,29 @@ async function main() {
       mainPourOperationIds.push(poured.operationId);
       result.mainPourOperationIds = mainPourOperationIds;
       result.inFlightMutation = null; result.lastCompletedStep = `poured-main-${index + 1}-of-4`; await persist(resultPath, result);
+      if (index === 0) {
+        await verifyCommittedReplay(page, ready, poured);
+        result.pourReplayVerified = true;
+      }
     }
+    await expect(bottleInput.locator("xpath=..")).toContainText("150 of 750 ml");
+    const counted = databaseState(ready);
+    assert.equal(counted.mainInventory.reduce((sum, item) => sum + item.quantity, 0), 1);
+    assert.deepEqual(counted.mainBottles, [{ id: mainBottle.id, remainingMl: 150, stateVersion: 4, closedAt: null }]);
+    assert.equal(counted.mainEvents, 5);
+    result.countedStock = { sealedBottles: 1, openBottles: 1, measuredRemainingMl: 150 };
+    result.lastCompletedStep = "counted-sealed-and-exact-open-stock"; await persist(resultPath, result);
     await mainSurface.drawer.getByRole("button", { name: /^close$/i }).click();
     await page.getByRole("button", { name: "More cellar actions", exact: true }).click();
     await page.getByRole("menu", { name: "More cellar actions", exact: true }).getByRole("menuitem", { name: /^Reconcile 1 open bottle$/ }).click();
     const reconcile = page.getByRole("dialog", { name: /Reconcile open bottles/i });
-    await reconcile.locator("li").filter({ hasText: ready.wineName }).first().getByLabel("Actual remaining volume in ml").fill("120");
+    const actualVolume = reconcile.locator("li").filter({ hasText: ready.wineName }).first().getByLabel("Actual remaining volume in ml");
+    await actualVolume.fill("120");
+    await expect(actualVolume).toHaveValue("120");
+    await page.screenshot({ path: path.join(args.evidenceDir, "measured-count-before-manager-save.png"), fullPage: true });
+    result.screenshots.push("measured-count-before-manager-save.png");
+    result.measuredCountMl = 120;
+    result.lastCompletedStep = "entered-measured-open-bottle-count"; await persist(resultPath, result);
     result.inFlightMutation = "reconcile-main-to-120"; await persist(resultPath, result);
     const reconciled = await capturePost(page, "/api/reconcile", () => reconcile.getByRole("button", { name: "Save 1 change", exact: true }).click());
     assert.equal(reconciled.response.status(), 200);
@@ -293,7 +330,7 @@ async function main() {
     result.lastCompletedStep = "owner-cross-site-denied-with-conservation"; await persist(resultPath, result);
     await ownerContext.close();
 
-    const freshOwnerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const freshOwnerContext = await browser.newContext(journeyViewport);
     page = await freshOwnerContext.newPage(); page.setDefaultTimeout(20_000);
     await passwordLogin(page, expect, ready, ready.ownerEmail, ownerPassword, ready.ownerId);
     await page.goto(`${ready.baseURL}/cellar?wine=${ready.wineId}&bottle=${mainBottle.id}`);
@@ -303,7 +340,7 @@ async function main() {
     result.lastCompletedStep = "fresh-owner-login-verified-main-120"; await persist(resultPath, result);
     await freshOwnerContext.close();
 
-    const staffContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const staffContext = await browser.newContext(journeyViewport);
     page = await staffContext.newPage(); page.setDefaultTimeout(20_000);
     await passwordLogin(page, expect, ready, ready.staffEmail, staffPassword, ready.staffId);
     const staffDrawer = (await selectWine(page, expect, ready, ready.staffWineId, ready.staffWineName)).drawer;

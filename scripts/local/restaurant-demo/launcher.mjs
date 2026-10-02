@@ -2,16 +2,19 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { cp, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { cp, lstat, mkdir, readFile, readdir, readlink, realpath, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, namespaceResources, readDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
 
 export const EXECUTION_ACK = "I_ACKNOWLEDGE_DISPOSABLE_RESTAURANT_DEMO";
 const PROJECT_ID = /^terroir-demo-[a-z0-9][a-z0-9-]{2,40}$/;
 const EMAIL = /^[a-z0-9][a-z0-9.+_-]*@terroir\.test$/i;
 const OWNERSHIP_MARKER = ".terroir-demo-owned.json";
+let admittedDockerDaemon;
 
 export function parseLauncherArgs(argv) {
   const values = new Map();
@@ -28,7 +31,7 @@ export function parseLauncherArgs(argv) {
     "db-port", "shadow-port", "studio-port", "mail-port", "app-port",
     "owner-email", "staff-email",
   ];
-  const allowed = new Set([...required, "ack"]);
+  const allowed = new Set([...required, "ack", "journey-width"]);
   for (const key of values.keys()) assert(allowed.has(key), `unknown argument: --${key}`);
   for (const key of required) assert(values.has(key), `missing argument: --${key}=...`);
   const ports = Object.fromEntries(
@@ -47,20 +50,26 @@ export function parseLauncherArgs(argv) {
     ownerEmail: values.get("owner-email"),
     staffEmail: values.get("staff-email"),
     ack: values.get("ack"), execute, ports,
+    journeyWidth: Number(values.get("journey-width") ?? 390),
   };
+  assert([390, 1200].includes(result.journeyWidth), "journey width must be 390 or 1200");
   assert(PROJECT_ID.test(result.projectId), "project ID must use the terroir-demo-* disposable namespace");
   assert(EMAIL.test(result.ownerEmail), "owner email must be synthetic @terroir.test");
   assert(EMAIL.test(result.staffEmail), "staff email must be synthetic @terroir.test");
   assert.notEqual(result.ownerEmail.toLowerCase(), result.staffEmail.toLowerCase(), "synthetic emails must be distinct");
   for (const [label, target] of [["runtime", result.runtimeRoot], ["evidence", result.evidenceDir]]) {
+    assert(path.isAbsolute(values.get(label === "runtime" ? "runtime-root" : "evidence-dir")), `${label} directory must be absolute`);
+    assert(/^terroir-demo-[a-z0-9][a-z0-9-]+$/i.test(path.basename(target)), `${label} directory must be a dedicated terroir-demo-* leaf`);
     assert(!isInside(result.sourceRoot, target), `${label} directory must be outside the source checkout`);
+    assert(!isInside(target, result.sourceRoot), `${label} directory must not contain the source checkout`);
   }
   assert(!isInside(result.runtimeRoot, result.evidenceDir), "evidence directory must survive runtime cleanup");
+  assert(!isInside(result.evidenceDir, result.runtimeRoot), "runtime directory must not be inside evidence");
   if (execute) {
     assert.equal(result.ack, EXECUTION_ACK, "exact disposable execution acknowledgement required");
-    assert.fail("portable execution is disabled pending independent Docker resource ownership admission");
+  } else {
+    assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
   }
-  assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
   return result;
 }
 
@@ -71,6 +80,7 @@ export function assertSafeSourcePath(relativePath) {
   assert(parts.every((part) => part && part !== "." && part !== ".."), "source path traversal refused");
   assert(!parts.some((part) => part === ".git" || part === "node_modules" || part === ".tmp"), "local/runtime source path refused");
   assert(!parts.some((part) => part === ".env" || part.startsWith(".env.")), "dotenv source path refused");
+  assert(!parts.includes(OWNERSHIP_MARKER), "runtime ownership marker cannot come from source");
   return relativePath;
 }
 
@@ -83,6 +93,7 @@ export function rewriteSupabaseConfig(raw, settings) {
   next = replaceTomlValue(next, "studio", "port", String(settings.ports.studio));
   next = replaceTomlValue(next, "local_smtp", "port", String(settings.ports.mail));
   next = replaceTomlValue(next, "db.seed", "enabled", "false");
+  next = replaceTomlValue(next, "db.migrations", "enabled", "false");
   next = replaceTomlValue(next, "auth", "site_url", `"http://127.0.0.1:${settings.ports.app}"`);
   next = replaceTomlValue(
     next,
@@ -136,15 +147,30 @@ function isInside(parent, candidate) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+export async function admitDestinationPaths(settings) {
+  const sourceRoot = await realpath(settings.sourceRoot);
+  for (const key of ["runtimeRoot", "evidenceDir"]) {
+    const target = settings[key];
+    const canonical = path.join(await realpath(path.dirname(target)), path.basename(target));
+    assert(!isInside(sourceRoot, canonical) && !isInside(canonical, sourceRoot), "destination aliases the source checkout");
+    try { await lstat(canonical); assert.fail("demo destination already exists"); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    settings[key] = canonical;
+  }
+  assert(!isInside(settings.runtimeRoot, settings.evidenceDir) && !isInside(settings.evidenceDir, settings.runtimeRoot), "demo destination aliases overlap");
+  settings.sourceRoot = sourceRoot;
+}
+
 function minimalEnvironment(extra = {}) {
   const base = {};
   for (const key of ["HOME", "PATH", "TMPDIR", "DOCKER_CONFIG"]) {
     if (process.env[key]) base[key] = process.env[key];
   }
-  return { ...base, OPENAI_API_KEY: "local-demo-disabled", ...extra };
+  return { ...base, OPENAI_API_KEY: "local-demo-disabled", ...extra, pnpm_config_verify_deps_before_run: "false", ...(admittedDockerDaemon ? { DOCKER_HOST: admittedDockerDaemon.endpoint } : {}) };
 }
 
 function run(command, args, options = {}) {
+  if (admittedDockerDaemon && (command === "docker" || args.includes("supabase"))) assertDockerSocketIdentity(admittedDockerDaemon);
   try {
     return execFileSync(command, args, {
       cwd: options.cwd,
@@ -162,32 +188,54 @@ function run(command, args, options = {}) {
 
 async function materializeRuntime(settings) {
   await mkdir(settings.runtimeRoot, { mode: 0o700 });
-  let owned = false;
-  try {
-    await writeFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), `${JSON.stringify({ version: 1, projectId: settings.projectId })}\n`, { flag: "wx", mode: 0o600 });
-    owned = true;
-    const listed = run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: settings.sourceRoot }).split("\0").filter(Boolean);
-    assert(listed.length > 0, "source checkout is empty");
-    for (const raw of listed) {
-      const relative = assertSafeSourcePath(raw);
-      const source = path.join(settings.sourceRoot, relative);
-      const metadata = await lstat(source);
-      assert(metadata.isFile() && !metadata.isSymbolicLink(), `source entry must be a regular file: ${relative}`);
-      const destination = path.join(settings.runtimeRoot, relative);
-      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
-      await cp(source, destination, { preserveTimestamps: true });
-    }
-    const nodeModules = await realpath(path.join(settings.sourceRoot, "node_modules"));
-    await symlink(nodeModules, path.join(settings.runtimeRoot, "node_modules"));
-    const configPath = path.join(settings.runtimeRoot, "supabase/config.toml");
-    const rewritten = rewriteSupabaseConfig(await readFile(configPath, "utf8"), settings);
-    await writeFile(configPath, rewritten, { mode: 0o600 });
-    await assertRuntimeHasNoDotenv(settings.runtimeRoot);
-    return { sourceFiles: listed.length, configPath };
-  } catch (error) {
-    if (owned) await rm(settings.runtimeRoot, { recursive: true }).catch(() => {});
-    throw error;
+  const marker = { version: 2, projectId: settings.projectId, executionId: settings.executionId, runtimeRoot: settings.runtimeRoot };
+  await writeFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), `${JSON.stringify(marker)}\n`, { flag: "wx", mode: 0o600 });
+  const identity = await lstat(settings.runtimeRoot);
+  // Omit even tracked dotenv examples without opening them; none may enter runtime.
+  const listed = run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: settings.sourceRoot }).split("\0").filter((relative) => relative && !relative.split("/").some((part) => part === ".env" || part.startsWith(".env.")));
+  assert(listed.length > 0, "source checkout is empty");
+  for (const raw of listed) {
+    const relative = assertSafeSourcePath(raw);
+    const source = path.join(settings.sourceRoot, relative);
+    const metadata = await lstat(source);
+    assert(metadata.isFile() && !metadata.isSymbolicLink(), `source entry must be a regular file: ${relative}`);
+    const destination = path.join(settings.runtimeRoot, relative);
+    await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+    await cp(source, destination, { preserveTimestamps: true });
   }
+  await materializeDependencies(settings.sourceRoot, settings.runtimeRoot);
+  const configPath = path.join(settings.runtimeRoot, "supabase/config.toml");
+  const rewritten = rewriteSupabaseConfig(await readFile(configPath, "utf8"), settings);
+  await writeFile(configPath, rewritten, { mode: 0o600 });
+  await assertRuntimeHasNoDotenv(settings.runtimeRoot);
+  return { sourceFiles: listed.length, configPath, marker, dev: identity.dev, ino: identity.ino };
+}
+
+export async function assertContainedDependencyLinks(root) {
+  const canonical = await realpath(root);
+  assert((await lstat(canonical)).isDirectory(), "dependencies must be a directory");
+  const pending = [canonical];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      assert(entry.name !== ".env" && !entry.name.startsWith(".env."), "dotenv dependency file refused before copying");
+      const target = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        assert(!path.isAbsolute(await readlink(target)), "absolute dependency symlink refused");
+        assert(isInside(canonical, await realpath(target)), "dependency symlink escapes node_modules");
+      } else if (entry.isDirectory()) pending.push(target);
+    }
+  }
+}
+
+export async function materializeDependencies(sourceRoot, runtimeRoot) {
+  const source = await realpath(path.join(sourceRoot, "node_modules"));
+  await assertContainedDependencyLinks(source);
+  const destination = path.join(runtimeRoot, "node_modules");
+  await cp(source, destination, { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
+  const metadata = await lstat(destination);
+  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), "runtime dependencies must be contained, not a root symlink");
+  await assertContainedDependencyLinks(destination);
 }
 
 async function assertRuntimeHasNoDotenv(root) {
@@ -201,7 +249,9 @@ function inspectAdmittedStack(settings) {
   return import(pathToFileURL(modulePath).href).then(({ parseLocalStackConfig, admitLocalStack }) => {
     const config = parseLocalStackConfig(configText);
     assert.deepEqual(config, { projectId: settings.projectId, apiPort: settings.ports.api, dbPort: settings.ports.db });
-    const target = admitLocalStack(configText);
+    // Its default subprocess runner inherits the host environment; inject our
+    // pinned local-daemon runner rather than allowing a second context lookup.
+    const target = admitLocalStack(configText, (command, args) => ({ status: 0, stdout: run(command, args), stderr: "" }));
     assertExactLoopbackBinding(target.database.id, 5432, settings.ports.db);
     assertExactLoopbackBinding(target.api.id, 8000, settings.ports.api);
     return target;
@@ -315,37 +365,94 @@ function ownedProcessGroupExists(child) {
   }
 }
 
-async function cleanupOwnedRuntime(settings, stopStack) {
-  try {
-    const marker = JSON.parse(await readFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), "utf8"));
-    assert.deepEqual(marker, { version: 1, projectId: settings.projectId });
-  } catch { throw new Error("runtime cleanup ownership marker missing or invalid"); }
-  if (stopStack) run("pnpm", ["exec", "supabase", "stop", "--workdir", settings.runtimeRoot, "--no-backup"], { cwd: settings.runtimeRoot, timeout: 300_000 });
-  await rm(settings.runtimeRoot, { recursive: true });
+export async function assertOwnedRuntime(settings, owned) {
+  const metadata = await lstat(settings.runtimeRoot);
+  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), "runtime cleanup refuses symlink/replaced root");
+  assert.equal(await realpath(settings.runtimeRoot), settings.runtimeRoot, "runtime parent alias changed");
+  assert.equal(metadata.dev, owned.dev, "runtime device identity changed");
+  assert.equal(metadata.ino, owned.ino, "runtime inode identity changed");
+  const marker = JSON.parse(await readFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), "utf8"));
+  assert.deepEqual(marker, owned.marker, "runtime cleanup ownership marker changed");
+}
+
+async function cleanupOwnedServices(settings, owned, ledger) {
+  await assertOwnedRuntime(settings, owned);
+  cleanupOwnedStack(ledger, run);
+  await assertOwnedRuntime(settings, owned);
+}
+
+export function transactionalMigrationArgs(databaseId, filename) {
+  assert(/^[a-f0-9]{64}$/.test(databaseId), "migration database identity is invalid");
+  const matched = filename.match(/^([0-9]{4})_([a-z0-9_]+)\.sql$/);
+  assert(matched, "migration filename refused");
+  const [, version, name] = matched;
+  return ["exec", "-i", databaseId, "psql", "-X", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-U", "postgres", "-d", "postgres", "-f", "-", "-c", `insert into supabase_migrations.schema_migrations(version,name) values ('${version}','${name}');`];
+}
+
+async function applySourceMigrations(settings, target, ledger) {
+  const databaseId = target.database.id;
+  const query = ["exec", "-i", databaseId, "psql", "-X", "-v", "ON_ERROR_STOP=1", "-qAt", "-U", "postgres", "-d", "postgres"];
+  assertCleanupAdmitted(ledger, readDockerInventory(run));
+  assert.equal(run("docker", [...query, "-c", "select to_regclass('supabase_migrations.schema_migrations') is not null"]), "f", "migration target is not empty");
+  run("docker", [...query, "--single-transaction", "-c", "create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[]);"]);
+  const directory = path.join(settings.runtimeRoot, "supabase/migrations");
+  const filenames = (await readdir(directory)).filter((filename) => /^[0-9].*\.sql$/.test(filename)).sort();
+  assert.equal(filenames.at(-1), "0164_import_revert_cleanup.sql", "portable migration ceiling must be reviewed 0164");
+  for (const filename of filenames) {
+    const sql = await readFile(path.join(directory, filename), "utf8");
+    assert(!/^\s*(?:begin|commit)\s*;/im.test(sql), "migration owns a conflicting transaction");
+    assert(!/^\s*create\s+(?:unique\s+)?index\s+concurrently/im.test(sql), "concurrent index cannot use migration transaction");
+    assertCleanupAdmitted(ledger, readDockerInventory(run));
+    const version = filename.slice(0, 4);
+    if (["0156", "0157", "0158"].includes(version)) {
+      const preflight = await readFile(path.join(settings.runtimeRoot, `scripts/${version}-production-preflight.sql`), "utf8");
+      run("docker", [...query, ...(version === "0158" ? ["-v", "bottle_route_drained=1"] : [])], { input: preflight });
+    }
+    run("docker", transactionalMigrationArgs(databaseId, filename), { input: sql });
+    if (["0156", "0157", "0158"].includes(version)) {
+      run("docker", query, { input: await readFile(path.join(settings.runtimeRoot, `scripts/${version}-production-postflight.sql`), "utf8") });
+    }
+    process.stderr.write(`portable demo: applied local migration ${version}\n`);
+  }
+  assert.equal(run("docker", [...query, "-c", "select count(*) || '/' || max(version) from supabase_migrations.schema_migrations"]), `${filenames.length}/0164`, "portable migration ledger mismatch");
+  run("docker", [...query, "-c", "notify pgrst, 'reload schema'"]);
+  return filenames.length;
 }
 
 async function execute(settings) {
   let app;
-  let runtimeCreated = false;
-  let stackStartAttempted = false;
+  let ownedRuntime;
+  let ledger;
+  settings.executionId = randomUUID();
   const result = { status: "failed", lastCompletedStep: "source-admission", projectId: settings.projectId };
   await mkdir(settings.evidenceDir, { mode: 0o700 });
   const resultPath = path.join(settings.evidenceDir, "launcher-result.json");
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   let thrown;
   try {
+    // Inspect with the same stripped environment, then pin every child to that
+    // admitted Unix endpoint rather than trusting a mutable Docker context.
+    admittedDockerDaemon = admitLocalDockerDaemon(run);
+    result.lastCompletedStep = "local-docker-daemon-admitted";
     await assertPortsAbsent(Object.values(settings.ports));
+    assertNamespaceAbsent(settings.projectId, readDockerInventory(run));
     result.lastCompletedStep = "requested-ports-admitted-absent";
     const materialized = await materializeRuntime(settings);
-    runtimeCreated = true;
+    ownedRuntime = materialized;
     result.lastCompletedStep = "safe-runtime-materialized";
     result.sourceFiles = materialized.sourceFiles;
-    stackStartAttempted = true;
-    run("pnpm", ["exec", "supabase", "start", "--workdir", settings.runtimeRoot, "--exclude", "studio,imgproxy,edge-runtime,logflare,vector,supavisor"], { cwd: settings.runtimeRoot, timeout: 900_000 });
+    const network = createOwnedNetwork(settings.projectId, settings.executionId, run);
+    result.networkId = network.id;
+    result.lastCompletedStep = "owned-loopback-network-created";
+    run("pnpm", ["exec", "supabase", "start", "--workdir", settings.runtimeRoot, "--network-id", network.name, "--exclude", "studio,imgproxy,edge-runtime,realtime,analytics,logflare,vector,supavisor"], { cwd: settings.runtimeRoot, timeout: 900_000 });
+    ledger = recordOwnedStack({ ...settings, network }, readDockerInventory(run));
+    await writeFile(path.join(settings.evidenceDir, "docker-ownership.json"), `${JSON.stringify(ledger, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     const local = parseLocalStatus(run("pnpm", ["exec", "supabase", "status", "--workdir", settings.runtimeRoot, "-o", "json"], { cwd: settings.runtimeRoot }), settings);
     const target = await inspectAdmittedStack(settings);
     result.databaseContainerId = target.database.id;
     result.lastCompletedStep = "isolated-stack-admitted";
+    result.migrationCount = await applySourceMigrations(settings, target, ledger);
+    result.lastCompletedStep = "transactional-migrations-applied";
     const users = await createSyntheticUsers(local, settings);
     result.lastCompletedStep = "synthetic-auth-created";
     const ids = fixtureIds(settings.projectId);
@@ -373,6 +480,7 @@ async function execute(settings) {
       `--ready-json=${readyPath}`,
       `--project-root=${settings.runtimeRoot}`,
       `--evidence-dir=${path.join(settings.evidenceDir, "journey")}`,
+      `--viewport-width=${settings.journeyWidth}`,
     ], {
       cwd: settings.runtimeRoot,
       timeout: 1_800_000,
@@ -390,13 +498,27 @@ async function execute(settings) {
     result.error = `${error instanceof assert.AssertionError ? "AssertionError" : "LauncherError"} at ${result.lastCompletedStep}`;
     thrown = error;
   } finally {
-    await stopChild(app).catch(() => {});
+    try { await stopChild(app); } catch {
+      result.status = "failed";
+      result.error = `AppCleanupError at ${result.lastCompletedStep}`;
+      thrown ??= new Error("owned app cleanup failed");
+    }
     try {
-      if (runtimeCreated) await cleanupOwnedRuntime(settings, stackStartAttempted);
+      // Failed runs retain even partially created resources and mutation latches.
+      if (!thrown && ownedRuntime && ledger) await cleanupOwnedServices(settings, ownedRuntime, ledger);
+      // Goal safety freezes directory deletion outside the source checkout.
+      result.runtimePreserved = true;
     } catch {
       result.status = "failed";
       result.error = `CleanupError at ${result.lastCompletedStep}`;
       thrown ??= new Error("owned runtime cleanup failed");
+      result.runtimePreserved = true;
+    }
+    if (result.runtimePreserved) {
+      try {
+        const observed = namespaceResources(settings.projectId, readDockerInventory(run));
+        await writeFile(path.join(settings.evidenceDir, "preserved-docker-observation.json"), `${JSON.stringify({ ownedForCleanup: false, resources: observed }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      } catch { result.preservedResourceObservationUnavailable = true; }
     }
     await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
   }
@@ -405,13 +527,14 @@ async function execute(settings) {
 
 async function main() {
   const settings = parseLauncherArgs(process.argv.slice(2));
+  await admitDestinationPaths(settings);
   const actualRoot = await realpath(settings.sourceRoot);
   const gitRoot = run("git", ["rev-parse", "--show-toplevel"], { cwd: actualRoot });
   assert.equal(actualRoot, gitRoot, "source root must be the exact Git checkout root");
   await lstat(path.join(actualRoot, "scripts/local/dev-local.sh"));
   await lstat(path.join(actualRoot, "supabase/migrations/0164_import_revert_cleanup.sql"));
   if (!settings.execute) {
-    process.stdout.write(`${JSON.stringify({ status: "DRY_RUN_SOURCE_ONLY", executionReady: false, blockedReason: "docker-resource-ownership-not-admitted", projectId: settings.projectId, ports: settings.ports })}\n`);
+    process.stdout.write(`${JSON.stringify({ status: "SOURCE_ONLY_UNEXECUTED", executionReady: true, projectId: settings.projectId, ports: settings.ports })}\n`);
     return;
   }
   await execute(settings);

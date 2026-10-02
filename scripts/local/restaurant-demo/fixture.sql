@@ -37,13 +37,22 @@ begin
   if current_database() <> c.expected_database or c.expected_database <> 'postgres' then
     raise exception 'portable demo database admission failed';
   end if;
+  if c.owner_id = c.staff_id
+     or lower(c.owner_email) = lower(c.staff_email)
+     or c.owner_email !~* '^[a-z0-9][a-z0-9.+_-]*@terroir[.]test$'
+     or c.staff_email !~* '^[a-z0-9][a-z0-9.+_-]*@terroir[.]test$'
+     or c.restaurant_id = c.other_restaurant_id
+     or c.wine_id = c.staff_wine_id
+     or c.item_id = c.staff_item_id then
+    raise exception 'portable demo distinct synthetic identities required';
+  end if;
   if not exists (
     select 1 from supabase_migrations.schema_migrations where version = '0164'
   ) then
     raise exception 'portable demo requires migrations through 0164';
   end if;
   foreach required_table in array array[
-    'restaurants', 'memberships', 'workspace_memberships', 'wines', 'bins',
+    'restaurants', 'memberships', 'workspace_memberships', 'membership_capability_grants', 'wines', 'bins',
     'wine_lists', 'wine_list_sections', 'wine_list_items', 'inventory_items',
     'open_bottles', 'pour_events', 'inventory_command_receipts'
   ] loop
@@ -65,11 +74,20 @@ begin
     raise exception 'portable demo synthetic auth identity mismatch';
   end if;
   if not exists (
-    select 1 from public.memberships
-     where restaurant_id = c.restaurant_id
-       and user_id = c.owner_id
-       and role = 'owner'
-       and status = 'active'
+    select 1 from public.memberships m
+    join public.restaurants r on r.id = m.restaurant_id
+    join public.workspace_memberships wm
+      on wm.id = m.workspace_membership_id
+     and wm.user_id = m.user_id
+     and wm.workspace_id = r.workspace_id
+     where m.restaurant_id = c.restaurant_id
+       and m.user_id = c.owner_id
+       and m.role = 'owner'
+       and m.status = 'active' and m.revoked_at is null
+       and (m.expires_at is null or m.expires_at > statement_timestamp())
+       and wm.governance_role = 'workspace_owner'
+       and wm.status = 'active' and wm.revoked_at is null
+       and (wm.expires_at is null or wm.expires_at > statement_timestamp())
   ) then
     raise exception 'portable demo owner membership mismatch';
   end if;
@@ -105,11 +123,74 @@ begin
        and m.restaurant_id = c.restaurant_id
        and m.role = 'staff'
        and m.status = 'active'
-       and wm.status = 'active'
+       and m.revoked_at is null and m.expires_at is null
+       and wm.user_id = c.staff_id
+       and wm.governance_role is null
+       and wm.status = 'active' and wm.revoked_at is null and wm.expires_at is null
   ) then
     raise exception 'portable demo staff membership link failed';
   end if;
 end $$;
+
+-- Use 0154's reviewed explicit-owner bootstrap contract, never an inferred
+-- legacy-role grant. handle_new_user supplied this named owner's governance;
+-- this fixture changes neither governance nor production ACLs.
+lock table public.membership_capability_grants in share row exclusive mode;
+
+do $portable_demo_capabilities$
+declare
+  c portable_demo_context%rowtype;
+  owner_membership_id uuid;
+  granted_keys text[];
+begin
+  select * into strict c from portable_demo_context;
+  if exists (select 1 from public.membership_capability_grants) then
+    raise exception 'portable demo requires empty capability history';
+  end if;
+  select m.id into strict owner_membership_id
+    from public.memberships m
+   where m.user_id = c.owner_id and m.restaurant_id = c.restaurant_id;
+  perform set_config('request.jwt.claim.sub', c.owner_id::text, true);
+  select array_agg(capability_key order by capability_key) into granted_keys
+    from public.replace_member_site_capabilities(
+      owner_membership_id, array['cost.read','margin.read','pricing.manage'],
+      null, 'Portable demo: explicit named synthetic owner capability bootstrap'
+    ) capability_key;
+  if granted_keys is distinct from array['cost.read','margin.read','pricing.manage']
+     or (select count(*) from public.membership_capability_grants) <> 3
+     or exists (
+       select 1 from public.membership_capability_grants g
+        where g.membership_id <> owner_membership_id
+           or g.restaurant_id <> c.restaurant_id
+           or g.subject_user_id <> c.owner_id
+           or g.granted_by_user_id <> c.owner_id
+           or g.revoked_at is not null or g.expires_at is not null
+     )
+     or not public.effective_site_capability(c.restaurant_id, 'cost.read')
+     or not public.effective_site_capability(c.restaurant_id, 'margin.read')
+     or not public.effective_site_capability(c.restaurant_id, 'pricing.manage')
+     or not public.current_site_role_at_least(c.restaurant_id, 'owner')
+     or not exists (
+       select 1 from public.read_current_operational_memberships(c.owner_id) m
+        where m.restaurant_id = c.restaurant_id and m.role = 'owner'
+     ) then
+    raise exception 'portable demo owner capability postflight failed';
+  end if;
+  perform set_config('request.jwt.claim.sub', c.staff_id::text, true);
+  if public.effective_site_capability(c.restaurant_id, 'cost.read')
+     or public.effective_site_capability(c.restaurant_id, 'margin.read')
+     or public.effective_site_capability(c.restaurant_id, 'pricing.manage')
+     or not public.current_site_role_at_least(c.restaurant_id, 'staff')
+     or public.current_site_role_at_least(c.restaurant_id, 'manager')
+     or not exists (
+       select 1 from public.read_current_operational_memberships(c.staff_id) m
+        where m.restaurant_id = c.restaurant_id and m.role = 'staff'
+     ) then
+    raise exception 'portable demo staff must be operational without pricing capabilities';
+  end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+end;
+$portable_demo_capabilities$;
 
 do $$
 declare c portable_demo_context%rowtype;
@@ -200,5 +281,7 @@ select jsonb_build_object(
   'glassPourMl', 150,
   'inventorySeedCount', 0,
   'commandReceiptSeedCount', 0,
-  'staffRole', 'staff'
+  'staffRole', 'staff',
+  'ownerCapabilities', jsonb_build_array('cost.read','margin.read','pricing.manage'),
+  'staffCapabilities', '[]'::jsonb
 );

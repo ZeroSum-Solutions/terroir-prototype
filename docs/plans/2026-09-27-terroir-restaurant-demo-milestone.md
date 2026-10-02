@@ -175,8 +175,8 @@ local test data and an isolated profile, never the personal browser profile or
 production data. The owner also approved catalog retention on import undo and
 autonomous routine implementation decisions. These resolve the earlier approval gates.
 
-For advisory review, the owner requests Opus 5.5 first; if unavailable, use the latest
-available Grok together with DeepSeek V4.1 Flash as two independent reviewers. Verify
+For advisory review, the owner's latest resume approval permits an independent Codex
+reviewer while Opus is unavailable, superseding the earlier provider fallback preference. Verify
 actual provider model identifiers and availability; never label a different model as
 the requested one. Use existing approved billing/auth lanes. Provider review remains
 advisory and cannot replace executable database/browser evidence. JEV remains advisory
@@ -234,3 +234,71 @@ check is necessary, not sufficient. A demo milestone pass never completes C00–
 
 No M1–M5 criterion is complete at this checkpoint. No hosted migration or deployment
 has occurred, and the feature branch has not been published with this milestone.
+
+## Resume checkpoint — October 2, 04:15 UTC
+
+The owner reapproved catalog-retaining import undo, isolated Playwright with synthetic
+local data, and a separate Codex reviewer. The native goal is active again. This
+approval is limited to the demo milestone and feature-branch commit/push; it does not
+authorize a new `main` merge, hosted database change or production deployment.
+
+Fresh GitHub inspection confirms PR #229 merged on September 27. The source now
+includes migration 0164 and the later physical/authority cutover repairs; the saved
+September 27 goal state and draft handoff describe earlier incomplete checkpoints,
+not the current implementation. Current `origin/main` is `2d76a701`; the new demo
+closeout branch starts at `c4bf61b4`, retaining the reviewed Cellar layout repair.
+
+The next critical path is the existing portable demo package: prove absent Docker
+resources and exact cleanup ownership, apply fresh migrations transactionally, admit
+loopback-only services, then demonstrate the complete restaurant journey without
+replaying a failed mutation. Current import/caller review proceeds independently.
+All M1–M5 acceptance criteria remain unchanged and require revision-bound evidence.
+
+## STOP checkpoint: October 2 mobile attempt C
+
+The independently reviewed attempt-C replan exhausted the authorized portable
+startup attempts. No fourth launch or automatic replay is allowed from this
+checkpoint.
+
+Attempt C reached `local-app-admitted` on a fresh loopback-only target. The launcher
+applied 136 migrations through `0164`, admitted the zero-stock catalog fixture,
+created synthetic users, and started the database-backed application. The real
+mobile journey received two bottles with distinct committed identities and passed
+the explicit same-key receive replay check. It then **FAILED** at
+`received-main-2-of-2`, before opening a bottle. The journey still queried the stale
+placeholder `Search name, producer, region…`; the current Cellar search exposes
+`Filter this cellar`. This is a journey-selector failure. It does not demonstrate an
+application stock defect or satisfy the remaining open/pour/count/reconcile,
+persistence, staff-denial, responsive, or accessibility results. See the
+[journey result](../evidence/restaurant-demo-20261001/mobile-c-journey-result.json)
+and [failure screenshot](../evidence/restaurant-demo-20261001/mobile-c-failure.png).
+
+Independent attempt-C database checks passed the bounded `0162` and `0163`
+functional rollback contracts and left no prefixed fixture rows. The separate staff
+acquisition-cost confidentiality result **FAILED**: a staff identity with no effective
+`cost.read` received zero rows from the governed reader but successfully selected raw
+`inventory_items.unit_cost = 47.75`. The diagnostic transaction rolled back with no
+residual user, wine, or inventory rows. M1 remains incomplete pending a forward raw
+cost privacy seal and its reviewed negative/positive runtime matrix. The retained
+proof is in [functional contracts](../evidence/restaurant-demo-20261001/functional-contracts.md)
+and [staff raw-cost failure](../evidence/restaurant-demo-20261001/staff-raw-cost-failure.md).
+
+Current non-runtime checks are bounded: 29 portable source tests passed with zero
+skips; the normal Turbopack build completed 73 pages; the focused import/session set
+passed 36 tests; and the full unit run passed 5,633 with 141 skips. These results do
+not replace live-database suites or the failed real-browser path.
+
+M1–M5 remain incomplete. Nobody reproduced the package on the MacBook, no native
+application passed, and no hosted migration, production deployment, new `main`
+merge, credential change, or retained-data reset occurred.
+
+Attempts A, B, and C remain preserved. Goal safety freezes deletion of the external
+runtime directory even after success; owned Docker service cleanup remains gated on a
+passing journey plus exact re-admission. Do not stop, delete, reseed, adopt, or rerun
+the failed targets. Resume only from a reviewed stable accessible locator and privacy
+seal with a fresh namespace; do not roll the current application UI back to the stale
+placeholder. The pushed and remotely verified application checkpoint remains
+`ffced31d0964082c2554b1e566d5762e4c36619a` at evidence capture. It is not a
+permanent claim about the latest feature-branch tip. The portable source snapshot
+is the commit containing this checkpoint; resolve its exact `HEAD` and verify the
+remote branch ref before reuse.
