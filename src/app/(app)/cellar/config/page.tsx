@@ -38,8 +38,11 @@ export default function CellarConfigPage() {
 
   const [sections, setSections] = useState<Section[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadSucceeded, setLoadSucceeded] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const saving = useRef(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -48,7 +51,7 @@ export default function CellarConfigPage() {
   const deleteDialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap({
     containerRef: deleteDialogRef,
-    onEscape: () => setDeleteTarget(null),
+    onEscape: () => { if (!saving.current) setDeleteTarget(null); },
     enabled: deleteTarget !== null,
   });
 
@@ -71,6 +74,8 @@ export default function CellarConfigPage() {
         if (config?.labels?.sections && Array.isArray(config.labels.sections)) {
           setSections(normalizeSections(config.labels.sections));
         }
+        setLoadSucceeded(true);
+        setError(null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load.");
@@ -84,10 +89,12 @@ export default function CellarConfigPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const save = useCallback(
     async (updated: Section[]) => {
+      if (saving.current || !loadSucceeded) return false;
+      saving.current = true;
       setBusy(true);
       setError(null);
       try {
@@ -101,36 +108,39 @@ export default function CellarConfigPage() {
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => null);
-          throw new Error(
-            (payload as { error?: string })?.error ?? "Failed to save.",
-          );
+          const message = typeof payload?.error === "string" ? payload.error : payload?.error?.message;
+          throw new Error(typeof message === "string" ? message : "Failed to save.");
         }
         setSections(updated);
         startTransition(() => router.refresh());
+        return true;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Save failed.");
+        return false;
       } finally {
+        saving.current = false;
         setBusy(false);
       }
     },
-    [router],
+    [router, loadSucceeded],
   );
 
-  const addSection = useCallback(() => {
+  const addSection = useCallback(async () => {
     const name = newName.trim();
     if (!name) return;
     const updated = [...sections, { id: generateId(), name }];
-    setNewName("");
-    save(updated);
+    if (await save(updated)) setNewName("");
   }, [newName, sections, save]);
 
   const startEdit = useCallback((section: Section) => {
+    if (saving.current) return;
     setEditingId(section.id);
     setEditName(section.name);
   }, []);
 
   const commitEdit = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      if (saving.current) return;
       const name = editName.trim();
       if (!name) {
         setEditingId(null);
@@ -139,21 +149,20 @@ export default function CellarConfigPage() {
       const updated = sections.map((s) =>
         s.id === id ? { ...s, name } : s,
       );
-      setEditingId(null);
-      save(updated);
+      if (await save(updated)) setEditingId(null);
     },
     [editName, sections, save],
   );
 
   const cancelEdit = useCallback(() => {
+    if (saving.current) return;
     setEditingId(null);
   }, []);
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
     const updated = sections.filter((s) => s.id !== deleteTarget.id);
-    setDeleteTarget(null);
-    save(updated);
+    if (await save(updated)) setDeleteTarget(null);
   }, [deleteTarget, sections, save]);
 
   const handleDragEnd = useCallback(
@@ -166,8 +175,7 @@ export default function CellarConfigPage() {
       if (oldIndex === -1 || newIndex === -1) return;
 
       const reordered = arrayMove(sections, oldIndex, newIndex);
-      setSections(reordered);
-      save(reordered);
+      void save(reordered);
     },
     [sections, save],
   );
@@ -179,8 +187,7 @@ export default function CellarConfigPage() {
       if (oldIndex === -1 || newIndex < 0 || newIndex >= sections.length) return;
 
       const reordered = arrayMove(sections, oldIndex, newIndex);
-      setSections(reordered);
-      save(reordered);
+      void save(reordered);
     },
     [sections, save],
   );
@@ -217,13 +224,19 @@ export default function CellarConfigPage() {
         </div>
       </div>
 
-      {error && (
+      {error && !deleteTarget && (
         <div
           role="alert"
           className="mb-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
         >
           {error}
         </div>
+      )}
+      {!loadSucceeded && (
+        <button type="button" className="mb-md min-h-11 rounded-pill border border-rule px-md text-control focus-ring"
+          onClick={() => { setLoaded(false); setLoadAttempt((value) => value + 1); }}>
+          Retry loading sections
+        </button>
       )}
 
       {sections.length > 0 ? (
@@ -248,18 +261,18 @@ export default function CellarConfigPage() {
                   onChangeEditName={setEditName}
                   onCommitEdit={commitEdit}
                   onCancelEdit={cancelEdit}
-                  onDelete={setDeleteTarget}
+                  onDelete={(section) => { setError(null); setDeleteTarget(section); }}
                   onKeyboardMove={moveSectionWithKeyboard}
                 />
               ))}
             </ul>
           </SortableContext>
         </DndContext>
-      ) : (
+      ) : loadSucceeded ? (
         <p className="mb-lg rounded-card card-surface px-md py-lg text-center text-control text-grey">
           No sections yet. Add your first one below.
         </p>
-      )}
+      ) : null}
 
       <div className="flex gap-xs">
         <input
@@ -270,13 +283,14 @@ export default function CellarConfigPage() {
             if (e.key === "Enter") addSection();
           }}
           placeholder="New section name (e.g. Reds by Region)"
+          aria-label="New section name"
           className="glass min-w-0 flex-1 rounded-pill px-sm py-sm text-control text-ink placeholder:text-grey focus-ring"
-          disabled={busy}
+          disabled={busy || !loadSucceeded}
         />
         <button
           type="button"
           onClick={addSection}
-          disabled={busy || !newName.trim()}
+          disabled={busy || !loadSucceeded || !newName.trim()}
           className={cn(
             "flex h-[44px] shrink-0 items-center gap-xs rounded-pill bg-primary px-md text-control font-semibold text-seal-ink transition-colors",
             "hover:bg-primary-hover disabled:opacity-60 focus-ring",
@@ -291,7 +305,7 @@ export default function CellarConfigPage() {
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop-click-to-dismiss is a mouse-only convenience; the dialog below has full keyboard access via useFocusTrap (Escape + a Cancel button).
         <div
           className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-scrim"
-          onClick={() => setDeleteTarget(null)}
+          onClick={() => { if (!saving.current) setDeleteTarget(null); }}
         >
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- onClick here only stops the backdrop's dismiss-click from bubbling; no independent interaction to reach by keyboard. */}
           <div
@@ -311,10 +325,11 @@ export default function CellarConfigPage() {
             <p className="mt-sm text-control text-ink-soft">
               This will permanently remove &ldquo;{deleteTarget.name}&rdquo;.
             </p>
+            {error && <p role="alert" className="mt-sm text-control text-risk-ink">{error}</p>}
             <div className="mt-lg flex gap-sm">
               <button
                 type="button"
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => { if (!saving.current) setDeleteTarget(null); }}
                 disabled={busy}
                 className="min-h-11 flex-1 rounded-pill border border-rule-strong bg-transparent px-md py-sm text-control font-medium text-ink hover:bg-wash disabled:opacity-60 focus-ring"
               >

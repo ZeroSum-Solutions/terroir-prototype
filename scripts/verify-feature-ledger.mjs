@@ -11,13 +11,15 @@ export const ALLOWED_STATUSES = [
   "retired",
 ];
 
-const SCHEMA_VERSION = 2;
-const SOURCE_FILE = "app_spec.txt";
-const BUDGET_DECISION = {
+export const SCHEMA_VERSION = 2;
+export const SOURCE_FILE = "app_spec.txt";
+export const APPROVED_FEATURE_COUNT = 328;
+export const BUDGET_DECISION = {
   previousMaximum: 200,
   decision: "all_enumerated_features_active",
   approvedBy: "product_owner",
   approvedOn: "2026-07-23",
+  expandedOn: "2026-09-26",
 };
 const REQUIRED_FIELDS = [
   "id",
@@ -32,7 +34,11 @@ const REQUIRED_FIELDS = [
   "evidenceOwner",
   "sourceOrder",
 ];
-const COMPLETION_RULES = [
+const TOP_LEVEL_FIELDS = [
+  "schemaVersion", "sourceFile", "featureCount", "budgetResolution", "items",
+];
+const BUDGET_FIELDS = [...Object.keys(BUDGET_DECISION), "approvedActiveCount"];
+export const COMPLETION_RULES = [
   [1, 13, "TER-010", "identity"],
   [14, 15, "TER-013", "restaurant-admin"],
   [16, 19, "TER-015", "team-invitations"],
@@ -71,12 +77,22 @@ const COMPLETION_RULES = [
   [264, 264, "TER-042", "wine-lists"],
   [265, 265, "TER-043", "team-lifecycle"],
   [266, 269, "TER-005", "quality-engineering"],
+  [270, 273, "TER-041", "pour-reconciliation"],
+  [274, 278, "TER-012", "tenant-access"],
+  [279, 281, "TER-014", "authorization"],
+  [282, 290, "TER-047", "pos-integrations"],
+  [291, 297, "TER-048", "offline-lookup"],
+  [298, 315, "TER-041", "physical-bottle-inventory"],
+  [316, 317, "TER-049", "csv-identity-review"],
+  [318, 320, "TER-050", "pilot-measurement"],
+  [321, 328, "TER-014", "authorization"],
 ];
 const ACTOR_PATTERNS = [
   /^(User|Owner|Manager|Staff|Guest|Invitee|System|API|UI|Claude|Sentry) (.+)$/,
   /^((?:GET|POST|PATCH|DELETE) \S+) (.+)$/,
   /^(All (?:write endpoints|endpoints|RLS policies)) (.+)$/,
   /^(Dev login route|Migrations|schema\.snapshot\.sql|set_updated_at trigger|handle_new_user trigger|find_or_create_wine and find_or_create_wines_batch|generate_slug|match_lwin and match_lwin_batch|lwin_search|cleanup_scan_idempotency|record_pour|reconcile_open_bottle and reconcile_open_bottles_batch|auto_eightysix_on_low_inventory|enrich_wines_batch|global-error\.tsx|Source maps|Railway deploy|pnpm build|pnpm start|Vitest|Playwright|ESLint 9 flat config|TypeScript strict mode|pnpm types:check|pnpm snapshot:check) (.+)$/,
+  /^(Opening|A pour|Contract-2 events|Undo|\/cellar\/open|Measured close and discard|Fresh physical open, pour, spill, close, discard, and undo writes|Insufficient selected-bottle volume|Venue-managed presets|Reconciliation lists|Reconciliation variance|Every reconciliation, including one bottle,|Each committed reconciliation entry|The database|Version 2|execute_physical_reconciliation_batch|Browser coverage|Fresh opens and closes|Each contract-2 open bottle|Multiple physical bottles of one wine|Every contract-2 pour, spill, reconcile, close, discard, and undo event\/effect|Exact-bottle reconciliation|Phase C|Discard|Exact-bottle readers|Physical source-lot provenance|Venue-managed pour and tasting presets|Flight and split-pour lines|Bottle\/table holds|Optional sealed tags) (.+)$/,
 ];
 
 export function parseCoreFeatures(source) {
@@ -163,30 +179,10 @@ export function validateCompletionRules(rules, approvedFeatureCount) {
   return errors;
 }
 
-export function createInitialLedger(source, approvedFeatureCount = 269) {
-  const features = parseCoreFeatures(source);
-  if (features.length !== approvedFeatureCount) {
-    throw new Error(
-      `source feature count must remain ${approvedFeatureCount}; received ${features.length}`,
-    );
+function rejectUnknownFields(record, allowed, label, errors) {
+  for (const field of Object.keys(record)) {
+    if (!allowed.includes(field)) errors.push(`${label}.${field} is not allowed`);
   }
-
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    sourceFile: SOURCE_FILE,
-    featureCount: features.length,
-    budgetResolution: {
-      ...BUDGET_DECISION,
-      approvedActiveCount: approvedFeatureCount,
-    },
-    items: features.map((feature) => ({
-      id: `TER-CF-${String(feature.sourceOrder).padStart(3, "0")}`,
-      ...feature,
-      ...deriveCriterion(feature.sourceText),
-      status: "active",
-      ...metadataForRequirement(feature.sourceOrder),
-    })),
-  };
 }
 
 export function verifyFeatureLedger(
@@ -198,7 +194,7 @@ export function verifyFeatureLedger(
   const errors = [];
   const expected = parseCoreFeatures(source);
   const {
-    approvedFeatureCount = 269,
+    approvedFeatureCount = APPROVED_FEATURE_COUNT,
     requireAllActive = true,
     completionRules = COMPLETION_RULES,
   } = options;
@@ -229,6 +225,8 @@ export function verifyFeatureLedger(
       (match) => match[1],
     ),
   );
+  rejectUnknownFields(candidate, TOP_LEVEL_FIELDS, "ledger", errors);
+  rejectUnknownFields(budget, BUDGET_FIELDS, "budgetResolution", errors);
 
   if (candidate.schemaVersion !== SCHEMA_VERSION) {
     errors.push(`schemaVersion must be ${SCHEMA_VERSION}`);
@@ -270,6 +268,7 @@ export function verifyFeatureLedger(
     }
 
     const item = /** @type {Record<string, unknown>} */ (rawItem);
+    rejectUnknownFields(item, REQUIRED_FIELDS, label, errors);
     for (const field of REQUIRED_FIELDS) {
       if (
         item[field] === undefined ||
@@ -284,13 +283,11 @@ export function verifyFeatureLedger(
       if (!/^TER-CF-\d{3,}$/.test(item.id)) {
         errors.push(`${label}.id must match TER-CF-NNN`);
       }
-      const expectedId = `TER-CF-${String(index + 1).padStart(3, "0")}`;
-      if (item.id !== expectedId) {
-        errors.push(`${label}.id must remain ${expectedId}`);
-      }
       if (seenIds.has(item.id)) {
         errors.push(`duplicate ID ${item.id}`);
       }
+      const expectedId = `TER-CF-${String(index + 1).padStart(3, "0")}`;
+      if (item.id !== expectedId) errors.push(`${label}.id must remain ${expectedId}`);
       seenIds.add(item.id);
     }
 
@@ -351,6 +348,14 @@ export function verifyFeatureLedger(
       `ledger is missing ${expected.length - items.length} source feature(s)`,
     );
   }
+
+  const seenAssertions = new Set();
+  expected.forEach(({ sourceText }, index) => {
+    if (seenAssertions.has(sourceText)) {
+      errors.push(`duplicate source assertion at source order ${index + 1}: ${sourceText}`);
+    }
+    seenAssertions.add(sourceText);
+  });
 
   return errors;
 }

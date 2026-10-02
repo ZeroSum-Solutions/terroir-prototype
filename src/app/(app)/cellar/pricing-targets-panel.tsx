@@ -79,7 +79,10 @@ export function PricingTargetsPanel({
     const prev = pourCostPct;
     setPourCostPct(value);
     try {
-      await patch({ default_target_pour_cost_pct: value });
+      await patch({
+        default_target_pour_cost_pct: value,
+        default_target_markup_ratio: markupRatio,
+      });
     } catch {
       setPourCostPct(prev);
     }
@@ -91,7 +94,10 @@ export function PricingTargetsPanel({
     const prev = markupRatio;
     setMarkupRatio(value);
     try {
-      await patch({ default_target_markup_ratio: value });
+      await patch({
+        default_target_pour_cost_pct: pourCostPct,
+        default_target_markup_ratio: value,
+      });
     } catch {
       setMarkupRatio(prev);
     }

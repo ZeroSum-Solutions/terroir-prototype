@@ -13,10 +13,12 @@
 // NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY aren't set, the same
 // convention e2e/reconcile-queue.test.ts and its siblings use for
 // live-fixture tests that can't run on a bare CI runner.
+import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const mockProcessInvoiceScanOnce = vi.fn();
 vi.mock("@/domains/scanning/invoice-scan-service", () => ({
@@ -68,17 +70,17 @@ const hasPublishableKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_K
 async function staffSession(
   admin: SupabaseClient<Database>,
   restaurantId: string,
+  identities: LiveDbFixtureIdentityTracker,
 ): Promise<{ client: SupabaseClient<Database>; userId: string }> {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const email = `fix-staff-${unique}@terroir.test`;
   const password = `Fix-Test-${unique}!`;
 
-  const { data: user, error: userErr } = await admin.auth.admin.createUser({
+  const user = await identities.createUser(admin, {
     email,
     password,
     email_confirm: true,
   });
-  if (userErr || !user) throw userErr ?? new Error("failed to create staff test user");
 
   const { error: memErr } = await admin.from("memberships").insert({
     user_id: user.user.id,
@@ -116,6 +118,7 @@ describe.skipIf(!hasLiveDb)(
     let restaurantA: string;
     let restaurantB: string;
     const storagePaths: string[] = [];
+    const identities = new LiveDbFixtureIdentityTracker();
 
     beforeAll(async () => {
       const client = createServiceRoleClient();
@@ -146,7 +149,9 @@ describe.skipIf(!hasLiveDb)(
       // Cascades: background_jobs and invoice_scans both FK restaurant_id
       // ON DELETE CASCADE, so deleting the two restaurants cleans up
       // every job/scan fixture this suite created.
-      await supabase.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
+      await identities.cleanup(supabase, {
+        restaurantIds: [restaurantA, restaurantB],
+      });
     });
 
     beforeEach(() => {
@@ -154,14 +159,16 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("rejects a crafted job whose restaurant_id does not own its subject scan, before any read or write of the other tenant's data", async () => {
+      const scanBId = randomUUID();
       const { data: scanB, error: scanBErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanBId,
           restaurant_id: restaurantB,
           distributor_name: "Cross-Tenant Distributor",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantB}/scan-crafted.jpg`,
+          raw_image_path: `${restaurantB}/${scanBId}.jpg`,
           status: "processing",
         } as never)
         .select("*")
@@ -217,7 +224,8 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("processing restaurant A's own job never reads or mutates restaurant B's rows", async () => {
-      const pathA = `${restaurantA}/scan-legit.jpg`;
+      const scanAId = randomUUID();
+      const pathA = `${restaurantA}/${scanAId}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("invoice-images")
         .upload(pathA, Buffer.from("fake-jpeg-bytes"), { contentType: "image/jpeg", upsert: true });
@@ -227,6 +235,7 @@ describe.skipIf(!hasLiveDb)(
       const { data: scanA, error: scanAErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanAId,
           restaurant_id: restaurantA,
           distributor_name: "Tenant A Distributor",
           parsed_line_items: [],
@@ -239,14 +248,16 @@ describe.skipIf(!hasLiveDb)(
       if (scanAErr || !scanA) throw scanAErr ?? new Error("failed to insert scan A");
 
       // Untouched control row belonging to restaurant B.
+      const scanBId = randomUUID();
       const { data: scanB, error: scanBErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanBId,
           restaurant_id: restaurantB,
           distributor_name: "Tenant B Control Row",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantB}/scan-control.jpg`,
+          raw_image_path: `${restaurantB}/${scanBId}.jpg`,
           status: "processing",
         } as never)
         .select("*")
@@ -263,13 +274,12 @@ describe.skipIf(!hasLiveDb)(
         },
       );
 
-      const staffA = await staffSession(supabase, restaurantA);
+      const staffA = await staffSession(supabase, restaurantA, identities);
       const enqueueResult = await enqueueInvoiceExtractJob({
         supabase: staffA.client,
         restaurantId: restaurantA,
         scanId: (scanA as { id: string }).id,
       });
-      await supabase.auth.admin.deleteUser(staffA.userId);
       expect(enqueueResult.created).toBe(true);
 
       const result = await processOneInvoiceExtractJob(supabase, "test-worker-legit");
@@ -326,10 +336,9 @@ describe.skipIf(!hasLiveDb)(
       if (error || !scan) throw error ?? new Error("failed to insert scan for idempotency test");
       const scanId = (scan as { id: string }).id;
 
-      const staffA = await staffSession(supabase, restaurantA);
+      const staffA = await staffSession(supabase, restaurantA, identities);
       const first = await enqueueInvoiceExtractJob({ supabase: staffA.client, restaurantId: restaurantA, scanId });
       const second = await enqueueInvoiceExtractJob({ supabase: staffA.client, restaurantId: restaurantA, scanId });
-      await supabase.auth.admin.deleteUser(staffA.userId);
 
       expect(first.created).toBe(true);
       expect(second.created).toBe(false);
@@ -348,26 +357,35 @@ describe.skipIf(!hasLiveDb)(
       await supabase.from("background_jobs").delete().eq("id", first.jobId);
     });
 
-    it("a job whose subject already persisted a result does not re-invoke the extraction service (no double Anthropic call)", async () => {
+    it("a recovered job whose subject already persisted a result does not re-invoke the extraction service (no double Anthropic call)", async () => {
+      const scanId = randomUUID();
       const { data: scan, error } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanId,
           restaurant_id: restaurantA,
           distributor_name: "Already Complete Distributor",
           parsed_line_items: [],
           final_line_items: [],
-          raw_image_path: `${restaurantA}/already-complete.jpg`,
+          raw_image_path: `${restaurantA}/${scanId}.jpg`,
           status: "complete", // persisted by a (simulated) prior attempt
           item_count: 3,
         } as never)
         .select("id")
         .single();
       if (error || !scan) throw error ?? new Error("failed to insert already-complete scan");
-      const scanId = (scan as { id: string }).id;
+      expect((scan as { id: string }).id).toBe(scanId);
 
-      const staffA = await staffSession(supabase, restaurantA);
+      const staffA = await staffSession(supabase, restaurantA, identities);
       const enqueueResult = await enqueueInvoiceExtractJob({ supabase: staffA.client, restaurantId: restaurantA, scanId });
-      await supabase.auth.admin.deleteUser(staffA.userId);
+      // A recovered initial attempt has attempt_count > 0. Attempt 0 on an
+      // uncommitted complete scan is intentionally reserved for a deliberate
+      // re-extraction request and would correctly invoke the provider again.
+      const { error: recoveredAttemptError } = await supabase
+        .from("background_jobs")
+        .update({ attempt_count: 1 } as never)
+        .eq("id", enqueueResult.jobId);
+      if (recoveredAttemptError) throw recoveredAttemptError;
       const result = await processOneInvoiceExtractJob(supabase, "test-worker-retry");
 
       expect(result.processed).toBe(true);
@@ -378,7 +396,8 @@ describe.skipIf(!hasLiveDb)(
     });
 
     it("aborts WITHOUT calling the extraction service when another worker has already stolen the claim (closes the double-bill window on reclaim)", async () => {
-      const pathA = `${restaurantA}/scan-claim-stolen.jpg`;
+      const scanId = randomUUID();
+      const pathA = `${restaurantA}/${scanId}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("invoice-images")
         .upload(pathA, Buffer.from("fake-jpeg-bytes"), { contentType: "image/jpeg", upsert: true });
@@ -388,6 +407,7 @@ describe.skipIf(!hasLiveDb)(
       const { data: scan, error: scanErr } = await supabase
         .from("invoice_scans")
         .insert({
+          id: scanId,
           restaurant_id: restaurantA,
           distributor_name: "Claim Stolen Distributor",
           parsed_line_items: [],
@@ -452,7 +472,7 @@ describe.skipIf(!hasLiveDb)(
       "enqueue_invoice_extract_job dead-job revival (C25)",
       () => {
         it("a real authenticated staff member's raw UPDATE against a dead job fails LOUD (not a silent no-op), and the sanctioned RPC actually revives it", async () => {
-          const staffA = await staffSession(supabase, restaurantA);
+          const staffA = await staffSession(supabase, restaurantA, identities);
 
           const { data: scan, error: scanErr } = await supabase
             .from("invoice_scans")
@@ -533,7 +553,6 @@ describe.skipIf(!hasLiveDb)(
           expect(afterRpc?.attempt_count).toBe(0);
           expect(afterRpc?.claimed_by).toBeNull();
 
-          await supabase.auth.admin.deleteUser(staffA.userId);
         });
       },
     );

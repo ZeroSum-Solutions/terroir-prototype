@@ -120,17 +120,17 @@ describe("bottleScanReducer", () => {
     expect(next.searchQuery).toBe("kept");
   });
 
-  it("location-entry-started clears section/binLocation", () => {
+  it("location-entry-started preserves section intent but clears the bin choice", () => {
     const seeded: BottleScanState = { ...initialBottleScanState, section: "A", binLocation: "B" };
     const next = bottleScanReducer(seeded, { type: "location-entry-started" });
     expect(next.phase).toBe("location");
-    expect(next.section).toBe("");
+    expect(next.section).toBe("A");
     expect(next.binLocation).toBe("");
   });
 
   it("location-confirmed appends to the session and returns to confirmed, clearing confirming", () => {
     const seeded: BottleScanState = { ...initialBottleScanState, confirming: true };
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     const next = bottleScanReducer(seeded, { type: "location-confirmed", scan });
     expect(next.session).toEqual([scan]);
     expect(next.phase).toBe("confirmed");
@@ -145,7 +145,7 @@ describe("bottleScanReducer", () => {
    * in place, exactly the way `searchError` is during `correcting`.
    */
   it("location-confirm-failed reports in place and keeps the typed bin", () => {
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     const seeded: BottleScanState = {
       ...initialBottleScanState,
       phase: "location",
@@ -183,12 +183,12 @@ describe("bottleScanReducer", () => {
       locationError: "Bin already full.",
     };
     expect(bottleScanReducer(seeded, { type: "location-entry-started" }).locationError).toBeNull();
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     expect(bottleScanReducer(seeded, { type: "location-confirmed", scan }).locationError).toBeNull();
   });
 
   it("scan-again resets the capture form but preserves the session", () => {
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     const seeded: BottleScanState = {
       ...initialBottleScanState,
       phase: "confirmed",
@@ -210,7 +210,7 @@ describe("bottleScanReducer", () => {
   });
 
   it("session-ended only changes phase", () => {
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     const seeded: BottleScanState = { ...initialBottleScanState, session: [scan] };
     const next = bottleScanReducer(seeded, { type: "session-ended" });
     expect(next.phase).toBe("summary");
@@ -218,7 +218,7 @@ describe("bottleScanReducer", () => {
   });
 
   it("new-session-started clears the session on top of the scan-again reset", () => {
-    const scan = { wine: wine(), section: "Red Room", binLocation: "A-1" };
+    const scan = { operationId: "receipt-1", wineId: "wine-1", wine: wine(), section: "Red Room", binLocation: "A-1" };
     const seeded: BottleScanState = { ...initialBottleScanState, phase: "summary", session: [scan] };
     const next = bottleScanReducer(seeded, { type: "new-session-started" });
     expect(next.phase).toBe("scanning");

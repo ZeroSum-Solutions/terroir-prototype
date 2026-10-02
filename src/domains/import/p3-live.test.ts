@@ -28,6 +28,7 @@ import {
 } from "./batch-service";
 import { createImportSession, revertImportSession } from "./session-service";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -82,6 +83,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
   let restaurantId: string;
   let userClient: SupabaseClient<Database>;
   let userId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -96,12 +98,11 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
 
     const run = Date.now();
     const password = "P3-Critical-Test-123!";
-    const { data: user, error: userError } = await admin.auth.admin.createUser({
+    const user = await identities.createUser(admin, {
       email: `p3-critical-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userError || !user) throw userError ?? new Error("failed to create user");
     userId = user.user.id;
 
     const { error: memError } = await admin
@@ -113,8 +114,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
   }, 30_000);
 
   afterAll(async () => {
-    await admin.from("restaurants").delete().eq("id", restaurantId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantId] });
   });
 
   /** Test-setup shortcut (see file header): flips every pending
@@ -155,17 +155,17 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const batchId = confirmed.batchId;
       await makeAllRowsEligible(batchId);
 
-      // Apply exactly 1,000 of the 1,500 rows (two 500-row RPC calls —
-      // the DB function's own hard clamp — well past PostgREST's 1,000-
-      // row default response cap).
+      // Apply exactly 1,000 of the 1,500 rows through the current sealed
+      // adapter (ten 100-row calls, the final contract's hard clamp) —
+      // well past PostgREST's 1,000-row default response cap.
       // Errors checked (integration critic finding): an unchecked failed
       // apply here under concurrent suite load silently shifted the
       // applied/eligible split and failed the count assertions below for
       // the wrong reason.
-      const apply1 = await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId, p_limit: 500 } as never);
-      expect(apply1.error).toBeNull();
-      const apply2 = await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId, p_limit: 500 } as never);
-      expect(apply2.error).toBeNull();
+      for (let call = 0; call < 10; call += 1) {
+        const applied = await applyImportBatchChunk(userClient, batchId);
+        expect(applied.processed).toHaveLength(100);
+      }
 
       // THE BUG, demonstrated directly: a raw PostgREST .select() over all
       // 1,500 rows is silently truncated to 1,000 by config's max_rows —
@@ -207,7 +207,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const applied = await applyAll(batchId);
       expect(applied.status).toBe("completed");
 
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, revertedCount: 5 });
 
       // Calling apply again on the now-REVERTED batch must be a hard
@@ -274,8 +274,8 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       const batchId2 = await oldConfirm(fixtureDigest());
       expect(batchId1).not.toBe(batchId2); // the bug: two batches for identical content
 
-      await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId1, p_limit: 10 } as never);
-      await userClient.rpc("apply_import_batch_chunk", { p_batch_id: batchId2, p_limit: 10 } as never);
+      await applyImportBatchChunk(userClient, batchId1);
+      await applyImportBatchChunk(userClient, batchId2);
 
       const { data: wine } = await admin
         .from("wines")
@@ -614,7 +614,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       expect(afterApply).toMatchObject({ lwin_id: "C2CONTRACT-LWIN", lwin_match_score: 0.9 });
       expect(afterApply.updated_at).not.toBe(preApplyUpdatedAt);
 
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, lwinStampsCleared: 1 });
 
       const { data: wineAfterRevert } = await admin
@@ -659,7 +659,7 @@ describe.skipIf(!hasLiveDb)("P3 critical findings (MANDATORY, live Postgres)", {
       expect(applied.status).toBe("applying"); // 3 applied, 2 still pending — never reaches 'completed'
 
       // Pre-fix (0076's original guard), this would fail with P0001.
-      const reverted = await revertImportBatch(userClient, restaurantId, batchId, admin);
+      const reverted = await revertImportBatch(userClient, restaurantId, batchId);
       expect(reverted).toMatchObject({ ok: true, revertedCount: 3 });
 
       const { data: batchRow } = await admin.from("import_batches").select("status").eq("id", batchId).single();

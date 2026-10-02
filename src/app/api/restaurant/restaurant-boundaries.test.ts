@@ -3,10 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const auth = vi.hoisted(() => ({
   requireAuth: vi.fn(),
+  requireMembership: vi.fn(),
   requireOwner: vi.fn(),
 }));
 vi.mock("@/lib/api/auth", () => ({
   requireAuth: (...args: unknown[]) => auth.requireAuth(...args),
+  requireMembership: (...args: unknown[]) => auth.requireMembership(...args),
   requireOwner: (...args: unknown[]) => auth.requireOwner(...args),
 }));
 
@@ -55,7 +57,7 @@ describe("restaurant API boundaries", () => {
     },
     {
       name: "PATCH",
-      auth: "requireOwner" as const,
+      auth: "requireMembership" as const,
       call: (params: Promise<{ id: string }>) =>
         PATCH(patchRequest, { params }),
     },

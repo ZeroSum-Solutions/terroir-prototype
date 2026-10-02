@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetRateLimitForTests } from "@/lib/api/rate-limit";
 
 class RedirectSignal extends Error {
@@ -8,13 +8,18 @@ class RedirectSignal extends Error {
 }
 
 const mocks = vi.hoisted(() => ({
+  cookieSet: vi.fn(),
+  cookies: vi.fn(),
   createClient: vi.fn(),
   headers: vi.fn(),
   redirect: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
-vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("next/headers", () => ({
+  cookies: mocks.cookies,
+  headers: mocks.headers,
+}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 const {
@@ -23,6 +28,25 @@ const {
   signInWithPassword,
   signUpWithPassword,
 } = await import("./actions");
+
+let scheduledCookies = new Map<string, string>();
+let failDeviceLockWrite = false;
+
+function mutableCookieStore() {
+  return {
+    get(name: string) {
+      const value = scheduledCookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    },
+    set(name: string, value: string, options: unknown) {
+      mocks.cookieSet(name, value, options);
+      if (failDeviceLockWrite && name === "terroir_device_locked") {
+        throw new Error("private detail");
+      }
+      scheduledCookies.set(name, value);
+    },
+  };
+}
 
 function form(values: Record<string, string>): FormData {
   const result = new FormData();
@@ -56,14 +80,28 @@ describe("login server actions", () => {
     mocks.headers.mockResolvedValue(
       new Headers({ "x-forwarded-for": "198.51.100.7" }),
     );
+    scheduledCookies = new Map();
+    failDeviceLockWrite = false;
+    mocks.cookies.mockResolvedValue(mutableCookieStore());
     mocks.redirect.mockImplementation((url: string) => {
       throw new RedirectSignal(url);
     });
     mocks.createClient.mockResolvedValue({ auth });
     auth.signInWithOtp.mockResolvedValue({ error: null });
-    auth.signInWithPassword.mockResolvedValue({ error: null });
-    auth.signUp.mockResolvedValue({ error: null });
+    auth.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: "session" } },
+      error: null,
+    });
+    auth.signUp.mockResolvedValue({
+      data: { session: { access_token: "session" } },
+      error: null,
+    });
     auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("sends a normalized magic-link request with a safe configured callback", async () => {
@@ -106,6 +144,79 @@ describe("login server actions", () => {
       },
     });
     expect(url.searchParams.get("signup")).toBe("1");
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_authorization_generation",
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+    expect(mocks.cookieSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves marker state when signup returns no session", async () => {
+    auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+
+    await redirectedUrl(() =>
+      signUpWithPassword(
+        form({
+          email: "new@restaurant.test",
+          password: "secure-password",
+          confirm: "secure-password",
+        }),
+      ),
+    );
+
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("completes session signup under hard denial when generation rotation is unavailable", async () => {
+    vi.stubGlobal("crypto", {});
+    scheduledCookies.set(
+      "terroir_authorization_generation",
+      "10000000-0000-4000-8000-000000000010",
+    );
+
+    const url = await redirectedUrl(() =>
+      signUpWithPassword(
+        form({
+          email: "new@restaurant.test",
+          password: "secure-password",
+          confirm: "secure-password",
+        }),
+      ),
+    );
+
+    expect(url.searchParams.get("signup")).toBe("1");
+    expect(scheduledCookies.get("terroir_authorization_generation"))
+      .toBe("10000000-0000-4000-8000-000000000010");
+    expect(scheduledCookies.get("terroir_device_locked")).toBe("1");
+    expect(mocks.cookieSet).not.toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.anything(),
+    );
+  });
+
+  it("maps a signup hard-denial scheduling failure to the existing unavailable response", async () => {
+    vi.stubGlobal("crypto", {});
+    failDeviceLockWrite = true;
+
+    const url = await redirectedUrl(() =>
+      signUpWithPassword(
+        form({
+          email: "new@restaurant.test",
+          password: "secure-password",
+          confirm: "secure-password",
+        }),
+      ),
+    );
+
+    expect(url.searchParams.get("error")).toBe("unavailable");
+    expect(scheduledCookies.has("terroir_device_locked")).toBe(false);
   });
 
   it("rejects mismatched signup passwords before calling Supabase", async () => {
@@ -138,10 +249,22 @@ describe("login server actions", () => {
       password: "secure-password",
     });
     expect(url.href).toBe("http://localhost:3000/cellar?section=reds");
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "terroir_authorization_generation",
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      expect.objectContaining({ path: "/", maxAge: 34_560_000 }),
+    );
+    expect(mocks.cookieSet).toHaveBeenCalledTimes(2);
   });
 
   it("maps rejected credentials to one generic response", async () => {
     auth.signInWithPassword.mockResolvedValue({
+      data: { session: null },
       error: { message: "Email not confirmed for person@restaurant.test" },
     });
 
@@ -153,6 +276,45 @@ describe("login server actions", () => {
 
     expect(url.searchParams.get("error")).toBe("invalid_credentials");
     expect(url.href).not.toContain("person%40restaurant.test");
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("completes password sign-in under hard denial when generation rotation is unavailable", async () => {
+    vi.stubGlobal("crypto", {});
+    scheduledCookies.set(
+      "terroir_authorization_generation",
+      "10000000-0000-4000-8000-000000000010",
+    );
+
+    const url = await redirectedUrl(() =>
+      signInWithPassword(
+        form({ email: "person@restaurant.test", password: "secure-password" }),
+      ),
+    );
+
+    expect(url.pathname).toBe("/");
+    expect(scheduledCookies.get("terroir_authorization_generation"))
+      .toBe("10000000-0000-4000-8000-000000000010");
+    expect(scheduledCookies.get("terroir_device_locked")).toBe("1");
+    expect(mocks.cookieSet).not.toHaveBeenCalledWith(
+      "terroir_device_locked",
+      "reprovision_required",
+      expect.anything(),
+    );
+  });
+
+  it("maps a sign-in hard-denial scheduling failure to the existing unavailable response", async () => {
+    vi.stubGlobal("crypto", {});
+    failDeviceLockWrite = true;
+
+    const url = await redirectedUrl(() =>
+      signInWithPassword(
+        form({ email: "person@restaurant.test", password: "secure-password" }),
+      ),
+    );
+
+    expect(url.searchParams.get("error")).toBe("unavailable");
+    expect(scheduledCookies.has("terroir_device_locked")).toBe(false);
   });
 
   it("always gives the same password-reset completion response", async () => {

@@ -12,9 +12,22 @@ import { findDuplicateSuspects } from "@/lib/lineage/rollups";
 import type { Database, Json } from "@/types/database";
 import { wineDisplayName } from "@/lib/wine-display-name";
 
-type Inventory = Database["public"]["Tables"]["inventory_items"]["Row"];
-type Scan = Database["public"]["Tables"]["invoice_scans"]["Row"];
-type Wine = Database["public"]["Tables"]["wines"]["Row"];
+export type ReconcileQueueInventory = Pick<
+  Database["public"]["Tables"]["inventory_items"]["Row"],
+  "id" | "wine_id" | "invoice_scan_id" | "bin_id" | "quantity" | "format" |
+    "added_at" | "unit_cost"
+>;
+export type ReconcileQueueScan = Pick<
+  Database["public"]["Tables"]["invoice_scans"]["Row"],
+  "id" | "distributor_name" | "final_line_items"
+>;
+export type ReconcileQueueWine = Pick<
+  Database["public"]["Tables"]["wines"]["Row"],
+  "id" | "lineage_id" | "producer" | "name" | "vintage" | "size_ml" | "lwin_id"
+>;
+type Inventory = ReconcileQueueInventory;
+type Scan = ReconcileQueueScan;
+type Wine = ReconcileQueueWine;
 type Line = Record<string, Json | undefined>;
 
 function number(value: Json | undefined): number {

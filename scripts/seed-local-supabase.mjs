@@ -19,6 +19,13 @@ config({ path: ".env.local" });
 const args = new Set(process.argv.slice(2));
 const CONFIRM = args.has("--confirm");
 const TEARDOWN = args.has("--teardown");
+const PHYSICAL_CONTRACT = process.env.LOCAL_SEED_PHYSICAL_CONTRACT ?? "2";
+if (PHYSICAL_CONTRACT !== "1" && PHYSICAL_CONTRACT !== "2") {
+  console.error(
+    `Refusing LOCAL_SEED_PHYSICAL_CONTRACT=${PHYSICAL_CONTRACT}; expected 1 or 2.`,
+  );
+  process.exit(1);
+}
 
 // No hardcoded fallback: this repo's local stack and other local Supabase
 // stacks on this machine use different ports, and a fallback here risked
@@ -284,8 +291,8 @@ function buildRows(userIds = DRY_USER_IDS) {
       pricing_dismissed_until: i % 61 === 0 ? dayOffset(-14) : null,
       alert_snoozed_until: i % 67 === 0 ? dayOffset(-7) : null,
       enrichment_metadata: {
-        source: "local_seed",
-        fields_enriched: ["drink_window", "serving_temp", "retail"],
+        source: "rule_engine",
+        fields_enriched: ["drink_window", "serving_temp"],
         enriched_at: dayOffset(i % 30),
       },
       manual_overrides: i % 29 === 0 ? ["drink_window"] : [],
@@ -300,6 +307,8 @@ function buildRows(userIds = DRY_USER_IDS) {
 
   const scans = Array.from({ length: 60 }, (_, idx) => {
     const i = idx + 1;
+    const scanId = uuid(UUID_PREFIX.scan, i);
+    const isMultiPage = i % 5 === 0;
     const lineItems = Array.from({ length: 4 }, (_, j) => {
       const wine = wines[(idx * 4 + j) % wines.length];
       return {
@@ -317,13 +326,13 @@ function buildRows(userIds = DRY_USER_IDS) {
     });
 
     return {
-      id: uuid(UUID_PREFIX.scan, i),
+      id: scanId,
       restaurant_id: RESTAURANT_ID,
       distributor_name: `Local Distributor ${1 + (i % 8)}`,
       invoice_number: `LOCAL-${String(i).padStart(4, "0")}`,
       invoice_date: dateOffset(i + 3),
-      raw_image_path: `${RESTAURANT_ID}/local-seed/invoice-${i}.jpg`,
-      extra_image_paths: i % 5 === 0 ? [`${RESTAURANT_ID}/local-seed/invoice-${i}-page-2.jpg`] : [],
+      raw_image_path: `${RESTAURANT_ID}/${scanId}${isMultiPage ? "_page1" : ""}.jpg`,
+      extra_image_paths: isMultiPage ? [`${RESTAURANT_ID}/${scanId}_page2.jpg`] : [],
       parsed_line_items: lineItems,
       final_line_items: lineItems.map((item, j) => ({
         ...item,
@@ -539,6 +548,7 @@ function buildRows(userIds = DRY_USER_IDS) {
       occurred_at: dayOffset(i % 90),
       note: i % 13 === 0 ? "Local seed pour note" : null,
       open_bottle_id: null,
+      event_contract: 1,
     };
   });
 
@@ -554,6 +564,15 @@ function buildRows(userIds = DRY_USER_IDS) {
       opened_by: userIds.staff ?? userIds.manager ?? null,
       source_inventory_item_id: inventoryItems[idx]?.id ?? null,
       closed_at: null,
+      preservation_method: "none",
+      identity_contract: Number(PHYSICAL_CONTRACT),
+      identity_origin:
+        PHYSICAL_CONTRACT === "1" ? "legacy_slot" : "migrated_active",
+      nominal_capacity_ml: PHYSICAL_CONTRACT === "1" ? null : wine.size_ml,
+      source_provenance:
+        PHYSICAL_CONTRACT === "1" ? "legacy_unknown" : "known",
+      opening_operation_id: null,
+      state_version: 0,
     };
   });
 
@@ -751,6 +770,98 @@ async function upsertRows(supabase, table, rows, options = {}) {
   }
 }
 
+function upsertProtectedPhysicalRows(pourEvents, openBottles) {
+  const dbContainer = "supabase_db_terroir-vw-local";
+  const inspect = execFileSync(
+    "docker",
+    ["inspect", "--format", "{{.State.Status}}|{{.Config.Image}}", dbContainer],
+    { encoding: "utf8" },
+  ).trim();
+  if (!/^running\|.*supabase\/postgres:17/u.test(inspect)) {
+    throw new Error(`Refusing unexpected local database container: ${inspect}`);
+  }
+
+  const pourJson = JSON.stringify(pourEvents);
+  const bottleJson = JSON.stringify(openBottles);
+  const sql = `
+begin;
+set local session_replication_role = replica;
+
+insert into public.pour_events (
+  id, wine_id, restaurant_id, ml_delta, kind, actor_user_id, occurred_at,
+  note, open_bottle_id, event_contract
+)
+select
+  x.id, x.wine_id, x.restaurant_id, x.ml_delta, x.kind, x.actor_user_id,
+  x.occurred_at, x.note, x.open_bottle_id, x.event_contract
+from jsonb_to_recordset($terroir_seed$${pourJson}$terroir_seed$::jsonb) as x(
+  id uuid, wine_id uuid, restaurant_id uuid, ml_delta integer, kind text,
+  actor_user_id uuid, occurred_at timestamptz, note text, open_bottle_id uuid,
+  event_contract smallint
+)
+on conflict (id) do update set
+  wine_id = excluded.wine_id,
+  restaurant_id = excluded.restaurant_id,
+  ml_delta = excluded.ml_delta,
+  kind = excluded.kind,
+  actor_user_id = excluded.actor_user_id,
+  occurred_at = excluded.occurred_at,
+  note = excluded.note,
+  open_bottle_id = excluded.open_bottle_id,
+  event_contract = excluded.event_contract,
+  operation_id = null,
+  operation_entry_ordinal = null,
+  reversal_of_event_id = null;
+
+insert into public.open_bottles (
+  id, wine_id, restaurant_id, remaining_ml, opened_at, opened_by,
+  source_inventory_item_id, closed_at, preservation_method,
+  identity_contract, identity_origin, nominal_capacity_ml,
+  source_provenance, opening_operation_id, state_version
+)
+select
+  x.id, x.wine_id, x.restaurant_id, x.remaining_ml, x.opened_at,
+  x.opened_by, x.source_inventory_item_id, x.closed_at,
+  x.preservation_method, x.identity_contract, x.identity_origin,
+  x.nominal_capacity_ml, x.source_provenance, x.opening_operation_id,
+  x.state_version
+from jsonb_to_recordset($terroir_seed$${bottleJson}$terroir_seed$::jsonb) as x(
+  id uuid, wine_id uuid, restaurant_id uuid, remaining_ml integer,
+  opened_at timestamptz, opened_by uuid, source_inventory_item_id uuid,
+  closed_at timestamptz, preservation_method text, identity_contract smallint,
+  identity_origin text, nominal_capacity_ml integer, source_provenance text,
+  opening_operation_id uuid, state_version bigint
+)
+on conflict (id) do update set
+  wine_id = excluded.wine_id,
+  restaurant_id = excluded.restaurant_id,
+  remaining_ml = excluded.remaining_ml,
+  opened_at = excluded.opened_at,
+  opened_by = excluded.opened_by,
+  source_inventory_item_id = excluded.source_inventory_item_id,
+  closed_at = excluded.closed_at,
+  preservation_method = excluded.preservation_method,
+  identity_contract = excluded.identity_contract,
+  identity_origin = excluded.identity_origin,
+  nominal_capacity_ml = excluded.nominal_capacity_ml,
+  source_provenance = excluded.source_provenance,
+  opening_operation_id = excluded.opening_operation_id,
+  state_version = excluded.state_version;
+
+commit;
+`;
+
+  execFileSync(
+    "docker",
+    [
+      "exec", "-i", dbContainer,
+      "psql", "-X", "-v", "ON_ERROR_STOP=1", "-q",
+      "-U", "postgres", "-d", "postgres",
+    ],
+    { input: sql, stdio: ["pipe", "inherit", "inherit"] },
+  );
+}
+
 function seedImagePaths(scans) {
   return scans.flatMap((scan) => [
     scan.raw_image_path,
@@ -811,10 +922,7 @@ async function seed() {
   await upsertRows(supabase, "wine_lists", rows.lists);
   await upsertRows(supabase, "wine_list_sections", rows.wineListSections);
   await upsertRows(supabase, "wine_list_items", rows.listItems);
-  await upsertRows(supabase, "pour_events", rows.pourEvents);
-  await upsertRows(supabase, "open_bottles", rows.openBottles, {
-    onConflict: "wine_id,restaurant_id",
-  });
+  upsertProtectedPhysicalRows(rows.pourEvents, rows.openBottles);
   await upsertRows(supabase, "availability_events", rows.availabilityEvents);
   await upsertRows(supabase, "invitations", rows.invitations);
 

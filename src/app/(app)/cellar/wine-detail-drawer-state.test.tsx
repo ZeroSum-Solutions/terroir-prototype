@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
 }));
 
-const { drawerStateKey, WineDetailDrawer } = await import("./wine-detail-drawer");
+const { buildDrawerPickerItem, drawerStateKey, WineDetailDrawer } = await import("./wine-detail-drawer");
 
 const reactTestEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
@@ -33,11 +33,137 @@ describe("WineDetailDrawer bottle state", () => {
     refresh.mockClear();
   });
 
+  it("keeps the picker count on the exact bottle snapshot", () => {
+    const bottleA = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const bottleB = physicalBottle("77777777-7777-4777-8777-777777777777", 300);
+    const siblings = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+      activeBottleCount: 2,
+      activeOpenMl: 900,
+      activeBottles: [bottleA, bottleB],
+    });
+    const emptyExactSnapshot = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+      activeBottleCount: 0,
+      activeOpenMl: 0,
+      activeBottles: [],
+      // Compatibility fields can lag the exact reader during cutover.
+      open_bottle_id: "legacy-slot",
+      open_remaining_ml: 500,
+    });
+    const legacy = row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+    });
+
+    expect(buildDrawerPickerItem(siblings, bottleA)?.active_bottle_count).toBe(2);
+    expect(buildDrawerPickerItem(emptyExactSnapshot, null)?.active_bottle_count).toBe(0);
+    expect(buildDrawerPickerItem(legacy, legacy.activeBottles[0]!)?.active_bottle_count).toBe(1);
+  });
+
+  it("fails closed when contract-2 exact bottle state is missing", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <ToastProvider>
+        <WineDetailDrawer
+          row={row({
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottleCount: 1,
+            activeOpenMl: 500,
+            activeBottles: undefined as never,
+          })}
+          inventoryContractVersion={2}
+          selectedBottleId={null}
+          onSelectBottle={() => undefined}
+          canManage
+          onClose={() => undefined}
+        />
+      </ToastProvider>,
+    ));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+    expect(button(container, "Open another bottle")).toBeUndefined();
+    expect([...container.querySelectorAll("button")].some((item) =>
+      item.textContent?.startsWith("Pour "),
+    )).toBe(false);
+    await act(async () => root.unmount());
+  });
+
+  it("shows exact contract-2 bottles while legacy closeout stays unavailable", async () => {
+    const onSelectBottle = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <ToastProvider>
+        <WineDetailDrawer
+          row={row({
+            hero_image_url: "https://example.test/wine.jpg",
+            activeBottleCount: 2,
+            activeOpenMl: 900,
+            activeBottles: [
+              physicalBottle("66666666-6666-4666-8666-666666666666", 600),
+              physicalBottle("77777777-7777-4777-8777-777777777777", 300),
+            ],
+          })}
+          inventoryContractVersion={2}
+          selectedBottleId={null}
+          onSelectBottle={onSelectBottle}
+          canManage
+          onClose={() => undefined}
+        />
+      </ToastProvider>,
+    ));
+    expect(container.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    expect(button(container, "Select a bottle")?.disabled).toBe(true);
+    expect(button(container, "Close bottle")).toBeUndefined();
+    await act(async () => {
+      container.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1].click();
+    });
+    expect(onSelectBottle).toHaveBeenCalledExactlyOnceWith(
+      "77777777-7777-4777-8777-777777777777",
+    );
+    await act(async () => root.unmount());
+  });
+
+  it("binds measured closeout to the selected physical bottle only", async () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      closeout: { id: "88888888-8888-4888-8888-888888888888", wine_id: wineId,
+        open_bottle_id: "77777777-7777-4777-8777-777777777777" },
+    }, 201));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const bottleA = { ...physicalBottle("66666666-6666-4666-8666-666666666666", 600), wineId };
+    const bottleB = { ...physicalBottle("77777777-7777-4777-8777-777777777777", 300), wineId };
+    await renderPhysicalDrawer(root, row({
+      wine_id: wineId, activeBottleCount: 2, activeOpenMl: 900, activeBottles: [bottleA, bottleB],
+    }), bottleB.id);
+    expect(input("actual_remaining_ml").value).toBe("300");
+    await click(button(container, "Close bottle"));
+    await act(async () => Promise.resolve());
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      wine_id: wineId,
+      open_bottle_id: bottleB.id,
+      actual_remaining_ml: 300,
+      written_off_ml: 0,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
+
   it("resets preservation and close-out values when switching drawer wines", async () => {
     const requests: Array<Record<string, unknown>> = [];
     vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.body) requests.push(JSON.parse(String(init.body)) as Record<string, unknown>);
-      return new Response("{}", {
+      return new Response(JSON.stringify({ closeout: { id: "closeout-1" } }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -67,13 +193,12 @@ describe("WineDetailDrawer bottle state", () => {
     expect(select("Preservation method").value).toBe("vacuum");
     expect(input("actual_remaining_ml").value).toBe("420");
 
-    await click(button("Open bottle"));
     await click(button("Close bottle"));
 
     expect(requests).toEqual([
-      { wine_id: "wine-2", preservation_method: "vacuum" },
       {
-        wine_id: "wine-2",
+        open_bottle_id: "bottle-1",
+        expected_opened_at: "2026-08-19T10:00:00.000Z",
         actual_remaining_ml: 420,
         written_off_ml: 0,
       },
@@ -82,11 +207,225 @@ describe("WineDetailDrawer bottle state", () => {
     await act(async () => root.unmount());
   });
 
+  it("reuses the open operation UUID after a network-uncertain failure", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({
+        open_bottle: {
+          id: "66666666-6666-4666-8666-666666666666",
+          wine_id: "55555555-5555-4555-8555-555555555555",
+          opened_at: "2026-09-23T12:00:00.000Z",
+          remaining_ml: 750,
+        },
+      }, 201));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderDrawer(root, row({
+      open_bottle_id: null,
+      opened_at: null,
+      open_remaining_ml: null,
+      theoretical_remaining_ml: null,
+      sealed_count: 2,
+      glass_pour_ml: null,
+    }));
+
+    await click(button(container, "Open bottle"));
+    await click(button(container, "Retry prior open"));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const retryHeaders = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(firstHeaders.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(retryHeaders.get("Idempotency-Key")).toBe(
+      firstHeaders.get("Idempotency-Key"),
+    );
+    await act(async () => root.unmount());
+  });
+
+  it("reuses the pour operation UUID after a network-uncertain failure", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({
+        open_bottle: {
+          id: "66666666-6666-4666-8666-666666666666",
+          wine_id: "55555555-5555-4555-8555-555555555555",
+          opened_at: "2026-09-23T12:00:00.000Z",
+          remaining_ml: 350,
+        },
+      }, 200));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderDrawer(root, row({
+      wine_list_item_id: "list-item-1",
+      glass_pour_ml: 150,
+      pour_size_mode: "fixed",
+      size_ml: 750,
+      open_remaining_ml: 500,
+      sealed_count: 2,
+    }));
+
+    const pour = () => [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((item) => item.textContent?.startsWith("Pour "))!;
+    await click(pour());
+    await click(button(container, "Retry prior pour"));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const retryHeaders = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(retryHeaders.get("Idempotency-Key")).toBe(
+      firstHeaders.get("Idempotency-Key"),
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      wine_id: "wine-1",
+      ml: 150,
+      kind: "pour",
+      preservation_method: "coravin",
+    });
+    await act(async () => root.unmount());
+  });
+
   it("also changes the remount key for a replacement bottle of the same wine", () => {
     const first = row({ wine_id: "wine-1", opened_at: "2026-08-18T10:00:00.000Z" });
     const replacement = row({ wine_id: "wine-1", opened_at: "2026-08-19T10:00:00.000Z" });
 
     expect(drawerStateKey(first)).not.toBe(drawerStateKey(replacement));
+  });
+
+  it("keeps an unresolved physical pour frozen when a sibling opens", async () => {
+    const bottleA = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const bottleB = physicalBottle("77777777-7777-4777-8777-777777777777", 750);
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({
+        open_bottle: {
+          id: bottleA.id,
+          wine_id: "wine-1",
+          opened_at: bottleA.openedAt,
+          remaining_ml: 450,
+        },
+      }, 200));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const initial = row({
+      activeBottleCount: 1,
+      activeOpenMl: 600,
+      activeBottles: [bottleA],
+      opened_at: bottleA.openedAt,
+      glass_pour_ml: 150,
+    });
+
+    await renderPhysicalDrawer(root, initial, bottleA.id);
+    await click(button(container, "Pour 5.1 oz"));
+    const withSibling = row({
+      activeBottleCount: 2,
+      activeOpenMl: 1350,
+      activeBottles: [bottleA, bottleB],
+      opened_at: null,
+      glass_pour_ml: 150,
+    });
+    await renderPhysicalDrawer(root, withSibling, bottleB.id);
+
+    expect(button(container, "Retry prior pour")).toBeDefined();
+    await click(button(container, "Retry prior pour"));
+    const first = fetchMock.mock.calls[0];
+    const retry = fetchMock.mock.calls[1];
+    expect(JSON.parse(String(first[1]?.body))).toEqual({
+      wine_id: "wine-1",
+      open_bottle_id: bottleA.id,
+      ml: 150,
+      kind: "pour",
+    });
+    expect(retry[1]?.body).toBe(first[1]?.body);
+    expect(new Headers(retry[1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(first[1]?.headers).get("Idempotency-Key"));
+    await act(async () => root.unmount());
+  });
+
+  it("keeps the exact unresolved pour retry when refreshed physical state is invalid", async () => {
+    const bottle = physicalBottle("66666666-6666-4666-8666-666666666666", 600);
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(jsonResponse({ error: "still unconfirmed" }, 500));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderPhysicalDrawer(root, row({
+      activeBottleCount: 1, activeOpenMl: 600, activeBottles: [bottle],
+      opened_at: bottle.openedAt, glass_pour_ml: 150, sealed_count: 2,
+    }), bottle.id);
+
+    await click(button(container, "Pour 5.1 oz"));
+    await renderPhysicalDrawer(root, row({
+      activeBottleCount: 1, activeOpenMl: 600, activeBottles: undefined as never,
+      opened_at: bottle.openedAt, glass_pour_ml: 150, sealed_count: 2,
+    }), bottle.id);
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Bottle data could not be verified",
+    );
+    expect(button(container, "Retry prior pour")).toBeDefined();
+    expect(button(container, "Open another bottle")).toBeUndefined();
+    expect(button(container, "Undo last pour (5.1 oz)")).toBeUndefined();
+    await click(button(container, "Retry prior pour"));
+
+    const first = fetchMock.mock.calls[0];
+    const retry = fetchMock.mock.calls[1];
+    expect(retry[1]?.body).toBe(first[1]?.body);
+    expect(new Headers(retry[1]?.headers).get("Idempotency-Key"))
+      .toBe(new Headers(first[1]?.headers).get("Idempotency-Key"));
+    await act(async () => root.unmount());
+  });
+
+  it("threads the exact physical pour receipt into Undo", async () => {
+    const wineId = "55555555-5555-4555-8555-555555555555";
+    const bottle = {
+      ...physicalBottle("66666666-6666-4666-8666-666666666666", 600),
+      wineId,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        pour_event_id: "77777777-7777-4777-8777-777777777777",
+        open_bottle: {
+          id: bottle.id, wine_id: wineId, opened_at: bottle.openedAt,
+          remaining_ml: 450,
+        },
+      }, 200))
+      .mockResolvedValueOnce(jsonResponse({
+        undo_event_id: "88888888-8888-4888-8888-888888888888",
+        open_bottle: {
+          id: bottle.id, wine_id: wineId, opened_at: bottle.openedAt,
+          remaining_ml: 600,
+        },
+      }, 200));
+    vi.stubGlobal("fetch", exceptCorpusImageFetch(fetchMock));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await renderPhysicalDrawer(root, row({
+      wine_id: wineId, activeBottleCount: 1, activeOpenMl: 600,
+      activeBottles: [bottle], opened_at: bottle.openedAt, glass_pour_ml: 150,
+    }), bottle.id);
+
+    await click(button(container, "Pour 5.1 oz"));
+    await click(button(container, "Undo last pour (5.1 oz)"));
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+      wine_id: wineId,
+      open_bottle_id: bottle.id,
+      reversal_of_event_id: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Idempotency-Key"))
+      .toMatch(/^[0-9a-f-]{36}$/i);
+    await act(async () => root.unmount());
   });
 
   it("hides immediately when Close is tapped while its URL owner catches up", async () => {
@@ -308,6 +647,14 @@ describe("WineDetailDrawer bottle state", () => {
       expect(control?.className, label).toContain("h-11");
     }
 
+    const fullDetail = container.querySelector<HTMLAnchorElement>(
+      'a[href^="/cellar/"]',
+    );
+    expect(fullDetail).not.toBeNull();
+    expect(fullDetail?.className).toContain("inline-flex");
+    expect(fullDetail?.className).toContain("min-h-11");
+    expect(fullDetail?.className).toContain("items-center");
+
     await act(async () => root.unmount());
   });
 });
@@ -325,6 +672,25 @@ async function renderDrawer(root: ReturnType<typeof createRoot>, value: CellarWi
       </ToastProvider>,
     );
   });
+}
+
+async function renderPhysicalDrawer(
+  root: ReturnType<typeof createRoot>,
+  value: CellarWineRow,
+  selectedBottleId: string,
+) {
+  await act(async () => root.render(
+    <ToastProvider>
+      <WineDetailDrawer
+        key={drawerStateKey(value, 2)}
+        row={value}
+        inventoryContractVersion={2}
+        selectedBottleId={selectedBottleId}
+        canManage
+        onClose={() => undefined}
+      />
+    </ToastProvider>,
+  ));
 }
 
 async function change(element: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -387,6 +753,22 @@ function jsonResponse(body: unknown, status: number) {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function physicalBottle(id: string, remainingMl: number) {
+  return {
+    id,
+    wineId: "wine-1",
+    remainingMl,
+    nominalCapacityMl: 750,
+    openedAt: "2026-09-23T12:00:00.000Z",
+    preservationMethod: "coravin" as const,
+    sourceProvenance: "known" as const,
+    sourceBinLocation: "A-1",
+    identityContract: 2 as const,
+    identityOrigin: "native" as const,
+    stateVersion: 1,
+  };
 }
 
 function select(label: string) {

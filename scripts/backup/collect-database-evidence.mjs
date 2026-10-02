@@ -6,13 +6,13 @@ import { pathToFileURL } from "node:url";
 const SERVICE_NAME = process.env.PGSERVICE ?? "terroir_backup";
 const SNAPSHOT_ID = process.env.BACKUP_SNAPSHOT_ID;
 
-function snapshotSql(sql) {
-  if (!SNAPSHOT_ID) return sql;
-  if (!/^[0-9A-Fa-f-]+$/u.test(SNAPSHOT_ID)) {
+function snapshotSql(sql, snapshotId) {
+  if (!snapshotId) return sql;
+  if (!/^[0-9A-Fa-f-]+$/u.test(snapshotId)) {
     throw new Error("BACKUP_SNAPSHOT_ID has an invalid format.");
   }
   return `begin isolation level repeatable read read only;
-set transaction snapshot '${SNAPSHOT_ID}';
+set transaction snapshot '${snapshotId}';
 ${sql};
 commit`;
 }
@@ -37,20 +37,31 @@ export function parseSequenceState(state, schema, sequence) {
   };
 }
 
-function psql(sql) {
+// Restore containers have no network. Keep their queries separate from the
+// production backup's service-file connection and exported snapshot.
+export function evidenceQueryCommand(sql, { container } = {}) {
+  if (container !== undefined && !/^terroir-restore-drill-[0-9]+$/u.test(container)) {
+    throw new Error("Evidence queries require the drill's disposable container name.");
+  }
+  const options = ["-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", "-c"];
+  if (container !== undefined) {
+    return {
+      command: "docker",
+      args: ["exec", container, "psql", "-U", "supabase_admin", "-d", "postgres",
+        ...options, sql],
+    };
+  }
+  return {
+    command: "psql",
+    args: [`service=${SERVICE_NAME}`, ...options, snapshotSql(sql, SNAPSHOT_ID)],
+  };
+}
+
+function psql(sql, transport) {
+  const { command, args } = evidenceQueryCommand(sql, transport);
   const result = spawnSync(
-    "psql",
-    [
-      `service=${SERVICE_NAME}`,
-      "-X",
-      "-A",
-      "-t",
-      "-q",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-c",
-      snapshotSql(sql),
-    ],
+    command,
+    args,
     { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
   );
   if (result.status !== 0) {
@@ -61,7 +72,7 @@ function psql(sql) {
   return result.stdout.trim();
 }
 
-function listTables() {
+function listTables(transport) {
   const output = psql(
     `select n.nspname || E'\\t' || c.relname
      from pg_catalog.pg_class c
@@ -76,7 +87,7 @@ function listTables() {
            and d.objid = c.oid
            and d.deptype = 'e'
        )
-     order by n.nspname collate "C", c.relname collate "C"`,
+     order by n.nspname collate "C", c.relname collate "C"`, transport,
   );
   if (!output) return [];
   return output.split("\n").map((line) => {
@@ -88,9 +99,9 @@ function listTables() {
   });
 }
 
-function exactRowCount({ schema, table }) {
+function exactRowCount({ schema, table }, transport) {
   const relation = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-  const output = psql(`select count(*)::text from ${relation}`);
+  const output = psql(`select count(*)::text from ${relation}`, transport);
   const count = Number(output);
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new Error(`Invalid row count for ${schema}.${table}.`);
@@ -98,23 +109,16 @@ function exactRowCount({ schema, table }) {
   return count;
 }
 
-function deterministicChecksum({ schema, table }) {
+function deterministicChecksum({ schema, table }, transport) {
   const relation = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
+  const { command, args } = evidenceQueryCommand(`copy (
+    select pg_catalog.to_jsonb(row_value)::text
+    from ${relation} as row_value
+    order by pg_catalog.to_jsonb(row_value)::text collate "C"
+  ) to stdout`, transport);
   const child = spawn(
-    "psql",
-    [
-      `service=${SERVICE_NAME}`,
-      "-X",
-      "-q",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-c",
-      snapshotSql(`copy (
-         select pg_catalog.to_jsonb(row_value)::text
-         from ${relation} as row_value
-         order by pg_catalog.to_jsonb(row_value)::text collate "C"
-       ) to stdout`),
-    ],
+    command,
+    args,
     { stdio: ["ignore", "pipe", "pipe"] },
   );
   const hash = createHash("sha256");
@@ -141,10 +145,10 @@ function deterministicChecksum({ schema, table }) {
   });
 }
 
-function migrationVersion() {
+function migrationVersion(transport) {
   const relation = "supabase_migrations.schema_migrations";
   const exists = psql(
-    `select pg_catalog.to_regclass('${relation}') is not null`,
+    `select pg_catalog.to_regclass('${relation}') is not null`, transport,
   );
   if (exists !== "t") return null;
   return (
@@ -152,12 +156,12 @@ function migrationVersion() {
       `select version::text
        from ${relation}
        order by version::text desc
-       limit 1`,
+       limit 1`, transport,
     ) || null
   );
 }
 
-function listSequences() {
+function listSequences(transport) {
   const output = psql(
     `select n.nspname || E'\\t' || c.relname
      from pg_catalog.pg_class c
@@ -172,7 +176,7 @@ function listSequences() {
            and d.objid = c.oid
            and d.deptype = 'e'
        )
-     order by n.nspname collate "C", c.relname collate "C"`,
+     order by n.nspname collate "C", c.relname collate "C"`, transport,
   );
   if (!output) return [];
   return output.split("\n").map((line) => {
@@ -182,16 +186,16 @@ function listSequences() {
     }
     const relation = `${quoteIdentifier(schema)}.${quoteIdentifier(sequence)}`;
     const state = psql(
-      `select last_value::text || E'\\t' || is_called::text from ${relation}`,
+      `select last_value::text || E'\\t' || is_called::text from ${relation}`, transport,
     );
     return parseSequenceState(state, schema, sequence);
   });
 }
 
-export async function collectDatabaseEvidence() {
-  const tables = listTables().map((entry) => ({
+export async function collectDatabaseEvidence(transport) {
+  const tables = listTables(transport).map((entry) => ({
     ...entry,
-    row_count: exactRowCount(entry),
+    row_count: exactRowCount(entry, transport),
   }));
   const largest = tables
     .filter(({ row_count }) => row_count > 0)
@@ -208,18 +212,18 @@ export async function collectDatabaseEvidence() {
   for (const entry of largest) {
     checksummed.push({
       ...entry,
-      sha256: await deterministicChecksum(entry),
+      sha256: await deterministicChecksum(entry, transport),
     });
   }
 
   return {
     format_version: 1,
-    migration_version: migrationVersion(),
+    migration_version: migrationVersion(transport),
     included_schemas: [
       ...new Set(tables.map(({ schema }) => schema)),
     ],
     tables,
-    sequences: listSequences(),
+    sequences: listSequences(transport),
     largest_non_empty_tables: checksummed,
   };
 }
@@ -230,11 +234,12 @@ function lexicalCompare(left, right) {
 
 export async function writeDatabaseEvidence({
   file = process.env.BACKUP_EVIDENCE_FILE,
+  container,
 } = {}) {
   if (!file) throw new Error("BACKUP_EVIDENCE_FILE is required.");
   writeFileSync(
     file,
-    `${JSON.stringify(await collectDatabaseEvidence(), null, 2)}\n`,
+    `${JSON.stringify(await collectDatabaseEvidence({ container }), null, 2)}\n`,
     "utf8",
   );
 }

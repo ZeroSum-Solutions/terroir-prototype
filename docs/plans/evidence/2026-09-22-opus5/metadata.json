@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-22",
+  "requestedModel": "claude-opus-5",
+  "reportedModels": [
+    "claude-haiku-4-5-20251001",
+    "claude-opus-5"
+  ],
+  "reviewModel": "claude-opus-5",
+  "sessionId": "ed84b086-a80d-492a-af3f-a2d07855c634",
+  "auth": "Claude Max subscription verified before call",
+  "tools": "disabled",
+  "permissionDenials": [],
+  "webSearchRequests": 0,
+  "webFetchRequests": 0,
+  "terminalReason": "completed",
+  "scope": "Supplied audit proposal and exact repository excerpts; no independent live inspection"
+}

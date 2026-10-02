@@ -10,8 +10,8 @@ would ever have said so out loud. This is that procedure.
 **Railway deploys `main`. Nothing deploys migrations.** `railway.toml` sets
 `startCommand = "pnpm start"` and that is the whole deploy. A merge to `main` ships
 application code to *both* the `production` and `staging` Railway environments at the
-same SHA — see `.github/workflows/staging-smoke.yml` — and touches the database not at
-all.
+same SHA — see the [staging smoke workflow](../../.github/workflows/staging-smoke.yml) —
+and touches the database not at all.
 
 **There is one Supabase project.** `terroir` / `qcfmwphlaekfkqwkfyth`, in the
 `Zerosumsolutions-Projects` org. Railway production and staging both point at it, so
@@ -26,8 +26,10 @@ code is still talking to.
 
 ### 1. Find the gap
 
+Put a PostgreSQL client compatible with the production database on `PATH` before
+starting.
+
 ```bash
-export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
 DB_URL=$(zsvault get terroir_supabase_admin_db_url)
 psql "$DB_URL" -Atc "select max(version) from supabase_migrations.schema_migrations;"
 ls supabase/migrations/*.sql | tail -1
@@ -92,7 +94,161 @@ done
 ```
 
 Note `--single-transaction` will not protect a migration containing
-`CREATE INDEX CONCURRENTLY`. Check for it first; none exist as of `0136`.
+`CREATE INDEX CONCURRENTLY`. Check for it first; none exist as of `0151`.
+
+### 4a. Special rollback boundary for 0151
+
+The forward `0151` migration follows the one-transaction apply procedure above. Its
+paired down is deliberately different: it owns its own `BEGIN`/`COMMIT`, takes an
+exclusive lock on `inventory_command_receipts`, and refuses before changing any object
+when even one receipt exists. Do not wrap that down in `--single-transaction`, and do
+not run it while application traffic is active.
+
+Receipts are the replay boundary for already-committed physical effects. If the guard
+reports `cannot_down_0151_inventory_command_receipts_not_empty`, stop. Do not truncate,
+delete, or bypass the guard to make the rollback run; retaining or reconciling those
+receipts requires a separate reviewed migration and incident plan. The verified empty
+down restores the prior Undo function before removing the receipt table; reapplying
+`0151` then restores the RPC and an empty receipt table.
+
+A code-only downgrade to an older inventory handler is not retry-safe merely because
+the 0151 table remains. The older handler ignores the new `Idempotency-Key`, so an
+outstanding new-client retry can apply its physical effect twice. Before any application
+downgrade, quiesce affected inventory traffic and assess outstanding client operations;
+otherwise keep the receipt-aware endpoint in service until those operations are resolved.
+
+### 4b. Maintenance-window and operator boundary for 0152
+
+Migration 0152 is backward-compatible after commit, but applying its schema is an
+explicit maintenance-window operation. It does not promise zero downtime.
+
+1. Pause application ingress, background jobs, invitation acceptance, and auth signup.
+   Let in-flight writers drain. Do not terminate sessions without separate incident
+   authority.
+2. Resolve the exact production migration credential. Do not assume a role named
+   `postgres` can lock or alter `auth.users`: table ownership and role membership vary
+   by environment. With traffic still paused, use that same credential for the bundled
+   no-DDL catalog and lock preflight, and retain its complete output:
+
+   ```bash
+   psql "$DB_URL" -X -v ON_ERROR_STOP=1 \
+     -f scripts/0152-production-preflight.sql
+   ```
+
+   Before the forward migration, this proves that `current_user` is the **direct shared
+   owner** of `public.restaurants`, `public.memberships`, and the existing
+   `public.handle_new_user()` function; has `USAGE` plus `CREATE` on schema `public`;
+   has `USAGE` on schema `auth`; has both `REFERENCES` and the narrowly required
+   runtime `SELECT` on `auth.users`; can execute `auth.uid()` and
+   `seed_reason_codes(uuid)`; can use `membership_role` and the SQL/PLpgSQL languages;
+   has either `rolsuper` or `rolbypassrls` so the provenance trigger can distinguish an
+   actually deleted auth parent from an RLS-hidden live one; and can obtain the exact
+   forward lock set. The evidence also reports inherited authority with PostgreSQL's
+   correctly spelled `pg_has_role(..., 'USAGE')`, but inherited-only ownership is
+   rejected: `CREATE OR REPLACE` preserves the signup function's security-definer
+   owner while new objects belong to `current_user`. If the connection login is only a
+   member of the shared owner, explicitly `SET ROLE` to that owner before running both
+   this preflight and the migration. The preflight records `rolsuper` and
+   `rolbypassrls`; one must be true for auth-row visibility, but neither substitutes
+   for the coherent direct-owner boundary. Ownership of `auth.users` is not required.
+
+   Any failed catalog gate, permission error, or SQLSTATE `55P03` blocks the apply. Do
+   not grant broader access ad hoc; resolve the approved migration operator and its
+   established role membership with the provider, then repeat the complete preflight.
+3. Apply through the direct PostgreSQL session used by this runbook. The migration and
+   its `schema_migrations` row must share one outer transaction:
+
+   ```bash
+   psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -q \
+     -f supabase/migrations/0152_workspace_access_foundation.sql \
+     -c "insert into supabase_migrations.schema_migrations(version,name) values ('0152','workspace_access_foundation');"
+   ```
+
+4. The migration's first statements take `SHARE ROW EXCLUSIVE NOWAIT` on `auth.users`
+   and `ACCESS EXCLUSIVE NOWAIT` on `restaurants` plus `memberships`. SQLSTATE `55P03`
+   is a clean pre-DDL refusal: keep the maintenance window in place, identify and drain
+   the conflicting session, and make one deliberate retry. Never loop-retry against
+   live traffic.
+5. After commit, run containment, signup, old-writer, cascade, exact-capability,
+   privilege, and query-plan smokes before restoring traffic. Existing application code
+   may resume because omitted workspace/lifecycle columns are derived by compatibility
+   triggers; application code that depends on the new schema must not deploy first.
+   During the pre-deployment window, generate and check types only against the guarded
+   local schema (`node scripts/generate-supabase-types.mjs --local` /
+   `pnpm run types:check:local`). Hosted type generation is expected to fail closed until
+   0152 has been separately authorized and applied there; never apply a production
+   migration merely to resolve local compilation.
+6. The paired down owns its own explicit transaction and must not be wrapped in
+   `--single-transaction`. It also requires paused traffic and refuses any state that the
+   legacy model cannot preserve. Re-run the bundled preflight with the exact rollback
+   credential after 0152 exists; it then checks direct ownership of the four public
+   tables and all C04 functions and probes the down lock set. The down itself first
+   takes `ACCESS EXCLUSIVE NOWAIT` on `auth.users`, then on `workspaces`, `restaurants`,
+   `workspace_memberships`, and `memberships`, before its first guard or DDL. SQLSTATE
+   `55P03` is a clean no-change refusal; do not loop-retry it against traffic.
+
+Generic migration runners are not approved for production 0152 unless their per-file
+transaction boundary has been demonstrated. The local/disposable path uses `psql -1`;
+the repository production path uses `psql --single-transaction`.
+
+The first-line `DRAFT ONLY` comment in `0152_workspace_access_foundation.sql` is a
+sealed historical marker, not the current release decision. Do not edit it: the
+admission tests pin that migration's exact SHA-256. Production approval lives in this
+runbook, the current preflight, the verified backup/restore evidence, and the explicit
+maintenance-window execution record.
+
+### 4c. Physical and operational cutover: 0153 through 0164
+
+Migrations `0153`–`0155` are additive preparation. Migration `0156` retires fresh
+version-1 inventory commands and seals direct writes to the physical-event tables;
+`0158` retires the old two-write bottle receiving path. This is therefore one
+maintenance window, not a series of live rolling changes.
+
+1. Keep both Railway web environments and every worker that can write this database
+   at zero replicas. Confirm in-flight sessions have drained. The same Supabase project
+   serves staging and production, so pausing only one environment is insufficient.
+2. Run the `0153`, `0154`, and `0156` preflights immediately before their matching
+   migrations. Apply `0153`, `0154`, and `0155` one at a time using the atomic
+   migration-plus-ledger-row procedure in step 4.
+   Immediately after `0154`, run `scripts/0154-production-capability-bootstrap.sql`
+   in one transaction with an owner-reviewed JSON manifest of exact
+   `membership_id`/`actor_user_id` pairs and the exact expected entry count. The
+   bootstrap refuses role-derived discovery, non-owner or stale identities,
+   pre-existing grant history, duplicate memberships, or partial results. It calls
+   the same governed replacement function as the application and grants the three
+   accepted owner capabilities (`cost.read`, `margin.read`, `pricing.manage`). Do not
+   proceed to `0157` until its `C04_0154_CAPABILITY_BOOTSTRAP_PASS` receipt reports
+   three active grants for every manifest membership.
+3. Apply `0156`, then run `scripts/0156-production-postflight.sql`. Do not restore the
+   old application: fresh calls to `execute_inventory_command` now refuse with
+   `legacy_inventory_command_retired` by design.
+4. Before `0157`, every committed invoice line must name a valid same-tenant wine.
+   If the reviewed preflight identifies the one known historical scan, run
+   `scripts/0157-production-remediation.sql` in its own transaction with the exact
+   reviewed scan id, line count, and preimage MD5. The script locks its target,
+   requires a one-to-one inventory match, changes only missing `wine_id` fields, and
+   refuses any preimage drift. Never generalize or bypass those guards during release.
+5. Run the `0157` preflight, apply `0157`, and run its postflight. Then acknowledge the
+   still-drained bottle route explicitly when running the `0158` preflight:
+
+   ```bash
+   psql "$DB_URL" -X -v ON_ERROR_STOP=1 -v bottle_route_drained=1 \
+     -f scripts/0158-production-preflight.sql
+   ```
+
+6. Apply `0158`, run its postflight, then apply `0159` through `0164` individually.
+   Keep the route drained until the application containing the exact physical-bottle
+   and receiving RPC callers is deployed successfully.
+7. Verify a contiguous hosted ledger through `0164`, physical inventory contract
+   version 2, the remediated scan postimage, and the object/capability assertions in
+   the postflights. Only then merge/deploy the application. Resume web replicas after
+   both Railway environments report the merged release SHA and `/api/health` confirms
+   database connectivity.
+
+The CI lifecycle intentionally mirrors this boundary: legacy live suites execute at
+`0155`, then the repository cutover helper applies and verifies `0156`–`0164` before
+current-schema E2E. A green local cutover is necessary but does not replace the hosted
+backup, maintenance-window, preflight, or postflight evidence above.
 
 ### 5. Verify the effect, not the record
 

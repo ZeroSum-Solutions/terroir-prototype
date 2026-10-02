@@ -279,7 +279,7 @@ describe("reconciliation semantics", () => {
     expect(errors).toContain(
       "reconciliation summary must be derived from contract documents",
     );
-    expect(errors).toContain("all 269 feature-ledger requirements must remain active");
+    expect(errors).toContain("all 328 feature-ledger requirements must remain active");
     expect(errors).toContain("TER-020 plan leaf IDs must be unique, exact, and ordered");
   });
 
@@ -336,9 +336,13 @@ describe("checked-in API contract gate", () => {
       // The import template moved off a data: URI onto a real route,
       // GET /api/import/template, because mobile Safari will not download a
       // data: URL and navigated the tab to raw CSV instead — 114 + 1 = 115.
-      discoveredOperationCount: 115,
-      plannedOperationCount: 15,
-      classificationCount: 115,
+      // C03 added the authenticated cost-free lookup projection at
+      // GET /api/offline-context — 115 + 1 = 116.
+      // C04 added the owner-governed capability replacement endpoint at
+      // PUT /api/team/members/[id]/capabilities — 116 + 1 = 117.
+      discoveredOperationCount: 117,
+      plannedOperationCount: 18,
+      classificationCount: 117,
     });
     expect(paths.map((file) => readFileSync(resolve(file), "utf8"))).toEqual(
       before,

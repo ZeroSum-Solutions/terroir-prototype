@@ -19,6 +19,7 @@ import type { Database } from "@/types/database";
 import { confirmImportBatch, applyImportBatchChunk, resolveImportBatchRow, revertImportBatch } from "./batch-service";
 import { buildImportPreview } from "./preview-service";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -43,6 +44,10 @@ if (!hasLiveDb && process.env.CI) {
 
 function csvBuffer() {
   return Buffer.from("producer,name,vintage,quantity,unit_cost\nCross Tenant Producer,Cross Tenant Wine,2020,6,24.50\n");
+}
+
+function bar4CsvBuffer() {
+  return Buffer.from("producer,name,vintage,quantity,unit_cost\nBar 4 Producer,Bar 4 Wine,2021,6,24.50\n");
 }
 
 /**
@@ -73,6 +78,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
   let userBClient: SupabaseClient<Database>;
   let userAId: string;
   let userBId: string;
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -88,20 +94,18 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const run = Date.now();
     const password = "G1-4-Tenant-Test-123!";
 
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `g1-4-tenant-a-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create user A");
     userAId = userA.user.id;
 
-    const { data: userB, error: userBErr } = await admin.auth.admin.createUser({
+    const userB = await identities.createUser(admin, {
       email: `g1-4-tenant-b-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userBErr || !userB) throw userBErr ?? new Error("failed to create user B");
     userBId = userB.user.id;
 
     const { error: memAErr } = await admin.from("memberships").insert({
@@ -131,16 +135,21 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
       producer: "Cross Tenant Producer",
     } as never);
     if (lwinError) throw lwinError;
+
+    const { error: bar4LwinError } = await admin.from("lwin_catalog").insert({
+      lwin_id: "G14-BAR-4-TEST",
+      display_name: "Bar 4 Wine",
+      producer: "Bar 4 Producer",
+    } as never);
+    if (bar4LwinError) throw bar4LwinError;
   });
 
   afterAll(async () => {
-    await admin.from("lwin_catalog").delete().eq("lwin_id", "G14-TENANT-TEST");
+    await admin.from("lwin_catalog").delete().in("lwin_id", ["G14-TENANT-TEST", "G14-BAR-4-TEST"]);
     // Cascades: import_batches, import_batch_rows, memberships, and
     // inventory_items/wines this suite created all FK restaurant_id ON
     // DELETE CASCADE.
-    await admin.from("restaurants").delete().in("id", [restaurantA, restaurantB]);
-    if (userAId) await admin.auth.admin.deleteUser(userAId);
-    if (userBId) await admin.auth.admin.deleteUser(userBId);
+    await identities.cleanup(admin, { restaurantIds: [restaurantA, restaurantB] });
   });
 
   // BLOCK 2 (round-13 fix) — match_lwin_bulk (0076_csv_import_batches.sql)
@@ -179,14 +188,10 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const { data: rowsAsB } = await userBClient.from("import_batch_rows").select("id").eq("batch_id", batchId);
     expect(rowsAsB ?? []).toHaveLength(0);
 
-    // User B calling apply on it now fails loudly instead of silently
-    // processing nothing: C17 (0082) added an explicit re-validation
-    // inside apply_import_batch_chunk that raises P0002 when the batch
-    // itself isn't visible to the caller (RLS on import_batches filters
-    // it out for a non-member of restaurant A), turning what used to be
-    // a silent "processed zero rows" no-op into an actionable error —
-    // the same idiom revert_import_batch already uses (see below).
-    await expect(applyImportBatchChunk(userBClient, batchId)).rejects.toMatchObject({ code: "P0002" });
+    // User B calling apply on it fails with PostgreSQL's generic
+    // insufficient-privilege code. The final sealed RPC intentionally
+    // does not reveal whether the foreign batch exists.
+    await expect(applyImportBatchChunk(userBClient, batchId)).rejects.toMatchObject({ code: "42501" });
 
     // Prove that the rejected attempt really did nothing to tenant A's
     // data: as user A, the row is still not_applied.
@@ -200,9 +205,9 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     const appliedInventoryItemId = applyAsA.processed[0].inventoryItemId!;
 
     // User B cannot revert it either — the batch is invisible to them,
-    // so revert_import_batch's own lookup reports "not found", not
+    // so the typed revert operation reports "not found", not
     // "not completed" (which would leak that the batch exists).
-    const revertAsB = await revertImportBatch(userBClient, restaurantB, batchId, admin);
+    const revertAsB = await revertImportBatch(userBClient, restaurantB, batchId);
     expect(revertAsB).toMatchObject({ ok: false, error: { code: "not_found" } });
 
     // The batch is untouched by user B's attempt — still completed, not reverted.
@@ -210,13 +215,11 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     expect((batchAfterAttempt as { status: string }).status).toBe("completed");
 
     // User A can revert their own batch, which actually removes the
-    // inventory row it created. This wine was freshly created by this
-    // batch's own apply step and has no other references once its
-    // inventory is gone, so orphan cleanup removes it too — see "bar 4"
-    // below, which relies on that (it inserts its own pre-existing wine
-    // fixture rather than reusing this one for exactly that reason).
-    const revertAsA = await revertImportBatch(userAClient, restaurantA, batchId, admin);
-    expect(revertAsA).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 1, lwinStampsCleared: 0, cleanupTruncated: false, orphanCleanupSkipped: false, cleanupFailures: 0 });
+    // inventory row it created while retaining the catalog wine and history.
+    // The final revert contract also clears the exact LWIN stamp this batch
+    // wrote, so the retained wine returns to its pre-import identity state.
+    const revertAsA = await revertImportBatch(userAClient, restaurantA, batchId);
+    expect(revertAsA).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 0, lwinStampsCleared: 1 });
 
     const { data: inventoryAfterRevert } = await admin
       .from("inventory_items")
@@ -227,20 +230,16 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
   });
 
   it("bar 4: revert removes only the inventory it created, never pre-existing inventory for the same wine", async () => {
-    // The previous test's own wine no longer exists — its revert's
-    // orphan-wine cleanup deleted it (nothing referenced it once its
-    // inventory was gone). So this test creates its OWN pre-existing wine
-    // fixture directly, matching the same dedup key (restaurant/producer/
-    // name/vintage/size) the new import below will upsert onto — this is
-    // also a truer fixture for what "pre-existing" means here: a wine a
-    // manual add or scan created, never a prior batch's leftovers.
+    // Create an explicit pre-existing wine fixture, matching the same dedup
+    // key the import below will upsert onto. This models a wine created by a
+    // manual add or scan before the import.
     const { data: existingWine, error: wineError } = await admin
       .from("wines")
       .insert({
         restaurant_id: restaurantA,
-        producer: "Cross Tenant Producer",
-        name: "Cross Tenant Wine",
-        vintage: 2020,
+        producer: "Bar 4 Producer",
+        name: "Bar 4 Wine",
+        vintage: 2021,
         size_ml: 750,
       } as never)
       .select("id")
@@ -261,7 +260,7 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     if (invError || !preExisting) throw invError ?? new Error("failed to insert pre-existing inventory");
     const preExistingId = (preExisting as { id: string }).id;
 
-    const confirmed = await confirmImportBatch(userAClient, restaurantA, userAId, "second-import.csv", csvBuffer());
+    const confirmed = await confirmImportBatch(userAClient, restaurantA, userAId, "second-import.csv", bar4CsvBuffer());
     expect(confirmed.ok).toBe(true);
     if (!confirmed.ok || confirmed.alreadyExists) return;
 
@@ -287,22 +286,29 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     expect(row.duplicate_reason).toMatchObject({ type: "existing_inventory" });
 
     const resolved = await resolveImportBatchRow(userAClient, restaurantA, userAId, row.id, "include");
-    expect(resolved).toEqual({ ok: true });
+    expect(resolved).toEqual({
+      ok: true,
+      receipt: {
+        rowId: row.id,
+        batchId: confirmed.batchId,
+        status: "resolved",
+        updated: true,
+      },
+    });
 
     const applied = await applyImportBatchChunk(userAClient, confirmed.batchId);
     expect(applied.processed).toEqual([expect.objectContaining({ outcome: "applied" })]);
     const importedInventoryId = applied.processed[0].inventoryItemId!;
     expect(importedInventoryId).not.toBe(preExistingId);
 
-    const reverted = await revertImportBatch(userAClient, restaurantA, confirmed.batchId, admin);
+    const reverted = await revertImportBatch(userAClient, restaurantA, confirmed.batchId);
     // The wine is spared twice over: the pre-existing inventory row still
     // references it, AND it predates this batch (created_at guard). Its
-    // LWIN stamp, however, IS cleared: the local seed's G14-TENANT-TEST
+    // LWIN stamp, however, IS cleared: the local seed's G14-BAR-4-TEST
     // catalog entry exact-matches this fixture (score 1.0), so the
     // batch's apply stamped the pre-existing wine (its lwin was null),
-    // and revert must undo exactly that write — live proof of
-    // clearBatchLwinStamps against real Postgres.
-    expect(reverted).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 0, lwinStampsCleared: 1, cleanupTruncated: false, orphanCleanupSkipped: false, cleanupFailures: 0 });
+    // and revert must undo exactly that write in the same transaction.
+    expect(reverted).toEqual({ ok: true, revertedCount: 1, orphanWinesDeleted: 0, lwinStampsCleared: 1 });
 
     const { data: wineAfterRevert } = await admin
       .from("wines")
@@ -357,7 +363,15 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
 
     if (row.resolution === "pending") {
       const resolved = await resolveImportBatchRow(userAClient, restaurantA, userAId, row.id, "include");
-      expect(resolved).toEqual({ ok: true });
+      expect(resolved).toEqual({
+        ok: true,
+        receipt: {
+          rowId: row.id,
+          batchId: confirmed.batchId,
+          status: "resolved",
+          updated: true,
+        },
+      });
     }
 
     const applied = await applyImportBatchChunk(userAClient, confirmed.batchId);
@@ -419,14 +433,9 @@ describe.skipIf(!hasLiveDb)("G1-4 CSV import: cross-tenant containment (MANDATOR
     } as never);
     expect(adjustmentError).toBeNull();
 
-    // User A reverts their own batch. A's own RLS-scoped client can never
-    // see tenant B's stock_adjustments row (RLS hides it) — without the
-    // service-role reference sweep, the wine would look unreferenced and
-    // get deleted, and Postgres' ON DELETE CASCADE (which bypasses row
-    // security when it fires) would destroy B's row along with it. With
-    // the service-role client passed through, the sweep sees B's row and
-    // spares the wine.
-    const reverted = await revertImportBatch(userAClient, restaurantA, confirmed.batchId, admin);
+    // User A reverts their own batch. The atomic database operation retains
+    // catalog wines, so the tenant-B history row cannot be cascade-deleted.
+    const reverted = await revertImportBatch(userAClient, restaurantA, confirmed.batchId);
     expect(reverted.ok).toBe(true);
     if (!reverted.ok) return;
     expect(reverted.orphanWinesDeleted).toBe(0);

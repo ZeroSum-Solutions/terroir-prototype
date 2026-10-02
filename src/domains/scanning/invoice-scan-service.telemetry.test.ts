@@ -1,30 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * M1-1 — proves `processInvoiceScanOnce` emits the expected per-stage
- * Sentry spans end-to-end: one `scan.ocr.page` span per page, one
- * `scan.ocr.merge`, `scan.extract` (attempt 1), `scan.extract.retry`
- * (attempt 2 — only on the G1-12 arithmetic-mismatch retry path, as its
- * own distinctly-named span), and `scan.persist`. Same mocking pattern as
- * `invoice-scan-service.arithmetic.test.ts` / `.test.ts`: OCR and
- * extraction are mocked at the adapter boundary, no live API calls.
- *
- * `@sentry/nextjs`'s `startSpan` is mocked to record every call's
- * `{name, op, attributes}` and simply run the callback — this proves
- * spans are emitted with the right shape without needing a real Sentry
- * backend, and without changing what the wrapped stage returns.
- */
-
-type SpanCall = {
-  name: string;
-  op?: string;
-  attributes?: Record<string, unknown>;
-};
-
-const spanCalls: SpanCall[] = [];
+/** Pipeline regressions after retiring remote per-stage scan telemetry. */
 
 const mockExtractOcr = vi.fn();
 const mockExtractFromOcr = vi.fn();
+const sentry = vi.hoisted(() => ({
+  captureException: vi.fn(),
+  loggerInfo: vi.fn(),
+  startSpan: vi.fn(),
+}));
 vi.mock("@/adapters/ocr/azure-document-intelligence", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/adapters/ocr/azure-document-intelligence")>();
@@ -39,11 +23,9 @@ vi.mock("@/adapters/llm/anthropic-invoice-extraction", () => ({
   extractFromOcr: (...args: unknown[]) => mockExtractFromOcr(...args),
 }));
 vi.mock("@sentry/nextjs", () => ({
-  captureException: vi.fn(),
-  startSpan: (options: SpanCall, callback: () => unknown) => {
-    spanCalls.push(options);
-    return callback();
-  },
+  captureException: sentry.captureException,
+  logger: { info: sentry.loggerInfo },
+  startSpan: sentry.startSpan,
 }));
 
 const { processInvoiceScanOnce } = await import("./invoice-scan-service");
@@ -95,7 +77,7 @@ function makeSupabase() {
   // Chainable AND directly awaitable, matching real supabase-js query
   // builders — the persist write now chains .eq().eq().select("id")
   // (fenced on status='processing', Grok-2); resolving with a non-empty
-  // row array means the fence matches, keeping these span-emission tests
+  // row array means the fence matches, keeping these no-remote-timing tests
   // on the same 200 happy path as before.
   function node(): Record<string, unknown> {
     const n: Record<string, unknown> = {};
@@ -105,8 +87,9 @@ function makeSupabase() {
       Promise.resolve({ data: [{ id: "scan-a" }], error: null }).then(resolve, reject);
     return n;
   }
-  const builder = { update: vi.fn(() => node()) };
-  return { supabase: { from: vi.fn(() => builder) } };
+  const update = vi.fn(() => node());
+  const builder = { update };
+  return { supabase: { from: vi.fn(() => builder) }, update };
 }
 
 async function runScan(
@@ -126,108 +109,87 @@ async function runScan(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  spanCalls.length = 0;
   mockExtractOcr.mockResolvedValue({ rawText: "invoice text", tables: [] });
 });
 
-describe("processInvoiceScanOnce — M1-1 per-stage span emission", () => {
-  it("emits ocr.page, ocr.merge, extract, and persist spans in order for a single-page reconciled scan", async () => {
+function expectNoRemoteTiming() {
+  expect(sentry.startSpan).not.toHaveBeenCalled();
+  expect(sentry.loggerInfo).not.toHaveBeenCalled();
+  expect(sentry.captureException).not.toHaveBeenCalled();
+}
+
+describe("processInvoiceScanOnce without remote scan timing", () => {
+  it("completes each single-page stage once and preserves the reconciled result", async () => {
     mockExtractFromOcr.mockResolvedValueOnce(reconciledInvoice());
-    const { supabase } = makeSupabase();
+    const { supabase, update } = makeSupabase();
 
     const result = await runScan(supabase);
 
     expect(result.status).toBe(200);
-    expect(spanCalls.map((s) => s.name)).toEqual([
-      "scan.ocr.page",
-      "scan.ocr.merge",
-      "scan.extract",
-      "scan.persist",
-    ]);
-    expect(spanCalls.every((s) => s.op === "scan")).toBe(true);
-
-    const [ocrPage, ocrMerge, extract, persist] = spanCalls;
-    expect(ocrPage.attributes).toMatchObject({
-      pageIndex: 0,
-      pageCount: 1,
-      mimeType: "image/jpeg",
-    });
-    expect(ocrMerge.attributes).toMatchObject({ pageCount: 1 });
-    expect(extract.attributes).toMatchObject({ attempt: 1 });
-    expect(persist.attributes).toMatchObject({ itemCount: 3, arithmeticOk: true });
+    expect((result.body as { arithmetic: { ok: boolean } }).arithmetic.ok).toBe(true);
+    expect(mockExtractOcr).toHaveBeenCalledOnce();
+    expect(mockExtractFromOcr).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledOnce();
+    expectNoRemoteTiming();
   });
 
-  it("emits one ocr.page span per page for a multi-page batch, plus a single ocr.merge", async () => {
+  it("processes each page once, merges once, and persists once", async () => {
     mockExtractOcr.mockImplementation(async (buffer: Buffer) =>
       buffer.toString() === "page one"
         ? { rawText: "PAGE ONE", tables: [] }
         : { rawText: "PAGE TWO", tables: [] },
     );
     mockExtractFromOcr.mockResolvedValueOnce(reconciledInvoice());
-    const { supabase } = makeSupabase();
+    const { supabase, update } = makeSupabase();
 
-    await runScan(supabase, {
+    const result = await runScan(supabase, {
       fileBuffer: Buffer.from("page one"),
       extraFiles: [{ buffer: Buffer.from("page two"), mimeType: "image/png" }],
     });
 
-    const pageSpans = spanCalls.filter((s) => s.name === "scan.ocr.page");
-    expect(pageSpans).toHaveLength(2);
-    expect(pageSpans[0].attributes).toMatchObject({ pageIndex: 0, pageCount: 2, mimeType: "image/jpeg" });
-    expect(pageSpans[1].attributes).toMatchObject({ pageIndex: 1, pageCount: 2, mimeType: "image/png" });
-    expect(spanCalls.filter((s) => s.name === "scan.ocr.merge")).toHaveLength(1);
+    expect(result.status).toBe(200);
+    expect(mockExtractOcr).toHaveBeenCalledTimes(2);
+    expect(mockExtractFromOcr).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledOnce();
+    expectNoRemoteTiming();
   });
 
-  it("emits a distinctly-named extract.retry span (attempt 2) on the G1-12 arithmetic-mismatch retry path", async () => {
+  it("keeps the single arithmetic retry and successful result", async () => {
     mockExtractFromOcr
       .mockResolvedValueOnce(mismatchedInvoice())
       .mockResolvedValueOnce(reconciledInvoice(0.97));
-    const { supabase } = makeSupabase();
+    const { supabase, update } = makeSupabase();
 
     const result = await runScan(supabase);
 
     expect(result.status).toBe(200);
-    const names = spanCalls.map((s) => s.name);
-    expect(names).toEqual([
-      "scan.ocr.page",
-      "scan.ocr.merge",
-      "scan.extract",
-      "scan.extract.retry",
-      "scan.persist",
-    ]);
-
-    const extractSpan = spanCalls.find((s) => s.name === "scan.extract");
-    const retrySpan = spanCalls.find((s) => s.name === "scan.extract.retry");
-    expect(extractSpan?.attributes).toMatchObject({ attempt: 1 });
-    expect(retrySpan?.attributes).toMatchObject({ attempt: 2 });
-    // Exactly one retry span — mirrors the G1-12 "exactly one retry" invariant.
-    expect(names.filter((n) => n === "scan.extract.retry")).toHaveLength(1);
-
-    const persistSpan = spanCalls.find((s) => s.name === "scan.persist");
-    expect(persistSpan?.attributes).toMatchObject({ arithmeticOk: true });
+    expect((result.body as { arithmetic: { ok: boolean } }).arithmetic.ok).toBe(true);
+    expect(mockExtractOcr).toHaveBeenCalledOnce();
+    expect(mockExtractFromOcr).toHaveBeenCalledTimes(2);
+    expect(update).toHaveBeenCalledOnce();
+    expectNoRemoteTiming();
   });
 
-  it("still emits persist with arithmeticOk: false when the retry itself fails validation", async () => {
+  it("persists the same arithmetic-failure result after the one retry", async () => {
     mockExtractFromOcr
       .mockResolvedValueOnce(mismatchedInvoice())
       .mockResolvedValueOnce(mismatchedInvoice());
-    const { supabase } = makeSupabase();
+    const { supabase, update } = makeSupabase();
 
     const result = await runScan(supabase);
 
     expect(result.status).toBe(200);
-    expect(spanCalls.filter((s) => s.name === "scan.extract.retry")).toHaveLength(1);
-    const persistSpan = spanCalls.find((s) => s.name === "scan.persist");
-    expect(persistSpan?.attributes).toMatchObject({ arithmeticOk: false });
+    expect((result.body as { arithmetic: { ok: boolean } }).arithmetic.ok).toBe(false);
+    expect(mockExtractOcr).toHaveBeenCalledOnce();
+    expect(mockExtractFromOcr).toHaveBeenCalledTimes(2);
+    expect(update).toHaveBeenCalledOnce();
+    expectNoRemoteTiming();
   });
 
-  it("does not emit an extract.retry span, and does not change the response, when startSpan is unavailable", async () => {
-    // Re-import with a minimal Sentry mock (no `startSpan` at all) — the
-    // same shape several other test files in this repo already use for
-    // @sentry/nextjs — to prove withScanSpan's fallback keeps the scan
-    // itself byte-for-byte identical when instrumentation is unusable.
+  it("does not depend on a startSpan export", async () => {
     vi.resetModules();
-    vi.doMock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+    const captureException = vi.fn();
+    vi.doMock("@sentry/nextjs", () => ({ captureException }));
     vi.doMock("@/adapters/ocr/azure-document-intelligence", async (importOriginal) => {
       const actual =
         await importOriginal<typeof import("@/adapters/ocr/azure-document-intelligence")>();
@@ -263,5 +225,6 @@ describe("processInvoiceScanOnce — M1-1 per-stage span emission", () => {
     expect(mockExtractFromOcr).toHaveBeenCalledTimes(2);
     const body = result.body as { arithmetic: { ok: boolean } };
     expect(body.arithmetic.ok).toBe(true);
+    expect(captureException).not.toHaveBeenCalled();
   });
 });

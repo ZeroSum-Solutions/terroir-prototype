@@ -48,7 +48,7 @@ function RecentScansList({ scans }: RecentScansListProps) {
             </span>
             <span className="shrink-0 text-right">
               <span className="tabular block text-body-lg text-ink">
-                ${formatMoney(s.total)}
+                {s.total === null ? "Cost restricted" : `$${formatMoney(s.total)}`}
               </span>
               <span className="mt-2xs block text-ledger text-grey">
                 <span className="tabular">{s.items}</span> wines ·{" "}
@@ -198,6 +198,13 @@ export function ReadyView({
             : "Parsed into inventory in about 20 seconds."}
         </p>
       </header>
+
+      {!disabled && <div className="mb-lg rounded-card card-surface p-md">
+        <p className="text-body-sm text-ink-soft">Already know the wine? Receive one bottle directly into an active bin. Use label scanning below when you need to identify it first.</p>
+        <Link href="/scan-bottle" className="mt-sm flex min-h-11 items-center justify-between gap-sm rounded-pill border border-rule-strong px-md text-control font-medium text-ink focus-ring">
+          Receive a known wine<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+        </Link>
+      </div>}
 
       {/* Mode switch - a glass segmented pill. The size token lives on the
           wrapper so cn() never has to choose between a size and a colour. */}

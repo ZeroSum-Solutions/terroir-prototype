@@ -19,15 +19,32 @@ const { CellarShell } = await import("./cellar-shell");
 
 type Resp = { data: unknown[] | null; error: unknown };
 
-function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
+function makeSupabase(opts: {
+  wines: unknown[];
+  inventoryItems: unknown[];
+  capabilities?: Partial<Record<"cost.read" | "margin.read" | "pricing.manage", boolean>>;
+}) {
   const ranges: Record<string, Array<[number, number]>> = {
     wines: [],
     inventory_items: [],
   };
+  const selects: Record<string, string[]> = {};
   const paginated: Record<string, unknown[]> = {
     wines: opts.wines,
     inventory_items: opts.inventoryItems,
   };
+
+  function rpcResult(data: unknown[]) {
+    const response = { data, error: null };
+    const resolved = Promise.resolve(response);
+    return {
+      range: async (from: number, to: number) => ({
+        data: data.slice(from, to + 1),
+        error: null,
+      }),
+      then: resolved.then.bind(resolved),
+    };
+  }
   const immediate: Record<string, unknown[]> = {
     bins: [],
     open_bottles: [],
@@ -39,7 +56,11 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
 
   function chain(table: string) {
     const self: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "order", "is", "limit", "in", "gte", "neq", "not"]) {
+    self.select = (fields: string) => {
+      (selects[table] ??= []).push(fields);
+      return self;
+    };
+    for (const method of ["eq", "order", "is", "limit", "in", "gte", "neq", "not"]) {
       self[method] = () => self;
     }
     self.range = async (from: number, to: number) => {
@@ -54,8 +75,6 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
             auto_eightysix_from_inventory: false,
             eightysix_ml_threshold: 148,
             eightysix_strategy: "hide",
-            default_target_pour_cost_pct: null,
-            default_target_markup_ratio: null,
           },
           error: null,
         };
@@ -70,13 +89,61 @@ function makeSupabase(opts: { wines: unknown[]; inventoryItems: unknown[] }) {
 
   return {
     ranges,
+    selects,
     from: (table: string) => chain(table),
-    rpc: () => Promise.resolve({ data: [], error: null }),
+    rpc: (name: string, args?: { p_capability_key?: string }) => {
+      if (name === "effective_site_capability") {
+        const key = args?.p_capability_key as "cost.read" | "margin.read" | "pricing.manage";
+        return {
+          abortSignal: () => Promise.resolve({
+            data: opts.capabilities?.[key] ?? false,
+            error: null,
+          }),
+        };
+      }
+      if (name === "read_inventory_costs") {
+        return rpcResult(opts.inventoryItems.map((item) => {
+          const row = item as ReturnType<typeof makeInventoryItem>;
+          return {
+            inventory_item_id: row.id,
+            wine_id: row.wine_id,
+            invoice_scan_id: null,
+            unit_cost: 10,
+            currency: "USD",
+            added_at: row.added_at,
+          };
+        }));
+      }
+      if (name === "read_wine_pricing_strategy") {
+        return rpcResult(opts.wines.map((item) => {
+          const row = item as ReturnType<typeof makeWine>;
+          return {
+            wine_id: row.id,
+            pricing_target_pour_cost_pct: 23,
+            pricing_target_markup_ratio: 3,
+            pricing_dismissed_until: null,
+          };
+        }));
+      }
+      if (name === "read_restaurant_pricing_defaults") {
+        return rpcResult([{
+          restaurant_id: "00000000-0000-4000-8000-000000000001",
+          default_target_pour_cost_pct: 24,
+          default_target_markup_ratio: 3.1,
+        }]);
+      }
+      if (name === "read_cellar_health_private") return rpcResult([]);
+      if (name === "current_inventory_contract_version") {
+        const resolved = Promise.resolve({ data: 1, error: null });
+        return { then: resolved.then.bind(resolved) };
+      }
+      return rpcResult([]);
+    },
   };
 }
 
 function makeWine(i: number) {
-  const id = `wine-${String(i).padStart(4, "0")}`;
+  const id = `00000000-0000-4000-8000-${String(i + 10).padStart(12, "0")}`;
   return {
     id,
     name: `Wine ${String(i).padStart(4, "0")}`,
@@ -104,8 +171,8 @@ function makeWine(i: number) {
     retail_median: null,
     retail_retailer_count: null,
     retail_refreshed_at: null,
-    pricing_target_pour_cost_pct: null,
-    pricing_target_markup_ratio: null,
+    pricing_target_pour_cost_pct: 23,
+    pricing_target_markup_ratio: 3,
     pricing_dismissed_until: null,
     tasting_notes: null,
     hero_image_url: null,
@@ -116,7 +183,8 @@ function makeWine(i: number) {
 
 function makeInventoryItem(i: number) {
   return {
-    wine_id: `wine-${String(i % 1001).padStart(4, "0")}`,
+    id: `10000000-0000-4000-8000-${String(i + 10).padStart(12, "0")}`,
+    wine_id: `00000000-0000-4000-8000-${String((i % 1001) + 10).padStart(12, "0")}`,
     bin_id: null,
     bin_location: null,
     quantity: 1,
@@ -134,7 +202,7 @@ describe("CellarPage cellar-scale read pagination", () => {
 
     mocks.getAuthContext.mockResolvedValue({
       supabase,
-      restaurantId: "restaurant-1",
+      restaurantId: "00000000-0000-4000-8000-000000000001",
       restaurantName: "House",
       userRole: "owner",
       user: { id: "user-1" },
@@ -152,5 +220,43 @@ describe("CellarPage cellar-scale read pagination", () => {
       [0, 999],
       [1000, 1999],
     ]);
+    expect(supabase.selects.inventory_items[0]).not.toContain("unit_cost");
+    expect(element.props.rows[0]).not.toHaveProperty("current_unit_cost");
+    expect(element.props.rows[0].pricing_target_pour_cost_pct).toBeNull();
+    expect(element.props.rows[0].pricing_target_markup_ratio).toBeNull();
+    expect(element.props.defaultTargetPourCostPct).toBeNull();
+    expect(element.props.defaultTargetMarkupRatio).toBeNull();
+    expect(element.props.canReadCost).toBe(false);
+    expect(element.props.canReadMargin).toBe(false);
+    expect(element.props.canManagePricing).toBe(false);
+  });
+
+  it("reads and serializes protected pricing only through exact-capability RPCs", async () => {
+    const supabase = makeSupabase({
+      wines: [makeWine(0)],
+      inventoryItems: [makeInventoryItem(0)],
+      capabilities: { "cost.read": true, "margin.read": true, "pricing.manage": true },
+    });
+    mocks.getAuthContext.mockResolvedValue({
+      supabase,
+      restaurantId: "00000000-0000-4000-8000-000000000001",
+      restaurantName: "House",
+      userRole: "staff",
+      user: { id: "user-1" },
+    });
+
+    const element = await CellarPage();
+
+    expect(supabase.selects.inventory_items[0]).not.toContain("unit_cost");
+    expect(supabase.selects.wines[0]).not.toContain("pricing_target_");
+    expect(supabase.selects.restaurants[0]).not.toContain("default_target_");
+    expect(element.props.rows[0].current_unit_cost).toBe(10);
+    expect(element.props.rows[0].pricing_target_pour_cost_pct).toBe(23);
+    expect(element.props.rows[0].pricing_target_markup_ratio).toBe(3);
+    expect(element.props.defaultTargetPourCostPct).toBe(24);
+    expect(element.props.defaultTargetMarkupRatio).toBe(3.1);
+    expect(element.props.canReadCost).toBe(true);
+    expect(element.props.canReadMargin).toBe(true);
+    expect(element.props.canManagePricing).toBe(true);
   });
 });

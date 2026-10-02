@@ -1,0 +1,76 @@
+-- Capture the exact non-membership state that a post-wait refusal must preserve.
+\set ON_ERROR_STOP on
+\pset pager off
+\if :{?expected_database}
+\else
+  \quit 3
+\endif
+\if :{?target_admitted}
+\else
+  \quit 3
+\endif
+\if :{?batch_id}
+\else
+  \quit 3
+\endif
+\if :{?actor_id}
+\else
+  \quit 3
+\endif
+\if :{?site_id}
+\else
+  \quit 3
+\endif
+\if :{?membership_id}
+\else
+  \quit 3
+\endif
+select 1 / case when current_database()=:'expected_database'
+  and current_user='postgres' and session_user='postgres'
+  and :'target_admitted'='on'
+  and exists(select 1 from public.memberships m
+              where m.id=:'membership_id'::uuid
+                and m.user_id=:'actor_id'::uuid
+                and m.restaurant_id=:'site_id'::uuid
+                and m.status='active' and m.revoked_at is null)
+  and exists(select 1 from public.import_batches b
+              where b.id=:'batch_id'::uuid
+                and b.restaurant_id=:'site_id'::uuid
+                and b.status<>'reverted')
+  and (select pg_catalog.count(*) from public.import_batch_rows r
+        where r.batch_id=:'batch_id'::uuid
+          and r.apply_status='applied'
+          and r.applied_inventory_item_id is not null
+          and r.applied_wine_id is not null)>0
+  and not exists(
+    select 1 from public.import_batch_rows r
+     where r.batch_id=:'batch_id'::uuid and r.apply_status='applied'
+       and (not exists(select 1 from public.inventory_items i
+                        where i.id=r.applied_inventory_item_id)
+         or not exists(select 1 from public.wines w
+                        where w.id=r.applied_wine_id))
+  )
+then 1 else 0 end as c09_0164_authority_baseline_valid;
+with state as (
+  select pg_catalog.jsonb_build_object(
+    'batch',(select pg_catalog.to_jsonb(b) from public.import_batches b
+              where b.id=:'batch_id'::uuid),
+    'rows',(select pg_catalog.jsonb_agg(pg_catalog.to_jsonb(r) order by r.id)
+              from public.import_batch_rows r
+             where r.batch_id=:'batch_id'::uuid),
+    'inventory',(select pg_catalog.jsonb_agg(pg_catalog.to_jsonb(i) order by i.id)
+                   from public.inventory_items i
+                  where i.id in (select r.applied_inventory_item_id
+                                   from public.import_batch_rows r
+                                  where r.batch_id=:'batch_id'::uuid)),
+    'wines',(select pg_catalog.jsonb_agg(pg_catalog.to_jsonb(w) order by w.id)
+               from public.wines w
+              where w.id in (select r.applied_wine_id
+                               from public.import_batch_rows r
+                              where r.batch_id=:'batch_id'::uuid))
+  ) as value
+)
+select pg_catalog.encode(
+  pg_catalog.sha256(pg_catalog.convert_to(state.value::text,'UTF8')),'hex'
+) as c09_0164_before_state_sha256
+from state;

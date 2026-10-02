@@ -33,7 +33,7 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 | Type check | `tsc --noEmit` passed | Baseline type gate is green |
 | Production build | Passed | Current source compiles for deployment |
 | Production health | `/api/health` returned 200 with database connected | Process and database are reachable only |
-| Specification inventory | 269 core feature bullets in `app_spec.txt` | Conflicts with the file's 200-feature budget and the diary's 231/231 claim |
+| Specification inventory | 269 core feature bullets at the 2026-07-20 baseline | Conflicted with the file's 200-feature budget and the diary's 231/231 claim |
 | Browser E2E | Login shell, unauthenticated redirect, and invalid public slug only; pour flow is skipped in CI | Critical workflows are not release-gated |
 | Database backup | Scheduled workflow has failed daily because `SUPABASE_DB_URL` is absent | Recovery is not proven |
 | Staging | No active production-like staging environment | Promotion cannot be rehearsed safely |
@@ -43,7 +43,7 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 
 ### 2.1 Specification truth problem
 
-`app_spec.txt` currently contains 269 core bullets across 17 domains:
+At the 2026-07-20 baseline, `app_spec.txt` contained 269 core bullets across 17 domains:
 
 | Domain | Bullets |
 | --- | ---: |
@@ -69,6 +69,10 @@ The codebase is healthy enough to extend, but it is not yet operationally comple
 The historical progress diary is useful evidence, but it is not an authoritative completion ledger. It records 231/231 while the original spec said both 269 and at most 200.
 
 Resolution recorded 2026-07-23: the product owner directed the team to implement every enumerated feature. All 269 core-feature bullets are active requirements, the former maximum of 200 is superseded, and `docs/feature-ledger.json` is the authoritative completion ledger.
+
+Expansion recorded 2026-09-23: the owner approved four C02 operation-integrity assertions, bringing the current ledger to 273 while preserving all existing requirement IDs.
+
+Second expansion recorded 2026-09-23: the owner approved eight C04 Slice 1 workspace/site shadow-access assertions, bringing the current ledger to 281. Legacy membership helpers remain authoritative until the separately gated cost/RPC conversion; the shadow resolver does not itself enforce application, RLS, or direct-RPC access.
 
 ## 3. Definition of done
 
@@ -96,7 +100,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Authentication methods | Support magic link plus email/password; retain password reset | No approval unless provider or schema changes |
 | Staff access to wine lists | Read-only view with edit controls absent | Safe default |
 | Missing documented GET APIs | Add thin authenticated handlers over existing query modules | Safe unless a route would expose new public data |
-| Offline promise | Amend to resilient ISR and graceful network-failure behavior; do not add a service worker | Stop only if true offline editing is required |
+| Offline promise | Public ISR remains; September 23 C03 approval adds native public-shell cached lookup under TER-048, followed by dependency-gated offline capture | Cached lookup is not offline editing or C03 completion |
 | Invitation delivery | Use a transactional email provider, with the generated link still copyable by owner/manager | Provider choice and production secret require approval |
 | Staff briefing | A restaurant-scoped daily queue that can be viewed, reordered, removed, printed, and copied | Safe default; notifications are out of scope |
 | Voice commands | Browser speech recognition with a typed fallback; all mutations require a confirmation screen | Stop if a paid speech provider is needed |
@@ -104,7 +108,7 @@ The autonomous runner may use the defaults below. It must stop only where the ta
 | Backup connection | Add a dedicated least-privilege direct database URL to GitHub Actions | Secret creation and production restore require approval |
 | Public list navigation | Show a switcher when the same restaurant has multiple published lists | Safe default |
 | Large-file refactors | Split only code touched by a feature, preserving behavior | Safe default |
-| Core feature count | Keep all 269 enumerated bullets active; the former maximum of 200 is superseded | Approved by product owner on 2026-07-23 |
+| Core feature count | Keep all 297 enumerated bullets active; the former maximum of 200 is superseded | Original 269 approved 2026-07-23; four C02, eight C04, nine C08 and seven C03 lookup additions approved 2026-09-23 |
 
 ### 4.1 Human provisioning checklist
 
@@ -173,7 +177,8 @@ The exact prerequisite graph is:
 | TER-043 | TER-004, TER-014, TER-015 |
 | TER-044 | TER-025 through TER-043 as applicable |
 | TER-045 | All implementation specs whose behavior it documents |
-| TER-046 | TER-002 through TER-045 |
+| TER-046 | TER-002 through TER-045, TER-047 through TER-050 |
+| TER-050 | TER-004, TER-010, TER-012, TER-014, TER-020, TER-024, TER-041, TER-044, TER-048 |
 
 Phases are ordered by risk, not visual appeal:
 
@@ -205,20 +210,20 @@ Phases are ordered by risk, not visual appeal:
 
 ### TER-001: Establish the authoritative feature ledger
 
-**Outcome:** One machine-checkable ledger replaces the contradictory 200, 231, and 269 completion claims.
+**Outcome:** One machine-checkable ledger replaces earlier contradictory completion claims and preserves stable IDs as approved requirements are promoted.
 
 **Scope:**
 
 - Parse every core feature bullet from `app_spec.txt` and assign a permanent requirement ID.
 - Classify each item as `active`, `amended`, `duplicate`, or `retired` with a reason.
-- Resolve the “at most 200” budget clause explicitly instead of silently treating 269 as valid.
+- Resolve the “at most 200” budget clause explicitly instead of silently treating the approved enumerated count as valid.
 - Link active items to source, tests, operational evidence, and one completion spec in this document.
 - Mark `claude-progress.txt` as historical evidence and prevent it from serving as the completion counter.
 - Add a CI check for duplicate IDs, missing evidence fields, and unknown statuses.
 
 **Acceptance:**
 
-- The ledger accounts for all 269 current bullets exactly once.
+- The ledger accounts for all 281 current bullets exactly once.
 - The generated totals match the checked-in source.
 - Every active criterion names an actor, action, observable outcome, negative case, and evidence owner.
 - Every non-active item has a rationale and recorded product-owner approval.
@@ -761,8 +766,47 @@ Each child is an independently mergeable leaf spec with its own acceptance subse
 
 **Acceptance:** All required checks pass on the promoted SHA; no active requirement lacks evidence; production auth, public list, health, queue, and key read paths pass; rollback target is recorded; during the 24-hour observation window, HTTP 5xx stays below 1%, synthetic auth and public-list success stay at or above 99%, background-job success stays at or above 95% with queue age below 5 minutes, public-list p95 response time stays below 2 seconds, and no unresolved severity-1 or severity-2 event is opened. Low-volume metrics must be supported by the scheduled synthetic canaries.
 **Verification:** Release manifest with commit, artifact, migrations, checks, staging report, production canary, and rollback reference.
-**Dependencies:** `TER-002` through `TER-045`.
+**Dependencies:** `TER-002` through `TER-045` and `TER-047` through `TER-050`.
 **Approval:** Production schema changes, deployment, data writes, and rollback require explicit approval at the release boundary.
+
+### TER-047: Deliver bounded POS corroboration Slice A
+
+**Outcome:** Staff can inspect durable fixture/manual POS observations and discrepancies without POS data mutating physical inventory or appearing as a live Toast connection.
+
+**Acceptance:** Authenticated fixture/manual imports retain explicit non-live provenance; accepted observations, duplicates, changed-body conflicts, out-of-order snapshots, incomplete mapping, and authorized linked interpretations preserve their reviewed evidence. Every exercised path leaves `pour_events`, `open_bottles`, `inventory_items`, `bottle_closeouts`, `stock_adjustments`, and `inventory_command_receipts` unchanged. Connection and coverage states remain truthful, and no public webhook route or Orders pull exists in Slice A.
+**Verification:** Adapter and persistence tests with signed local fixtures, cross-site containment, row-and-value comparisons for the six forbidden physical relations, API contract tests for the three authenticated Slice A routes, and operator UI tests for provenance, abstention, mismatch, coverage-gap, and connection-state presentation. Live C08 remains gated on the provider evidence in the approved Toast contract.
+**Dependencies:** `TER-004`, `TER-012`, `TER-014`, `TER-020`, `TER-023`, `TER-041`.
+
+### TER-048: Deliver the offline lookup foundation
+
+**Outcome:** Staff can find their site's cached wines and every authorized placement after a disconnected restart, with honest projection age and no costs, private session HTML or offline-write promise.
+
+**Acceptance:** Current server authentication derives the actor/site in `GET /api/offline-context`; its strict allowlist contains neither costs nor roles and every response is `no-store`. Native IndexedDB v1 contains only replaceable contexts and projections. Atomic provisioning locks all other partitions. Invalid, ambiguous, expired or clock-rollback state and storage denial reveal no private rows. The worker caches only the credentialless public shell and exact same-build assets, and reports ready only after every entry succeeds. Sign-out blanks private UI immediately, prevents locked-login loops, clears active-site selection remotely, and reports local-lock failures truthfully; remote success does not imply failed local locks were repaired. New sign-in does not unlock an old partition without fresh provisioning.
+**Verification:** Field-exclusion and authorization tests; real-browser two-store, denial, quota, corruption and clock tests; cache/request inspection; actor/site switch and sign-out failure matrix; hard offline reload and lookup at 320, 390 and 768 pixels. All authorized placements must survive projection and search. This source promotion precedes implementation; all seven requirements remain unimplemented until those proofs pass.
+**Dependencies:** `TER-004`, `TER-010`, `TER-012`, `TER-020`, `TER-044`. The approved offline-operation contract governs implementation. C03 mutation capture remains required after C06 physical-bottle receipts and online count/receiving/placement authority; transfers additionally require C04/C05. TER-048 alone cannot close those criteria.
+
+### TER-049: Deliver bounded CSV identity review
+
+**Outcome:** The active deterministic CSV identity-review baseline remains authoritative, and an authenticated operator may explicitly request one optional display-only producer/cuvee advisory for a currently displayed apply-eligible candidate without changing deterministic matching, review, confirmation, or writes.
+
+**Scope:**
+
+- Preserve incremental apply-eligible candidate display with score and reject/undo, below-threshold non-linking, and confirm-time re-parse/re-match plus approval veto whenever the reviewed set is supplied, including an empty set.
+- Establish the direct-HTTP JEV adapter and producer/cuvee advisory contract first through injected fake transport, clock, and token tests only. This pure leaf adds no caller, route, UI, environment lookup, provider call, action authority, or persistent spend accounting.
+- A later authenticated caller must derive tenant authority server-side, use only normalized `PreviewRow.raw` producer/name text, rederive the global candidate, compare the expected candidate ID/display tuple, and return a server-computed view digest. A request-side digest is not authority, and locked or skipped rows cannot request advice.
+- Any bounded non-private provider evaluation requires a separately frozen model/question/policy, request/attempt/token/dollar ceiling, effective price basis, and sealed held-out protocol. Private tenant runtime additionally requires recorded privacy, retention/deletion, subprocessor, region, telemetry/ZDR, and payload approval. Aggregate spend requires proven provider credit caps or durable accounting; the existing process-local rate limiter is not such a counter.
+
+**Acceptance:** Source promotion preserves the exact first 315 assertion identities and text and appends only `TER-CF-316` and `TER-CF-317` as active requirements. The pure adapter/domain leaf passes exact request, response, minimization, deadline, schema, model, usage, oversize, and fail-closed tests with fake transport, but neither promotion nor those tests mark TER-049 complete. Completion later requires the authenticated caller and operator surface, current candidate and tenant isolation, bounded provider evaluation, provider-failure fallback, privacy approval for any private export, and aggregate-spend enforcement. The dormant adapter now has independently verified synthetic coverage for a 64 KiB delivered-response limit before decoding/JSON materialization, bounded empty-chunk handling, cooperative deadline checks, and body consumption or best-effort cancellation on early returns. These checks do not prove live provider behavior, synchronous socket closure, or an upstream transport memory bound. The 145-test checkpoint at `de9927f7` adds `src/adapters/llm/typesafe-jev-response.ts` beside the adapter and preserves caller activation, privacy, evaluation, and spend gates.
+**Verification:** Official feature-ledger generation and old-315 regression; pure fake-transport adapter/domain tests; later authenticated route, UI, stale-view, locked/skipped-row, tenant/source-isolation, pre-materialization response-byte-bound, and early-return body-consumption/cancellation tests; separately authorized bounded provider evaluation with frozen inputs and raw latency/usage/cost evidence. No live/provider/quality/runtime result may be inferred from source promotion or synthetic tests.
+**Dependencies:** `TER-004`, `TER-010`, `TER-014`, `TER-020`, `TER-023`, `TER-026`, `TER-040`, `TER-044`.
+
+### TER-050: Deliver pilot measurement capability
+
+**Outcome:** Authorized staff can capture provenance-bound lookup, standard-pour, and count-labor evidence and export one deterministic privacy-safe baseline/pilot CSV under the fixed Q7 definitions.
+
+**Acceptance:** Source promotion preserves the complete first 317 source and ledger objects and appends only `TER-CF-318` through `TER-CF-320` as active requirements; promotion does not prove capture, authorization, export, or runtime behavior. TER-050 and the C14 software criterion complete only after server-derived authorization and provenance, versioned phase/window and clock validation, durable capture, the authorized export surface, and end-to-end evidence are implemented and verified. They do not require real four-week pilot observations. A real Q7 success claim separately requires real same-venue baseline evidence, a closed pilot window spanning at least 2,419,200,000,000 microseconds, and every other qualification in the accepted measurement contract. Synthetic fixtures and provisional exports may prove software behavior but cannot claim a real Q7 result. The pure nine-path calculation/export leaf cannot complete TER-050 or C14 by itself.
+**Verification:** Official feature-ledger generation; exact first-317 source and complete-ledger conservation against `006330bb3037bb2ce52f1575ebf105316cfd06ba`; pure arithmetic, denominator/failure, deterministic ordering, privacy projection, and synthetic/real-gate tests; later authorization, capture, persistence, export, and end-to-end integration evidence. Source promotion alone supplies none of that runtime proof.
+**Dependencies:** `TER-004`, `TER-010`, `TER-012`, `TER-014`, `TER-020`, `TER-024`, `TER-041`, `TER-044`, `TER-048`.
 
 ## 7. Autonomous execution contract
 
@@ -873,7 +917,7 @@ These areas should change only when a numbered completion spec requires it. Pass
 The first tranche should run in this exact order:
 
 1. `TER-000`: rotate and constrain the bypass, then require current green checks on `main`.
-2. `TER-001`: produce the 269-item ledger and obtain approval for the budget and classifications.
+2. `TER-001`: produce the original 269-item ledger and obtain approval for the budget and classifications.
 3. `TER-002`: repair scheduled backups and complete a disposable restore.
 4. `TER-003`: create isolated staging and validate auth redirects there.
 5. `TER-004`: establish isolated authenticated E2E fixtures.

@@ -20,14 +20,10 @@ export const QrLookupBodySchema = z.object({
   qr_payload: z.string().uuid(),
 });
 
-export const ConfirmBottleBodySchema = z.object({
+export const ConfirmBottleBodySchema = z.strictObject({
   wine_id: z.string().uuid("wine_id must be a valid UUID"),
   section: z.string().trim().min(1, "section is required").max(200),
-  bin_location: z
-    .string()
-    .trim()
-    .min(1, "bin_location is required")
-    .max(200),
+  bin_id: z.string().uuid("Select an active bin"),
 });
 
 export const SaveBottleScanBodySchema = z.object({

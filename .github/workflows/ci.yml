@@ -110,16 +110,15 @@ jobs:
 
       - name: Start local Supabase
         # supabase/config.toml is committed since the 2026-08-24 integration
-        # (573xx ports, terroir-vw-local project id — see
-        # docs/runbooks/local-stack.md); `init` is only a fallback for a
-        # tree without one. `start` applies every file in
-        # supabase/migrations/ into a fresh Postgres + PostgREST + GoTrue
-        # stack that lives only for this job — not a shared database.
-        run: |
-          if [ ! -f supabase/config.toml ]; then
-            supabase init --with-vscode-settings=false --with-intellij-settings=false
-          fi
-          supabase start
+        # The CLI executes migration statements separately; 0152 deliberately
+        # starts with LOCK TABLE and therefore requires an outer transaction.
+        # This CI-only launcher starts an empty disposable stack, then applies
+        # each exact migration plus its ledger row in one transaction.
+        # Stop at the last additive migration for the legacy-contract live
+        # suites. The cutover migrations intentionally retire those RPCs and
+        # seal direct service-role writes; they are applied immediately after
+        # the legacy suite and before build/current-schema/E2E verification.
+        run: CI_MIGRATION_CEILING=0155 scripts/local/ci-start-supabase.sh
 
       - name: Export local Supabase env for tests and E2E
         run: |
@@ -145,21 +144,45 @@ jobs:
           echo "DEV_BYPASS_EMAIL=owner+local@terroir.test" >> "$GITHUB_ENV"
 
       - name: Seed local Supabase for tests and E2E
-        run: pnpm run supabase:seed:local:apply
+        run: LOCAL_SEED_PHYSICAL_CONTRACT=1 pnpm run supabase:seed:local:apply
 
+      - name: Bootstrap explicit seed-owner capabilities
+        # Exercises the exact one-time production bootstrap against the
+        # disposable local database. The local wrapper resolves only the
+        # deterministic seed owner; production requires an owner-reviewed
+        # explicit manifest and never discovers recipients by role.
+        run: scripts/local/ci-bootstrap-owner-capabilities.sh
+
+
+      - name: Legacy-contract live tests
+        # These suites prove the exact contract that 0156 intentionally
+        # retires or seals. They must run at 0155 and must not be silently
+        # reinterpreted as current-schema tests. They exercise SQL contracts,
+        # not the TypeScript modules in the coverage budget, so coverage is
+        # enforced once against the current application below.
+        run: |
+          pnpm exec vitest run \
+            src/domains/cellar/wine-ownership-write-policies.test.ts \
+            src/domains/identity/merge.test.ts \
+            src/domains/pours/inventory-command-lock-compatibility-live.test.ts \
+            src/domains/pours/inventory-commands-live.test.ts \
+            src/domains/pours/physical-bottle-phase-a-live.test.ts
+
+      - name: Apply physical and operational cutover migrations
+        run: scripts/local/ci-apply-cutover-migrations.sh
 
       - name: Test
-        # Runs AFTER the local Supabase stack is up and its env exported
-        # (integration critic finding, 2026-08-24): the MANDATORY live-DB
-        # suites (P2 cross-tenant containment, merge_wines repointing, P3
-        # chunked import) previously skipped silently in CI because this
-        # step had no stack. They now run for real, and each suite throws
-        # outright if the env is missing while CI=true instead of skipping.
-        # Runs with --coverage (same full suite, instrumented) rather than
-        # a separate step, so the reconcile-ledger/cellar/pours coverage
-        # gate (vitest.config.ts) rides along instead of re-running the
-        # whole suite a second time.
-        run: pnpm run coverage
+        # The full current application runs after the cutover. Exclude only
+        # the five schema-bound suites proved immediately above; every other
+        # mandatory live-DB suite runs here against the final schema. The
+        # unchanged coverage thresholds are enforced by this run.
+        run: |
+          pnpm exec vitest run --coverage \
+            --exclude src/domains/cellar/wine-ownership-write-policies.test.ts \
+            --exclude src/domains/identity/merge.test.ts \
+            --exclude src/domains/pours/inventory-command-lock-compatibility-live.test.ts \
+            --exclude src/domains/pours/inventory-commands-live.test.ts \
+            --exclude src/domains/pours/physical-bottle-phase-a-live.test.ts
 
       - name: Build
         # Catches build-only failures that typecheck/lint/tests don't:

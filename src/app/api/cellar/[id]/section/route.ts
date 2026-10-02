@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { requireRole } from "@/lib/api/auth";
 import { z } from "zod";
 import { Errors } from "@/lib/api/errors";
 import { withApiHandler } from "@/lib/api/handler";
 import { parseJson, parseParams } from "@/lib/api/validation";
+import { parseWineSectionAssignmentReceipt } from "@/lib/staff-cost/wine-section-assignment";
 
 export const runtime = "nodejs";
 
@@ -45,34 +45,29 @@ export async function PATCH(
     if (!parsed.ok) return parsed.response;
     const section = parsed.data.section === "" ? null : parsed.data.section;
 
-    // Verify the wine belongs to this restaurant
-    const { data: wine } = await supabase
-      .from("wines")
-      .select("id")
-      .eq("id", wineId)
-      .eq("restaurant_id", restaurantId)
-      .single();
-
-    if (!wine) {
-      return Errors.notFound("Wine");
+    let result;
+    try {
+      result = await supabase.rpc("assign_wine_sections_private", {
+        p_restaurant_id: restaurantId,
+        p_wine_ids: [wineId],
+        p_section: section,
+      });
+    } catch {
+      throw new Error("Wine section assignment call failed.");
     }
-
-    // Update all inventory_items for this wine
-    const { error } = await supabase
-      .from("inventory_items")
-      .update({ section })
-      .eq("wine_id", wineId)
-      .eq("restaurant_id", restaurantId);
+    const { data, error } = result;
 
     if (error) {
-      console.error("inventory_items section update failed:", error);
-      Sentry.captureException(error, {
-        tags: { surface: "cellar", phase: "update-section" },
-        extra: { restaurantId, wineId, section },
-      });
-      return Errors.internal("Failed to update section.");
+      if (error.code === "P04W1") return Errors.notFound("Wine");
+      if (error.code === "42501") return Errors.forbidden();
+      throw new Error("Wine section assignment failed.");
     }
 
-    return NextResponse.json({ wine_id: wineId, section });
+    const receipt = parseWineSectionAssignmentReceipt(data, 1, section);
+    if (!receipt) {
+      throw new Error("Wine section assignment returned an invalid receipt.");
+    }
+
+    return NextResponse.json({ wine_id: wineId, section: receipt.section });
   });
 }

@@ -1,4 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/staff-cost/protected-readers", () => ({
+  readRestaurantPricingDefaults: async (_client: unknown, restaurantId: string) => ({
+    restaurant_id: restaurantId,
+    default_target_pour_cost_pct: null,
+    default_target_markup_ratio: null,
+  }),
+  readWinePricingStrategy: async (
+    _client: unknown,
+    _restaurantId: string,
+    wineIds: string[],
+  ) => wineIds.map((wineId) => ({
+    wine_id: wineId,
+    pricing_target_pour_cost_pct: null,
+    pricing_target_markup_ratio: null,
+    pricing_dismissed_until: null,
+  })),
+  readInventoryCosts: async () => [],
+}));
 import { fetchPricingAlerts } from "./alerts";
 
 /**

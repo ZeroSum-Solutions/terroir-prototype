@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -58,8 +59,8 @@ describe.skipIf(!hasLiveDb)("P2 merge_wines / merge_canonical_wines (MANDATORY l
   let restaurantB: string;
   let ownerAClient: SupabaseClient<Database>;
   let ownerAId: string;
-  const cleanupUserIds: string[] = [];
   const cleanupRestaurantIds: string[] = [];
+  const identities = new LiveDbFixtureIdentityTracker();
   // canonical_wines is a global table with no restaurant_id — deleting
   // restaurantA/B cascades away every wine_variants row (and thus the
   // wines_canonical_wine_id_fkey ON DELETE RESTRICT that would otherwise
@@ -84,14 +85,12 @@ describe.skipIf(!hasLiveDb)("P2 merge_wines / merge_canonical_wines (MANDATORY l
 
     const run = Date.now();
     const password = "P2-Merge-Test-123!";
-    const { data: userA, error: userAErr } = await admin.auth.admin.createUser({
+    const userA = await identities.createUser(admin, {
       email: `p2-merge-owner-a-${run}@terroir.test`,
       password,
       email_confirm: true,
     });
-    if (userAErr || !userA) throw userAErr ?? new Error("failed to create owner A");
     ownerAId = userA.user.id;
-    cleanupUserIds.push(ownerAId);
 
     const { error: memAErr } = await admin.from("memberships").insert({
       user_id: ownerAId,
@@ -140,13 +139,7 @@ describe.skipIf(!hasLiveDb)("P2 merge_wines / merge_canonical_wines (MANDATORY l
       await admin.from("wine_variants").delete().in("restaurant_id", cleanupRestaurantIds);
       await admin.from("wines").delete().in("restaurant_id", cleanupRestaurantIds);
       await admin.from("reason_codes").delete().in("restaurant_id", cleanupRestaurantIds);
-      const { error: restaurantDeleteError } = await admin.from("restaurants").delete().in("id", cleanupRestaurantIds);
-      if (restaurantDeleteError) {
-        // Surface loudly rather than the previous silent swallow — a
-        // leftover restaurant here means the NEXT run's fixed producer/
-        // cuvee_norm text will collide.
-        console.error("P2 merge.test.ts cleanup: restaurant delete failed:", restaurantDeleteError);
-      }
+      await identities.cleanup(admin, { restaurantIds: cleanupRestaurantIds });
     }
     if (cleanupCanonicalWineIds.length > 0) {
       // Deleting an already-merged-away id via .in() is a no-op, not an
@@ -156,9 +149,6 @@ describe.skipIf(!hasLiveDb)("P2 merge_wines / merge_canonical_wines (MANDATORY l
       if (canonDeleteError) {
         console.error("P2 merge.test.ts cleanup: canonical_wines delete failed:", canonDeleteError);
       }
-    }
-    for (const id of cleanupUserIds) {
-      await admin.auth.admin.deleteUser(id);
     }
   });
 

@@ -3,6 +3,8 @@ import { getAuthContext } from "@/lib/auth-context";
 import { DollarSign, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { RouteDataEmpty } from "@/components/route-data-state";
+import { resolveSiteCostReadAccess } from "@/lib/api/site-capability";
+import { fetchDistributorPriceRows } from "@/lib/pricing/price-comparison-data";
 import { PriceComparisonMasthead } from "./price-comparison-masthead";
 import { SortControls } from "./sort-controls";
 import {
@@ -44,21 +46,35 @@ export default async function PriceComparisonPage({
     : 25;
   const auth = (await getAuthContext())!; // AppLayout redirects when null
   const { supabase, restaurantId: rid, restaurantName } = auth;
+  const canReadCost = await resolveSiteCostReadAccess(supabase, rid);
 
-  // Fetch inventory items with wine retail data + invoice scan details
-  const { data: items, error: itemsError } = await supabase
-    .from("inventory_items")
-    .select(
-      "unit_cost, quantity, wine_id, wines(id, name, producer, vintage, varietal, retail_median, retail_min, retail_max, enrichment_metadata, overpaid_flag, hero_image_url, colour), invoice_scan_id, invoice_scans(distributor_name, invoice_date)",
-    )
-    .eq("restaurant_id", rid);
+  if (!canReadCost) {
+    return (
+      <section>
+        <PriceComparisonMasthead tenant={restaurantName} />
+        <RouteDataEmpty
+          icon={<DollarSign className="h-6 w-6" strokeWidth={1.5} />}
+          title="Price comparison is unavailable"
+          description="Cost access could not be verified for this site."
+          action={
+            <Link
+              href="/cellar"
+              className="inline-flex h-11 items-center rounded-pill bg-primary px-md text-control font-medium text-seal-ink hover:bg-primary-hover focus-ring"
+            >
+              Back to cellar
+            </Link>
+          }
+        />
+      </section>
+    );
+  }
 
-  if (itemsError) throw itemsError;
+  const items = await fetchDistributorPriceRows(supabase, rid);
 
   // BND-138: also fetch wines without inventory items that still have retail data
   const { data: winesWithRetail, error: retailError } = await supabase
     .from("wines")
-    .select("id, retail_median, retail_min, retail_max, enrichment_metadata")
+    .select("id, retail_median, retail_min, retail_max")
     .eq("restaurant_id", rid)
     .not("retail_median", "is", null);
 
@@ -70,20 +86,8 @@ export default async function PriceComparisonPage({
   // Group by wine, then compute comparison data
   const wineMap = new Map<string, WineComparison>();
 
-  for (const item of items ?? []) {
-    const wine = item.wines as {
-      id: string; name: string; producer: string; vintage: number | null; varietal: string | null;
-      hero_image_url: string | null; colour: string | null;
-      retail_median: number | null; retail_min: number | null; retail_max: number | null;
-      enrichment_metadata: Record<string, unknown> | null;
-      overpaid_flag: boolean | null;
-    } | null;
-    const scan = item.invoice_scans as {
-      distributor_name: string;
-      invoice_date: string | null;
-    } | null;
-
-    if (!wine || !scan) continue;
+  for (const item of items) {
+    const { wine, scan } = item;
 
     let entry = wineMap.get(wine.id);
     if (!entry) {
@@ -106,14 +110,14 @@ export default async function PriceComparisonPage({
         lastPaid: 0,
         marketPrice: null,
         variancePct: null,
-        flagged: wine.overpaid_flag ?? false,
+        flagged: item.overpaidFlag,
       };
       wineMap.set(wine.id, entry);
     }
 
     entry.prices.push({
       distributor: scan.distributor_name,
-      unitCost: item.unit_cost,
+      unitCost: item.unitCost,
       quantity: item.quantity,
       invoiceDate: scan.invoice_date,
     });

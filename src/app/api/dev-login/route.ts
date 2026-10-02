@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import {
+  REPROVISION_REQUIRED,
+  setDeviceLockCookie,
+} from "@/domains/offline/device-lock";
 import { Errors } from "@/lib/api/errors";
 import { createClient } from "@/lib/supabase/server";
 
@@ -88,11 +93,14 @@ export async function GET(request: NextRequest) {
 
     // Step 2: verify the proof against the caller's cookie-bound client.
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       token_hash: parsed.data.hashed_token,
       type: "magiclink",
     });
     if (error) return temporaryLoginUnavailable();
+    if (data?.session) {
+      setDeviceLockCookie(await cookies(), REPROVISION_REQUIRED);
+    }
   } catch {
     return temporaryLoginUnavailable();
   }

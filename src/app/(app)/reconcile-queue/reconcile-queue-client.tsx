@@ -4,52 +4,75 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, RefreshCw, Undo2 } from "lucide-react";
 import { buildAcceptAction } from "./accept-action";
 import { QueueIssueRow } from "./issue-row";
+import { useReconcileMutations } from "./use-reconcile-mutations";
 import type { QueueResponse } from "./types";
 
 const QUEUE_PAGE_SIZE = 25;
 
-export function ReconcileQueueClient({ canManage }: { canManage: boolean }) {
-  const queue = useQueueData();
+type ReconcileQueueClientProps = {
+  canManage: boolean;
+  userId: string;
+  restaurantId: string;
+};
+
+export function ReconcileQueueClient({
+  canManage,
+  userId,
+  restaurantId,
+}: ReconcileQueueClientProps) {
+  const contextKey = `${userId}:${restaurantId}`;
+  const queue = useQueueData(contextKey);
   if (queue.loading) return <QueueLoading />;
   if (queue.error || !queue.data) return <QueueError message={queue.error ?? "Queue unavailable."} retry={queue.reload} />;
-  return <LoadedQueue data={queue.data} reload={queue.reload} canManage={canManage} />;
+  return (
+    <LoadedQueue
+      key={contextKey}
+      data={queue.data}
+      reload={queue.reload}
+      canManage={canManage}
+      userId={userId}
+      restaurantId={restaurantId}
+    />
+  );
 }
 
-function LoadedQueue({ data, reload, canManage }: { data: QueueResponse; reload: () => Promise<void>; canManage: boolean }) {
+function LoadedQueue({
+  data,
+  reload,
+  canManage,
+  userId,
+  restaurantId,
+}: {
+  data: QueueResponse;
+  reload: () => Promise<void>;
+  canManage: boolean;
+  userId: string;
+  restaurantId: string;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [binByIssue, setBinByIssue] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [mutationError, setMutationError] = useState<string | null>(null);
   const rows = useMemo(() => [...data.issues].sort(compareRows), [data.issues]);
   const ready = rows.filter((row) => buildAcceptAction(row, binByIssue[row.id]) !== null);
   const selectedRows = rows.filter((row) => selected.has(row.id));
-  const mutate = useCallback(async (path: string, body: unknown, success: string) => {
-    setBusy(true);
-    setMutationError(null);
-    try {
-      await postJson(path, body);
-      setMessage(success);
-      setSelected(new Set());
-      await reload();
-    } catch (error) {
-      setMutationError(error instanceof Error ? error.message : "Request failed.");
-    } finally {
-      setBusy(false);
-    }
-  }, [reload]);
+  const mutation = useReconcileMutations({
+    userId,
+    restaurantId,
+    reload,
+    onAccepted: () => setSelected(new Set()),
+  });
+
   const accept = () => {
     const actions = selectedRows.flatMap((row) => {
       const action = buildAcceptAction(row, binByIssue[row.id]);
       return action ? [action] : [];
     });
-    if (actions.length) void mutate("/api/reconcile-queue/accept", actions, `${actions.length} item${actions.length === 1 ? "" : "s"} accepted`);
+    if (actions.length) void mutation.accept(actions);
   };
   const undo = () => {
-    const id = data.latest_batch?.id;
-    if (id) void mutate("/api/reconcile-queue/undo", { batch_id: id }, "Latest batch undone");
+    if (data.latest_batch) void mutation.undo(data.latest_batch);
   };
-  return <QueueView data={data} rows={rows} ready={ready} selected={selected} selectedRows={selectedRows} binByIssue={binByIssue} busy={busy} message={message} mutationError={mutationError} canManage={canManage} accept={accept} undo={undo} setSelected={setSelected} setBinByIssue={setBinByIssue} />;
+
+  return <QueueView data={data} rows={rows} ready={ready} selected={selected} selectedRows={selectedRows} binByIssue={binByIssue} busy={mutation.busy} message={mutation.message} mutationError={mutation.error} canManage={canManage} accept={accept} undo={undo} setSelected={setSelected} setBinByIssue={setBinByIssue} />;
 }
 
 type QueueViewProps = {
@@ -129,34 +152,51 @@ function QueueView(props: QueueViewProps) {
   );
 }
 
-function useQueueData() {
-  const [data, setData] = useState<QueueResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+function useQueueData(contextKey: string) {
+  const [snapshot, setSnapshot] = useState<{
+    contextKey: string;
+    data: QueueResponse | null;
+    loading: boolean;
+    error: string | null;
+  }>({ contextKey, data: null, loading: true, error: null });
+  const current = snapshot.contextKey === contextKey
+    ? snapshot
+    : { contextKey, data: null, loading: true, error: null };
   const reload = useCallback(async () => {
-    setError(null);
+    setSnapshot((value) => value.contextKey === contextKey
+      ? { ...value, error: null }
+      : { contextKey, data: null, loading: true, error: null });
     try {
       const response = await fetch("/api/reconcile-queue", { cache: "no-store" });
       if (!response.ok) throw new Error(await responseMessage(response));
-      setData(await response.json() as QueueResponse);
+      const data = await response.json() as QueueResponse;
+      setSnapshot({ contextKey, data, loading: false, error: null });
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Queue unavailable.");
-    } finally {
-      setLoading(false);
+      setSnapshot({
+        contextKey,
+        data: null,
+        loading: false,
+        error: failure instanceof Error ? failure.message : "Queue unavailable.",
+      });
     }
-  }, []);
+  }, [contextKey]);
   useEffect(() => {
     let active = true;
     requestQueue().then((result) => {
-      if (active) setData(result);
+      if (active) setSnapshot({ contextKey, data: result, loading: false, error: null });
     }).catch((failure: unknown) => {
-      if (active) setError(failure instanceof Error ? failure.message : "Queue unavailable.");
-    }).finally(() => {
-      if (active) setLoading(false);
+      if (active) {
+        setSnapshot({
+          contextKey,
+          data: null,
+          loading: false,
+          error: failure instanceof Error ? failure.message : "Queue unavailable.",
+        });
+      }
     });
     return () => { active = false; };
-  }, []);
-  return { data, loading, error, reload };
+  }, [contextKey]);
+  return { ...current, reload };
 }
 
 function QueueHeader({ summary, latestBatch, busy, undo }: { summary: QueueResponse["summary"]; latestBatch: QueueResponse["latest_batch"]; busy: boolean; undo: () => void }) {
@@ -257,11 +297,6 @@ function toggleAllReady(current: Set<string>, ready: string[]) {
 
 function compareRows(left: QueueResponse["issues"][number], right: QueueResponse["issues"][number]) {
   return right.atRisk - left.atRisk || left.id.localeCompare(right.id);
-}
-
-async function postJson(path: string, body: unknown) {
-  const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!response.ok) throw new Error(await responseMessage(response));
 }
 
 async function requestQueue(): Promise<QueueResponse> {

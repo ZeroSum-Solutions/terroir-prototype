@@ -9,12 +9,15 @@ const routeSource = readFileSync(
 );
 
 describe("/api/scan architecture boundary", () => {
-  it("keeps provider and scan-domain work out of the route handler", () => {
-    expect(routeSource).toContain("@/domains/scanning/invoice-scan-service");
+  it("queues through the closed upload RPC without synchronous provider or protected-table work", () => {
+    expect(routeSource).toContain("create_invoice_scan_upload");
+    expect(routeSource).toContain("withIdempotency");
+    expect(routeSource).not.toContain("@/domains/scanning/invoice-scan-service");
     expect(routeSource).not.toMatch(
       /@\/lib\/scanner\/(?:ai-extract|ocr-service|scoring)/,
     );
+    expect(routeSource).not.toContain('.from("invoice_scans")');
+    expect(routeSource).not.toContain("createServiceClient");
     expect(routeSource).not.toContain("@sentry/nextjs");
   });
 });
-

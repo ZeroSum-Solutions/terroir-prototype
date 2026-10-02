@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { assertLiveDbTargetIsLocal } from "@/test/live-db-target";
+import { LiveDbFixtureIdentityTracker } from "@/test/live-db-fixture-identities";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -36,13 +37,13 @@ if (!hasLiveDb && process.env.CI) {
 describe.skipIf(!hasLiveDb)("lwin_xwines_links storage contract (MANDATORY)", { timeout: 60_000 }, () => {
   let admin: SupabaseClient<Database>;
   let userClient: SupabaseClient<Database>;
-  let userId: string;
   let runId: string;
   let lwinIdA: string;
   let lwinIdB: string;
   let xwinesId: number;
   const email = `lwin-xwines-links-${Date.now()}@example.test`;
   const password = "test-password-1234";
+  const identities = new LiveDbFixtureIdentityTracker();
 
   beforeAll(async () => {
     admin = createClient<Database>(supabaseUrl!, serviceRoleKey!, { auth: { persistSession: false } });
@@ -90,12 +91,9 @@ describe.skipIf(!hasLiveDb)("lwin_xwines_links storage contract (MANDATORY)", { 
     } as never);
     if (linkErr) throw linkErr;
 
-    const { data: u, error: uErr } = await admin.auth.admin.createUser({
+    await identities.createUser(admin, {
       email, password, email_confirm: true,
     });
-    if (uErr || !u.user) throw uErr ?? new Error("failed to create user");
-    userId = u.user.id;
-
     const throwaway = createClient<Database>(supabaseUrl!, publishableKey!, { auth: { persistSession: false } });
     const { data: s, error: sErr } = await throwaway.auth.signInWithPassword({ email, password });
     if (sErr || !s.session) throw sErr ?? new Error("sign-in failed");
@@ -112,7 +110,7 @@ describe.skipIf(!hasLiveDb)("lwin_xwines_links storage contract (MANDATORY)", { 
     await admin.from("lwin_catalog").delete().in("lwin_id", [lwinIdA, lwinIdB]);
     await admin.from("xwines_catalog").delete().eq("wine_id", xwinesId);
     await admin.from("xwines_link_runs").delete().eq("id", runId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    await identities.cleanup(admin);
   });
 
   it("an authenticated session can read links — P1's palette dedupes on them", async () => {

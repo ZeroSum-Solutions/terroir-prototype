@@ -88,9 +88,11 @@ export type RecentScan = {
   parsedAt: string;
   distributor: string;
   items: number;
-  total: number;
+  /** Null means the current actor has no cost.read grant. */
+  total: number | null;
   accuracy: number;
-  hasImage: boolean;
+  /** Null means image presence is protected for the current actor. */
+  hasImage: boolean | null;
 };
 
 export type ScanMode = "invoice" | "bottle";

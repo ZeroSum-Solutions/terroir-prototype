@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { NextResponse } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { requireMembership } from "@/lib/api/auth";
+import { resolveSitePricingReadAccess } from "@/lib/api/site-capability";
 import {
   WineListEditor,
   type WineListEditorSection,
+  type WineListEditorWine,
 } from "./wine-list-editor";
 import type { WineList } from "@/lib/wine-list/types";
 import {
@@ -17,10 +19,44 @@ import {
   suggestPricesForWine,
   type PricingWine,
 } from "@/domains/wine-lists/list-item-pricing";
+import {
+  readInventoryCosts,
+  readRestaurantPricingDefaults,
+  readWinePricingStrategy,
+} from "@/lib/staff-cost/protected-readers";
 
 export const metadata: Metadata = { title: "Edit list" };
 
 type Params = Promise<{ id: string }>;
+
+type RawListWine = WineListEditorWine & {
+  is_eightysixed: boolean;
+  rating?: number | null;
+  size_ml?: number | null;
+  retail_median?: number | null;
+  [key: string]: unknown;
+};
+
+function toSafeListWine(wine: RawListWine): WineListEditorWine & {
+  is_eightysixed: boolean;
+} {
+  return {
+    id: wine.id,
+    name: wine.name,
+    producer: wine.producer,
+    vintage: wine.vintage,
+    varietal: wine.varietal,
+    region: wine.region,
+    drink_window_start: wine.drink_window_start,
+    drink_window_end: wine.drink_window_end,
+    serving_temp_min: wine.serving_temp_min,
+    serving_temp_max: wine.serving_temp_max,
+    serving_temp_label: wine.serving_temp_label,
+    colour: wine.colour,
+    hero_image_url: wine.hero_image_url,
+    is_eightysixed: wine.is_eightysixed,
+  };
+}
 
 // ARCH-015: this server component is the primary read path for the
 // wine-list editor. Before the fix it created its own supabase client
@@ -41,16 +77,24 @@ export default async function WineListEditorPage({
     redirect(`/login?next=/lists/${id}`);
   }
   const { supabase, restaurantId, role } = auth;
+  const canReadPricingBasis = await resolveSitePricingReadAccess(supabase, restaurantId);
 
   // wines!wine_list_items_wine_id_fkey: 0080 added a second FK between
   // wine_list_items and wines (the tenant-matching composite FK), so
   // PostgREST needs the relationship named explicitly or embedding fails
   // with PGRST201 ("more than one relationship was found").
-  const { data: list, error } = await supabase
-    .from("wine_lists")
-    .select(
-      "*, wine_list_sections(*, wine_list_items(*, wines!wine_list_items_wine_id_fkey(*)))",
-    )
+  const listQuery = canReadPricingBasis
+    ? supabase
+        .from("wine_lists")
+        .select(
+          "*, wine_list_sections(*, wine_list_items(*, wines!wine_list_items_wine_id_fkey(id, name, producer, vintage, varietal, region, drink_window_start, drink_window_end, serving_temp_min, serving_temp_max, serving_temp_label, colour, hero_image_url, is_eightysixed, rating, size_ml, retail_median)))",
+        )
+    : supabase
+        .from("wine_lists")
+        .select(
+          "*, wine_list_sections(*, wine_list_items(*, wines!wine_list_items_wine_id_fkey(id, name, producer, vintage, varietal, region, drink_window_start, drink_window_end, serving_temp_min, serving_temp_max, serving_temp_label, colour, hero_image_url, is_eightysixed)))",
+        );
+  const { data: list, error } = await listQuery
     .eq("id", id)
     .eq("restaurant_id", restaurantId)
     .single();
@@ -97,26 +141,7 @@ export default async function WineListEditorPage({
       name_override?: string | null;
       blurb?: string | null;
       hidden?: boolean | null;
-      // LIST-03 reads rating / retail_median / the two pricing_target_*
-      // columns off this same row; `wines(*)` already returns them.
-      wines: PricingWine & {
-        name: string;
-        producer: string;
-        vintage: number | null;
-        restaurant_id: string;
-        size_ml: number;
-        country: string | null;
-        lwin_id: string | null;
-        colour: string | null;
-        hero_image_url: string | null;
-        drink_window_start: number | null;
-        drink_window_end: number | null;
-        serving_temp_min: number | null;
-        serving_temp_max: number | null;
-        serving_temp_label: string | null;
-        created_at: string;
-        updated_at: string;
-      };
+      wines: RawListWine;
     }>;
   }>;
 
@@ -130,35 +155,102 @@ export default async function WineListEditorPage({
       ),
     ),
   ];
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("default_target_markup_ratio, default_target_pour_cost_pct")
-    .eq("id", restaurantId)
-    .single();
-  const { data: costRows } = wineIds.length
-    ? await supabase
-        .from("inventory_items")
-        .select("wine_id, unit_cost, added_at")
-        .eq("restaurant_id", restaurantId)
-        .in("wine_id", wineIds)
-        .order("added_at", { ascending: false })
-    : { data: [] };
-  const unitCosts = latestUnitCostByWine(costRows ?? []);
+  let restaurant = null;
+  let unitCosts = new Map<string, number>();
+  let pricingStrategy = new Map<
+    string,
+    { pricing_target_markup_ratio: number | null; pricing_target_pour_cost_pct: number | null }
+  >();
+  let pricingInputsAvailable = false;
+  if (canReadPricingBasis) {
+    const inventoryIdentityRows = wineIds.length
+      ? await Promise.all(
+          Array.from({ length: Math.ceil(wineIds.length / 500) }, (_, index) =>
+            supabase
+              .from("inventory_items")
+              .select("id, wine_id, added_at")
+              .eq("restaurant_id", restaurantId)
+              .in("wine_id", wineIds.slice(index * 500, (index + 1) * 500)),
+          ),
+        )
+      : [];
+    const identityError = inventoryIdentityRows.find((result) => result.error)?.error;
+    if (identityError) throw identityError;
+    const [pricingDefaults, protectedChunks] = await Promise.all([
+      readRestaurantPricingDefaults(supabase, restaurantId),
+      Promise.all(
+        Array.from({ length: Math.ceil(wineIds.length / 500) }, (_, index) => {
+          const ids = wineIds.slice(index * 500, (index + 1) * 500);
+          return Promise.all([
+            readInventoryCosts(supabase, restaurantId, ids),
+            readWinePricingStrategy(supabase, restaurantId, ids),
+          ]);
+        }),
+      ),
+    ]);
+    if (pricingDefaults?.restaurant_id !== restaurantId) {
+      throw new Error("Restaurant pricing defaults protected read was incomplete.");
+    }
+    const inventoryCosts = protectedChunks.flatMap(([rows]) => rows);
+    const strategyRows = protectedChunks.flatMap(([, rows]) => rows);
+    const costByInventoryId = new Map(
+      inventoryCosts.map((row) => [row.inventory_item_id, row.unit_cost]),
+    );
+    const identities = inventoryIdentityRows.flatMap((result) => result.data ?? []);
+    if (
+      costByInventoryId.size !== inventoryCosts.length ||
+      identities.some((row) => !costByInventoryId.has(row.id))
+    ) {
+      throw new Error("Inventory cost protected read was incomplete.");
+    }
+    pricingStrategy = new Map(strategyRows.map((row) => [row.wine_id, row]));
+    if (
+      pricingStrategy.size !== strategyRows.length ||
+      wineIds.some((wineId) => !pricingStrategy.has(wineId))
+    ) {
+      throw new Error("Wine pricing strategy protected read was incomplete.");
+    }
+    restaurant = pricingDefaults;
+    unitCosts = latestUnitCostByWine(
+      identities
+        .map((row) => ({
+          wine_id: row.wine_id,
+          unit_cost: costByInventoryId.get(row.id) ?? null,
+          added_at: row.added_at,
+        }))
+        .sort((a, b) => b.added_at.localeCompare(a.added_at)),
+    );
+    pricingInputsAvailable = true;
+  }
 
   const sections: WineListEditorSection[] = rawSections
     .sort((a, b) => a.position - b.position)
     .map((s) => ({
       ...s,
       wine_list_items: [...(s.wine_list_items ?? [])].map((item) => {
-        const suggested = suggestPricesForWine(
-          item.wines,
-          restaurant ?? null,
-          unitCosts.get(item.wine_id) ?? null,
-          item.glass_pour_ml,
-          item.bottle_price,
-        );
+        const suggested = pricingInputsAvailable
+          ? suggestPricesForWine(
+              {
+                id: item.wines.id,
+                varietal: item.wines.varietal,
+                region: item.wines.region,
+                rating: item.wines.rating ?? null,
+                size_ml: item.wines.size_ml ?? null,
+                retail_median: item.wines.retail_median ?? null,
+                pricing_target_markup_ratio:
+                  pricingStrategy.get(item.wine_id)?.pricing_target_markup_ratio ?? null,
+                pricing_target_pour_cost_pct:
+                  pricingStrategy.get(item.wine_id)?.pricing_target_pour_cost_pct ?? null,
+              } satisfies PricingWine,
+              restaurant,
+              unitCosts.get(item.wine_id) ?? null,
+              item.glass_pour_ml,
+              item.bottle_price,
+            )
+          : { suggestedGlass: null, suggestedBottle: null };
         return {
           ...item,
+          wines: toSafeListWine(item.wines),
           name_override: item.name_override ?? null,
           blurb: item.blurb ?? null,
           hidden: item.hidden ?? false,

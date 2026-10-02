@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { NoteModal } from "./note-modal";
 import { EditMetadataModal } from "./edit-metadata-modal";
 import { PourPickerModal } from "./pour-picker-modal";
-import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { OpenBottleRow, PhysicalBottleSummary } from "@/lib/wine-list/shapes";
 import type { CellarWineRow } from "./types";
 import type { PreservationMethod } from "@/lib/partial-bottles/math";
 import { PartialBottleCloseout } from "./partial-bottle-closeout";
@@ -28,23 +28,48 @@ import { EnrichControl } from "./enrich-control";
 import { PourActionBar } from "./pour-action-bar";
 import { useHeroImageActions } from "./use-hero-image-actions";
 import { useEightysixToggle } from "./use-eightysix-toggle";
-import { useAsyncAction } from "./use-async-action";
+import {
+  useInventoryCommands,
+  type LastPourReceipt,
+} from "./use-inventory-commands";
 import { wineDisplayName } from "@/lib/wine-display-name";
+import {
+  PhysicalBottleSelector,
+  resolvePhysicalBottleSelection,
+} from "./physical-bottle-selector";
 
 export function WineDetailDrawer({
   row,
   canManage,
+  canReadCost = false,
+  canReadMargin = false,
+  canManagePricing = false,
   isOwner,
   onClose,
   duplicateRows,
+  inventoryContractVersion = 1,
+  selectedBottleId = null,
+  onSelectBottle = () => undefined,
+  onBottleOpened = onSelectBottle,
+  bottleSelectionMessage = null,
+  onBottleStale = () => undefined,
 }: {
   row: CellarWineRow | null;
   canManage: boolean;
+  canReadCost?: boolean;
+  canReadMargin?: boolean;
+  canManagePricing?: boolean;
   isOwner?: boolean;
   onClose: () => void;
   // OPP-1 (EV-1.2) — same-lineage/vintage/format twins of `row`, offered
   // for merge below. Provided by the shell from the page's suspect scan.
   duplicateRows?: CellarWineRow[];
+  inventoryContractVersion?: 1 | 2;
+  selectedBottleId?: string | null;
+  onSelectBottle?: (bottleId: string) => void;
+  onBottleOpened?: (bottleId: string) => void;
+  bottleSelectionMessage?: string | null;
+  onBottleStale?: (message: string) => void;
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -70,7 +95,7 @@ export function WineDetailDrawer({
   }, [onClose]);
 
   // BND-119: track last pour for undo.
-  const [lastPour, setLastPour] = useState<{ ml: number } | null>(null);
+  const [lastPour, setLastPour] = useState<LastPourReceipt | null>(null);
 
   // OPP-1 (EV-1.2) — merge-duplicate confirmation state (mergeConfirm) now
   // lives inside merge-duplicates-panel.tsx; `busy`/`errorMsg` above stay
@@ -114,163 +139,84 @@ export function WineDetailDrawer({
     paused: pickerOpen || eightysix.pendingDirection !== null || editOpen,
   });
 
-  // BND-121: manually open a bottle without recording a pour. Its busy
-  // flag has never been shared with any other drawer action, so — unlike
-  // merge/pour/undo/delete/86 above — this is a genuine fit for
-  // useAsyncAction.
   const [preservationMethod, setPreservationMethod] =
     useState<PreservationMethod>(row?.preservation_method ?? "none");
-  const openBottleAction = useAsyncAction();
-
-  const doOpenBottle = useCallback(
-    () => {
-      if (!row) return Promise.resolve();
-      setErrorMsg(null);
-      return openBottleAction.run(
-        async () => {
-          const res = await fetch("/api/open-bottles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              wine_id: row.wine_id,
-              preservation_method: preservationMethod,
-            }),
-          });
-          if (!res.ok) {
-            const payload = (await res.json().catch(() => null)) as
-              | { error?: { message?: string } }
-              | null;
-            throw new Error(
-              payload?.error?.message ?? `Failed to open bottle (${res.status}).`,
-            );
-          }
-          toast.success("Bottle opened");
-          refresh();
-        },
-        {
-          fallbackMessage: "Failed to open bottle.",
-          onError: (message) => {
-            toast.error("Open bottle failed");
-            setErrorMsg(message);
-          },
-        },
-      );
-    },
-    [row, preservationMethod, toast, refresh, openBottleAction],
-  );
-
-  const doPour = useCallback(
-    async (ml: number) => {
-      if (!row || !row.glass_pour_ml) return;
-      setErrorMsg(null);
-      setBusy(true);
-      setLastPour(null);
-
-      try {
-        const res = await fetch("/api/pour", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            wine_id: row.wine_id,
-            ml,
-            kind: "pour",
-            preservation_method: preservationMethod,
-          }),
-        });
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string | { message?: string }; warning?: { message?: string } }
-          | null;
-        if (!res.ok) {
-          const message = typeof payload?.error === "string"
-            ? payload.error
-            : payload?.error?.message;
-          throw new Error(message ?? `Request failed (${res.status}).`);
-        }
-        toast.success("Glass poured");
-        if (payload?.warning?.message) {
-          setErrorMsg(payload.warning.message);
-        }
-        setLastPour({ ml });
-        startTransition(() => router.refresh());
-      } catch (err) {
-        toast.error("Pour failed");
-        setErrorMsg(err instanceof Error ? err.message : "Pour failed.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [row, router, toast, preservationMethod],
-  );
-
-  // BND-119: undo the most recent pour.
-  const doUndo = useCallback(
-    async () => {
-      if (!row || !lastPour) return;
-      setErrorMsg(null);
-      setBusy(true);
-      try {
-        const res = await fetch("/api/pour/undo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wine_id: row.wine_id }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          throw new Error(payload?.error ?? `Undo failed (${res.status}).`);
-        }
-        toast.success("Pour undone");
-        setLastPour(null);
-        startTransition(() => router.refresh());
-      } catch (err) {
-        toast.error("Undo failed");
-        setErrorMsg(err instanceof Error ? err.message : "Undo failed.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [row, lastPour, router, toast],
-  );
+  const bottleSelection = resolvePhysicalBottleSelection({
+    contractVersion: inventoryContractVersion,
+    bottles: row?.activeBottles,
+    activeBottleCount: row?.activeBottleCount,
+    activeOpenMl: row?.activeOpenMl,
+    requestedBottleId: selectedBottleId,
+  });
+  const effectiveBottleId = inventoryContractVersion === 2
+    ? bottleSelection.selectedBottleId
+    : row?.open_bottle_id ?? null;
+  const selectedPhysicalBottle = row?.activeBottles?.find(
+    (bottle) => bottle.id === effectiveBottleId,
+  ) ?? null;
+  const physicalStateInvalid = inventoryContractVersion === 2 &&
+    bottleSelection.status === "invalid";
+  const {
+    doOpenBottle, doPour, doUndo, retryPriorOpen, retryPriorPour,
+    retryPriorUndo, openBottleBusy, openNeedsReview, pourNeedsReview,
+    undoNeedsReview,
+  } = useInventoryCommands({
+    row,
+    contractVersion: inventoryContractVersion,
+    selectedBottleId: effectiveBottleId,
+    preservationMethod,
+    setBusy,
+    setErrorMsg,
+    lastPour,
+    setLastPour,
+    toast,
+    refresh,
+    onBottleOpened,
+    onBottleStale,
+  });
 
   if (!row) return null;
 
-  const pickerItem: OpenBottleRow | null =
-    row.wine_list_item_id && row.glass_pour_ml && row.size_ml
-      ? {
-          wine_id: row.wine_id,
-          name: row.name,
-          producer: row.producer,
-          vintage: row.vintage as number,
-          glass_pour_ml: row.glass_pour_ml,
-          open_remaining_ml: row.open_remaining_ml as number,
-          opened_at: row.opened_at as string,
-          pour_size_mode: row.pour_size_mode ?? "fixed",
-          sealed_count: row.sealed_count,
-          size_ml: row.size_ml,
-          wine_list_item_id: row.wine_list_item_id,
-        }
-      : null;
-
+  const pickerItem = buildDrawerPickerItem(row, selectedPhysicalBottle);
   const totalMl =
     row.size_ml === null
       ? null
-      : (row.open_remaining_ml ?? 0) + row.sealed_count * row.size_ml;
+      : row.activeOpenMl + row.sealed_count * row.size_ml;
   const glassesLeft =
     row.glass_pour_ml && totalMl !== null
       ? Math.floor(totalMl / row.glass_pour_ml)
       : null;
-  const ozLeft =
-    row.open_remaining_ml !== null
-      ? (row.open_remaining_ml / ML_PER_OZ).toFixed(1)
-      : null;
+  const ozLeft = row.activeBottleCount > 0
+    ? (row.activeOpenMl / ML_PER_OZ).toFixed(1)
+    : null;
 
-  const canPour = Boolean(
+  const hasPourConfig = Boolean(
     row.glass_pour_ml &&
     row.glass_pour_ml > 0 &&
     !row.is_eightysixed,
   );
-  const outOfStock = Boolean(canPour && totalMl !== null && totalMl < row.glass_pour_ml!);
+  const canPour = hasPourConfig && !physicalStateInvalid && (
+    inventoryContractVersion === 1 || selectedPhysicalBottle !== null
+  );
+  const requiresBottleSelection = inventoryContractVersion === 2 &&
+    !physicalStateInvalid &&
+    row.activeBottleCount > 1 &&
+    !selectedPhysicalBottle;
+  const availablePourMl = inventoryContractVersion === 2
+    ? selectedPhysicalBottle?.remainingMl ?? 0
+    : totalMl;
+  const outOfStock = Boolean(
+    canPour && availablePourMl !== null && availablePourMl < row.glass_pour_ml!,
+  );
+  const closeoutBottle = inventoryContractVersion === 2 && selectedPhysicalBottle
+    ? { id: selectedPhysicalBottle.id, wineId: selectedPhysicalBottle.wineId,
+        openedAt: selectedPhysicalBottle.openedAt, theoreticalRemainingMl: selectedPhysicalBottle.remainingMl,
+        preservationMethod: selectedPhysicalBottle.preservationMethod, openedBy: null, identityContract: 2 as const }
+    : inventoryContractVersion === 1 && row.open_bottle_id && row.opened_at && row.theoretical_remaining_ml !== null
+      ? { id: row.open_bottle_id, wineId: row.wine_id, openedAt: row.opened_at,
+          theoreticalRemainingMl: row.theoretical_remaining_ml,
+          preservationMethod: row.preservation_method, openedBy: row.opened_by }
+      : null;
 
   return (
     <>
@@ -311,7 +257,7 @@ export function WineDetailDrawer({
                   for. */}
               <Link
                 href={`/cellar/${row.wine_id}`}
-                className="mt-2xs inline-block text-caption uppercase text-accent hover:underline"
+                className="mt-2xs inline-flex min-h-11 items-center text-caption uppercase text-accent hover:underline"
               >
                 Full detail
               </Link>
@@ -364,6 +310,13 @@ export function WineDetailDrawer({
                     ` · pour size ${(row.glass_pour_ml / ML_PER_OZ).toFixed(1)} oz`}
                 </p>
               )}
+              {inventoryContractVersion === 2 && !physicalStateInvalid && (
+                <PhysicalBottleSelector
+                  bottles={row.activeBottles}
+                  selectedBottleId={selectedPhysicalBottle?.id ?? null}
+                  onSelect={onSelectBottle}
+                />
+              )}
               {row.bin_placements.map((placement) => (
                 <p
                   key={placement.binId}
@@ -410,7 +363,13 @@ export function WineDetailDrawer({
             )}
 
             {row.retail_median != null && (
-              <PricingSection row={row} canManage={canManage} />
+              <PricingSection
+                row={row}
+                canManage={canManage}
+                canReadCost={canReadCost}
+                canReadMargin={canReadMargin}
+                canManagePricing={canManagePricing}
+              />
             )}
 
             {row.drink_window_end != null && (
@@ -423,29 +382,25 @@ export function WineDetailDrawer({
               <DecantTimeSection row={row} />
             )}
 
-            {errorMsg && eightysix.pendingDirection === null && (
+            {(physicalStateInvalid || bottleSelectionMessage || errorMsg) &&
+              eightysix.pendingDirection === null && (
               <div
                 role="alert"
                 className="mt-md rounded-card border border-risk-ink/30 bg-risk-wash px-md py-sm text-body-sm text-risk-ink"
               >
-                {errorMsg}
+                {physicalStateInvalid
+                  ? "Bottle data could not be verified. Refresh and try again."
+                  : bottleSelectionMessage ?? errorMsg}
               </div>
             )}
 
-            {row.open_bottle_id && row.theoretical_remaining_ml !== null && (
+            {closeoutBottle && (
               <PartialBottleCloseout
-                bottle={{
-                  id: row.open_bottle_id,
-                  wineId: row.wine_id,
-                  theoreticalRemainingMl: row.theoretical_remaining_ml,
-                  preservationMethod: row.preservation_method,
-                  openedBy: row.opened_by,
-                }}
+                bottle={closeoutBottle}
                 reasons={row.closeout_reason_codes}
-                onComplete={() => startTransition(() => router.refresh())}
+                onComplete={refresh}
               />
             )}
-
             {/* Quick actions */}
             <section aria-label="Actions" className="mt-md flex flex-col gap-sm">
               {(row.sealed_count > 0 || canPour) && (
@@ -569,14 +524,25 @@ export function WineDetailDrawer({
               Undo) pinned at the foot so they never sit below the fold
               (Kimi audit 2026-08-26). Reference sections scroll; actions
               don't. */}
-          {(canPour || row.sealed_count > 0) && (
+          {(openNeedsReview || pourNeedsReview || undoNeedsReview ||
+            (!physicalStateInvalid && (canPour || requiresBottleSelection ||
+              row.sealed_count > 0 || lastPour))) && (
             <PourActionBar
               row={row}
+              contractVersion={inventoryContractVersion}
               canPour={canPour}
+              freshActionsAvailable={!physicalStateInvalid}
+              requiresBottleSelection={requiresBottleSelection}
               outOfStock={outOfStock}
               pickerItem={pickerItem}
               busy={busy}
-              openBottleBusy={openBottleAction.busy}
+              openBottleBusy={openBottleBusy}
+              openNeedsReview={openNeedsReview}
+              pourNeedsReview={pourNeedsReview}
+              undoNeedsReview={undoNeedsReview}
+              retryPriorOpen={retryPriorOpen}
+              retryPriorPour={retryPriorPour}
+              retryPriorUndo={retryPriorUndo}
               lastPour={lastPour}
               doOpenBottle={doOpenBottle}
               doPour={doPour}
@@ -634,6 +600,28 @@ export function WineDetailDrawer({
   );
 }
 
-export function drawerStateKey(row: CellarWineRow | null) {
-  return row ? `${row.wine_id}:${row.opened_at ?? "sealed"}` : "none";
+export function drawerStateKey(row: CellarWineRow | null, version: 1 | 2 = 1) {
+  return !row ? "none" : version === 2 ? row.wine_id : `${row.wine_id}:${row.opened_at ?? "sealed"}`;
+}
+
+export function buildDrawerPickerItem(
+  row: CellarWineRow,
+  selectedPhysicalBottle: PhysicalBottleSummary | null,
+): OpenBottleRow | null {
+  return row.wine_list_item_id && row.glass_pour_ml && row.size_ml
+    ? {
+        active_bottle_count: row.activeBottleCount,
+        wine_id: row.wine_id,
+        name: row.name,
+        producer: row.producer,
+        vintage: row.vintage as number,
+        glass_pour_ml: row.glass_pour_ml,
+        open_remaining_ml: (selectedPhysicalBottle?.remainingMl ?? row.open_remaining_ml) as number,
+        opened_at: row.opened_at as string,
+        pour_size_mode: row.pour_size_mode ?? "fixed",
+        sealed_count: row.sealed_count,
+        size_ml: row.size_ml,
+        wine_list_item_id: row.wine_list_item_id,
+      }
+    : null;
 }

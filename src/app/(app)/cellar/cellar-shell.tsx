@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { isClosingWindow, isHolding } from "@/lib/drink-window/status";
 import type { OpenBottleRow } from "@/lib/wine-list/shapes";
+import type { PhysicalReconcileItem } from "@/domains/cellar/reconcile-contract";
 import type { CellarWineRow } from "./types";
 import { CellarList, FILTER_LABELS } from "./cellar-list";
 import { drawerStateKey, WineDetailDrawer } from "./wine-detail-drawer";
@@ -12,7 +13,10 @@ import { ReconcileModal } from "./reconcile-modal";
 import { AutoEightysixModal } from "./auto-eightysix-modal";
 import { CellarGridView, CellarSetup } from "./cellar-grid";
 import type { GridData } from "./grid-types";
-import { resolveCellarNavigationIntent } from "./cellar-navigation";
+import {
+  resolveCellarNavigationIntent,
+  useCellarSelectionNavigation,
+} from "./cellar-navigation";
 import { useCellarUrlState } from "./use-cellar-url-state";
 import { buildCellarCounters } from "./cellar-counters";
 import { CellarControlBar } from "./cellar-control-bar";
@@ -37,11 +41,14 @@ export function CellarShell({
   eightysixStrategy,
   defaultTargetPourCostPct,
   defaultTargetMarkupRatio,
+  canReadCost = false, canReadMargin = false,
+  canManagePricing = false,
   role,
   cellarSections,
+  inventoryContractVersion,
 }: {
   rows: CellarWineRow[];
-  reconcileItems: OpenBottleRow[];
+  reconcileItems: OpenBottleRow[] | PhysicalReconcileItem[];
   cellarConfig: { id: string; rows: number; columns: number; name: string; lowStockThreshold: number; reconcileVarianceThresholdOz: number } | null;
   gridData: GridData;
   restaurantName: string;
@@ -51,9 +58,11 @@ export function CellarShell({
   eightysixStrategy: "hide" | "mark";
   defaultTargetPourCostPct: number | null;
   defaultTargetMarkupRatio: number | null;
+  canReadCost?: boolean; canReadMargin?: boolean; canManagePricing?: boolean;
   role: "owner" | "manager" | "staff";
   // BND-063/064 — cellar sections for grouping and DnD
   cellarSections?: CellarSection[];
+  inventoryContractVersion: 1 | 2;
 }) {
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -61,19 +70,10 @@ export function CellarShell({
   const mode = searchParams.get("mode");
   const { urlState, urlStateRef, applyUrlState, replaceUrlState } =
     useCellarUrlState();
-  // Opening the drawer pushes a history entry so Back closes it.
-  const openWine = useCallback(
-    (wineId: string) => applyUrlState({ wine: wineId }, "push"),
-    [applyUrlState],
-  );
-
-  // A deep-linked wine id that doesn't exist in this cellar would otherwise
-  // pin a dead wine= param to the URL with no visible way to clear it.
-  useEffect(() => {
-    if (urlState.wine && !rows.some((row) => row.wine_id === urlState.wine)) {
-      replaceUrlState({ wine: null });
-    }
-  }, [urlState.wine, rows, replaceUrlState]);
+  const selectionNavigation = useCellarSelectionNavigation({
+    rows, wineId: urlState.wine, bottleId: urlState.bottle,
+    applyUrlState, replaceUrlState,
+  });
 
   // Search input draft: filters client-side per keystroke, syncs to the URL
   // on a debounce so typing doesn't trigger an RSC refetch per character.
@@ -122,13 +122,7 @@ export function CellarShell({
     observer.observe(el);
     return () => observer.disconnect();
   }, [view]);
-  const selected = useMemo(
-    () =>
-      urlState.wine
-        ? rows.find((row) => row.wine_id === urlState.wine) ?? null
-        : null,
-    [rows, urlState.wine],
-  );
+  const selected = selectionNavigation.selected;
   const [reconcileOpen, setReconcileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // CELLAR-01 — every facet, the sort and the grouping now live behind one
@@ -258,7 +252,7 @@ export function CellarShell({
           </div>
           <VoiceCellarControl
             onResolve={(wineId) => {
-              applyUrlState({ view: "list", wine: wineId }, "push");
+              applyUrlState({ view: "list", wine: wineId, bottle: null }, "push");
             }}
             onFilter={(filters) => {
               applyUrlState(
@@ -284,9 +278,11 @@ export function CellarShell({
         onSelectFilter={selectCounter}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
-        openBottleCount={alerts.openCount}
+        openBottleCount={rows.reduce((n, row) => n + (row.activeBottleCount ?? ((row.open_remaining_ml ?? 0) > 0 ? 1 : 0)), 0)}
         reconcileCount={
-          view === "list" && canManage ? reconcileItems.length : 0
+          view === "list" && canManage
+            ? reconcileItems.length
+            : 0
         }
         onReconcile={() => setReconcileOpen(true)}
         view={view}
@@ -383,7 +379,7 @@ export function CellarShell({
           query={qDraft}
           filter={urlState.filter}
           lowStockThreshold={cellarConfig?.lowStockThreshold ?? 3}
-          onSelectWine={(row) => openWine(row.wine_id)}
+          onSelectWine={(row) => selectionNavigation.openWine(row.wine_id)}
           onResetFilters={() => {
             replaceUrlState({
               q: "",
@@ -419,18 +415,27 @@ export function CellarShell({
           sections={cellarSections}
         />
       ) : cellarConfig ? (
-        <CellarGridView config={cellarConfig} gridData={gridData} onSelectWine={openWine} />
+        <CellarGridView config={cellarConfig} gridData={gridData} onSelectWine={selectionNavigation.openWine} />
       ) : (
         <CellarSetup restaurantName={restaurantName} />
       )}
 
       {/* Drawer + modals */}
       <WineDetailDrawer
-        key={drawerStateKey(selected)}
+        key={drawerStateKey(selected, inventoryContractVersion)}
         row={selected}
         canManage={canManage}
+        canReadCost={canReadCost}
+        canReadMargin={canReadMargin}
+        canManagePricing={canManagePricing}
         isOwner={isOwner}
-        onClose={() => replaceUrlState({ wine: null })}
+        inventoryContractVersion={inventoryContractVersion}
+        selectedBottleId={selectionNavigation.selectedBottleId}
+        bottleSelectionMessage={selectionNavigation.message}
+        onSelectBottle={selectionNavigation.selectBottle}
+        onBottleOpened={selectionNavigation.selectOpenedBottle}
+        onBottleStale={selectionNavigation.markBottleStale}
+        onClose={selectionNavigation.closeWine}
         duplicateRows={
           selected
             ? rows.filter((r) => selected.duplicate_wine_ids.includes(r.wine_id))
@@ -443,6 +448,7 @@ export function CellarShell({
         items={reconcileItems}
         varianceThresholdOz={cellarConfig?.reconcileVarianceThresholdOz ?? 1.0}
         onClose={() => setReconcileOpen(false)} restaurantId={restaurantId} userId={userId}
+        inventoryContractVersion={inventoryContractVersion}
       />
 
       {isOwner && (
@@ -451,6 +457,7 @@ export function CellarShell({
           restaurantId={restaurantId}
           defaultTargetPourCostPct={defaultTargetPourCostPct}
           defaultTargetMarkupRatio={defaultTargetMarkupRatio}
+          canManagePricingTargets={canReadMargin && canManagePricing}
           enabled={autoEightysixEnabled}
           thresholdMl={autoEightysixThresholdMl}
           eightysixStrategy={eightysixStrategy}

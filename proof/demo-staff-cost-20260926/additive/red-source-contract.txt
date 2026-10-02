@@ -1,0 +1,57 @@
+COMMAND
+NO_COLOR=1 VITE_CONFIG_NATIVE_IGNORE_WARNING=true pnpm exec vitest run src/test/contracts/staff-cost-seal-additive.test.ts --reporter=dot
+
+WORKDIR
+/Users/zero/projects/_archive/terroir-prototype
+
+STDOUT_STDERR_COMBINED
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v4.1.4 /Users/zero/projects/_archive/terroir-prototype
+
+(node:28704) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+xxxxxxx
+
+ Failed Tests 7
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > owns the collision-free additive migration before asserting its contracts
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ at src/test/contracts/staff-cost-seal-additive.test.ts:50:39
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > declares the exact non-cache caller interface
+AssertionError: current_site_role_at_least(uuid,public.membership_role): expected '' to contain 'public.current_site_role_at_least(uuid,public.membership_role)'
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > uses one lifecycle-aware current-role helper and never the legacy role helpers
+AssertionError: expected '' to contain 'security definer'
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > preflights and enforces the closed metadata shapes before exposing them
+AssertionError: expected '' to contain ''drink_window''
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > gates exact-site typed readers and preserves null, empty, and bounded wine filters
+AssertionError: read_inventory_costs: expected '' to contain 'security definer'
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > keeps inventory cost hidden across create and explicit-flag CAS patch receipts
+AssertionError: expected '' to contain 'public.current_site_role_at_least'
+
+ FAIL  src/test/contracts/staff-cost-seal-additive.test.ts > 0157 additive staff-cost seal > closes helper execution and grants only exact protected RPC execution
+AssertionError: expected '' to contain 'revoke all on function public.current_site_role_at_least'
+
+ Test Files  1 failed (1)
+      Tests  7 failed (7)
+   Start at  10:50:49
+   Duration  220ms (transform 8ms, setup 5ms, import 8ms, tests 5ms, environment 85ms)
+
+The Vitest global setup also printed its standard local warning that 25 live-database
+suites were skipped because no loopback Supabase stack was configured. No database was
+started or contacted in this source-only RED run.
+
+EXIT_CODE
+1

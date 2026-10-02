@@ -30,6 +30,24 @@ afterEach(() => {
 });
 
 describe("ReadyView", () => {
+  it("labels an unavailable recent-scan total as restricted rather than zero", async () => {
+    await act(async () => root.render(
+      <ReadyView
+        mode="invoice"
+        onModeChange={vi.fn()}
+        onStart={vi.fn()}
+        onSpreadsheet={vi.fn()}
+        recentScans={[{ ...recentScan, total: null, hasImage: null }]}
+        savedResult={null}
+        onDismissSaved={vi.fn()}
+      />,
+    ));
+
+    expect(container.textContent).toContain("Cost restricted");
+    expect(container.textContent).not.toContain("$0");
+    expect(container.querySelector('[aria-label="Has invoice image"]')).toBeNull();
+  });
+
   it("keeps mode and capture controls inactive until the scanner is ready", async () => {
     const onModeChange = vi.fn();
     await act(async () => root.render(
@@ -39,6 +57,7 @@ describe("ReadyView", () => {
     for (const control of container.querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input[type=file]")) {
       expect(control.disabled).toBe(true);
     }
+    expect(container.querySelector('a[href="/scan-bottle"]')).toBeNull();
     await act(async () => buttonNamed("Bottle").click());
     expect(onModeChange).not.toHaveBeenCalled();
     await renderReady("invoice", onModeChange);
@@ -56,14 +75,15 @@ describe("ReadyView", () => {
     expect(buttonNamed("Bottle").getAttribute("aria-pressed")).toBe(bottle);
   });
 
-  it("keeps bottle scanning inside the scan surface and delegates the mode change", async () => {
+  it("keeps photo identification inside Scan and links known-wine receiving separately", async () => {
     const onModeChange = vi.fn();
     await renderReady("invoice", onModeChange);
 
     await act(async () => buttonNamed("Bottle").click());
 
     expect(onModeChange).toHaveBeenCalledWith("bottle");
-    expect(container.querySelector('a[href="/scan-bottle"]')).toBeNull();
+    expect(container.querySelector('a[href="/scan-bottle"]')?.textContent).toContain("Receive a known wine");
+    expect(container.textContent).toContain("identify it first");
   });
 
   it("keeps every visible action at least 44px at desktop breakpoints", async () => {

@@ -78,6 +78,17 @@ describe("applyCellarQueryFilter", () => {
     ]);
   });
 
+  it("low: treats summed active volume at two bottles as the exact boundary", () => {
+    const rows = [
+      wine({ name: "two active bottles", sealed_count: 0, open_remaining_ml: 1_500 }),
+      wine({ name: "just below", sealed_count: 0, open_remaining_ml: 1_499 }),
+    ];
+
+    expect(applyCellarQueryFilter(rows, "", "low").map((r) => r.name)).toEqual([
+      "just below",
+    ]);
+  });
+
   it("low: a wine with no bottle size is never low rather than always low", () => {
     const rows = [wine({ name: "sizeless", size_ml: null, sealed_count: 0 })];
     expect(applyCellarQueryFilter(rows, "", "low")).toEqual([]);

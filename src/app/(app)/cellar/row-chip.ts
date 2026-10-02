@@ -24,6 +24,8 @@ export function pickRowChip(
     sealed_count: number;
     size_ml: number | null;
     open_remaining_ml: number | null;
+    activeBottleCount?: number;
+    activeOpenMl?: number;
     drink_window_start: number | null;
     drink_window_end: number | null;
     duplicate_wine_ids: string[];
@@ -40,10 +42,17 @@ export function pickRowChip(
   );
   if (status === "past_peak") return { label: "Past peak", tone: "urgent" };
 
+  const openMl = row.activeOpenMl ?? row.open_remaining_ml;
+  const hasMeasuredStock =
+    row.sealed_count > 0 ||
+    (row.size_ml != null && row.size_ml > 0 && openMl != null && openMl > 0);
+  const bottleEquivalentStock =
+    row.sealed_count +
+    (row.size_ml != null && row.size_ml > 0 ? (openMl ?? 0) / row.size_ml : 0);
   const isLowStock =
     lowStockThreshold != null &&
-    row.sealed_count > 0 &&
-    row.sealed_count < lowStockThreshold;
+    hasMeasuredStock &&
+    bottleEquivalentStock < lowStockThreshold;
   if (isLowStock) return { label: "Low stock", tone: "attention" };
 
   if (status === "drink_now") {
@@ -58,10 +67,14 @@ export function pickRowChip(
     return { label: "Duplicate?", tone: "neutral" };
   }
 
-  const isOpen = row.open_remaining_ml !== null && row.open_remaining_ml > 0;
+  const isOpen = openMl !== null && openMl > 0;
   if (isOpen) {
-    const oz = (row.open_remaining_ml! / ML_PER_OZ).toFixed(1);
-    return { label: `Open · ${oz} oz`, tone: "neutral" };
+    const oz = (openMl! / ML_PER_OZ).toFixed(1);
+    const count = row.activeBottleCount ?? 1;
+    return {
+      label: count > 1 ? `${count} open · ${oz} oz` : `Open · ${oz} oz`,
+      tone: "neutral",
+    };
   }
 
   if (status === "optimal") return { label: "Peak", tone: "optimal" };
@@ -75,7 +88,9 @@ export function pickRowChip(
 export function bottlesOnHand(row: {
   sealed_count: number;
   open_remaining_ml: number | null;
+  activeBottleCount?: number;
 }): number {
-  const open = row.open_remaining_ml !== null && row.open_remaining_ml > 0 ? 1 : 0;
+  const open = row.activeBottleCount ??
+    (row.open_remaining_ml !== null && row.open_remaining_ml > 0 ? 1 : 0);
   return row.sealed_count + open;
 }

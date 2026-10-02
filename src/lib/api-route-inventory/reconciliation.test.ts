@@ -114,21 +114,21 @@ const completionPlan = readFileSync(
 );
 
 describe("TER-020Ab active API requirement reconciliation", () => {
-  it("keeps all 269 requirements active and maps TER-CF-180..211 once", () => {
-    expect(ledger.items).toHaveLength(269);
+  it("keeps all 328 requirements active and maps the original, C08 and C03 route assertions once", () => {
+    expect(ledger.items).toHaveLength(328);
     expect(ledger.items.every((item) => item.status === "active")).toBe(true);
 
     const concreteLedger = ledger.items.filter((item) => {
       const order = Number(item.id.slice("TER-CF-".length));
-      return order >= 180 && order <= 211;
+      return (order >= 180 && order <= 211) || (order >= 288 && order <= 290) || order === 297;
     });
-    expect(concreteLedger).toHaveLength(32);
+    expect(concreteLedger).toHaveLength(36);
 
     const mapped = uniqueBy(
       reconciliation.concreteRequirements,
       (item) => item.requirementId,
     );
-    expect(mapped.size).toBe(32);
+    expect(mapped.size).toBe(36);
     for (const requirement of concreteLedger) {
       const mapping = mapped.get(requirement.id);
       expect(mapping, `${requirement.id} must be mapped`).toBeDefined();
@@ -137,6 +137,75 @@ describe("TER-020Ab active API requirement reconciliation", () => {
       expect(mapping!.operationId).toBe(
         operationIdFor(actor.method, actor.path),
       );
+    }
+  });
+
+  it("keeps C08 Slice A routes planned and omits a provider webhook route", () => {
+    expect(
+      inventory.plannedOperations
+        .filter((item) => item.path.startsWith("/api/integrations/pos/toast/"))
+        .map((item) => [item.sourceRequirementIds, item.method, item.path]),
+    ).toEqual([
+      [["TER-CF-288"], "POST", "/api/integrations/pos/toast/imports"],
+      [["TER-CF-290"], "POST", "/api/integrations/pos/toast/observations/[id]/interpretations"],
+      [["TER-CF-289"], "GET", "/api/integrations/pos/toast/reconciliation"],
+    ]);
+    expect(
+      inventory.plannedOperations.some((item) => item.path.includes("webhook")),
+    ).toBe(false);
+  });
+
+  it("classifies the C03 lookup route exactly without promising mutation or recovery", () => {
+    expect(inventory.plannedOperations.filter((item) => item.path.includes("offline")))
+      .toEqual([]);
+    expect(inventory.discoveredOperations.filter((item) => item.path.includes("offline")))
+      .toEqual([expect.objectContaining({
+        operationId: "api:GET:/api/offline-context",
+        method: "GET",
+        path: "/api/offline-context",
+      })]);
+    expect(reconciliation.discoveredClassifications.find(
+      (item) => item.operationId === "api:GET:/api/offline-context",
+    )).toEqual({
+      operationId: "api:GET:/api/offline-context",
+      classification: "exact",
+      concreteRequirementId: "TER-CF-297",
+      semanticAliasContext: [],
+    });
+  });
+
+  it("inventories the C04 capability replacement route without claiming a concrete API requirement", () => {
+    expect(inventory.discoveredOperations).toContainEqual(
+      expect.objectContaining({
+        operationId: "api:PUT:/api/team/members/{param}/capabilities",
+        method: "PUT",
+        path: "/api/team/members/[id]/capabilities",
+      }),
+    );
+    expect(
+      reconciliation.discoveredClassifications.find(
+        (item) =>
+          item.operationId ===
+          "api:PUT:/api/team/members/{param}/capabilities",
+      ),
+    ).toEqual({
+      operationId: "api:PUT:/api/team/members/{param}/capabilities",
+      classification: "extension",
+      concreteRequirementId: null,
+      semanticAliasContext: [],
+    });
+  });
+
+  it("binds the physical-bottle route promises to existing operations without planned duplicates", () => {
+    const discovered = new Set(inventory.discoveredOperations.map((item) => item.operationId));
+    const planned = new Set(inventory.plannedOperations.map((item) => item.operationId));
+
+    for (const order of [311, 312, 313, 314, 315]) {
+      const requirement = ledger.items[order - 1];
+      const actor = apiActor(requirement);
+      const operationId = operationIdFor(actor.method, actor.path);
+      expect(discovered.has(operationId), requirement.id).toBe(true);
+      expect(planned.has(operationId), requirement.id).toBe(false);
     }
   });
 

@@ -40,7 +40,7 @@ permissions:
 jobs:
   e2e:
     name: E2E — full suite
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # The two-spec subset fits inside ci.yml's 25 min alongside everything
     # else; the complete suite against a cold stack needs its own headroom.
     timeout-minutes: 45
@@ -68,12 +68,11 @@ jobs:
           version: 2.109.1
 
       - name: Start local Supabase
-        # Disposable stack, lives only for this job. Identical to ci.yml.
-        run: |
-          if [ ! -f supabase/config.toml ]; then
-            supabase init --with-vscode-settings=false --with-intellij-settings=false
-          fi
-          supabase start
+        # Disposable stack, with the same per-migration transaction boundary
+        # used by ci.yml so LOCK TABLE migrations are exercised correctly.
+        # Stop before the physical-inventory cutover so the legacy-shaped
+        # fixtures can be loaded and migrated through the production path.
+        run: CI_MIGRATION_CEILING=0155 scripts/local/ci-start-supabase.sh
 
       - name: Export local Supabase env for E2E
         # Kept byte-identical to ci.yml's equivalent step on purpose. If you
@@ -95,7 +94,7 @@ jobs:
           echo "DEV_BYPASS_EMAIL=owner+local@terroir.test" >> "$GITHUB_ENV"
 
       - name: Seed local Supabase
-        run: pnpm run supabase:seed:local:apply
+        run: LOCAL_SEED_PHYSICAL_CONTRACT=1 pnpm run supabase:seed:local:apply
 
       - name: Seed the production-shaped tenant
         # e2e/prodshape.ts's enterProdShape() PUTs /api/restaurant/{prodshape
@@ -104,7 +103,17 @@ jobs:
         # prodshape-tenant all call it. Must run after the base seed: the
         # fixture attaches to the base seeder's users instead of creating its
         # own (docs/runbooks/prodshape-tenant.md). Idempotent.
-        run: pnpm run prodshape:seed
+        run: PRODSHAPE_LEGACY_PHYSICAL_FIXTURE=1 pnpm run prodshape:seed
+
+      - name: Bootstrap owner capabilities
+        # Match ci.yml: promote the named local owner's demo and prodshape
+        # memberships so both sites exercise an explicit capability manifest.
+        run: scripts/local/ci-bootstrap-owner-capabilities.sh
+
+      - name: Apply physical and operational cutover migrations
+        # Migrate the seeded 0155 state through 0156-0164, including every
+        # production preflight/postflight assertion, before Playwright starts.
+        run: scripts/local/ci-apply-cutover-migrations.sh
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
