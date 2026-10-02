@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { RAW_PROJECT_LABELS, admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, namespaceResources, readDockerInventory, readProjectDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
+import { PRESERVED_D, admitPreservedDBootstrap, admitPreservedDPrivacyReceipt, assertFrozenPreservedDSource, assertPreservedDDockerDaemon, assertPreservedDSettings, runPreservedDContinuation, sha256 } from "./preserved-d-continuation.mjs";
 
 export const EXECUTION_ACK = "I_ACKNOWLEDGE_DISPOSABLE_RESTAURANT_DEMO";
 const PROJECT_ID = /^terroir-demo-[a-z0-9][a-z0-9-]{2,40}$/;
@@ -20,9 +21,11 @@ export function parseLauncherArgs(argv) {
   const values = new Map();
   let execute = false;
   let bootstrapOnly = false;
+  let continuePreservedD = false;
   for (const raw of argv) {
     if (raw === "--execute") { execute = true; continue; }
     if (raw === "--bootstrap-only") { bootstrapOnly = true; continue; }
+    if (raw === "--continue-preserved-d") { continuePreservedD = true; continue; }
     const match = raw.match(/^--([^=]+)=(.+)$/);
     assert(match, `invalid argument: ${raw}`);
     assert(!values.has(match[1]), `duplicate argument: --${match[1]}`);
@@ -33,7 +36,11 @@ export function parseLauncherArgs(argv) {
     "db-port", "shadow-port", "studio-port", "mail-port", "app-port",
     "owner-email", "staff-email",
   ];
-  const allowed = new Set([...required, "ack", "journey-width"]);
+  const continuationOnly = [
+    "privacy-receipt", "privacy-receipt-sha256", "privacy-migration-sha256",
+    "privacy-review-sha256", "reviewed-launcher-sha256",
+  ];
+  const allowed = new Set([...required, "ack", "journey-width", ...continuationOnly]);
   for (const key of values.keys()) assert(allowed.has(key), `unknown argument: --${key}`);
   for (const key of required) assert(values.has(key), `missing argument: --${key}=...`);
   const ports = Object.fromEntries(
@@ -51,8 +58,13 @@ export function parseLauncherArgs(argv) {
     projectId: values.get("project-id"),
     ownerEmail: values.get("owner-email"),
     staffEmail: values.get("staff-email"),
-    ack: values.get("ack"), execute, bootstrapOnly, ports,
+    ack: values.get("ack"), execute, bootstrapOnly, continuePreservedD, ports,
     journeyWidth: Number(values.get("journey-width") ?? 390),
+    privacyReceipt: values.get("privacy-receipt"),
+    privacyReceiptSha256: values.get("privacy-receipt-sha256"),
+    privacyMigrationSha256: values.get("privacy-migration-sha256"),
+    privacyReviewSha256: values.get("privacy-review-sha256"),
+    reviewedLauncherSha256: values.get("reviewed-launcher-sha256"),
   };
   assert([390, 1200].includes(result.journeyWidth), "journey width must be 390 or 1200");
   assert(PROJECT_ID.test(result.projectId), "project ID must use the terroir-demo-* disposable namespace");
@@ -67,11 +79,16 @@ export function parseLauncherArgs(argv) {
   }
   assert(!isInside(result.runtimeRoot, result.evidenceDir), "evidence directory must survive runtime cleanup");
   assert(!isInside(result.evidenceDir, result.runtimeRoot), "runtime directory must not be inside evidence");
-  if (execute) {
+  assert(!(bootstrapOnly && continuePreservedD), "bootstrap and preserved D continuation modes are mutually exclusive");
+  if (continuePreservedD) {
+    assertPreservedDSettings(result);
+  } else if (execute) {
     assert.equal(result.ack, EXECUTION_ACK, "exact disposable execution acknowledgement required");
+    for (const key of continuationOnly) assert.equal(values.get(key), undefined, `--${key} requires preserved D continuation`);
   } else {
     assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
     assert.equal(result.bootstrapOnly, false, "bootstrap-only requires execution");
+    for (const key of continuationOnly) assert.equal(values.get(key), undefined, `--${key} requires preserved D continuation`);
   }
   return result;
 }
@@ -152,6 +169,21 @@ function isInside(parent, candidate) {
 
 export async function admitDestinationPaths(settings) {
   const sourceRoot = await realpath(settings.sourceRoot);
+  if (settings.continuePreservedD) {
+    const runtimeRoot = await realpath(settings.runtimeRoot);
+    const runtime = await lstat(runtimeRoot);
+    assert(runtime.isDirectory() && !runtime.isSymbolicLink(), "preserved D runtime must be the original directory");
+    assert.equal(runtimeRoot, PRESERVED_D.runtimeRoot, "preserved D runtime path changed");
+    const evidence = path.join(await realpath(path.dirname(settings.evidenceDir)), path.basename(settings.evidenceDir));
+    try { await lstat(evidence); assert.fail("continuation evidence destination already exists"); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    assert(!isInside(sourceRoot, evidence) && !isInside(evidence, sourceRoot), "continuation evidence aliases the source checkout");
+    assert(!isInside(runtimeRoot, evidence) && !isInside(evidence, runtimeRoot), "continuation evidence aliases the preserved runtime");
+    settings.sourceRoot = sourceRoot;
+    settings.runtimeRoot = runtimeRoot;
+    settings.evidenceDir = evidence;
+    return;
+  }
   for (const key of ["runtimeRoot", "evidenceDir"]) {
     const target = settings[key];
     const canonical = path.join(await realpath(path.dirname(target)), path.basename(target));
@@ -175,7 +207,7 @@ function minimalEnvironment(extra = {}) {
 function run(command, args, options = {}) {
   if (admittedDockerDaemon && (command === "docker" || args.includes("supabase"))) assertDockerSocketIdentity(admittedDockerDaemon);
   try {
-    return execFileSync(command, args, {
+    const output = execFileSync(command, args, {
       cwd: options.cwd,
       env: options.env ?? minimalEnvironment(),
       input: options.input,
@@ -183,7 +215,8 @@ function run(command, args, options = {}) {
       timeout: options.timeout ?? 300_000,
       maxBuffer: 30_000_000,
       stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
-    }).trim();
+    });
+    return options.trim === false ? output : output.trim();
   } catch {
     throw new Error(`${path.basename(command)} failed without exposing child output`);
   }
@@ -423,6 +456,50 @@ async function applySourceMigrations(settings, target, ledger, readInventory = r
   return filenames.length;
 }
 
+async function runPortableJourneyTail(settings, local, target, result, onApp) {
+  const users = await createSyntheticUsers(local, settings);
+  result.lastCompletedStep = "synthetic-auth-created";
+  const ids = fixtureIds(settings.projectId);
+  const fixture = applyFixture(settings, target, users, ids);
+  result.lastCompletedStep = "zero-stock-fixture-applied";
+  const baseURL = `http://127.0.0.1:${settings.ports.app}`;
+  const ready = {
+    version: 1, result: "READY_FOR_PORTABLE_JOURNEY", projectId: settings.projectId,
+    baseURL, database: "postgres", databaseContainerId: target.database.id,
+    apiURL: local.apiURL, ownerEmail: settings.ownerEmail, staffEmail: settings.staffEmail,
+    ownerId: users.ownerId, staffId: users.staffId, ...fixture,
+  };
+  const readyPath = path.join(settings.evidenceDir, "ready.json");
+  await writeFile(readyPath, `${JSON.stringify(ready, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  const app = spawn("scripts/local/dev-local.sh", [`--port=${settings.ports.app}`, "--hostname=127.0.0.1"], {
+    cwd: settings.runtimeRoot,
+    env: minimalEnvironment({ ACTIVE_RESTAURANT_COOKIE_SECRET: randomBytes(32).toString("hex") }),
+    stdio: ["ignore", "ignore", "ignore"],
+    detached: true,
+  });
+  onApp(app);
+  await waitForHealth(baseURL, app);
+  result.lastCompletedStep = "local-app-admitted";
+  const journeyOutput = run("node", [
+    "scripts/local/restaurant-demo/journey.mjs",
+    `--ready-json=${readyPath}`,
+    `--project-root=${settings.runtimeRoot}`,
+    `--evidence-dir=${path.join(settings.evidenceDir, "journey")}`,
+    `--viewport-width=${settings.journeyWidth}`,
+  ], {
+    cwd: settings.runtimeRoot,
+    timeout: 1_800_000,
+    env: minimalEnvironment({
+      TERROIR_DEMO_OWNER_PASSWORD: users.ownerPassword,
+      TERROIR_DEMO_STAFF_PASSWORD: users.staffPassword,
+    }),
+  });
+  const journey = JSON.parse(journeyOutput.split("\n").at(-1));
+  assert.equal(journey.status, "passed", "portable browser journey did not pass");
+  result.status = "passed";
+  result.lastCompletedStep = "portable-journey-passed";
+}
+
 async function execute(settings) {
   let app;
   let ownedRuntime;
@@ -486,46 +563,7 @@ async function execute(settings) {
       });
       return;
     }
-    const users = await createSyntheticUsers(local, settings);
-    result.lastCompletedStep = "synthetic-auth-created";
-    const ids = fixtureIds(settings.projectId);
-    const fixture = applyFixture(settings, target, users, ids);
-    result.lastCompletedStep = "zero-stock-fixture-applied";
-    const baseURL = `http://127.0.0.1:${settings.ports.app}`;
-    const ready = {
-      version: 1, result: "READY_FOR_PORTABLE_JOURNEY", projectId: settings.projectId,
-      baseURL, database: "postgres", databaseContainerId: target.database.id,
-      apiURL: local.apiURL, ownerEmail: settings.ownerEmail, staffEmail: settings.staffEmail,
-      ownerId: users.ownerId, staffId: users.staffId, ...fixture,
-    };
-    const readyPath = path.join(settings.evidenceDir, "ready.json");
-    await writeFile(readyPath, `${JSON.stringify(ready, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-    app = spawn("scripts/local/dev-local.sh", [`--port=${settings.ports.app}`, "--hostname=127.0.0.1"], {
-      cwd: settings.runtimeRoot,
-      env: minimalEnvironment({ ACTIVE_RESTAURANT_COOKIE_SECRET: randomBytes(32).toString("hex") }),
-      stdio: ["ignore", "ignore", "ignore"],
-      detached: true,
-    });
-    await waitForHealth(baseURL, app);
-    result.lastCompletedStep = "local-app-admitted";
-    const journeyOutput = run("node", [
-      "scripts/local/restaurant-demo/journey.mjs",
-      `--ready-json=${readyPath}`,
-      `--project-root=${settings.runtimeRoot}`,
-      `--evidence-dir=${path.join(settings.evidenceDir, "journey")}`,
-      `--viewport-width=${settings.journeyWidth}`,
-    ], {
-      cwd: settings.runtimeRoot,
-      timeout: 1_800_000,
-      env: minimalEnvironment({
-        TERROIR_DEMO_OWNER_PASSWORD: users.ownerPassword,
-        TERROIR_DEMO_STAFF_PASSWORD: users.staffPassword,
-      }),
-    });
-    const journey = JSON.parse(journeyOutput.split("\n").at(-1));
-    assert.equal(journey.status, "passed", "portable browser journey did not pass");
-    result.status = "passed";
-    result.lastCompletedStep = "portable-journey-passed";
+    await runPortableJourneyTail(settings, local, target, result, (child) => { app = child; });
   } catch (error) {
     result.status = "failed";
     result.error = `${error instanceof assert.AssertionError ? "AssertionError" : "LauncherError"} at ${result.lastCompletedStep}`;
@@ -558,6 +596,97 @@ async function execute(settings) {
   if (thrown) throw thrown;
 }
 
+export async function preservedDLauncherSourceSha256() {
+  const directory = path.dirname(fileURLToPath(import.meta.url));
+  const files = ["launcher.mjs", "preserved-d-continuation.mjs", "docker-lifecycle.mjs"];
+  const contents = await Promise.all(files.map((filename) => readFile(path.join(directory, filename), "utf8")));
+  return sha256(JSON.stringify(files.map((filename, index) => [filename, contents[index]])));
+}
+
+async function readExactRegularFile(filename, label) {
+  assert(path.isAbsolute(filename), `${label} path must be absolute`);
+  const metadata = await lstat(filename);
+  assert(metadata.isFile() && !metadata.isSymbolicLink(), `${label} must be a regular file`);
+  assert.equal(await realpath(filename), filename, `${label} path aliases another file`);
+  return readFile(filename, "utf8");
+}
+
+async function admitPreservedDContinuation(settings) {
+  const bootstrapResultText = await readExactRegularFile(path.join(PRESERVED_D.bootstrapEvidenceRoot, "launcher-result.json"), "bootstrap result receipt");
+  const ownershipText = await readExactRegularFile(path.join(PRESERVED_D.bootstrapEvidenceRoot, "docker-ownership.json"), "Docker ownership receipt");
+  const markerText = await readExactRegularFile(path.join(PRESERVED_D.runtimeRoot, OWNERSHIP_MARKER), "runtime ownership marker");
+  const privacyReceiptText = await readExactRegularFile(settings.privacyReceipt, "privacy application receipt");
+  const sourceTree = run("git", ["ls-tree", "-rz", "--full-tree", PRESERVED_D.sourceHead], { cwd: settings.sourceRoot, trim: false });
+  const originalConfig = run("git", ["show", `${PRESERVED_D.sourceHead}:supabase/config.toml`], { cwd: settings.sourceRoot, trim: false });
+  const runtimeIdentity = await assertFrozenPreservedDSource({
+    runtimeRoot: settings.runtimeRoot,
+    treeText: sourceTree,
+    expectedConfigText: rewriteSupabaseConfig(originalConfig, settings),
+  });
+  const admitted = admitPreservedDBootstrap({
+    settings, bootstrapResultText, ownershipText, markerText, runtimeIdentity,
+    actualLauncherSha256: await preservedDLauncherSourceSha256(),
+  });
+  admitted.privacy = admitPreservedDPrivacyReceipt(settings, privacyReceiptText);
+  await assertOwnedRuntime(settings, { ...runtimeIdentity, marker: admitted.marker });
+
+  admittedDockerDaemon = assertPreservedDDockerDaemon(admitLocalDockerDaemon(run));
+  await assertPortsAbsent([settings.ports.app]);
+  const inventory = readProjectDockerInventory(settings.projectId, run);
+  assertCleanupAdmitted(admitted.ownership, inventory);
+  const target = await inspectAdmittedStack(settings);
+  assert.equal(target.database.id, PRESERVED_D.databaseContainerId, "preserved D database identity changed");
+  const phase = run("docker", [
+    "exec", "-i", "-e", "PGOPTIONS=-c default_transaction_read_only=on -c row_security=off -c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000",
+    target.database.id, "psql", "-X", "--no-password", "-qAt",
+    "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres", "-c",
+    `select count(*) || '/' || max(version) || '/' || (select count(*) from auth.users where lower(email) in ('${PRESERVED_D.ownerEmail}','${PRESERVED_D.staffEmail}')) || '/' || (select count(*) from public.membership_capability_grants) || '/' || (select count(*) from public.wines) || '/' || (select count(*) from public.inventory_items) from supabase_migrations.schema_migrations`,
+  ]);
+  assert.equal(phase, "137/0165/0/0/0/0", "preserved D phase is not the untouched post-privacy continuation boundary");
+  const local = parseLocalStatus(run("pnpm", ["exec", "supabase", "status", "--workdir", settings.runtimeRoot, "-o", "json"], { cwd: settings.runtimeRoot }), settings);
+  return { ...admitted, local, target };
+}
+
+async function executePreservedDContinuation(settings) {
+  let app;
+  const result = {
+    status: "failed", lastCompletedStep: "preserved-d-source-admission",
+    projectId: settings.projectId, executionId: PRESERVED_D.executionId,
+  };
+  await mkdir(settings.evidenceDir, { mode: 0o700 });
+  const resultPath = path.join(settings.evidenceDir, "continuation-result.json");
+  await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  let thrown;
+  try {
+    await runPreservedDContinuation({
+      admit: async () => admitPreservedDContinuation(settings),
+      tail: async (admitted) => {
+        result.lastCompletedStep = "preserved-d-post-privacy-admitted";
+        result.applicationSourceHead = PRESERVED_D.sourceHead;
+        result.applicationSourceTree = PRESERVED_D.sourceTree;
+        result.reviewedLauncherSha256 = settings.reviewedLauncherSha256;
+        result.privacyReceiptSha256 = settings.privacyReceiptSha256;
+        result.migrationLedger = admitted.privacy.migrationLedger;
+        await runPortableJourneyTail(settings, admitted.local, admitted.target, result, (child) => { app = child; });
+      },
+    });
+  } catch (error) {
+    result.status = "failed";
+    result.error = `${error instanceof assert.AssertionError ? "AssertionError" : "LauncherError"} at ${result.lastCompletedStep}`;
+    thrown = error;
+  } finally {
+    try { await stopChild(app); } catch {
+      result.status = "failed";
+      result.error = `AppCleanupError at ${result.lastCompletedStep}`;
+      thrown ??= new Error("owned app cleanup failed");
+    }
+    result.runtimePreserved = true;
+    result.stackPreserved = true;
+    await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
+  }
+  if (thrown) throw thrown;
+}
+
 async function main() {
   const settings = parseLauncherArgs(process.argv.slice(2));
   await admitDestinationPaths(settings);
@@ -573,7 +702,8 @@ async function main() {
     process.stdout.write(`${JSON.stringify({ status: "SOURCE_ONLY_UNEXECUTED", executionReady: true, projectId: settings.projectId, ports: settings.ports })}\n`);
     return;
   }
-  await execute(settings);
+  if (settings.continuePreservedD) await executePreservedDContinuation(settings);
+  else await execute(settings);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

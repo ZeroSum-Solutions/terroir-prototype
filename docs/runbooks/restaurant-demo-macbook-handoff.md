@@ -89,6 +89,33 @@ root's exact path/port/namespace admission, the structural baseline and aggregat
 history result, a reviewed forward/down privacy packet, and independent runtime
 verification. Staff-cost privacy and M1–M5 remain incomplete.
 
+### October 2 preserved D continuation source candidate
+
+The launcher now has one closed continuation mode for
+`terroir-demo-20261002-privacy-d`. It is not a reusable resume or adoption mode.
+It accepts only the original execution, runtime, receipt hashes, Docker identities,
+ports, synthetic users, and 589a application tree. Before Auth, fixture, application,
+or browser work, it checks every copied runtime source file against that Git tree,
+re-admits the original ownership ledger and exact OrbStack Docker socket path, requires an unused
+app port, and requires the database to be at the untouched `137/0165` post-privacy
+boundary.
+
+The caller must supply the exact external hashes for the reviewed continuation source
+chain (`launcher.mjs`, `preserved-d-continuation.mjs`, and `docker-lifecycle.mjs`),
+the applied `0165_staff_cost_seal_contract.sql`, its independent review, and the final
+privacy application receipt. The receipt must link the original `136/0164` bootstrap
+to `137/0165` on the same execution, database container, and network. A new continuation
+evidence directory is mandatory; the launcher never overwrites the bootstrap or privacy
+receipts and never starts, bootstraps, recreates, or cleans up a Docker stack in this
+mode. The preserved runtime and database remain after either success or failure.
+
+This is source only. Its local mock suite covers missing, changed, wrong-target,
+wrong-source, wrong-phase, and wrong-privacy refusal before the existing tail, plus one
+accepted call of that tail. Do not execute it until the privacy application receipt
+exists and independent TypeScript and security reviews accept the exact source hash.
+No Auth user, fixture, application, or browser action has run from this candidate.
+M1–M5 remain incomplete.
+
 ### October 2 source-only locator repair (independent source review passed)
 
 Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, the portable
@@ -644,8 +671,10 @@ the goal-state `proof/browser-demo-lane/journey/` directory:
 failure markers, role denial, and viewport assertions. Do not port their fixed
 database/container/network IDs, fixed actors, fixed bottle IDs, absolute
 paths, ports, in-memory JWT implementation or split continuation into a new run.
-The portable package has no continuation mode. Keep the old continuation as
-historical recovery evidence, not as instructions to resume a failed new clone.
+That portable checkpoint had no continuation mode. The later preserved D exception
+documented above is bound to its exact bootstrap and privacy receipts; it does not make
+the old continuation a supported way to resume any failed clone. Keep the old
+continuation as historical recovery evidence.
 
 ## Remaining portability gates
 

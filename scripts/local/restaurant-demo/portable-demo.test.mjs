@@ -16,6 +16,7 @@ import {
   rewriteSupabaseConfig,
   transactionalMigrationArgs,
 } from "./launcher.mjs";
+import { PRESERVED_D, PRESERVED_D_CONTINUATION_ACK } from "./preserved-d-continuation.mjs";
 import { RAW_PROJECT_LABELS, admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, parseLocalDockerEndpoint, readDockerInventory, readProjectDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
 import { parseJourneyArgs, safeErrorKind } from "./journey.mjs";
 
@@ -50,6 +51,30 @@ test("launcher requires the disposable namespace, unique ports, and exact execut
   assert.throws(() => parseLauncherArgs([...baseArgs, "--bootstrap-only"]), /requires execution/);
   const bootstrap = parseLauncherArgs([...baseArgs, "--bootstrap-only", "--execute", `--ack=${EXECUTION_ACK}`]);
   assert.equal(bootstrap.bootstrapOnly, true);
+});
+
+test("preserved D continuation accepts only its exact target and externally pinned review chain", () => {
+  const continuation = [
+    `--source-root=${PRESERVED_D.sourceRoot}`,
+    `--runtime-root=${PRESERVED_D.runtimeRoot}`,
+    `--evidence-dir=${PRESERVED_D.bootstrapEvidenceRoot}-continuation`,
+    `--project-id=${PRESERVED_D.projectId}`,
+    ...Object.entries(PRESERVED_D.ports).map(([name, port]) => `--${name}-port=${port}`),
+    `--owner-email=${PRESERVED_D.ownerEmail}`,
+    `--staff-email=${PRESERVED_D.staffEmail}`,
+    "--privacy-receipt=/tmp/privacy-apply-receipt.json",
+    `--privacy-receipt-sha256=${"a".repeat(64)}`,
+    `--privacy-migration-sha256=${"b".repeat(64)}`,
+    `--privacy-review-sha256=${"c".repeat(64)}`,
+    `--reviewed-launcher-sha256=${"d".repeat(64)}`,
+    "--journey-width=390", "--continue-preserved-d", "--execute",
+    `--ack=${PRESERVED_D_CONTINUATION_ACK}`,
+  ];
+  assert.equal(parseLauncherArgs(continuation).continuePreservedD, true);
+  assert.throws(() => parseLauncherArgs(continuation.filter((arg) => !arg.startsWith("--privacy-receipt="))), /privacy receipt path/);
+  assert.throws(() => parseLauncherArgs(continuation.map((arg) => arg.startsWith("--project-id=") ? "--project-id=terroir-demo-wrong-d" : arg)), /projectId changed/);
+  assert.throws(() => parseLauncherArgs([...continuation, "--bootstrap-only"]), /mutually exclusive/);
+  assert.throws(() => parseLauncherArgs([...baseArgs, "--privacy-receipt=/tmp/unreviewed.json"]), /requires preserved D continuation/);
 });
 
 test("source materialization refuses dotenv, traversal, Git, dependencies, and temp paths", () => {
@@ -511,9 +536,9 @@ test("launcher keeps failed runtimes and never uses project-name stop or dotenv 
 test("bootstrap-only stops after migrations and preserves the admitted stack without auth, fixture, app, or browser", async () => {
   const launcher = await readFile(path.join(here, "launcher.mjs"), "utf8");
   const stop = launcher.indexOf("if (settings.bootstrapOnly)");
-  const auth = launcher.indexOf("const users = await createSyntheticUsers");
-  assert(stop > 0 && stop < auth, "bootstrap stop must precede synthetic auth");
-  const boundary = launcher.slice(stop, auth);
+  const tail = launcher.indexOf("await runPortableJourneyTail(settings, local, target, result");
+  assert(stop > 0 && stop < tail, "bootstrap stop must precede the auth/fixture/app/browser tail");
+  const boundary = launcher.slice(stop, tail);
   assert.match(boundary, /READY_FOR_READ_ONLY_PREFLIGHT/);
   assert.match(boundary, /status: "READY_FOR_READ_ONLY_PREFLIGHT"/);
   assert.match(boundary, /fixtureApplied: false/);
@@ -531,4 +556,26 @@ test("bootstrap-only stops after migrations and preserves the admitted stack wit
   assert.match(launcher, /"-c", "select 1"/);
   assert.match(launcher, /if \(!settings\.bootstrapOnly && !thrown && ownedRuntime && ledger\) await cleanupOwnedServices/);
   assert.match(launcher, /const readInventory = settings\.bootstrapOnly\s+\? \(runner\) => readProjectDockerInventory/);
+});
+
+test("preserved D continuation reuses only the existing tail and cannot bootstrap, recreate, or clean the stack", async () => {
+  const launcher = await readFile(path.join(here, "launcher.mjs"), "utf8");
+  const start = launcher.indexOf("async function admitPreservedDContinuation");
+  const end = launcher.indexOf("async function main()", start);
+  assert(start > 0 && end > start);
+  const continuation = launcher.slice(start, end);
+  assert.match(continuation, /runPortableJourneyTail\(/);
+  assert.equal(continuation.match(/runPortableJourneyTail\(/g)?.length, 1);
+  for (const forbidden of [
+    "applySourceMigrations(", "createOwnedNetwork(", "materializeRuntime(",
+    "cleanupOwnedServices(", "cleanupOwnedStack(", "assertNamespaceAbsent(",
+    '"supabase", "start"', '"supabase", "stop"', "--no-backup",
+  ]) {
+    assert.equal(continuation.includes(forbidden), false, `continuation contains forbidden lifecycle action: ${forbidden}`);
+  }
+  assert.match(continuation, /assertCleanupAdmitted\(admitted\.ownership, inventory\)/);
+  assert.match(continuation, /assertPreservedDDockerDaemon\(admitLocalDockerDaemon\(run\)\)/);
+  assert.match(continuation, /default_transaction_read_only=on/);
+  assert.match(continuation, /"137\/0165\/0\/0\/0\/0"/);
+  assert.match(continuation, /result\.stackPreserved = true/);
 });
