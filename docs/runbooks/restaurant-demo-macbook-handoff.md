@@ -5,9 +5,13 @@
 > completed two real receives and the committed receive replay before the journey
 > stopped on a stale Cellar search locator. A source-only repair now targets the
 > current accessible Cellar search contract and the portable suite passes 30 tests
-> with zero skips. Independent review is pending, and no browser journey was rerun.
-> Nobody has reproduced the package on the MacBook. The independent staff-cost
-> probe also failed confidentiality. Restaurant-demo milestones M1–M5 and production
+> with zero skips. Independent locator review passed, and no browser journey was
+> rerun. A separate S10 source repair now limits both recompute responses and future
+> successful job results to cost-free receipts. Its first independent review found a
+> stale seeder caller; that source caller is repaired and the bounded source review
+> retry passed.
+> Nobody has reproduced the package on the MacBook. The independent staff-cost probe
+> also failed confidentiality. Restaurant-demo milestones M1–M5 and production
 > readiness remain incomplete.
 
 This is the smallest intended handoff for reproducing the restaurant inventory
@@ -64,6 +68,42 @@ failed, and its evidence below is unchanged. Do not launch a fourth portable tar
 or restart, adopt, reseed, delete, or replay attempts A, B, or C. Any later runtime
 attempt still requires a reviewed locator, a fresh namespace, and the separate raw
 cost privacy seal. M1–M5 remain incomplete.
+
+### October 2 S10 recompute-receipt repair (independent source review passed)
+
+The source-only S10 candidate adds
+`src/lib/staff-cost/recompute-receipt.ts` as the shared closed contract. Cellar-health
+and pricing-recommendation recomputes now return and persist only their matching
+three-field receipt: `version: 1`, the fixed recompute `kind`, and
+`status: "succeeded"`. Both API routes validate the exact kind and reject legacy or
+additional fields before responding. The existing browser callers remain unchanged;
+they check `response.ok` and refresh without reading response JSON.
+
+The first independent review found that `scripts/seed-local-operational.ts`, which is
+outside the TypeScript compile boundary, still read the removed derived result fields.
+A new static regression failed on those four reads before the seeder was changed to
+log only each receipt's `kind` and `status`. A fresh whole-tree caller search found no
+remaining runtime caller that reads the legacy result fields.
+
+The repaired focused source run passed 50 tests with zero focused skips, including
+exact HTTP bodies, exact future `background_jobs.result` writes, legacy and extra-key
+rejection, and a staff delegate with `pricing.manage = true` while both read grants
+are false.
+Independent review reran the same seven-file suite with the same result. Vitest's
+global setup separately listed 25 unavailable live-database suites; they are not
+counted as passes and are outside the bounded source verdict. TypeScript, targeted
+lint, the file-size ratchet, and diff hygiene passed. A broader
+unit attempt did not complete as evidence because unrelated search and theme tests
+reported an absent localhost application and unavailable Node local storage. A later
+process-state check found no remaining `pnpm test` or Vitest process, but the original
+command's terminal exit was not observed and no result is inferred from it.
+
+Independent review passed this bounded source leaf only. No browser, application
+runtime, database, SQL, migration, Storage request, Docker service, credential, dotenv
+file, commit, or push was used for this leaf. Historical detailed job results remain
+unsealed, and the raw table ACL, invoice-image Storage policy, real JWT/Data API matrix,
+and runtime privacy proof remain open. This source checkpoint does not seal staff
+costs, complete M1, or complete M1–M5.
 
 ### October 2 mobile attempt C
 
@@ -185,6 +225,10 @@ the raw-cost/Storage privacy cutover or provide an atomic authority seal.
   creates/reads `.env.local` and resets the retained repository stack.
 - Use the name-search receiving path. The label-photo route needs an external
   model provider key and is not required for this inventory demonstration.
+- Attempts A, B, and C remain closed evidence. Do not restart, adopt, reseed,
+  delete, or replay them. A later attempt D is not authorized by this source
+  checkpoint. It requires full independent privacy-seal acceptance, a frozen
+  candidate, separate owner authorization, and fresh paths, ports, and namespace.
 
 ## Readiness gate before attempting the MacBook run
 
@@ -399,7 +443,8 @@ Hidden cost controls alone never prove a cost boundary.
 
 | Current source | Reuse | Gap before MacBook use |
 |---|---|---|
-| `scripts/local/restaurant-demo/launcher.mjs`, `docker-lifecycle.mjs`, `fixture.sql`, and `journey.mjs` | Reviewed local-only source package, with explicit execution acknowledgement. | Mobile C failed on a stale Cellar locator before opening. Cleanup did not run; staff raw-cost privacy and MacBook reproduction remain open. |
+| `scripts/local/restaurant-demo/launcher.mjs`, `docker-lifecycle.mjs`, `fixture.sql`, and `journey.mjs` | Reviewed local-only source package, with explicit execution acknowledgement. | Mobile C failed on a stale Cellar locator before opening. The locator source repair passed independent review, but no browser rerun or cleanup occurred; staff raw-cost privacy and MacBook reproduction remain open. |
+| `src/lib/staff-cost/recompute-receipt.ts`, both recompute services, their API routes, and `scripts/seed-local-operational.ts` | Reuse the exact three-field success receipt for future recompute HTTP and job-result output; the seeder logs only receipt kind and status. | Bounded source review passed. Historical job-result remediation, final ACL/Storage seal, and runtime proof remain open. |
 | `scripts/local/dev-local.sh` | Reuse directly after stack admission. It obtains current local keys and pins the local origin safely. | Requires an already-running instance of this repository's configured local stack; it does not create a disposable stack. |
 | `scripts/local/assert-local-db.sh` | Reuse its exact-host-and-port refusal pattern. | It recognizes the retained repo ports and can fall back to `.env.local`; the disposable launcher needs its own explicit process-only target admission. |
 | `scripts/local/dev-stack.sh` | Reuse its migration/readiness sequencing as design input only. | Do not execute for this handoff: it creates/reads `.env.local` and performs a destructive retained-stack reset. |

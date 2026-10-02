@@ -1054,14 +1054,14 @@ async function seed(): Promise<void> {
     RESTAURANT_ID,
     world.users.owner,
   );
-  console.log(`cellar_health: classified ${health.classified}`, health.segments);
+  console.log("cellar_health recompute:", health.kind, health.status);
 
   const pricing = await runPricingRecommendationsRecompute(
     supabase,
     RESTAURANT_ID,
     world.users.owner,
   );
-  console.log(`pricing_recommendations: ${pricing.recommended}`, pricing.classes);
+  console.log("pricing_recommendations recompute:", pricing.kind, pricing.status);
 
   console.log("Operational seed complete.");
 }

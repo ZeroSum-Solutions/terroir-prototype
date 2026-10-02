@@ -319,3 +319,82 @@ restart or adoption, mutation replay, commit, or push occurred. Attempt C remain
 failed, its retained evidence remains authoritative for that run, and the prohibition
 on a fourth launch or replay remains in force. The staff raw-cost privacy failure is
 still open. M1–M5 remain incomplete.
+
+## Source-only S10 recompute-receipt checkpoint: October 2, 06:03 UTC
+
+Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, both protected
+recompute services now return and persist exact cost-free success receipts. The
+Cellar-health kind is `cellar_health_recompute`; the pricing kind is
+`pricing_recommendations_recompute`. Each receipt contains only `version: 1`, its
+fixed `kind`, and `status: "succeeded"`. The API routes validate those exact contracts
+and reject legacy derived counts, segment or class maps, and any additional key.
+
+The bounded source suite passed 49 tests with zero skips. It covers both service
+returns, exact future `background_jobs.result` writes, strict HTTP bodies, rejected
+legacy and expanded receipts, unchanged client request behavior, and successful
+pricing recompute for a delegate with `pricing.manage = true`, `cost.read = false`,
+and `margin.read = false`. TypeScript, targeted lint, the file-size ratchet, and diff
+hygiene passed. A broader unit attempt did not complete as evidence because unrelated
+search and theme tests required an absent localhost application and unavailable Node
+local storage. Independent S10 source review is running; no verdict is recorded yet.
+
+This checkpoint changes future source output only. Historical detailed job results,
+the authenticated table ACL cut, invoice-image Storage policy, real JWT/Data API and
+Storage checks, paired migration proof, and browser runtime verification remain open.
+No SQL, migration, Docker service, credential, dotenv file, browser or application
+runtime, commit, or push was used. Attempt C remains failed, attempts A–C remain
+closed evidence, and no fourth launch or replay is authorized. Any later attempt D
+requires full independent privacy-seal acceptance, a frozen candidate, separate owner
+authorization, and a fresh namespace, paths, and ports. Staff-cost privacy, M1, and
+M1–M5 remain incomplete.
+
+## Source-only S10 review retry checkpoint: October 2, 06:11 UTC
+
+The first independent S10 source review failed because
+`scripts/seed-local-operational.ts` still read the removed `health.classified`,
+`health.segments`, `pricing.recommended`, and `pricing.classes` result fields. That
+script is outside the TypeScript compile boundary, so the earlier green typecheck did
+not cover the stale caller.
+
+A new static source regression failed with 12 tests passing and one failing before the
+repair. The seeder now logs only each closed receipt's `kind` and `status`, preserving
+the recompute order and all seed business actions. The repaired seven-file focused
+suite passed 50 of 50 tests with zero skips. TypeScript, targeted lint, and diff hygiene
+passed, and a fresh search of `src` and `scripts` found no runtime caller reading those
+four legacy result fields. The independent review retry is pending; no independent S10
+pass is claimed.
+
+The earlier broad `pnpm test` attempt still is not evidence: its terminal exit was not
+observed. A later process-state check found no remaining `pnpm test` or Vitest process,
+but no pass or failure is inferred from that absence.
+
+This remains a source-only checkpoint. Historical detailed job results, the raw table
+ACL cut, invoice-image Storage policy, real JWT/Data API and Storage checks, paired
+migration proof, the full privacy seal, and browser runtime verification remain open.
+No seeder, SQL, migration, Docker service, credential, dotenv file, browser or
+application runtime, commit, or push was used. Attempts A–C remain closed evidence,
+and no fourth launch, replay, or attempt D is authorized. Any later attempt D still
+requires full independent privacy-seal acceptance, a frozen candidate, separate owner
+authorization, and fresh paths, ports, and namespace. Staff-cost privacy, M1, and
+M1–M5 remain incomplete.
+
+## Independent S10 source-review disposition: October 2
+
+Independent review passed the repaired eleven-path source leaf. The reviewer reran
+the seven focused files: all 50 focused tests passed with zero focused skips. The
+preimage probe failed on the stale seeder fields and the repaired probe passed.
+TypeScript, targeted lint, the file-size ratchet, scoped diff hygiene, and the
+whole-tree caller search also passed. Vitest's global setup separately listed 25
+unavailable live-database suites; they are not counted as passes and are outside this
+source-only verdict. The earlier broad `pnpm test` attempt remains unaccepted because
+its terminal exit was not observed, although no owned test process remained at the
+later process-state check.
+
+This approval is limited to exact future HTTP and successful-job receipts plus the
+compatible seeder caller. Historical job results, raw-table ACLs, invoice-image
+Storage policy, real JWT/Data API and Storage checks, paired migration proof, the full
+privacy seal, runtime verification, and the final committed-range security scan remain
+open. Attempts A–C remain closed evidence. No fourth launch, replay, or attempt D is
+authorized; any later attempt D still requires full independent privacy-seal
+acceptance, a frozen candidate, separate owner authorization, and fresh paths, ports,
+and namespace. Staff-cost privacy, M1, and M1–M5 remain incomplete.
