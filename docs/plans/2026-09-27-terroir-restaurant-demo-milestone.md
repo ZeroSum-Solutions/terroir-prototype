@@ -436,3 +436,52 @@ file, commit, or push was used. Attempts A–C remain closed evidence. No fourth
 replay, or attempt D is authorized; any later attempt D still requires full
 independent privacy-seal acceptance, a frozen candidate, separate owner authority,
 and fresh paths, ports, and namespace. M1–M5 remain incomplete.
+
+## Source-only invoice-scan tenant-fence and job-history preflight checkpoint: October 2
+
+Against immutable base `0662ee1553e05186e2961952f807afe607f987e2`, the five-file
+invoice-scan leaf adds the exact `restaurant_id` predicate to every identified
+service-role `invoice_scans` update in the handler and scan service. The new
+regressions exercise the actual database-builder chains for failed-reset,
+no-wines-terminal, success, and catch-path failure writes. Existing job and scan
+identity, worker, status, claim, and tenant fences remain in place. Reset, retry,
+re-extract, no-row rejection, provider calls, update-count checks, and generic stored
+job errors are unchanged.
+
+The preimage regression failed four tests while 46 passed. After the bounded repair,
+the direct set passed 50 of 50. The combined non-live compatibility set passed 126 of
+126 tests, and TypeScript, targeted lint, the file-size ratchet, and diff hygiene
+passed. Independent source review passed that same bounded 126-test contract. This is
+a source result only; it is not a live database, worker, or browser result.
+
+The separate `scripts/staff-cost-background-jobs-preflight.sql` candidate is a
+read-only, repeatable-read snapshot probe over historical `background_jobs` shapes.
+It fails closed on null payload drift, compares exact recompute receipts and the
+24-code invoice failure set, emits aggregate violation classes and counts without row
+material, and rolls back. Its first independent source review failed because nullable
+JSON comparisons could admit nulls. The repaired candidate passed independent source
+review, and its static contract passed 84 tests.
+
+The one frozen retained-target diagnostic ran at 07:29:54 UTC. Source revision, SQL
+and test hashes, local Docker Unix-socket transport, database identity and name, and
+running-state guards passed. The exact `com.supabase.cli.project` label equality guard
+failed, so the wrapper exited 1 before `DATABASE_SESSION_BEGIN`. No database session,
+SQL statement, or preflight query occurred. Historical compatibility is unknown, not
+proved by SQL grammar or source review. The diagnostic admission is consumed; reading
+or repairing the label, requerying, and rerunning are not authorized. No runnable
+database command is admitted by this checkpoint.
+
+The dormant restaurant deletion route remains unsupported, with no demonstrated UI
+caller and no RLS delete policy. Independent database review classifies it as a
+deferred, lower-priority M4 and full-production API-quality gap. It does not, by
+itself, block the bounded demo caller contract. A new closed owner RPC would activate
+destructive history cascades and is not authorized or migration-ready. Historical-row
+repair or acceptance, final table ACLs, invoice-image Storage policy, real JWT/Data
+API and worker proof, immutable operator receipt, and the full runtime privacy seal
+remain open.
+
+No database query, SQL apply, migration, seed execution, browser, application runtime,
+Docker service, credential, dotenv file, commit, or push was used for this checkpoint.
+Attempts A–C remain closed evidence. No fourth launch, replay, or attempt D is
+authorized. M1–M5 remain incomplete, and the failed attempt-C and raw-cost evidence
+remain authoritative.

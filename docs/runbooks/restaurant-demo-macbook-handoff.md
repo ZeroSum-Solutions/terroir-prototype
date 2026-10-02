@@ -11,6 +11,10 @@
 > stale seeder caller; that source caller is repaired and the bounded source review
 > retry passed. A bounded invoice-job error repair also passed independent source
 > review; the disjoint synthetic-job fixture repair passed its bounded source review.
+> Explicit restaurant predicates on the invoice-scan service-role writes passed
+> independent source review. A read-only historical-job preflight exists only as an
+> independently reviewed source candidate. Its one guarded target diagnostic was
+> refused before a database session, so retained history remains unknown.
 > Nobody has reproduced the package on the MacBook. The independent staff-cost probe
 > also failed confidentiality. Restaurant-demo milestones M1–M5 and production
 > readiness remain incomplete.
@@ -137,6 +141,38 @@ API and service-worker behavior, M4 rendered-state coverage, S16 runtime and rec
 coverage, and the full privacy seal remain open. The seed repair does not waive those
 requirements. Attempts A–C remain closed evidence, and no fourth launch, replay, or
 attempt D is authorized. M1–M5 remain incomplete.
+
+### October 2 invoice-scan tenant fences and history-preflight source checkpoint
+
+Against base `0662ee1553e05186e2961952f807afe607f987e2`, every identified
+service-role `invoice_scans` update in the handler and scan service now includes the
+exact `restaurant_id` predicate alongside its existing job, scan, worker, status, and
+claim fences. The repair preserves reset, retry, re-extract, no-row rejection,
+provider-call, update-count, and generic stored-error behavior. Independent source
+review passed the 126-test focused non-live set.
+
+`scripts/staff-cost-background-jobs-preflight.sql` is a separate source-only,
+read-only candidate for checking historical `background_jobs` shapes. It uses a
+null-safe repeatable-read transaction, reports aggregate violation classes and counts,
+and rolls back. Its first source review exposed unsafe nullable comparisons. The
+repaired source passed independent review and its static contract passed 84 tests.
+
+The one admitted retained-target diagnostic stopped when the exact
+`com.supabase.cli.project` label equality guard failed. It exited before opening a
+database session, so no SQL or preflight query ran and historical job compatibility
+remains unknown. The diagnostic admission is consumed. Do not read or repair the
+label, requery, or rerun it. This handoff does not provide a runnable database command
+or authorize applying the candidate.
+
+The dormant restaurant deletion route remains unsupported: it has no demonstrated UI
+caller and no RLS delete policy. Independent database review deferred it as a lower
+priority M4 and full-production API-quality gap that does not, by itself, block this
+bounded demo caller contract. A new closed owner RPC would activate destructive
+history cascades and is not authorized or migration-ready. Historical rows, final
+table ACLs, invoice-image Storage policy, real JWT/Data API and worker behavior,
+operator receipt, and runtime privacy proof remain open. Attempts A–C remain closed
+evidence. No fourth launch, replay, target query, SQL apply, or attempt D is
+authorized, and M1–M5 remain incomplete.
 
 ### October 2 mobile attempt C
 
