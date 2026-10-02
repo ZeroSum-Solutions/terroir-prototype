@@ -398,3 +398,41 @@ open. Attempts A–C remain closed evidence. No fourth launch, replay, or attemp
 authorized; any later attempt D still requires full independent privacy-seal
 acceptance, a frozen candidate, separate owner authorization, and fresh paths, ports,
 and namespace. Staff-cost privacy, M1, and M1–M5 remain incomplete.
+
+## Source-only invoice-job error checkpoint: October 2
+
+Against base `e7ad3b335d4173e6deee3debe467bfa791f2713c`, both
+`invoice_extract` failure-completion writers now store one closed pair. A private
+total mapper preserves the 24 admitted handler and scan-service codes, maps any
+unrecognized or dynamic code to the existing `unknown`, and writes only
+`Invoice extraction job failed.`. It never persists the handler's raw failure prose.
+
+The direct regression failed with 34 failures and eight passes before the source
+change and passed all 42 tests afterward. The six-file completion, run-once, handler,
+scan recovery, fencing, and arithmetic set passed all 105 focused tests with zero
+focused skips. Independent review repeated those gates and passed this bounded
+two-file source leaf. Vitest global setup separately listed 25 unavailable
+live-database suites; they are not counted as passes.
+
+Retry versus dead classification, attempt accounting, exponential backoff, claim
+clearing, tenant/job/worker/status fencing, database write-error propagation, success
+clearing, provider-call behavior, scan recovery, the fixed SQL reclaim pair, and all
+`result` and `metadata` behavior remain unchanged.
+
+A separate fixture source leaf retains safe synthetic job ordinals 1, 2, 3, 4, 8, 9,
+11, and 12 and omits only four unsupported legacy error fixtures. Both deterministic
+IDs derive from the original ordinal, and every retained job is hard-projected to
+empty `result` and `metadata` objects plus null error fields. Independent review
+reproduced the three-failure, one-pass baseline and passed the current two-file set at
+17 of 17 focused tests. The leaf never deletes or rewrites old database rows.
+
+This remains source-only preparation. Historical job rows, raw-table ACLs,
+invoice-image Storage policy, real JWT/Data API, RPC, Storage and service-worker
+proof and the full privacy seal remain open. The fixture leaf does not alter or waive
+M4 rendered-state coverage or S16 worker, retry, recovery, and exactly-once coverage.
+No database,
+SQL, migration, seed execution, browser, runtime, Docker service, credential, dotenv
+file, commit, or push was used. Attempts A–C remain closed evidence. No fourth launch,
+replay, or attempt D is authorized; any later attempt D still requires full
+independent privacy-seal acceptance, a frozen candidate, separate owner authority,
+and fresh paths, ports, and namespace. M1–M5 remain incomplete.

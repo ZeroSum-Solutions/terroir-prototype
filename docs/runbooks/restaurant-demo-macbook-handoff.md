@@ -9,7 +9,8 @@
 > rerun. A separate S10 source repair now limits both recompute responses and future
 > successful job results to cost-free receipts. Its first independent review found a
 > stale seeder caller; that source caller is repaired and the bounded source review
-> retry passed.
+> retry passed. A bounded invoice-job error repair also passed independent source
+> review; the disjoint synthetic-job fixture repair passed its bounded source review.
 > Nobody has reproduced the package on the MacBook. The independent staff-cost probe
 > also failed confidentiality. Restaurant-demo milestones M1–M5 and production
 > readiness remain incomplete.
@@ -104,6 +105,38 @@ file, commit, or push was used for this leaf. Historical detailed job results re
 unsealed, and the raw table ACL, invoice-image Storage policy, real JWT/Data API matrix,
 and runtime privacy proof remain open. This source checkpoint does not seal staff
 costs, complete M1, or complete M1–M5.
+
+### October 2 invoice-job stored-error and seed compatibility repairs (source reviews passed)
+
+Against base `e7ad3b335d4173e6deee3debe467bfa791f2713c`, both
+`invoice_extract` failure-completion writers now use one private total mapper. It
+preserves the 24 admitted handler and scan-service codes, maps any other code to the
+existing `unknown`, and stores only `Invoice extraction job failed.`. Raw database,
+Storage-path, OCR/provider, and thrown prose no longer enters future handler-driven
+job error rows. Success clearing, retry/dead classification, attempts, backoff, claim
+clearing, fencing, database-write failures, scan recovery, provider calls, and the
+existing `result` and `metadata` behavior are unchanged.
+
+The direct regression was red with 34 failures and eight passes, then green at 42 of
+42. The six-file completion, run-once, handler, recovery, fencing, and arithmetic set
+passed 105 focused tests with zero focused skips. Independent review reran the same
+set and passed this bounded two-file source leaf. Vitest global setup separately
+listed 25 unavailable live-database suites; they are not counted as passes.
+
+A disjoint fixture-source leaf retains safe synthetic job ordinals 1, 2, 3, 4, 8, 9,
+11, and 12 and omits only four unsupported legacy error fixtures. Both deterministic
+IDs still derive from each original ordinal, and every retained row is hard-projected
+to empty `result` and `metadata` objects plus null error fields. Independent review
+reproduced the three-failure, one-pass baseline and passed the current 17 focused
+tests across two files. It does not delete or rewrite historical database rows.
+
+No database, SQL, migration, seed execution, browser, application runtime, Docker
+service, credential, dotenv file, commit, or push was used for the error leaf.
+Historical job rows, the raw table ACL, invoice-image Storage policy, real JWT/Data
+API and service-worker behavior, M4 rendered-state coverage, S16 runtime and recovery
+coverage, and the full privacy seal remain open. The seed repair does not waive those
+requirements. Attempts A–C remain closed evidence, and no fourth launch, replay, or
+attempt D is authorized. M1–M5 remain incomplete.
 
 ### October 2 mobile attempt C
 
@@ -445,6 +478,7 @@ Hidden cost controls alone never prove a cost boundary.
 |---|---|---|
 | `scripts/local/restaurant-demo/launcher.mjs`, `docker-lifecycle.mjs`, `fixture.sql`, and `journey.mjs` | Reviewed local-only source package, with explicit execution acknowledgement. | Mobile C failed on a stale Cellar locator before opening. The locator source repair passed independent review, but no browser rerun or cleanup occurred; staff raw-cost privacy and MacBook reproduction remain open. |
 | `src/lib/staff-cost/recompute-receipt.ts`, both recompute services, their API routes, and `scripts/seed-local-operational.ts` | Reuse the exact three-field success receipt for future recompute HTTP and job-result output; the seeder logs only receipt kind and status. | Bounded source review passed. Historical job-result remediation, final ACL/Storage seal, and runtime proof remain open. |
+| `src/lib/jobs/complete.ts`, `scripts/seed-local-operational.ts`, and their direct source-contract tests | Reuse the closed invoice-job error pair and the eight-row synthetic job projection. | Bounded source reviews passed. Historical rows, final ACL/Storage seal, M4/S16 coverage, and runtime proof remain open. |
 | `scripts/local/dev-local.sh` | Reuse directly after stack admission. It obtains current local keys and pins the local origin safely. | Requires an already-running instance of this repository's configured local stack; it does not create a disposable stack. |
 | `scripts/local/assert-local-db.sh` | Reuse its exact-host-and-port refusal pattern. | It recognizes the retained repo ports and can fall back to `.env.local`; the disposable launcher needs its own explicit process-only target admission. |
 | `scripts/local/dev-stack.sh` | Reuse its migration/readiness sequencing as design input only. | Do not execute for this handoff: it creates/reads `.env.local` and performs a destructive retained-stack reset. |
