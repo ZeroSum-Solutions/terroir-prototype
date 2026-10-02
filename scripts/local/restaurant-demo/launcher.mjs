@@ -8,7 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
-import { admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, namespaceResources, readDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
+import { RAW_PROJECT_LABELS, admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, namespaceResources, readDockerInventory, readProjectDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
 
 export const EXECUTION_ACK = "I_ACKNOWLEDGE_DISPOSABLE_RESTAURANT_DEMO";
 const PROJECT_ID = /^terroir-demo-[a-z0-9][a-z0-9-]{2,40}$/;
@@ -19,8 +19,10 @@ let admittedDockerDaemon;
 export function parseLauncherArgs(argv) {
   const values = new Map();
   let execute = false;
+  let bootstrapOnly = false;
   for (const raw of argv) {
     if (raw === "--execute") { execute = true; continue; }
+    if (raw === "--bootstrap-only") { bootstrapOnly = true; continue; }
     const match = raw.match(/^--([^=]+)=(.+)$/);
     assert(match, `invalid argument: ${raw}`);
     assert(!values.has(match[1]), `duplicate argument: --${match[1]}`);
@@ -49,7 +51,7 @@ export function parseLauncherArgs(argv) {
     projectId: values.get("project-id"),
     ownerEmail: values.get("owner-email"),
     staffEmail: values.get("staff-email"),
-    ack: values.get("ack"), execute, ports,
+    ack: values.get("ack"), execute, bootstrapOnly, ports,
     journeyWidth: Number(values.get("journey-width") ?? 390),
   };
   assert([390, 1200].includes(result.journeyWidth), "journey width must be 390 or 1200");
@@ -69,6 +71,7 @@ export function parseLauncherArgs(argv) {
     assert.equal(result.ack, EXECUTION_ACK, "exact disposable execution acknowledgement required");
   } else {
     assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
+    assert.equal(result.bootstrapOnly, false, "bootstrap-only requires execution");
   }
   return result;
 }
@@ -287,7 +290,7 @@ function applyFixture(settings, target, users, ids) {
     bin_id: ids.binId, list_id: ids.listId, section_id: ids.sectionId,
     item_id: ids.itemId, staff_item_id: ids.staffItemId, list_slug: ids.listSlug,
   };
-  const args = ["exec", "-i", target.database.id, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"];
+  const args = ["exec", "-i", target.database.id, "psql", "-X", "--no-password", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"];
   for (const [name, value] of Object.entries(variables)) args.push("-v", `${name}=${value}`);
   const output = run("docker", args, { input: fixture });
   const receipt = JSON.parse(output.split("\n").at(-1));
@@ -386,13 +389,14 @@ export function transactionalMigrationArgs(databaseId, filename) {
   const matched = filename.match(/^([0-9]{4})_([a-z0-9_]+)\.sql$/);
   assert(matched, "migration filename refused");
   const [, version, name] = matched;
-  return ["exec", "-i", databaseId, "psql", "-X", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-U", "postgres", "-d", "postgres", "-f", "-", "-c", `insert into supabase_migrations.schema_migrations(version,name) values ('${version}','${name}');`];
+  return ["exec", "-i", databaseId, "psql", "-X", "--no-password", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-U", "postgres", "-d", "postgres", "-f", "-", "-c", `insert into supabase_migrations.schema_migrations(version,name) values ('${version}','${name}');`];
 }
 
-async function applySourceMigrations(settings, target, ledger) {
+async function applySourceMigrations(settings, target, ledger, readInventory = readDockerInventory) {
   const databaseId = target.database.id;
-  const query = ["exec", "-i", databaseId, "psql", "-X", "-v", "ON_ERROR_STOP=1", "-qAt", "-U", "postgres", "-d", "postgres"];
-  assertCleanupAdmitted(ledger, readDockerInventory(run));
+  const query = ["exec", "-i", databaseId, "psql", "-X", "--no-password", "-v", "ON_ERROR_STOP=1", "-qAt", "-U", "postgres", "-d", "postgres"];
+  assertCleanupAdmitted(ledger, readInventory(run));
+  assert.equal(run("docker", [...query, "-c", "select 1"]), "1", "migration database health check failed");
   assert.equal(run("docker", [...query, "-c", "select to_regclass('supabase_migrations.schema_migrations') is not null"]), "f", "migration target is not empty");
   run("docker", [...query, "--single-transaction", "-c", "create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[]);"]);
   const directory = path.join(settings.runtimeRoot, "supabase/migrations");
@@ -402,7 +406,7 @@ async function applySourceMigrations(settings, target, ledger) {
     const sql = await readFile(path.join(directory, filename), "utf8");
     assert(!/^\s*(?:begin|commit)\s*;/im.test(sql), "migration owns a conflicting transaction");
     assert(!/^\s*create\s+(?:unique\s+)?index\s+concurrently/im.test(sql), "concurrent index cannot use migration transaction");
-    assertCleanupAdmitted(ledger, readDockerInventory(run));
+    assertCleanupAdmitted(ledger, readInventory(run));
     const version = filename.slice(0, 4);
     if (["0156", "0157", "0158"].includes(version)) {
       const preflight = await readFile(path.join(settings.runtimeRoot, `scripts/${version}-production-preflight.sql`), "utf8");
@@ -423,6 +427,9 @@ async function execute(settings) {
   let app;
   let ownedRuntime;
   let ledger;
+  const readInventory = settings.bootstrapOnly
+    ? (runner) => readProjectDockerInventory(settings.projectId, runner)
+    : readDockerInventory;
   settings.executionId = randomUUID();
   const result = { status: "failed", lastCompletedStep: "source-admission", projectId: settings.projectId };
   await mkdir(settings.evidenceDir, { mode: 0o700 });
@@ -435,24 +442,50 @@ async function execute(settings) {
     admittedDockerDaemon = admitLocalDockerDaemon(run);
     result.lastCompletedStep = "local-docker-daemon-admitted";
     await assertPortsAbsent(Object.values(settings.ports));
-    assertNamespaceAbsent(settings.projectId, readDockerInventory(run));
+    assertNamespaceAbsent(settings.projectId, readInventory(run));
     result.lastCompletedStep = "requested-ports-admitted-absent";
     const materialized = await materializeRuntime(settings);
     ownedRuntime = materialized;
     result.lastCompletedStep = "safe-runtime-materialized";
     result.sourceFiles = materialized.sourceFiles;
-    const network = createOwnedNetwork(settings.projectId, settings.executionId, run);
+    const network = createOwnedNetwork(settings.projectId, settings.executionId, run, readInventory);
     result.networkId = network.id;
     result.lastCompletedStep = "owned-loopback-network-created";
     run("pnpm", ["exec", "supabase", "start", "--workdir", settings.runtimeRoot, "--network-id", network.name, "--exclude", "studio,imgproxy,edge-runtime,realtime,analytics,logflare,vector,supavisor"], { cwd: settings.runtimeRoot, timeout: 900_000 });
-    ledger = recordOwnedStack({ ...settings, network }, readDockerInventory(run));
+    ledger = recordOwnedStack({ ...settings, network }, readInventory(run));
     await writeFile(path.join(settings.evidenceDir, "docker-ownership.json"), `${JSON.stringify(ledger, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     const local = parseLocalStatus(run("pnpm", ["exec", "supabase", "status", "--workdir", settings.runtimeRoot, "-o", "json"], { cwd: settings.runtimeRoot }), settings);
     const target = await inspectAdmittedStack(settings);
     result.databaseContainerId = target.database.id;
     result.lastCompletedStep = "isolated-stack-admitted";
-    result.migrationCount = await applySourceMigrations(settings, target, ledger);
+    result.migrationCount = await applySourceMigrations(settings, target, ledger, readInventory);
     result.lastCompletedStep = "transactional-migrations-applied";
+    if (settings.bootstrapOnly) {
+      Object.assign(result, {
+        status: "READY_FOR_READ_ONLY_PREFLIGHT",
+        result: "READY_FOR_READ_ONLY_PREFLIGHT",
+        executionId: settings.executionId,
+        sourceHead: settings.sourceHead,
+        sourceTree: settings.sourceTree,
+        runtimeRoot: settings.runtimeRoot,
+        evidenceRoot: settings.evidenceDir,
+        runtimeIdentity: {
+          dev: ownedRuntime.dev,
+          ino: ownedRuntime.ino,
+          marker: ownedRuntime.marker,
+        },
+        database: "postgres",
+        databaseBinding: `127.0.0.1:${settings.ports.db}`,
+        apiBinding: `127.0.0.1:${settings.ports.api}`,
+        rawProjectLabelKeys: RAW_PROJECT_LABELS,
+        migrationLedger: `${result.migrationCount}/0164`,
+        fixtureApplied: false,
+        appStarted: false,
+        browserStarted: false,
+        privacyMigrationApplied: false,
+      });
+      return;
+    }
     const users = await createSyntheticUsers(local, settings);
     result.lastCompletedStep = "synthetic-auth-created";
     const ids = fixtureIds(settings.projectId);
@@ -505,7 +538,7 @@ async function execute(settings) {
     }
     try {
       // Failed runs retain even partially created resources and mutation latches.
-      if (!thrown && ownedRuntime && ledger) await cleanupOwnedServices(settings, ownedRuntime, ledger);
+      if (!settings.bootstrapOnly && !thrown && ownedRuntime && ledger) await cleanupOwnedServices(settings, ownedRuntime, ledger);
       // Goal safety freezes directory deletion outside the source checkout.
       result.runtimePreserved = true;
     } catch {
@@ -516,7 +549,7 @@ async function execute(settings) {
     }
     if (result.runtimePreserved) {
       try {
-        const observed = namespaceResources(settings.projectId, readDockerInventory(run));
+        const observed = namespaceResources(settings.projectId, readInventory(run));
         await writeFile(path.join(settings.evidenceDir, "preserved-docker-observation.json"), `${JSON.stringify({ ownedForCleanup: false, resources: observed }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       } catch { result.preservedResourceObservationUnavailable = true; }
     }
@@ -531,6 +564,9 @@ async function main() {
   const actualRoot = await realpath(settings.sourceRoot);
   const gitRoot = run("git", ["rev-parse", "--show-toplevel"], { cwd: actualRoot });
   assert.equal(actualRoot, gitRoot, "source root must be the exact Git checkout root");
+  settings.sourceHead = run("git", ["rev-parse", "HEAD"], { cwd: actualRoot });
+  settings.sourceTree = run("git", ["rev-parse", "HEAD^{tree}"], { cwd: actualRoot });
+  if (settings.bootstrapOnly) assert.equal(run("git", ["status", "--porcelain"], { cwd: actualRoot }), "", "bootstrap source checkout must be clean");
   await lstat(path.join(actualRoot, "scripts/local/dev-local.sh"));
   await lstat(path.join(actualRoot, "supabase/migrations/0164_import_revert_cleanup.sql"));
   if (!settings.execute) {

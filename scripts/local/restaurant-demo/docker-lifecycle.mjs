@@ -4,7 +4,11 @@ import path from "node:path";
 
 const PROJECT = /^terroir-demo-[a-z0-9][a-z0-9-]{2,40}$/;
 const LABEL = "com.terroir.demo.execution";
-const PROJECT_LABELS = ["com.supabase.cli.project", "com.docker.compose.project"];
+export const RAW_PROJECT_LABELS = Object.freeze({
+  supabase: "com.supabase.cli.project",
+  compose: "com.docker.compose.project",
+});
+const PROJECT_LABELS = Object.values(RAW_PROJECT_LABELS);
 const LABEL_FORMAT = `{"supabase":{{json (index .Labels "${PROJECT_LABELS[0]}")}},"compose":{{json (index .Labels "${PROJECT_LABELS[1]}")}},"execution":{{json (index .Labels "${LABEL}")}}}`;
 const CONTAINER_LABEL_FORMAT = LABEL_FORMAT.replaceAll(".Labels", ".Config.Labels");
 const FORMATS = {
@@ -12,6 +16,12 @@ const FORMATS = {
   network: `{"id":{{json .Id}},"name":{{json .Name}},"created":{{json .Created}},"labels":${LABEL_FORMAT},"driver":{{json .Driver}},"binding":{{json (index .Options "com.docker.network.bridge.host_binding_ipv4")}}}`,
   volume: `{"name":{{json .Name}},"created":{{json .CreatedAt}},"labels":${LABEL_FORMAT}}`,
 };
+
+const NAME_LIST_FORMATS = Object.freeze({
+  container: "{{.ID}}\t{{.Names}}",
+  network: "{{.ID}}\t{{.Name}}",
+  volume: "{{.Name}}\t{{.Name}}",
+});
 
 export function parseLocalDockerEndpoint(raw) {
   assert(typeof raw === "string", "Docker daemon endpoint missing");
@@ -47,12 +57,59 @@ export function assertDockerSocketIdentity(admitted, inspectSocket = inspectLoca
 // Read only identity/topology fields: never Docker's Config.Env or service secrets.
 export function readDockerInventory(run) {
   return Object.fromEntries(Object.keys(FORMATS).map((kind) => {
-    const args = kind === "container" ? ["--all", "--quiet", "--no-trunc"] : kind === "network" ? ["--quiet", "--no-trunc"] : ["--quiet"];
-    const ids = run("docker", [kind, "ls", ...args]).split(/\s+/).filter(Boolean);
-    const rows = ids.length === 0 ? [] : run("docker", [kind, "inspect", "--format", FORMATS[kind], ...ids]).split("\n").map((line) => JSON.parse(line));
-    assert.equal(rows.length, ids.length, "Docker inventory changed during inspection");
-    return [kind, rows.map((row) => normalizeResource(kind, row))];
+    const ids = listResourceIds(kind, run);
+    return [kind, inspectResources(kind, ids, run)];
   }));
+}
+
+export function readProjectDockerInventory(projectId, run) {
+  assert(PROJECT.test(projectId), "Docker project must be a disposable demo namespace");
+  const idsByKind = Object.fromEntries(Object.keys(FORMATS).map((kind) => [kind, new Set()]));
+  for (const kind of Object.keys(FORMATS)) {
+    for (const id of listNamedProjectResourceIds(kind, projectId, run)) idsByKind[kind].add(id);
+    for (const filter of [
+      `label=${RAW_PROJECT_LABELS.supabase}=${projectId}`,
+      `label=${RAW_PROJECT_LABELS.compose}=${projectId}`,
+    ]) {
+      for (const id of listResourceIds(kind, run, filter)) idsByKind[kind].add(id);
+    }
+  }
+  let inventory = inspectInventory(idsByKind, run);
+  for (const network of inventory.network) {
+    for (const id of listResourceIds("container", run, `network=${network.id}`)) idsByKind.container.add(id);
+  }
+  for (const volume of inventory.volume) {
+    for (const id of listResourceIds("container", run, `volume=${volume.name}`)) idsByKind.container.add(id);
+  }
+  inventory = inspectInventory(idsByKind, run);
+  return inventory;
+}
+
+function listNamedProjectResourceIds(kind, projectId, run) {
+  const args = kind === "container" ? ["--all", "--no-trunc"] : kind === "network" ? ["--no-trunc"] : [];
+  const format = NAME_LIST_FORMATS[kind];
+  const output = run("docker", [kind, "ls", ...args, "--filter", `name=${projectId}`, "--format", format]);
+  return output.split("\n").filter(Boolean).flatMap((line) => {
+    const [id, rawName, ...extra] = line.split("\t");
+    assert(id && rawName && extra.length === 0, "Docker name inventory is malformed");
+    return resourceNameMatchesProject(rawName.replace(/^\//, ""), projectId) ? [id] : [];
+  });
+}
+
+function listResourceIds(kind, run, filter) {
+  const args = kind === "container" ? ["--all", "--quiet", "--no-trunc"] : kind === "network" ? ["--quiet", "--no-trunc"] : ["--quiet"];
+  if (filter) args.push("--filter", filter);
+  return run("docker", [kind, "ls", ...args]).split(/\s+/).filter(Boolean);
+}
+
+function inspectInventory(idsByKind, run) {
+  return Object.fromEntries(Object.keys(FORMATS).map((kind) => [kind, inspectResources(kind, [...idsByKind[kind]], run)]));
+}
+
+function inspectResources(kind, ids, run) {
+  const rows = ids.length === 0 ? [] : run("docker", [kind, "inspect", "--format", FORMATS[kind], ...ids]).split("\n").map((line) => JSON.parse(line));
+  assert.equal(rows.length, ids.length, "Docker inventory changed during inspection");
+  return rows.map((row) => normalizeResource(kind, row));
 }
 
 function normalizeResource(kind, row) {
@@ -76,22 +133,26 @@ function normalizeResource(kind, row) {
 export function namespaceResources(projectId, inventory) {
   assert(PROJECT.test(projectId), "Docker project must be a disposable demo namespace");
   return Object.values(inventory).flat().filter((resource) => (
-    resource.name === projectId || resource.name.endsWith(`_${projectId}`) || resource.name.startsWith(`${projectId}-`) ||
+    resourceNameMatchesProject(resource.name, projectId) ||
     resource.labels.supabase === projectId || resource.labels.compose === projectId
   )).sort((a, b) => `${a.kind}/${a.name}`.localeCompare(`${b.kind}/${b.name}`));
+}
+
+function resourceNameMatchesProject(name, projectId) {
+  return name === projectId || name.endsWith(`_${projectId}`) || name.startsWith(`${projectId}-`);
 }
 
 export function assertNamespaceAbsent(projectId, inventory) {
   assert.equal(namespaceResources(projectId, inventory).length, 0, "disposable Docker namespace already has resources (including stopped containers)");
 }
 
-export function createOwnedNetwork(projectId, executionId, run) {
-  assertNamespaceAbsent(projectId, readDockerInventory(run));
+export function createOwnedNetwork(projectId, executionId, run, readInventory = readDockerInventory) {
+  assertNamespaceAbsent(projectId, readInventory(run));
   assert(/^[a-f0-9-]{36}$/.test(executionId), "execution identity must be a UUID");
   const id = run("docker", ["network", "create", "--driver", "bridge", "--opt", "com.docker.network.bridge.host_binding_ipv4=127.0.0.1",
     ...PROJECT_LABELS.flatMap((label) => ["--label", `${label}=${projectId}`]),
     "--label", `${LABEL}=${executionId}`, `supabase_network_${projectId}`]);
-  const resources = namespaceResources(projectId, readDockerInventory(run));
+  const resources = namespaceResources(projectId, readInventory(run));
   assert.equal(resources.length, 1, "unexpected resources appeared during network creation");
   const [network] = resources;
   assert.equal(network.id, id, "created network identity drifted");

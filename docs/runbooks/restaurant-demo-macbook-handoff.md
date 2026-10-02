@@ -15,6 +15,10 @@
 > independent source review. A read-only historical-job preflight exists only as an
 > independently reviewed source candidate. Its one guarded target diagnostic was
 > refused before a database session, so retained history remains unknown.
+> The owner has since approved one new disposable local database, separately
+> reviewed local privacy changes, and one desktop/mobile demo. A source-only
+> bootstrap candidate exists for that new target; its bounded source review
+> passed, while all runtime evidence remains pending.
 > Nobody has reproduced the package on the MacBook. The independent staff-cost probe
 > also failed confidentiality. Restaurant-demo milestones M1–M5 and production
 > readiness remain incomplete.
@@ -51,6 +55,39 @@ for current scope and the [production migration runbook](production-migrations.m
 for separate release gates. This package tests mobile browser layouts, not a native app.
 
 ## Current evidence boundary
+
+### October 2 fresh disposable bootstrap source checkpoint (independent review passed)
+
+The owner approved one new disposable loopback database, later independently
+reviewed privacy changes on that database, and one desktop/mobile demo. Attempts
+A–C remain closed evidence. This approval does not permit their inspection,
+restart, adoption, reseed, cleanup, or replay.
+
+The source candidate adds a closed `--bootstrap-only` launcher mode. It reuses the
+existing admitted launcher path through all 136 migrations and exact frontier
+`0164`, then stops before synthetic auth, fixture writes, application startup, or
+the browser journey. It preserves only the new stack for the separately reviewed
+read-only structural and historical preflights. Bootstrap discovery uses the raw
+Docker keys `com.supabase.cli.project` and `com.docker.compose.project`, inspects
+only the new project resources and their network or volume attachment users, and
+records a `READY_FOR_READ_ONLY_PREFLIGHT` receipt rather than a demo-ready result.
+Normal launcher cleanup behavior is unchanged.
+
+The behavior-level preimage replay reproduced four missing boundaries: the old
+parser rejected the new flag, no pre-auth stop existed, successful cleanup could
+not preserve a bootstrap stack, and inventory inspected unrelated retained
+resources. The repaired focused suite passed 25 of 25 tests; the complete portable
+source suite passed 32 of 32 with zero skips. TypeScript, targeted lint, the
+file-size ratchet, and diff hygiene passed. Independent review rejected two earlier
+source candidates, then approved the corrected bounded source checkpoint.
+No Docker, SQL, migration, service, seed, application, browser, credential, dotenv,
+or provider action ran for this checkpoint.
+
+This source candidate is not a privacy seal, a runnable-target admission, or a
+database or demo result. The approved target still needs a clean committed revision,
+root's exact path/port/namespace admission, the structural baseline and aggregate-only
+history result, a reviewed forward/down privacy packet, and independent runtime
+verification. Staff-cost privacy and M1–M5 remain incomplete.
 
 ### October 2 source-only locator repair (independent source review passed)
 
@@ -368,10 +405,11 @@ the raw-cost/Storage privacy cutover or provide an atomic authority seal.
   creates/reads `.env.local` and resets the retained repository stack.
 - Use the name-search receiving path. The label-photo route needs an external
   model provider key and is not required for this inventory demonstration.
-- Attempts A, B, and C remain closed evidence. Do not restart, adopt, reseed,
-  delete, or replay them. A later attempt D is not authorized by this source
-  checkpoint. It requires full independent privacy-seal acceptance, a frozen
-  candidate, separate owner authorization, and fresh paths, ports, and namespace.
+- Attempts A, B, and C remain closed evidence. Do not inspect, restart, adopt,
+  reseed, delete, or replay them. The owner has authorized one new disposable
+  target with fresh paths, ports, and namespace. That authorization does not bypass
+  the bootstrap source review, clean-revision admission, read-only preflights,
+  reviewed privacy forward/down packet, or separate runtime checkpoints.
 
 ## Readiness gate before attempting the MacBook run
 

@@ -16,7 +16,7 @@ import {
   rewriteSupabaseConfig,
   transactionalMigrationArgs,
 } from "./launcher.mjs";
-import { admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, parseLocalDockerEndpoint, readDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
+import { RAW_PROJECT_LABELS, admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, parseLocalDockerEndpoint, readDockerInventory, readProjectDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
 import { parseJourneyArgs, safeErrorKind } from "./journey.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +38,7 @@ const baseArgs = [
 test("launcher requires the disposable namespace, unique ports, and exact execution acknowledgement", () => {
   const dry = parseLauncherArgs(baseArgs);
   assert.equal(dry.execute, false);
+  assert.equal(dry.bootstrapOnly, false);
   assert.equal(dry.projectId, "terroir-demo-portable-a");
   assert.equal(dry.journeyWidth, 390);
   assert.equal(parseLauncherArgs([...baseArgs, "--journey-width=1200"]).journeyWidth, 1200);
@@ -46,6 +47,9 @@ test("launcher requires the disposable namespace, unique ports, and exact execut
   assert.throws(() => parseLauncherArgs(baseArgs.map((value) => value === "--db-port=61322" ? "--db-port=61321" : value)), /ports must be unique/);
   assert.throws(() => parseLauncherArgs([...baseArgs, "--execute"]), /acknowledgement/);
   assert.equal(parseLauncherArgs([...baseArgs, "--execute", `--ack=${EXECUTION_ACK}`]).execute, true);
+  assert.throws(() => parseLauncherArgs([...baseArgs, "--bootstrap-only"]), /requires execution/);
+  const bootstrap = parseLauncherArgs([...baseArgs, "--bootstrap-only", "--execute", `--ack=${EXECUTION_ACK}`]);
+  assert.equal(bootstrap.bootstrapOnly, true);
 });
 
 test("source materialization refuses dotenv, traversal, Git, dependencies, and temp paths", () => {
@@ -261,6 +265,72 @@ function admitFixture(raw, run) {
   return recordOwnedStack({ projectId, executionId, network: inventory.network[0], ports: parseLauncherArgs(baseArgs).ports }, inventory);
 }
 
+test("project inventory uses raw project labels and inspects only the new namespace plus attachment users", () => {
+  assert.deepEqual(RAW_PROJECT_LABELS, {
+    supabase: "com.supabase.cli.project",
+    compose: "com.docker.compose.project",
+  });
+  const raw = dockerFixture();
+  const attachedId = "8".repeat(64);
+  const retainedId = "9".repeat(64);
+  const similarId = "6".repeat(64);
+  raw.container.push({
+    id: attachedId, name: "/foreign-attached", created: "2026-10-01T10:00:03.000000000Z", running: true,
+    labels: { supabase: null, compose: null, execution: null }, networks: { own: { NetworkID: networkId } },
+    mounts: [], ports: {},
+  });
+  raw.container.push({
+    id: retainedId, name: "/supabase_db_terroir-demo-retained-c", created: "2026-10-01T09:00:00.000000000Z", running: true,
+    labels: { supabase: "terroir-demo-retained-c", compose: "terroir-demo-retained-c", execution: null },
+    networks: { retained: { NetworkID: "7".repeat(64) } }, mounts: [], ports: {},
+  });
+  raw.container.push({
+    id: similarId, name: `/archive-${projectId}-copy`, created: "2026-10-01T09:30:00.000000000Z", running: true,
+    labels: { supabase: "unrelated-project", compose: "unrelated-project", execution: null },
+    networks: { unrelated: { NetworkID: "5".repeat(64) } }, mounts: [], ports: {},
+  });
+  const inspected = [];
+  const expectedNameFormats = {
+    container: "{{.ID}}\t{{.Names}}",
+    network: "{{.ID}}\t{{.Name}}",
+    volume: "{{.Name}}\t{{.Name}}",
+  };
+  const run = (command, args) => {
+    assert.equal(command, "docker");
+    const [kind, action] = args;
+    if (action === "ls") {
+      const filterAt = args.indexOf("--filter");
+      assert(filterAt >= 0);
+      const filter = args[filterAt + 1];
+      if (filter === `name=${projectId}`) {
+        assert(args.includes("--format"), "name discovery must return names before inspection");
+        assert.equal(args.at(-1), expectedNameFormats[kind], `${kind} name discovery must use its documented Docker format fields`);
+        if (kind === "container") assert(!args.at(-1).includes("{{.Name}}"), "container ls does not support singular .Name");
+        else assert(!args.at(-1).includes("{{.Names}}"), `${kind} ls does not support plural .Names`);
+        return raw[kind].filter((resource) => resource.name.includes(projectId)).map((resource) => `${resource.id ?? resource.name}\t${resource.name.replace(/^\//, "")}`).join("\n");
+      }
+      if (filter === `label=${RAW_PROJECT_LABELS.supabase}=${projectId}` || filter === `label=${RAW_PROJECT_LABELS.compose}=${projectId}`) {
+        return raw[kind].filter((resource) => resource.labels.supabase === projectId || resource.labels.compose === projectId).map((resource) => resource.id ?? resource.name).join("\n");
+      }
+      if (kind === "container" && filter === `network=${networkId}`) return [raw.container[0].id, raw.container[1].id, attachedId].join("\n");
+      if (kind === "container" && filter === `volume=supabase_db_${projectId}`) return raw.container[0].id;
+      assert.fail(`unexpected Docker filter: ${kind} ${filter}`);
+    }
+    assert.equal(action, "inspect");
+    const ids = args.slice(4);
+    inspected.push(...ids);
+    assert(!ids.includes(retainedId), "retained resource must never be inspected");
+    assert(!ids.includes(similarId), "similarly named unrelated resource must be filtered before inspection");
+    return ids.map((id) => JSON.stringify(raw[kind].find((resource) => (resource.id ?? resource.name) === id))).join("\n");
+  };
+  const inventory = readProjectDockerInventory(projectId, run);
+  assert(inventory.container.some((resource) => resource.id === attachedId));
+  assert(!inventory.container.some((resource) => resource.id === retainedId));
+  assert(!inspected.includes(retainedId));
+  assert(!inspected.includes(similarId));
+  assert.throws(() => recordOwnedStack({ projectId, executionId, network: inventory.network[0], ports: parseLauncherArgs(baseArgs).ports }, inventory), /foreign container joined owned network/);
+});
+
 test("namespace absence catches stopped containers, foreign labels, orphan networks and volumes", () => {
   for (const kind of ["container", "network", "volume"]) {
     const raw = dockerFixture();
@@ -415,6 +485,7 @@ test("cleanup repeats admission before every delete, and only removes admitted e
 test("migration and ledger insert share a transaction and immutable container identity", () => {
   const args = transactionalMigrationArgs("2".repeat(64), "0152_native_physical.sql");
   assert(args.includes("--single-transaction"));
+  assert(args.includes("--no-password"));
   assert.equal(args[2], "2".repeat(64));
   assert.deepEqual(args.slice(-4), ["-f", "-", "-c", "insert into supabase_migrations.schema_migrations(version,name) values ('0152','native_physical');"]);
   assert.throws(() => transactionalMigrationArgs("supabase_db_retained", "0152_native_physical.sql"), /identity/);
@@ -423,7 +494,7 @@ test("migration and ledger insert share a transaction and immutable container id
 
 test("launcher keeps failed runtimes and never uses project-name stop or dotenv materialization", async () => {
   const launcher = await readFile(path.join(here, "launcher.mjs"), "utf8");
-  assert.match(launcher, /if \(!thrown && ownedRuntime && ledger\) await cleanupOwnedServices/);
+  assert.match(launcher, /if \(!settings\.bootstrapOnly && !thrown && ownedRuntime && ledger\) await cleanupOwnedServices/);
   assert.doesNotMatch(launcher, /await rm\(settings\.runtimeRoot/);
   assert.match(launcher, /result\.runtimePreserved = true/);
   assert.doesNotMatch(launcher, /supabase", "stop"|--no-backup/);
@@ -435,4 +506,29 @@ test("launcher keeps failed runtimes and never uses project-name stop or dotenv 
   assert.match(launcher, /assertDockerSocketIdentity\(admittedDockerDaemon\)/);
   assert.match(launcher, /--viewport-width=\$\{settings\.journeyWidth\}/);
   assert.match(launcher, /readFile\(path\.join\(settings\.runtimeRoot, `scripts\/\$\{version\}-production-preflight\.sql`\)/);
+});
+
+test("bootstrap-only stops after migrations and preserves the admitted stack without auth, fixture, app, or browser", async () => {
+  const launcher = await readFile(path.join(here, "launcher.mjs"), "utf8");
+  const stop = launcher.indexOf("if (settings.bootstrapOnly)");
+  const auth = launcher.indexOf("const users = await createSyntheticUsers");
+  assert(stop > 0 && stop < auth, "bootstrap stop must precede synthetic auth");
+  const boundary = launcher.slice(stop, auth);
+  assert.match(boundary, /READY_FOR_READ_ONLY_PREFLIGHT/);
+  assert.match(boundary, /status: "READY_FOR_READ_ONLY_PREFLIGHT"/);
+  assert.match(boundary, /fixtureApplied: false/);
+  assert.match(boundary, /appStarted: false/);
+  assert.match(boundary, /browserStarted: false/);
+  assert.match(boundary, /privacyMigrationApplied: false/);
+  assert.match(boundary, /executionId: settings\.executionId/);
+  assert.match(boundary, /runtimeIdentity:/);
+  assert.match(boundary, /dev: ownedRuntime\.dev/);
+  assert.match(boundary, /ino: ownedRuntime\.ino/);
+  assert.match(boundary, /marker: ownedRuntime\.marker/);
+  assert.match(boundary, /runtimeRoot: settings\.runtimeRoot/);
+  assert.match(boundary, /evidenceRoot: settings\.evidenceDir/);
+  assert.match(launcher, /"psql", "-X", "--no-password"/);
+  assert.match(launcher, /"-c", "select 1"/);
+  assert.match(launcher, /if \(!settings\.bootstrapOnly && !thrown && ownedRuntime && ledger\) await cleanupOwnedServices/);
+  assert.match(launcher, /const readInventory = settings\.bootstrapOnly\s+\? \(runner\) => readProjectDockerInventory/);
 });
