@@ -178,6 +178,50 @@ operator receipt, and runtime privacy proof remain open. Attempts A–C remain c
 evidence. No fourth launch, replay, target query, SQL apply, or attempt D is
 authorized, and M1–M5 remain incomplete.
 
+### October 2 staff-cost baseline-query source checkpoint
+
+The caller-chain receipt is `READY_SOURCE_ONLY` at
+`c1b14310abdc91944a59266dc118241eacff1a23`. It closes the bounded source-caller
+inventory only; it is not an operator/app cutover receipt or privacy proof.
+
+`scripts/staff-cost-seal-baseline-preflight.sql` is an unregistered, read-only
+structural prerequisite for a faithful final permissions migration and exact rollback.
+Source alone does not reveal the target's ambient or default ACL grantors. The candidate
+uses a fixed operator identity and authority gate, repeatable-read timeouts, and rollback.
+It inventories catalog structure for the eleven protected table owners and table/column
+ACL tuples, including grantors; asserts zero owned-sequence dependencies; records the
+private invoice-image bucket and every policy on `storage.objects`; and inventories
+required routine, overload, ACL, and constraint metadata. It does not read protected
+business rows or execute application routines.
+
+The first independent review rejected the initial static contract with four high-severity
+findings and one medium finding. A second independent review rejected the first repair's
+static parser gate. The final purpose-built lexer and mutation regressions passed bounded
+independent source review: nine of nine focused static tests plus TypeScript, targeted lint,
+the file-size ratchet, and diff hygiene passed. Twenty-five unavailable live-database suites
+are not acceptance evidence. This is an accepted source prerequisite only, not runnable
+target admission.
+
+Standalone pglast 8.4 with PostgreSQL parser 18.4 accepted all 24 outer SQL statements.
+It did not parse the PL/pgSQL `DO` bodies; `parse_plpgsql` was unavailable. Catalog
+resolution, target execution, runtime behavior, and historical data therefore remain
+unknown. Static comparison with current `0164` source found seven required constraints and
+62 routine names: 61 canonical exact signatures plus the legacy `int`/`integer` alias.
+Seven older routine-owner expectations rely on the `postgres` migration executor. Any
+actual owner drift must refuse admission; this source never normalizes it.
+
+Historical wine metadata, invoice paths, retry-cache state, and background-job payloads
+remain separate admission checks. No final permissions forward or down migration has been
+authored because the actual quiesced target baseline is unknown. No target query,
+database behavior, application runtime, or privacy result is established here.
+This checkpoint provides no runnable database, Docker, or application command and grants
+no activation authority. Broader product privacy still fails on three inherited
+high-severity findings.
+
+Attempts A–C and the consumed retained-target diagnostic remain closed evidence. No new
+attempt D or local rehearsal is authorized, and the separate local-rehearsal decision is
+still unanswered. Full staff-cost privacy and M1–M5 remain incomplete.
+
 ### October 2 mobile attempt C
 
 The fresh `terroir-demo-20261001-mobile-c` run proved the bounded startup path

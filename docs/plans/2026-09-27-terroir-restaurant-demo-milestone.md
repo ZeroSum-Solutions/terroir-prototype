@@ -489,3 +489,13 @@ Docker service, credential, dotenv file, commit, or push was used for this check
 Attempts A–C remain closed evidence. No fourth launch, replay, or attempt D is
 authorized. M1–M5 remain incomplete, and the failed attempt-C and raw-cost evidence
 remain authoritative.
+
+## Source-only staff-cost baseline-query checkpoint: October 2
+
+The [canonical handoff checkpoint](../runbooks/restaurant-demo-macbook-handoff.md#october-2-staff-cost-baseline-query-source-checkpoint)
+owns the operational scope, source locations, review failures, and remaining admission
+gates for the unregistered structural baseline query. Final independent review accepted it
+as a bounded source prerequisite only. No runnable target admission, target result,
+permissions migration, runtime proof, or activation authority is claimed here. Attempts
+A–C remain closed, no attempt D or local rehearsal is authorized, and M1–M5 remain
+incomplete.
