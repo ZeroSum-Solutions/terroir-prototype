@@ -132,7 +132,8 @@ export async function processInvoiceScanOnce(
       const { error: completionError } = await supabase
         .from("invoice_scans")
         .update({ status: "complete", item_count: 0, status_reason: "no_wines_extracted" })
-        .eq("id", scanId);
+        .eq("id", scanId)
+        .eq("restaurant_id", restaurantId);
       if (completionError) throw completionError;
       return {
         status: 422,
@@ -263,6 +264,7 @@ export async function processInvoiceScanOnce(
           .from("invoice_scans")
           .update(updatePayload as never)
           .eq("id", scanId)
+          .eq("restaurant_id", restaurantId)
           .eq("status", "processing")
           .select("id"),
     );
@@ -309,6 +311,7 @@ export async function processInvoiceScanOnce(
         .from("invoice_scans")
         .update(failurePayload as never)
         .eq("id", scanId)
+        .eq("restaurant_id", restaurantId)
         .eq("status", "processing");
     } catch {}
 
