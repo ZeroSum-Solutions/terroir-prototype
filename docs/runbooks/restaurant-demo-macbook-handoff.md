@@ -1,5 +1,48 @@
 # Restaurant demo MacBook handoff (failed candidate)
 
+## Latest release status: October 2
+
+The owner now authorizes reviewed pushes, protected-main merges and deployment.
+This supersedes the earlier release restrictions below, not the CI, privacy or
+data-preservation gates. The previous native demo goal is blocked; M1–M5 remain
+incomplete.
+
+[PR #231](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/231) merged
+the Cellar layout fix into `main` at `9821bb7cdc530e5669a524ceff90b4bed804280d`.
+The subsequent [PR #227](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/227)
+merged the PWA appearance fix at `146b5ea572fd64579ddc1ddeac76df928e8cd197` after
+fresh required CI passed. Both Railway web deployments reported SUCCESS and
+connected health at this newer SHA; its main CI also passed.
+Test the deployed [Cellar page](https://terroir-web-production.up.railway.app/cellar).
+This is a UI-only release, not a completed restaurant demo or privacy seal.
+
+The reviewed continuation checkpoint `0621581190a5cf2719d27e05cc141367b5382376`
+is pushed on `feat/restaurant-demo-closeout-20261001`; [draft PR #232](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232)
+tracks that source work and its remaining release gates. Its 41 pure launcher
+tests and exact-range security review pass. No continuation browser run is claimed.
+
+The hosted database already has all 136 source migrations through `0164` and
+physical inventory contract 2. Do not reapply `0153`–`0164`. The latest real
+backup, run `37003308212` / artifact `11224716954`, restored successfully with
+87 compared tables, two sequences and ten content checksums at `0164`. That
+data-recovery drill excludes ownership/grant recovery and extension-owned tables.
+
+Disposable D bootstrapped to `0164`; its actual structural and job-history
+baseline was captured and independently assessed. The pending `0165` packet
+has independently reviewed source and CI-script repairs. Its read-only D catalog
+and three history preflight gates passed after one PostgreSQL name/text cast repair;
+the failed attempt remains preserved. Forward/down and application privacy still
+need runtime verification. The ordinary local postgres role lacks effective Storage
+owner authority; the reviewed local apply lane uses the existing superuser
+supabase_admin without adding role membership or changing owners. Production's
+ACL baseline differs from D, so a passing local packet must not be applied blindly
+to production. Neither inspected Railway environment has an active invoice worker.
+Full privacy proof and the persisted desktop/mobile staff-manager journey remain
+open. Keep the older alternative and archived branches separate; several prototype
+checkpoints are already integrated by squash and must not be applied twice.
+
+### Earlier October 2 evidence
+
 > **Status: October 2 closeout.** Mobile attempt C is **FAILED**, not pending.
 > It reached a healthy local application after 136 migrations through `0164`, then
 > completed two real receives and the committed receive replay before the journey
@@ -38,7 +81,7 @@ Fresh GitHub checks confirm [PR #229](https://github.com/ZeroSum-Solutions/terro
 merged at `85f6ac5f` and [PR #230](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/230)
 merged at `2d76a701` on September 27. The current closeout branch is
 `feat/restaurant-demo-closeout-20261001`, starting at `c4bf61b4`. It preserves
-the Cellar layout repair, which has not merged into `main`. Partial import-caller
+the Cellar layout repair, now merged separately by PR #231. Partial import-caller
 checkpoint `ffced31d0964082c2554b1e566d5762e4c36619a` is pushed and matches the
 remote feature branch at evidence capture. It is the verified application
 checkpoint, not a permanent claim about the latest feature-branch tip. The
@@ -46,8 +89,9 @@ portable source snapshot documented here is the commit containing this file.
 Resolve its exact `HEAD` and verify the remote feature-branch ref before MacBook
 use. A pushed checkpoint does not complete the milestone.
 
-The resumed approval covers isolated local testing and feature-branch commit/push.
-It does not authorize a new `main` merge, hosted migration or production deployment.
+The earlier resumed approval covered isolated local testing and feature-branch
+commit/push. The latest release authorization above supersedes its main/deployment
+restriction; hosted changes still require an independently admitted migration.
 `main` deploys code to both Railway environments without applying migrations.
 Do not infer the hosted release SHA from local Git or a healthy production page.
 Use the [milestone plan](../plans/2026-09-27-terroir-restaurant-demo-milestone.md)

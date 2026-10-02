@@ -86,10 +86,14 @@ if rg -n -i '^[[:space:]]*create[[:space:]]+(unique[[:space:]]+)?index[[:space:]
   exit 2
 fi
 
-if rg -n -i '^[[:space:]]*(begin|commit)[[:space:]]*;' supabase/migrations/[0-9]*.sql; then
-  echo "ci-start-supabase: a forward migration owns a conflicting transaction" >&2
-  exit 2
-fi
+for file in supabase/migrations/[0-9]*.sql; do
+  # Only 0165 owns its transaction and ledger; its dedicated CI path admits it.
+  [ "$file" = "supabase/migrations/0165_staff_cost_seal_contract.sql" ] && continue
+  if rg -n -i '^[[:space:]]*(begin|commit)[[:space:]]*;' "$file"; then
+    echo "ci-start-supabase: a forward migration owns a conflicting transaction" >&2
+    exit 2
+  fi
+done
 
 expected=0
 ceiling=${CI_MIGRATION_CEILING:-}
@@ -102,6 +106,11 @@ for file in supabase/migrations/[0-9]*.sql; do
   version=${base%%_*}
   if [ -n "$ceiling" ] && [ "$version" -gt "$ceiling" ]; then
     break
+  fi
+  if [ "$version" = "0165" ]; then
+    bash scripts/local/ci-apply-staff-cost-seal.sh
+    expected=$((expected + 1))
+    continue
   fi
   name=${base#${version}_}
   docker exec -i "$db_container" psql -X -v ON_ERROR_STOP=1 \
