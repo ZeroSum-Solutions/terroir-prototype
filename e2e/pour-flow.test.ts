@@ -256,7 +256,7 @@ test.describe("BND-038 pour → reconcile", () => {
     expect(identityError).toBeNull();
     expect(identity?.name).toBeTruthy();
     await page.goto("/cellar");
-    const search = page.getByPlaceholder("Search name, producer, region…");
+    const search = page.getByRole("searchbox", { name: "Filter this cellar" });
     await expect(search).toBeVisible();
     // The search box filters client-side, but the list hydrates after the
     // server render and the demo tenant now holds ~950 wines, so hydration is

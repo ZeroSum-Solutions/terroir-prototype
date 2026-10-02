@@ -205,15 +205,15 @@ export function CellarList({
       }
     }
 
-    // Every configured section renders, empty or not. Hiding the empty ones
-    // meant a newly-created section was not a drop target until something was
-    // already in it — you could never drag the first wine into it (CELLAR-04).
+    // Keep all sections as drop targets until refinement; then empty groups are noise.
     return [...groups].map(([key, group]) => ({
       key,
       name: group.name,
       wines: group.wines,
     }));
   }, [visibleRows, sections, sectionOverrides]);
+  const hideEmptySections = query.trim() || filter !== "all" || Object.values(facets).some((value) => value != null);
+  const visibleSectionGroups = hideEmptySections ? sectionGroups.filter((group) => group.wines.length > 0) : sectionGroups;
 
   // BND-063: handle DnD — when a wine is dropped into a different section
   /**
@@ -479,8 +479,8 @@ export function CellarList({
           }}
           onDragCancel={() => setDraggingId(null)}
         >
-          <div className="flex flex-col gap-md">
-            {sectionGroups.map((group) => (
+          <div className="flex flex-col gap-xs sm:gap-md">
+            {visibleSectionGroups.map((group) => (
               <SectionGroup
                 key={group.key}
                 sectionKey={group.key}

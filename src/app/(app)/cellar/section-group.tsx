@@ -45,13 +45,20 @@ export function SectionGroup({
       // ground, not white cards floating on it: no card surface, no beige
       // header band. The section label sits directly on canvas, closed off
       // by one hairline, and the rows beneath it divide the same way.
-      className={cn("transition-colors", isOver && "bg-surface-raised")}
+      className={cn(
+        "transition-colors",
+        wines.length === 0 && "min-h-11",
+        isOver && "bg-surface-raised",
+      )}
     >
       <div className="flex items-baseline gap-xs border-b border-rule-strong px-md py-sm">
         <h3 className="text-caption font-medium uppercase text-ink-soft">
           {sectionName}
         </h3>
         <span className="tabular text-caption text-grey">{wines.length}</span>
+        {wines.length === 0 && (
+          <span className="ml-auto text-ledger text-grey">Empty</span>
+        )}
       </div>
 
       {/* Wine rows in this section */}
@@ -74,9 +81,7 @@ export function SectionGroup({
           />
         </div>
       ) : (
-        <div className="px-md py-lg text-center text-body-sm text-grey">
-          No wines in this section.
-        </div>
+        <p className="sr-only">No wines in this section.</p>
       )}
     </div>
   );

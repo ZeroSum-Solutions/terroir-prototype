@@ -8,12 +8,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-function renderList(rows: CellarWineRow[], sections?: { id: string; name: string }[], groupBy: "producer" | null = null) {
+function renderList(rows: CellarWineRow[], sections?: { id: string; name: string }[], groupBy: "producer" | null = null, query = "") {
   return renderToStaticMarkup(
     <ToastProvider>
       <CellarList
         rows={rows}
-        query=""
+        query={query}
         filter="all"
         onSelectWine={() => {}}
         onResetFilters={() => {}}
@@ -81,6 +81,18 @@ describe("CellarList section groups", () => {
     expect(markup).toContain('data-cellar-section="Reds"');
     expect(markup).toContain('data-cellar-section="Whites"');
     expect(markup).toContain("No wines in this section.");
+  });
+
+  it("hides empty sections once search narrows the working set", () => {
+    const markup = renderList(
+      [row({ wine_id: "wine-1", name: "Pinot Noir", section: "Reds" })],
+      [{ id: "s1", name: "Reds" }, { id: "s2", name: "Whites" }],
+      null,
+      "Pinot",
+    );
+
+    expect(markup).toContain('data-cellar-section="Reds"');
+    expect(markup).not.toContain('data-cellar-section="Whites"');
   });
 });
 
