@@ -157,11 +157,15 @@ null-safe repeatable-read transaction, reports aggregate violation classes and c
 and rolls back. Its first source review exposed unsafe nullable comparisons. The
 repaired source passed independent review and its static contract passed 84 tests.
 
-The one admitted retained-target diagnostic stopped when the exact
-`com.supabase.cli.project` label equality guard failed. It exited before opening a
-database session, so no SQL or preflight query ran and historical job compatibility
-remains unknown. The diagnostic admission is consumed. Do not read or repair the
-label, requery, or rerun it. This handoff does not provide a runnable database command
+The one admitted retained-target diagnostic used the raw Docker label key `supabase`
+and stopped when that equality guard failed. The repository's
+`ownershipProof.labels.supabase` field is a normalized alias for the raw
+`com.supabase.cli.project` label, not a raw label key itself. The wrapper never ran the
+canonical raw-key equality guard. This was an operator-command preparation error, not
+evidence of target label drift or compromise. The wrapper failed closed before opening
+a database session, so no SQL or preflight query ran and historical job compatibility
+remains unknown. The diagnostic admission is consumed. Do not inspect or repair target
+labels, requery, or rerun it. This handoff does not provide a runnable database command
 or authorize applying the candidate.
 
 The dormant restaurant deletion route remains unsupported: it has no demonstrated UI

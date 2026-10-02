@@ -464,12 +464,16 @@ review, and its static contract passed 84 tests.
 
 The one frozen retained-target diagnostic ran at 07:29:54 UTC. Source revision, SQL
 and test hashes, local Docker Unix-socket transport, database identity and name, and
-running-state guards passed. The exact `com.supabase.cli.project` label equality guard
-failed, so the wrapper exited 1 before `DATABASE_SESSION_BEGIN`. No database session,
-SQL statement, or preflight query occurred. Historical compatibility is unknown, not
-proved by SQL grammar or source review. The diagnostic admission is consumed; reading
-or repairing the label, requerying, and rerunning are not authorized. No runnable
-database command is admitted by this checkpoint.
+running-state guards passed. Its operator wrapper then checked the raw Docker label
+key `supabase` and failed that equality guard. The repository field
+`ownershipProof.labels.supabase` is a normalized alias for the raw
+`com.supabase.cli.project` label; the wrapper did not execute the canonical raw-key
+guard. This was a command-preparation error, not evidence of target label drift or
+compromise. The wrapper exited 1 before `DATABASE_SESSION_BEGIN`, so no database
+session, SQL statement, or preflight query occurred. Historical compatibility is
+unknown, not proved by SQL grammar or source review. The diagnostic admission is
+consumed; inspecting or repairing target labels, requerying, and rerunning are not
+authorized. No runnable database command is admitted by this checkpoint.
 
 The dormant restaurant deletion route remains unsupported, with no demonstrated UI
 caller and no RLS delete policy. Independent database review classifies it as a
