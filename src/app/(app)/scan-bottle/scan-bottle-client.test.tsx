@@ -14,6 +14,15 @@ const binId = "44444444-4444-4444-8444-444444444444";
 const userId = "11111111-1111-4111-8111-111111111111";
 let hook: ReturnType<typeof useBottleLocationReceive>;
 let input: Parameters<typeof useBottleLocationReceive>[0];
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 beforeEach(() => {
   vi.clearAllMocks();
   hook = { state: { phase: "empty" }, isSaving: false, save: vi.fn(), retry: vi.fn(), recheck: vi.fn(), message: null };
@@ -51,6 +60,75 @@ describe("receiving screen integration", () => {
     expect(view.querySelector('input[type="search"]')).not.toBeNull();
     expect(hook.save).not.toHaveBeenCalled();
   });
+  it("keeps only the newest wine search when older success and failure responses arrive later", async () => {
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const third = deferred<Response>();
+    const fourth = deferred<Response>();
+    const latestWine = { ...wine, id: "55555555-5555-4555-8555-555555555555", name: "Latest result" };
+    const fetchMock = vi.fn((request: string | URL | Request) => {
+      const url = String(request);
+      if (url.endsWith("q=ca")) return first.promise;
+      if (url.endsWith("q=cab")) return second.promise;
+      if (url.endsWith("q=mer")) return third.promise;
+      if (url.endsWith("q=merl")) return fourth.promise;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = await mount(<ScanBottleClient userId={userId} />);
+    await click(button(view, "Find wine by name"));
+
+    await field(view, "#correct-search", "ca");
+    await field(view, "#correct-search", "cab");
+    await act(async () => second.resolve(Response.json([latestWine])));
+    expect(view.textContent).toContain("Latest result");
+    await act(async () => first.resolve(Response.json([{ ...wine, name: "Stale result" }])));
+    expect(view.textContent).toContain("Latest result");
+    expect(view.textContent).not.toContain("Stale result");
+
+    await field(view, "#correct-search", "mer");
+    await field(view, "#correct-search", "merl");
+    await act(async () => fourth.resolve(Response.json([latestWine])));
+    await act(async () => third.reject(new Error("stale search failed")));
+    expect(view.textContent).toContain("Latest result");
+    expect(view.textContent).not.toContain("stale search failed");
+  });
+  it("stops loading when a query is shortened and never resurrects its pending result", async () => {
+    const pending = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(pending.promise));
+    const view = await mount(<ScanBottleClient userId={userId} />);
+    await click(button(view, "Find wine by name"));
+    await field(view, "#correct-search", "ca");
+    expect(view.textContent).toContain("Searching...");
+
+    await field(view, "#correct-search", "c");
+    expect(view.textContent).not.toContain("Searching...");
+    await act(async () => pending.resolve(Response.json([{ ...wine, name: "Resurrected result" }])));
+    expect(view.textContent).not.toContain("Resurrected result");
+  });
+  it("cancels a pending search across reset and unmount without adopting its response", async () => {
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn((_request: string | URL | Request, init?: RequestInit) => {
+      signals.push(init?.signal as AbortSignal);
+      return signals.length === 1 ? first.promise : second.promise;
+    }));
+    const view = await mount(<ScanBottleClient userId={userId} />);
+    await click(button(view, "Find wine by name"));
+    await field(view, "#correct-search", "ca");
+    await click(button(view, "Cancel"));
+    expect(signals[0]?.aborted).toBe(true);
+    await click(button(view, "Find wine by name"));
+    expect(view.textContent).not.toContain("Searching...");
+    await act(async () => first.resolve(Response.json([{ ...wine, name: "Previous result" }])));
+    expect(view.textContent).not.toContain("Previous result");
+
+    await field(view, "#correct-search", "mer");
+    await cleanup();
+    expect(signals[1]?.aborted).toBe(true);
+    await act(async () => second.resolve(Response.json([{ ...wine, name: "Unmounted result" }])));
+  });
   it("sends only wine ID, normalized section and explicitly selected bin ID", async () => {
     const view = await mount(<ScanBottleClient userId={userId} />); await lookup();
     const matchedButton = [...view.querySelectorAll("button")].find((entry) => /confirm/i.test(entry.textContent ?? ""))!;
@@ -66,7 +144,7 @@ describe("receiving screen integration", () => {
     expect(view.textContent).toContain("1 bottle received");
     expect(view.textContent).toContain("Recovered bottle receipt");
     expect(view.textContent).toContain("A-1");
-    expect(view.querySelector("a")?.getAttribute("href")).toBe(`/cellar/${wine.id}`);
+    expect(view.querySelector("a")?.getAttribute("href")).toBe(`/cellar?wine=${wine.id}`);
   });
   it("preserves recovery intent but requires a new explicit bin choice", async () => {
     const view = await mount(<ScanBottleClient userId={userId} />);

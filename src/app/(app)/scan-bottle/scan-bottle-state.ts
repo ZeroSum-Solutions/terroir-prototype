@@ -143,10 +143,10 @@ export function bottleScanReducer(state: BottleScanState, action: BottleScanActi
       return { ...state, wine: action.wine, receivingWineId: action.wine.id, phase: "matched", error: null };
 
     case "correction-started":
-      return { ...state, phase: "correcting", searchQuery: "", searchResults: [], searchError: null };
+      return { ...state, phase: "correcting", searchQuery: "", searchResults: [], searching: false, searchError: null };
 
     case "correction-cancelled":
-      return { ...state, phase: "matched" };
+      return { ...state, phase: "matched", searching: false };
 
     case "location-entry-started":
       return { ...state, phase: "location", binId: "", binLocation: "", locationError: null };

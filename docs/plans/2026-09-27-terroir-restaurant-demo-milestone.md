@@ -499,3 +499,12 @@ as a bounded source prerequisite only. No runnable target admission, target resu
 permissions migration, runtime proof, or activation authority is claimed here. Attempts
 A–C remain closed, no attempt D or local rehearsal is authorized, and M1–M5 remain
 incomplete.
+
+## Source-only known-wine search and receive-summary checkpoint: October 2
+
+The [canonical handoff checkpoint](../runbooks/restaurant-demo-macbook-handoff.md#october-2-known-wine-search-and-receive-summary-source-repairs)
+records the latest-request search guard, idle reset behavior, actionable receive-summary
+link, test-first evidence, and independent source review. This closes the two bounded
+source findings only. It does not supply the browser, database, responsive, role,
+privacy, or persistence evidence required by M3 or M4. Attempts A–C remain closed,
+the fresh local rehearsal decision remains pending, and M1–M5 remain incomplete.

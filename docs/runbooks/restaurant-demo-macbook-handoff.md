@@ -74,6 +74,32 @@ or restart, adopt, reseed, delete, or replay attempts A, B, or C. Any later runt
 attempt still requires a reviewed locator, a fresh namespace, and the separate raw
 cost privacy seal. M1–M5 remain incomplete.
 
+### October 2 known-wine search and receive-summary source repairs
+
+Against base `c17ec2d1cda8efc72005a2b804a3aa03f0f1b0f6`, known-wine
+receiving now accepts a search success or failure only from the latest request.
+A new query aborts its predecessor. Shortening the query below two characters,
+cancelling or resetting the search, leaving the correction step, and unmounting all
+invalidate pending work; reopening a blank search starts idle. The receive-session
+summary now links the
+selected wine to the encoded `/cellar?wine=` state that opens the actionable Cellar
+drawer instead of the informational wine page.
+
+The first source regression run failed four tests while 12 passed. A second red run
+isolated the retained loading flag with three failures and 29 passes. The repaired
+focused set passed 36 of 36 tests, and the complete Scan Bottle folder passed 73 of
+73 with zero skips. TypeScript, targeted lint, the file-size ratchet, and diff hygiene
+passed. Independent source review repeated both test sets and the same gates and
+passed this six-file behavior repair.
+
+This is source evidence only. This candidate's browser navigation, rendered search
+states, database persistence, real JWT and Data API denial, Storage isolation, and
+historical-data checks remain unverified. Full staff-cost privacy remains failing and
+incomplete. Attempts A–C and the consumed
+retained-target diagnostic remain closed. No fourth launch, replay, fresh rehearsal,
+or attempt D is authorized; the owner decision on a fresh local rehearsal is still
+pending. M1–M5 remain incomplete.
+
 ### October 2 S10 recompute-receipt repair (independent source review passed)
 
 The source-only S10 candidate adds
