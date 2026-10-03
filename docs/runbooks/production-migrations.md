@@ -327,6 +327,31 @@ routine definitions and restores the previous definitions; it does not delete
 inventory or reconciliation history. CI applies `0166` after `0165` and then
 runs the standalone regression. Local or CI success is not hosted apply proof.
 
+### 4f. Immutable invoice upload and resume: 0167
+
+`0167_invoice_upload_resume.sql` follows `0165` and `0166`. The privacy seal
+intentionally does not grant invoice-image UPDATE or unrestricted SELECT.
+Compatible callers insert pages with `upsert: false` and record a SHA-256 digest
+in object user metadata. A narrow boolean reader admits a pending page only
+for its current actor, live upload claim, exact path and recorded digest/size/MIME.
+The digest is caller-recorded metadata, not a Storage-service byte attestation.
+
+The seven-argument upload creator binds exactly the submitted page names and
+requires all bound objects to belong to the actor. Missing, extra, stale or
+cross-actor pages fail before a scan or extraction job is created. The original
+six-argument creator retains its body but is no longer callable by users. JSON
+uploads provide a one-object manifest even when their transport key differs
+from the object's scan ID.
+
+Apply the SQL and ledger record atomically in a caller-owned transaction. Run
+the `0165` postflight before this migration, since that postflight pins the old
+creator grant. Rehearse forward/down in a rollback-only window and verify
+unchanged data, history and image policies. Run the standalone local regression
+`supabase/tests/0167_invoice_upload_resume/regression.sql` separately.
+Restore compatible callers before applying the paired down and removing its
+ledger entry atomically; it restores the old creator grant and deletes no data.
+Local source or regression checks do not prove hosted activation or real OCR.
+
 ### 5. Verify the effect, not the record
 
 Assert the thing the migration was for. A `schema_migrations` row proves only that an

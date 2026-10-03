@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Complete the disposable CI schema after the legacy-contract live suites have
 # run at 0155. This models the real cutover: legacy behavior is proved before
-# 0156 retires it, then the current application and E2E run against 0166.
+# 0156 retires it, then the current application and E2E run against 0167.
 
 set -euo pipefail
 
@@ -68,6 +68,8 @@ bash scripts/local/ci-apply-staff-cost-seal.sh
 
 apply_migration supabase/migrations/0166_reconcile_lineage_poststate.sql
 psql_local -f - < supabase/tests/0166_reconcile_lineage_poststate/regression.sql
+apply_migration supabase/migrations/0167_invoice_upload_resume.sql
+psql_local -f - < supabase/tests/0167_invoice_upload_resume/regression.sql
 
 actual=$(psql_local -Atc "select count(*) from supabase_migrations.schema_migrations")
 latest=$(psql_local -Atc "select max(version) from supabase_migrations.schema_migrations")

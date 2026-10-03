@@ -188,6 +188,13 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   and ledger inserts through the authenticated Supabase client, with explicit
   compensation on partial failure. Do not describe that workflow as one
   database transaction.
+- Invoice upload uses immutable Storage inserts, not upserts requiring private
+  image SELECT/UPDATE. Migration 0167 supplies a cost-free boolean pending-page
+  check bound to current membership, actor, site, live upload claim, exact path,
+  caller-recorded digest, size and MIME. Its manifest-aware creator requires the
+  exact requested page set and actor ownership of every page; it rejects stale
+  extra pages and cross-actor adoption. The old six-argument creator becomes an
+  inaccessible legacy entrypoint. This source contract still requires local/hosted verification.
 - Public wine-list reads stay explicitly protected by RLS policies and contract
   tests.
 - Version 1 open, pour, spill, and measured-close routes send a caller-generated UUID
