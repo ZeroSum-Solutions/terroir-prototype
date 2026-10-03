@@ -65,7 +65,16 @@ export async function assertFrozenPreservedDSource({ runtimeRoot, treeText, expe
     expected.set(relative, objectId);
   }
   const actual = await runtimeSourcePaths(runtimeRoot);
-  assert.deepEqual(actual, [...expected.keys(), ".terroir-demo-owned.json"].sort(), "frozen runtime source file set changed");
+  // These two exact CLI-created files were observed at D's original bootstrap.
+  // No other generated entry, changed value, or application source is exempt.
+  const cliMetadata = {
+    "supabase/.branches/_current_branch": "0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605",
+    "supabase/.temp/cli-latest": "008368133cc42a3c2209c6e9dbf2612e56f28a1534b4c60383ec6403ea4d556f",
+  };
+  assert.deepEqual(actual, [...expected.keys(), ".terroir-demo-owned.json", ...Object.keys(cliMetadata)].sort(), "frozen runtime source file set changed");
+  for (const [relative, expectedHash] of Object.entries(cliMetadata)) {
+    assert.equal(sha256(await readFile(path.join(runtimeRoot, relative))), expectedHash, `frozen runtime CLI metadata changed: ${relative}`);
+  }
   for (const [relative, objectId] of expected) {
     const contents = await readFile(path.join(runtimeRoot, relative));
     if (relative === "supabase/config.toml") {

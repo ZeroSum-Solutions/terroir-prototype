@@ -203,7 +203,19 @@ test("frozen runtime source rejects modified and additional application files", 
     await writeFile(path.join(root, "src.mjs"), app);
     await writeFile(path.join(root, "supabase/config.toml"), config);
     await writeFile(path.join(root, ".terroir-demo-owned.json"), "{}\n");
+    await mkdir(path.join(root, "supabase/.branches"));
+    await mkdir(path.join(root, "supabase/.temp"));
+    await writeFile(path.join(root, "supabase/.branches/_current_branch"), "main");
+    await writeFile(path.join(root, "supabase/.temp/cli-latest"), "v2.119.0");
     await assert.doesNotReject(assertFrozenPreservedDSource({ runtimeRoot: root, treeText: tree, expectedConfigText: config }));
+    for (const [relative, original] of [
+      ["supabase/.branches/_current_branch", "main"],
+      ["supabase/.temp/cli-latest", "v2.119.0"],
+    ]) {
+      await writeFile(path.join(root, relative), "unexpected\n");
+      await assert.rejects(assertFrozenPreservedDSource({ runtimeRoot: root, treeText: tree, expectedConfigText: config }), /CLI metadata changed/);
+      await writeFile(path.join(root, relative), original);
+    }
     await writeFile(path.join(root, "src.mjs"), "tampered\n");
     await assert.rejects(assertFrozenPreservedDSource({ runtimeRoot: root, treeText: tree, expectedConfigText: config }), /source changed/);
     await writeFile(path.join(root, "src.mjs"), app);
