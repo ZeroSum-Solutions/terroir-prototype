@@ -300,6 +300,33 @@ own independent review and actual dry-run/apply evidence pass. Never infer a
 hosted apply, complete privacy certification or completed team demo from local
 catalog checks or CI alone.
 
+### 4e. Reconciliation lineage post-state: 0166
+
+`0166_reconcile_lineage_poststate.sql` follows the privacy seal. It changes only
+the acceptance and undo routines to verify the lineage actually returned by an
+update. It does not bypass lineage derivation, change grants, or rewrite history.
+Its admission and postcondition gates pin routine bodies, owner, privileges and
+interface metadata; an unexpected preimage stops the migration.
+
+Unlike `0165`, this file does not own a transaction or ledger insert. Apply its
+SQL and its migration-ledger record together in one caller-owned transaction.
+Run the `0165` postflight before applying `0166`: that earlier postflight pins
+the pre-0166 routine bodies and is not a valid final-state check afterward.
+
+Before hosted apply, retain a reviewed rollback-only rehearsal and exact
+catalog/data conservation evidence. The canonical regression at
+`supabase/tests/0166_reconcile_lineage_poststate/regression.sql` owns its own
+transaction and terminal rollback. Run it separately; do not nest it unchanged
+inside a migration rehearsal. Any savepoint adaptation needs separate review.
+The regression covers a valid mixed batch, conflicting lineage acceptance,
+replay, stale undo and trigger-rejected legacy restoration.
+
+For a full rollback, restore `0166` with its paired down and remove its ledger
+entry atomically before rolling back `0165`. The down requires the exact new
+routine definitions and restores the previous definitions; it does not delete
+inventory or reconciliation history. CI applies `0166` after `0165` and then
+runs the standalone regression. Local or CI success is not hosted apply proof.
+
 ### 5. Verify the effect, not the record
 
 Assert the thing the migration was for. A `schema_migrations` row proves only that an

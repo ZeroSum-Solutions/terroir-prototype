@@ -225,7 +225,11 @@ directly. Wine-list PDF generation still reaches Puppeteer through
   `bottle_closeouts` insertion also remains a receipt-bypass until the separately
   reviewed contraction removes the legacy grants and policy.
 - Reconciliation batches persist ordered before-and-after state so undo restores
-  actions in reverse application order.
+  actions in reverse application order. Migration `0166` verifies the lineage
+  returned by the actual update before recording acceptance or marking undo
+  complete. A lineage derivation trigger can refuse a requested link; that
+  mismatch raises the existing conflict error and rolls back the whole batch,
+  including earlier actions. The derivation and merge guards remain unchanged.
 - First-class bins, cellar-health rows, reconciliation history, bottle
   close-outs, stock adjustments, brand kits, and pricing recommendations are
   restaurant-scoped and protected by RLS. Ordinary authenticated app clients
