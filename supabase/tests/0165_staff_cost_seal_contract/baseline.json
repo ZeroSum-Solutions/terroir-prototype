@@ -1,0 +1,547 @@
+{
+  "receiptSha256": "b5f1d7bc2307650124a1714e9c114ceb263f42bfa7f80643669a1c6bb2b64ecb",
+  "aclBaselineSha256": "d76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd",
+  "aclContractSha256": "e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd",
+  "storageBaselineSha256": "e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f",
+  "winePoliciesSha256": "e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0",
+  "routines": [
+    {
+      "signature": "public.abandon_scan_idempotency(uuid,uuid,text)",
+      "sha256": "19868e4a479cd9b41c9d108923ba147815e4a53c30b8f530c0dc1e0f6b57c33b",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.accept_reconcile_batch(uuid,jsonb,uuid)",
+      "sha256": "7222617de9f7440a0e4e579c94a2eb85ea85387d7c5efffc26b8d38ebe5b187d",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.add_manual_overrides(uuid,text[])",
+      "sha256": "0b188ec60084d9776ff908782f3bafbccbc10c21884f83f823606da138d7eadb",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.apply_import_batch_chunk(uuid,integer)",
+      "sha256": "00aa08b2c6968e5b34df44ccc20bffdf0a9be8c4ab9c6603083277c57593ffab",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.assign_wine_sections_private(uuid,uuid[],text)",
+      "sha256": "c44a69ab56540c8b5d982849c57f489b62bde3d29faab18a39b44485db724cde",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.bulk_resolve_import_batch_rows(uuid,text)",
+      "sha256": "d2c8d853eada81255ac286e1ed6ba8574b7ed2b22d074038d2bf77f5dfc197fe",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.claim_invoice_extract_job(text)",
+      "sha256": "aeb478c1132c6a23556f02ba532ac50fe20c20dbca7eb98d7da675d78ff38ad0",
+      "grantees": [
+        "postgres",
+        "service_role"
+      ]
+    },
+    {
+      "signature": "public.claim_scan_idempotency(uuid,uuid,text)",
+      "sha256": "4072266c12ba053e35eeab3c94b6bc269a4734e308b0ca52290f58025397210c",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.cleanup_scan_idempotency()",
+      "sha256": "a7719119e439d97a85db423cf25fcceffaf74f8fc10ed449c46e0467986a86f4",
+      "grantees": [
+        "postgres",
+        "service_role"
+      ]
+    },
+    {
+      "signature": "public.commit_invoice_scan(uuid)",
+      "sha256": "10fc0c841b6baa2953c09e6364424cbf2d847c1470ab080c038859d0a83ad054",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid)",
+      "sha256": "cbd6b5b4147b37992ba52d428b0ab24babff7035ba870ce57623b7374e545656",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.count_import_batch_rows(uuid)",
+      "sha256": "edb4c231e87324c54832b98654b2cdf4a30ed0d45c74e499a80cb4aa226b000e",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text)",
+      "sha256": "df8487e06bf635bddcc042d1bcfdd75bc83e52b820ca2e8da37f6934bb92e6e8",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.create_inventory_item_private(uuid,uuid,integer,numeric,text,uuid,text,text,text,uuid,public.added_via)",
+      "sha256": "2909ac0b15d7dbcdbe771718e7f3da454d55bcb0895674d7fd72f4ce9e6b109d",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.create_invoice_scan_upload(uuid,uuid,text,text,text,date)",
+      "sha256": "9e82c6aea3e76f37b7905d3f39c0b0eeb911f87e05bdf7af3cc61441cc26a308",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.current_inventory_contract_version()",
+      "sha256": "5898b9c5d5d9ed81487617ded9fb61014522b9ed21bbd5d5aa164061ac6cb2e6",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.current_site_role_at_least(uuid,public.membership_role)",
+      "sha256": "417509ed348fb8317a8671107adc5d4ccbaa53a78f37c5cbf31e0cd154dd3c21",
+      "grantees": [
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.delete_invoice_scan(uuid)",
+      "sha256": "b64d58fe4d7e566be07f2b6e4f059647100de917a1b378215889957381cd02f6",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.delete_wine_private(uuid,uuid,timestamp with time zone)",
+      "sha256": "9b1d94188b5dddd20889110396f7321a281080e43a4aa06b9951c6fbbb2eafc2",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.dismiss_pricing_alert_private(uuid,integer)",
+      "sha256": "969c9e06cbac0f9a407af092bb58aa308971782a3a4922413377e8893e6b0ad4",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.dismiss_pricing_alert(uuid,integer)",
+      "sha256": "3a58676d2ecb283c4afa712cf6161f7dba825e3f0c9663fcb9dfc6a7531b245b",
+      "grantees": [
+        "PUBLIC",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.effective_site_capability(uuid,text)",
+      "sha256": "ba90e657b84892fe24e00c87c96c5c0d61d02d4956211c657201b2a7ed3e17fb",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.effective_site_ids(text)",
+      "sha256": "2d14aecc5dc0d563c42f20f98ee07f8d92c3eb4bcb52690b052ad5b2256fa7dc",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.enqueue_invoice_extract_job(uuid,uuid)",
+      "sha256": "5ac88c60315d46ca8ca102b9ad983be21201d7603c55e3fc6b356cd49e3f3b9b",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.enrich_wines_batch(uuid,jsonb)",
+      "sha256": "a785b1a41d1a4e55a3604058fbc252cd59394fbdf2773b73993181b765955658",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.expire_stalled_invoice_scans(uuid)",
+      "sha256": "a02c02e8b441230aa38ff336f86e2c7637b7c1c297c82227aa3f4dae1fb1bb9b",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.invoice_edits_valid(jsonb)",
+      "sha256": "bf491cf8d8749961bad6cf5d79fff3b636299a35350275b6408eeb8c37e503f4",
+      "grantees": [
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.invoice_image_paths_valid(uuid,uuid,text,jsonb)",
+      "sha256": "782bf227fad7bfbb39e70b4b466c02b4f4bbf772e5fb5a634ab35cc829060f53",
+      "grantees": [
+        "authenticated",
+        "postgres",
+        "service_role"
+      ]
+    },
+    {
+      "signature": "public.invoice_line_items_valid(jsonb)",
+      "sha256": "14fa666068165ba7e56c9e975b95637cc43087efce23ef2e5899fadd3221c7ee",
+      "grantees": [
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.merge_wines(uuid,uuid)",
+      "sha256": "67d17b5d5d091fa2c7495c39552cc47074b4fbc1b5e108bf46ec00dd19a7ce63",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.mirror_bin_code_to_inventory_items()",
+      "sha256": "0b3abc25c95d636b8d460d9585fb512a92f49757921f82f1fbb37e329da8124f",
+      "grantees": [
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.patch_inventory_item_private(uuid,timestamp with time zone,boolean,integer,boolean,numeric,boolean,text,boolean,uuid,boolean,text,boolean,text,boolean,text)",
+      "sha256": "0683075e50e26e1081bac9c4d8b79658f14cbcb1ffaa06c326c9284afb77c5d7",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_cellar_health_private(uuid,uuid[])",
+      "sha256": "8b024de11c7ba70bf966c837e8ce01919c39ea0a7c7e49d6f797e0f79cd7345a",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_current_operational_memberships(uuid)",
+      "sha256": "dfb8579fc556d2452ae22adba63ef3088bae0f9015c0ddd8ed48128b5682801d",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_identity_merge_private(uuid)",
+      "sha256": "14d8d116468407934a282681accaf13d849c130f48b3efb8ec9e886134cf51ad",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_import_batch_cost_rows(uuid,integer,integer)",
+      "sha256": "ce87c85a3306b9849599bc1745decd264fbd139db78942376a2a4d6adac9cb5e",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_import_batch_display_rows(uuid,integer,integer)",
+      "sha256": "b28f41c8a6f2456003606987cf93910ccd61fe2a2ca40fd21e25e5154fa63c51",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_inventory_costs(uuid,uuid[])",
+      "sha256": "fb079bf12d27f6a8f428efee9c582642e66b8a2073f25c0ea5b36e6ece2d15d9",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_invoice_image_target(uuid,integer)",
+      "sha256": "e2d08429a6b596d9398e735619559de72c7a721565433e4435a70912b44dc4cd",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_invoice_scan_deletion_private(uuid)",
+      "sha256": "aed40799e0d0336b978bf39ce524d4fd0d8961b2b3eced8de022c75137d2dfea",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_invoice_scan_private(uuid)",
+      "sha256": "ac9902982db511cd6f40ffe071eebaf857185e7194832348db3e7bdbb7ba07dd",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_pricing_recommendations(uuid)",
+      "sha256": "42116ffeb0ed148f5ea5b10b26acf0fa48d40bdd8f77b4aedad7d035113c6d9b",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_reconcile_action_private(uuid)",
+      "sha256": "3fbc77af972fce6be95442315d4aa5276be1b01df72aebd25f31fcd9cd170ca8",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_restaurant_pricing_defaults(uuid)",
+      "sha256": "f36c2010ea6230e70404b7ed6f6d8743089d21058a59d37a45f600b474f570d8",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_wine_cost_flags(uuid,uuid[])",
+      "sha256": "353cfa564326324f0e8f9b9a4c428149329b1e771c190f31cc476a896ab2d0e6",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.read_wine_pricing_strategy(uuid,uuid[])",
+      "sha256": "a967eaf8316c0d5e464547b6e2d6defc261232a5194dd560eb2f6f09c1997db4",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)",
+      "sha256": "31c4a0c6efcf721a087156009180e70d7d5dc99d0860ab319183d74f523a16c1",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.reclaim_stuck_invoice_extract_jobs(integer)",
+      "sha256": "f1e6a13067a346672d03ab6b9a6b319e8c8c432e80043d508b8195d251e971a5",
+      "grantees": [
+        "postgres",
+        "service_role"
+      ]
+    },
+    {
+      "signature": "public.request_invoice_scan_reextract(uuid)",
+      "sha256": "1f345ab5f150b506f0f14bfd61434302e7c91fa25b3be9bb07c80d8245d2dec2",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.resolve_import_batch_row(uuid,text,numeric)",
+      "sha256": "cb93a65b4d8a5e16b0918e577884d44f10ff04c43e90c21ca48942ec73be96f2",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.revert_import_batch_core_private(uuid,uuid[])",
+      "sha256": "e13f22d4254e056c92c6cfd475d255cc35b52386b97feb54d239967205ea4a02",
+      "grantees": [
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.revert_import_batch_private(uuid)",
+      "sha256": "028d7f870987625ce254303e2a02c6ef362e5b4363ebd46dbe887d3082ae4088",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.revert_import_batch(uuid)",
+      "sha256": "7beb1e2b6e3c01c01b3d4eb45324469688dd7dc63e54e0315029bdb45f83c285",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.revert_import_session(uuid)",
+      "sha256": "2c77c68620352cc7c1f4655f6aa7b7c7fd1960487b9bac80c540630177accac9",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.review_invoice_scan(uuid,timestamp with time zone,text,text,date,jsonb,jsonb)",
+      "sha256": "381fb4db77e0441bb6070bfe6c18cca47ffd8e28f314eb242af197b2cc1006a4",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.save_bottle_inventory_private(uuid,uuid,text,text,integer,text,text,text,text,integer,numeric)",
+      "sha256": "b39aaa105b186ae14b879b91a512297cf884a4352a427cf0a5b932fa1d8b95da",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.set_restaurant_pricing_defaults(uuid,numeric,numeric)",
+      "sha256": "11930a20c1d8cce6b1f6b7564c570fb12616899507b92203d00fea3dc1e5611c",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.set_wine_overpaid_flag(uuid,uuid,boolean)",
+      "sha256": "dd71644d40c44f79c7a8db2bb767cce815a80db5cd5ac259bf355d9ebed4760d",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.set_wine_pricing_strategy(uuid,uuid,numeric,numeric)",
+      "sha256": "a14d69c3c4e1dc53a98e8dbf9004d2382f5c5651e2499fca858aae13fd6fc7d7",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.undo_reconcile_batch(uuid)",
+      "sha256": "5bb6bd5585ba7b67895f01717fb039ffe4163c836cbfd9fdf4f6b0586bc58071",
+      "grantees": [
+        "authenticated",
+        "postgres"
+      ]
+    },
+    {
+      "signature": "public.wine_enrichment_metadata_valid(jsonb)",
+      "sha256": "9b0471b5138c5a0d266192d415ded210db54072336e928aecbb125a032a8e649",
+      "grantees": [
+        "authenticated",
+        "postgres",
+        "service_role"
+      ]
+    },
+    {
+      "signature": "public.wine_manual_overrides_valid(text[])",
+      "sha256": "768ff4923f2a861ed7292769c8ad5fde70ccc05117f2e457d41042050634b6bc",
+      "grantees": [
+        "authenticated",
+        "postgres",
+        "service_role"
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "relation": "background_jobs",
+      "name": "background_jobs_attempt_window",
+      "type": "c",
+      "sha256": "4fbad9b056940bf3916eb0392ca26776c5a298c72906b7e940fdff5d95e07166"
+    },
+    {
+      "relation": "background_jobs",
+      "name": "background_jobs_job_type_check",
+      "type": "c",
+      "sha256": "067ffb3d13ff4ec6a287523e8ce9007b2c8fd22032390fdfa35dd27f2eb0f483"
+    },
+    {
+      "relation": "background_jobs",
+      "name": "background_jobs_status_check",
+      "type": "c",
+      "sha256": "a3543a9b48beb3fe479f6a8c08cbc6099aca913ce65a6e9c4b2e72fbd7fc9a61"
+    },
+    {
+      "relation": "invoice_scans",
+      "name": "invoice_scans_image_paths_valid_check",
+      "type": "c",
+      "sha256": "c0fc7187a3c97149d99fe06228384627019c860b7966b27363d2734eeedbda51"
+    },
+    {
+      "relation": "scan_idempotency",
+      "name": "scan_idempotency_pkey",
+      "type": "p",
+      "sha256": "a4ead6746766b1dfbedce39f875b7005601651248a496f375f33e7f70c973b65"
+    },
+    {
+      "relation": "wines",
+      "name": "wines_enrichment_metadata_valid_check",
+      "type": "c",
+      "sha256": "72fe9823fcc2ba003214d62b9d63fd25e6fafbc6601f5b3c4711037da2012005"
+    },
+    {
+      "relation": "wines",
+      "name": "wines_manual_overrides_valid_check",
+      "type": "c",
+      "sha256": "857d6bbea8a2fcc814be21aa11c93fbb26cc3dd857c241a8263ea22b45618508"
+    }
+  ]
+}

@@ -214,9 +214,13 @@ describe("processInvoiceScanOnce multi-page batching (BND-081 / TER-CF-032)", ()
       invoiceDate: "2026-07-24",
       lineItems: [],
     });
+    const updateChain: Record<string, unknown> = {};
+    updateChain.eq = vi.fn(() => updateChain);
+    updateChain.then = (resolve: (value: { data: null; error: null }) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve);
     const supabase = {
       from: vi.fn(() => ({
-        update: vi.fn(() => ({ eq: vi.fn(async () => ({ data: null, error: null })) })),
+        update: vi.fn(() => updateChain),
       })),
     };
 

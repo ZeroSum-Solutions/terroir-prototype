@@ -45,7 +45,7 @@ export function SummaryView({ session, onNewSession }: SummaryViewProps) {
                 <span aria-hidden>&middot;</span>{" "}
                 {scan.binLocation}
               </p>
-              <Link href={`/cellar/${scan.wineId}`} className="flex min-h-11 items-center text-control text-accent focus-ring">View wine</Link>
+              <Link href={`/cellar?wine=${encodeURIComponent(scan.wineId)}`} className="flex min-h-11 items-center text-control text-accent focus-ring">View wine</Link>
             </li>
           ))}
         </ul>

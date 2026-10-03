@@ -106,18 +106,21 @@ describe("bottleScanReducer", () => {
       phase: "matched",
       searchQuery: "old",
       searchResults: [wine()],
+      searching: true,
     };
     const next = bottleScanReducer(seeded, { type: "correction-started" });
     expect(next.phase).toBe("correcting");
     expect(next.searchQuery).toBe("");
     expect(next.searchResults).toEqual([]);
+    expect(next.searching).toBe(false);
   });
 
-  it("correction-cancelled only changes phase (used by both Cancel and Back)", () => {
-    const seeded: BottleScanState = { ...initialBottleScanState, phase: "correcting", searchQuery: "kept" };
+  it("correction-cancelled stops search while preserving its query (used by both Cancel and Back)", () => {
+    const seeded: BottleScanState = { ...initialBottleScanState, phase: "correcting", searchQuery: "kept", searching: true };
     const next = bottleScanReducer(seeded, { type: "correction-cancelled" });
     expect(next.phase).toBe("matched");
     expect(next.searchQuery).toBe("kept");
+    expect(next.searching).toBe(false);
   });
 
   it("location-entry-started preserves section intent but clears the bin choice", () => {

@@ -22,11 +22,20 @@ export async function POST(_request: NextRequest, { params }: { params: Params }
 async function postRevert(params: Params) {
   const auth = await requireMembership();
   if (auth instanceof NextResponse) return auth;
-  const { supabase } = auth;
+  const { supabase, restaurantId } = auth;
 
   const parsedParams = await parseParams(params, SessionIdParamsSchema);
   if (!parsedParams.ok) return parsedParams.response;
   const { id } = parsedParams.data;
+
+  const { data: session, error: sessionError } = await supabase
+    .from("import_sessions")
+    .select("id")
+    .eq("id", id)
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle();
+  if (sessionError) throw sessionError;
+  if (!session) return Errors.notFound("Import session");
 
   const result = await revertImportSession(supabase, id);
   if (!result.ok) {

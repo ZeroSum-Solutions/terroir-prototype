@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/api/auth";
 import { Errors } from "@/lib/api/errors";
 import { runCellarHealthRecompute } from "@/lib/cellar-health/recompute";
+import { parseRecomputeReceipt } from "@/lib/staff-cost/recompute-receipt";
 import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -37,9 +38,14 @@ export async function POST() {
       auth.restaurantId,
       auth.user.id,
     );
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error("cellar health recompute failed", error);
+    const receipt = parseRecomputeReceipt(result, "cellar_health_recompute");
+    if (!receipt) {
+      console.error("cellar health recompute returned an invalid receipt");
+      return Errors.internal("Cellar health recompute failed.");
+    }
+    return NextResponse.json(receipt);
+  } catch {
+    console.error("cellar health recompute failed");
     return Errors.internal("Cellar health recompute failed.");
   }
 }

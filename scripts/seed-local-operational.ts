@@ -859,43 +859,34 @@ function buildCloseouts(world: World) {
 
 // ── background_jobs ────────────────────────────────────────────────────
 
-/** A worker queue mid-flight. The two recompute runs at the end of this
- * script insert their own `processing` → `succeeded` rows; these cover the
- * states nothing else on a local stack ever produces (retrying, failed,
- * dead, cancelled, queued). */
+/** Supported synthetic queue states. Explicit ordinals keep deterministic
+ * identities stable when unsupported legacy fixtures are omitted. */
 function buildJobs(world: World) {
   const scan = (i: number) => world.scanIds[i % Math.max(1, world.scanIds.length)] ?? null;
   const wine = (i: number) => world.wines[i % world.wines.length].id;
   const list = (i: number) => world.listIds[i % Math.max(1, world.listIds.length)] ?? null;
 
   const plans: Array<{
+    ordinal: number;
     job_type: string;
     status: string;
     subject_table: string | null;
     subject_id: string | null;
     daysAgo: number;
     attempt_count: number;
-    error_code?: string;
-    error_message?: string;
-    result?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
   }> = [
-    { job_type: "invoice_extract", status: "succeeded", subject_table: "invoice_scans", subject_id: scan(0), daysAgo: 3, attempt_count: 1, result: { line_items: 14, accuracy: 0.94 }, metadata: { distributor: "Skurnik" } },
-    { job_type: "invoice_extract", status: "succeeded", subject_table: "invoice_scans", subject_id: scan(1), daysAgo: 2, attempt_count: 1, result: { line_items: 9, accuracy: 0.88 }, metadata: { distributor: "Polaner" } },
-    { job_type: "invoice_extract", status: "processing", subject_table: "invoice_scans", subject_id: scan(2), daysAgo: 0, attempt_count: 1, metadata: { distributor: "Vine Street" } },
-    { job_type: "invoice_ocr", status: "queued", subject_table: "invoice_scans", subject_id: scan(3), daysAgo: 0, attempt_count: 0, metadata: { pages: 2 } },
-    { job_type: "invoice_ocr", status: "retrying", subject_table: "invoice_scans", subject_id: scan(4), daysAgo: 0, attempt_count: 2, error_code: "ocr_timeout", error_message: "Document Intelligence timed out; retrying with backoff." },
-    { job_type: "invoice_ocr", status: "failed", subject_table: "invoice_scans", subject_id: scan(5), daysAgo: 6, attempt_count: 3, error_code: "ocr_unreadable", error_message: "Scan too low-contrast to read." },
-    { job_type: "invoice_ocr", status: "dead", subject_table: "invoice_scans", subject_id: scan(6), daysAgo: 21, attempt_count: 3, error_code: "ocr_unreadable", error_message: "Exhausted all attempts; needs a re-scan." },
-    { job_type: "wine_enrichment", status: "succeeded", subject_table: "wines", subject_id: wine(5), daysAgo: 9, attempt_count: 1, result: { enriched: 118, skipped: 12 } },
-    { job_type: "wine_enrichment", status: "processing", subject_table: "wines", subject_id: wine(40), daysAgo: 0, attempt_count: 1, metadata: { batch: "drink-window-refresh" } },
-    { job_type: "wine_enrichment", status: "cancelled", subject_table: "wines", subject_id: wine(90), daysAgo: 14, attempt_count: 1, error_code: "cancelled_by_user", error_message: "Superseded by a newer enrichment run." },
-    { job_type: "wine_list_pdf", status: "succeeded", subject_table: "wine_lists", subject_id: list(0), daysAgo: 5, attempt_count: 1, result: { pages: 4, bytes: 512_884 } },
-    { job_type: "wine_list_pdf", status: "queued", subject_table: "wine_lists", subject_id: list(1), daysAgo: 0, attempt_count: 0, metadata: { theme: "Osteria Ivory" } },
+    { ordinal: 1, job_type: "invoice_extract", status: "succeeded", subject_table: "invoice_scans", subject_id: scan(0), daysAgo: 3, attempt_count: 1 },
+    { ordinal: 2, job_type: "invoice_extract", status: "succeeded", subject_table: "invoice_scans", subject_id: scan(1), daysAgo: 2, attempt_count: 1 },
+    { ordinal: 3, job_type: "invoice_extract", status: "processing", subject_table: "invoice_scans", subject_id: scan(2), daysAgo: 0, attempt_count: 1 },
+    { ordinal: 4, job_type: "invoice_ocr", status: "queued", subject_table: "invoice_scans", subject_id: scan(3), daysAgo: 0, attempt_count: 0 },
+    { ordinal: 8, job_type: "wine_enrichment", status: "succeeded", subject_table: "wines", subject_id: wine(5), daysAgo: 9, attempt_count: 1 },
+    { ordinal: 9, job_type: "wine_enrichment", status: "processing", subject_table: "wines", subject_id: wine(40), daysAgo: 0, attempt_count: 1 },
+    { ordinal: 11, job_type: "wine_list_pdf", status: "succeeded", subject_table: "wine_lists", subject_id: list(0), daysAgo: 5, attempt_count: 1 },
+    { ordinal: 12, job_type: "wine_list_pdf", status: "queued", subject_table: "wine_lists", subject_id: list(1), daysAgo: 0, attempt_count: 0 },
   ];
 
-  return plans.map((plan, i) => ({
-    id: uuid(UUID_PREFIX.job, i + 1),
+  return plans.map((plan) => ({
+    id: uuid(UUID_PREFIX.job, plan.ordinal),
     restaurant_id: RESTAURANT_ID,
     created_by: world.users.manager,
     job_type: plan.job_type,
@@ -909,12 +900,12 @@ function buildJobs(world: World) {
     finished_at: ["succeeded", "failed", "dead", "cancelled"].includes(plan.status)
       ? hoursAgo(plan.daysAgo, 9)
       : null,
-    error_code: plan.error_code ?? null,
-    error_message: plan.error_message ?? null,
-    result: plan.result ?? {},
-    metadata: plan.metadata ?? {},
+    error_code: null,
+    error_message: null,
+    result: {},
+    metadata: {},
     claimed_at: plan.status === "processing" ? hoursAgo(plan.daysAgo, 8) : null,
-    idempotency_key: `local-seed-${i + 1}`,
+    idempotency_key: `local-seed-${plan.ordinal}`,
     created_at: hoursAgo(plan.daysAgo, 7),
     updated_at: hoursAgo(plan.daysAgo, 9),
   }));
@@ -1054,14 +1045,14 @@ async function seed(): Promise<void> {
     RESTAURANT_ID,
     world.users.owner,
   );
-  console.log(`cellar_health: classified ${health.classified}`, health.segments);
+  console.log("cellar_health recompute:", health.kind, health.status);
 
   const pricing = await runPricingRecommendationsRecompute(
     supabase,
     RESTAURANT_ID,
     world.users.owner,
   );
-  console.log(`pricing_recommendations: ${pricing.recommended}`, pricing.classes);
+  console.log("pricing_recommendations recompute:", pricing.kind, pricing.status);
 
   console.log("Operational seed complete.");
 }
