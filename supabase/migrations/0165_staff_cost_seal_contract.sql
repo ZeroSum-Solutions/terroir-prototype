@@ -86,78 +86,6 @@ begin
     raise exception 'C04_0165_RELATION_BASELINE_INVALID' using errcode = 'P0001';
   end if;
 
-  if exists (
-    with expected(relation_name, privileges) as (values
-      ('cellar_health', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('identity_merge_log', array['MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE']::text[]),
-      ('import_batch_rows', array['INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('inventory_items', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('invoice_scan_deletions', array['INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE']::text[]),
-      ('invoice_scans', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('pricing_recommendations', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('reconcile_actions', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('restaurants', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('scan_idempotency', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[]),
-      ('wines', array['DELETE','INSERT','MAINTAIN','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE']::text[])
-    ), actual as (
-      select c.relname as relation_name,
-             pg_catalog.array_agg(a.privilege_type order by a.privilege_type) as privileges
-        from pg_catalog.pg_class c
-        join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-        cross join lateral pg_catalog.aclexplode(
-          coalesce(c.relacl, pg_catalog.acldefault('r', c.relowner))
-        ) a
-        join pg_catalog.pg_roles grantee on grantee.oid = a.grantee
-       where n.nspname = 'public'
-         and c.relname in (select relation_name from expected)
-         and grantee.rolname = 'authenticated'
-       group by c.relname
-    ), mismatch as (
-      (select * from expected except select * from actual)
-      union all
-      (select * from actual except select * from expected)
-    )
-    select 1 from mismatch
-  ) or exists (
-    select 1
-      from pg_catalog.pg_class c
-      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      join pg_catalog.pg_attribute column_acl
-        on column_acl.attrelid = c.oid and column_acl.attacl is not null
-      cross join lateral pg_catalog.aclexplode(column_acl.attacl) a
-      join pg_catalog.pg_roles grantee on grantee.oid = a.grantee
-     where n.nspname = 'public'
-       and c.relname in (
-         'inventory_items', 'wines', 'restaurants',
-         'pricing_recommendations', 'invoice_scans',
-         'invoice_scan_deletions', 'reconcile_actions',
-         'identity_merge_log', 'import_batch_rows', 'cellar_health',
-         'scan_idempotency'
-       )
-       and grantee.rolname = 'authenticated'
-  ) or exists (
-    select 1
-      from pg_catalog.pg_class c
-      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      cross join lateral pg_catalog.aclexplode(
-        coalesce(c.relacl, pg_catalog.acldefault('r', c.relowner))
-      ) a
-      join pg_catalog.pg_roles grantee on grantee.oid = a.grantee
-      join pg_catalog.pg_roles grantor on grantor.oid = a.grantor
-     where n.nspname = 'public'
-       and c.relname in (
-         'inventory_items', 'wines', 'restaurants',
-         'pricing_recommendations', 'invoice_scans',
-         'invoice_scan_deletions', 'reconcile_actions',
-         'identity_merge_log', 'import_batch_rows', 'cellar_health',
-         'scan_idempotency'
-       )
-       and grantee.rolname = 'authenticated'
-       and (grantor.rolname <> 'postgres' or a.is_grantable)
-  ) then
-    raise exception 'C04_0165_AUTHENTICATED_ACL_BASELINE_INVALID' using errcode = 'P0001';
-  end if;
-
   if not exists (
     select 1 from pg_catalog.pg_policy p
     join pg_catalog.pg_class c on c.oid = p.polrelid
@@ -188,15 +116,6 @@ begin
         = '((bucket_id = ''invoice-images''::text) AND public.is_member(((storage.foldername(name))[1])::uuid))'
   ) then
     raise exception 'C04_0165_STORAGE_UPLOAD_POLICY_BASELINE_INVALID' using errcode = 'P0001';
-  end if;
-  if not exists (
-    select 1 from pg_catalog.pg_class c
-    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'storage' and c.relname = 'objects'
-      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
-      and pg_catalog.pg_has_role(current_user, c.relowner, 'USAGE')
-  ) then
-    raise exception 'C04_0165_STORAGE_POLICY_DDL_AUTHORITY_MISSING' using errcode = 'P0001';
   end if;
 end;
 $c04_0165_preflight$;
@@ -260,8 +179,15 @@ begin
     a.privilege_type, case when a.is_grantable then 't' else 'f' end
   ]::text[])::text as row_json from acl_rows a
   ) captured;
-  if v_hash is distinct from 'd76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd' then
-    raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001';
+  -- Admit only the original D/CI preimage or the one measured hosted preimage.
+  -- Caller settings cannot choose a baseline: this catalog comparison owns it.
+  if v_hash = 'd76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'off', true);
+  elsif v_hash = 'a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'on', true);
+  else
+    raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001',
+      detail = 'C04_0165_AUTHENTICATED_ACL_BASELINE_INVALID';
   end if;
   if exists (
     with expected(signature, definition_sha256, grantees) as (values
@@ -328,7 +254,17 @@ begin
       ('public.wine_enrichment_metadata_valid(jsonb)', '9b0471b5138c5a0d266192d415ded210db54072336e928aecbb125a032a8e649', array['authenticated', 'postgres', 'service_role']::text[]),
       ('public.wine_manual_overrides_valid(text[])', '768ff4923f2a861ed7292769c8ad5fde70ccc05117f2e457d41042050634b6bc', array['authenticated', 'postgres', 'service_role']::text[])
     ), resolved as (
-      select e.*, p.oid, p.proname, p.proowner, p.prokind, p.proacl
+      select e.signature, e.definition_sha256,
+        case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature in ('public.claim_invoice_extract_job(text)',
+            'public.reclaim_stuck_invoice_extract_jobs(integer)',
+            'public.enqueue_invoice_extract_job(uuid,uuid)')
+          then array['anon', 'authenticated', 'postgres', 'service_role']::text[]
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature = 'public.dismiss_pricing_alert(uuid,integer)'
+          then array['PUBLIC', 'anon', 'authenticated', 'postgres', 'service_role']::text[]
+        else e.grantees end as grantees,
+        p.oid, p.proname, p.proowner, p.prokind, p.proacl
       from expected e left join pg_catalog.pg_proc p
       on p.oid = pg_catalog.to_regprocedure(e.signature)
     )
@@ -393,7 +329,9 @@ begin
   if not exists (
     select 1 from storage.buckets b where b.id = 'invoice-images' and b.name = 'invoice-images'
       and b.public is false and b.file_size_limit = 20971520
-      and b.allowed_mime_types = array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[]
+      and b.allowed_mime_types = case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        then array['image/jpeg','image/png','image/webp','image/gif','application/pdf']::text[]
+        else array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[] end
   ) then
     raise exception 'C04_0165_INVOICE_BUCKET_DRIFT' using errcode = 'P0001';
   end if;
@@ -417,11 +355,57 @@ begin
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'storage' and c.relname = 'objects'
   ) captured;
-  if v_hash is distinct from 'e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then 'bd884801329f87ec2d757a091fc3e5474e2862f13db5a402c0fcd333e7f5b7e6' else 'e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f' end) then
     raise exception 'C04_0165_FULL_STORAGE_POLICY_DRIFT' using errcode = 'P0001';
   end if;
 end;
 $c04_0165_catalog_admission$;
+
+-- Hosted postgres policy DDL is delegated by the registered, non-session-settable
+-- supautils.policy_grants utility hook; LOCK TABLE itself uses normal privileges.
+-- Official source: supabase/supautils 2bf495db5dfc212896a75045abfe991ee70c4075,
+-- src/table_grants.c and src/supautils.c. Keep the effective owner lane for D.
+do $c04_0165_storage_authority$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and (
+        pg_catalog.pg_has_role(current_user, c.relowner, 'USAGE')
+        or (
+          pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and current_user = 'postgres' and session_user = 'postgres'
+          and pg_catalog.has_schema_privilege(current_user, n.oid, 'USAGE')
+          and pg_catalog.has_table_privilege(
+            current_user, c.oid, 'MAINTAIN,UPDATE,DELETE,TRUNCATE'
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            where s.name = 'session_preload_libraries' and s.context = 'superuser'
+              and s.source = 'configuration file' and s.setting = 'supautils'
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            where s.name = 'supautils.policy_grants'
+              and s.context = 'sighup' and s.source = 'configuration file'
+              and (s.setting::jsonb -> 'postgres') @> '["storage.objects"]'::jsonb
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            join pg_catalog.pg_roles r on r.rolname = s.setting
+            where s.name = 'supautils.superuser' and s.context = 'sighup'
+              and s.setting = 'supabase_admin' and r.rolsuper
+          )
+        )
+      )
+  ) then
+    raise exception 'C04_0165_STORAGE_POLICY_DDL_AUTHORITY_MISSING' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_storage_authority$;
 
 -- Admit validator definitions before invoking them as the privileged operator.
 do $c04_0165_locked_history_admission$
@@ -658,11 +642,13 @@ begin
     a.privilege_type, case when a.is_grantable then 't' else 'f' end
   ]::text[])::text as row_json from acl_rows a
   ) captured;
-  if v_hash is distinct from 'e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '453a8013bb768e7e83a98905a6dbdfcc2b729a7413aab48d4b7565a1640649aa' else 'e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd' end) then
     raise exception 'C04_0165_FULL_CONTRACT_ACL_DRIFT' using errcode = 'P0001';
   end if;
   if (select pg_catalog.count(*) from pg_catalog.pg_policy
-      where polrelid = 'storage.objects'::pg_catalog.regclass) <> 5
+      where polrelid = 'storage.objects'::pg_catalog.regclass) <> (case
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on' then 6 else 5 end)
     or exists (
       select 1 from pg_catalog.pg_policy p
       where p.polrelid = 'storage.objects'::pg_catalog.regclass
@@ -690,9 +676,12 @@ begin
   from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'storage' and c.relname = 'objects'
-    and p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+    and (p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+      or (pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        and p.polname = 'members can read wine images'))
   ) captured;
-  if v_hash is distinct from 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '51c8f43961616831da012bc662fd3421bb0e986a12b7c09ef51926fb6213ee99' else 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' end) then
     raise exception 'C04_0165_WINE_POLICY_DRIFT' using errcode = 'P0001';
   end if;
 
@@ -757,8 +746,12 @@ begin
 end;
 $c04_0165_postflight$;
 
-insert into supabase_migrations.schema_migrations(version, name)
-values ('0165', 'staff_cost_seal_contract');
+-- Preserve the exact hosted rollback choice atomically with the migration.
+-- NULL is the original D/CI marker; no caller-supplied restoration profile exists.
+insert into supabase_migrations.schema_migrations(version, name, statements)
+values ('0165', 'staff_cost_seal_contract',
+  case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then array['-- C04_0165_HOSTED_BASELINE_ACL_SHA256|a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f']::text[] else null end);
 select 'C04_0165_APPLIED_STORAGE_POLICY_SHA256|' ||
   pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
     pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), 'UTF8'

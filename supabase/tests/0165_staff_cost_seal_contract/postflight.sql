@@ -11,8 +11,20 @@ set local row_security = off;
 -- Frozen 0164 catalog tuples from structural receipt b5f1d7bc2307650124a1714e9c114ceb263f42bfa7f80643669a1c6bb2b64ecb.
 -- Fingerprints use sorted compact JSON text arrays, joined by one newline.
 do $c04_0165_catalog_admission$
-declare v_hash text;
+declare v_hash text; v_statements text[];
 begin
+  select statements into v_statements from supabase_migrations.schema_migrations
+    where version = '0165' and name = 'staff_cost_seal_contract';
+  if not found then
+    raise exception 'C04_0165_BASELINE_MARKER_MISSING' using errcode = 'P0001';
+  end if;
+  if v_statements is null then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'off', true);
+  elsif v_statements = array['-- C04_0165_HOSTED_BASELINE_ACL_SHA256|a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f']::text[] then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'on', true);
+  else
+    raise exception 'C04_0165_BASELINE_MARKER_INVALID' using errcode = 'P0001';
+  end if;
   select pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
     coalesce(pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), ''), 'UTF8'
   )), 'hex') into v_hash from (
@@ -37,7 +49,8 @@ begin
     a.privilege_type, case when a.is_grantable then 't' else 'f' end
   ]::text[])::text as row_json from acl_rows a
   ) captured;
-  if v_hash is distinct from 'e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '453a8013bb768e7e83a98905a6dbdfcc2b729a7413aab48d4b7565a1640649aa' else 'e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd' end) then
     raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001';
   end if;
   if exists (
@@ -105,7 +118,14 @@ begin
       ('public.wine_enrichment_metadata_valid(jsonb)', '9b0471b5138c5a0d266192d415ded210db54072336e928aecbb125a032a8e649', array['authenticated', 'postgres', 'service_role']::text[]),
       ('public.wine_manual_overrides_valid(text[])', '768ff4923f2a861ed7292769c8ad5fde70ccc05117f2e457d41042050634b6bc', array['authenticated', 'postgres', 'service_role']::text[])
     ), resolved as (
-      select e.*, p.oid, p.proname, p.proowner, p.prokind, p.proacl
+      select e.signature, e.definition_sha256,
+        case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature in ('public.claim_invoice_extract_job(text)',
+            'public.reclaim_stuck_invoice_extract_jobs(integer)',
+            'public.enqueue_invoice_extract_job(uuid,uuid)')
+          then array['anon', 'authenticated', 'postgres', 'service_role']::text[]
+        else e.grantees end as grantees,
+        p.oid, p.proname, p.proowner, p.prokind, p.proacl
       from expected e left join pg_catalog.pg_proc p
       on p.oid = pg_catalog.to_regprocedure(e.signature)
     )
@@ -170,7 +190,9 @@ begin
   if not exists (
     select 1 from storage.buckets b where b.id = 'invoice-images' and b.name = 'invoice-images'
       and b.public is false and b.file_size_limit = 20971520
-      and b.allowed_mime_types = array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[]
+      and b.allowed_mime_types = case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        then array['image/jpeg','image/png','image/webp','image/gif','application/pdf']::text[]
+        else array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[] end
   ) then
     raise exception 'C04_0165_INVOICE_BUCKET_DRIFT' using errcode = 'P0001';
   end if;
@@ -216,9 +238,12 @@ begin
   from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'storage' and c.relname = 'objects'
-    and p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+    and (p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+      or (pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        and p.polname = 'members can read wine images'))
   ) captured;
-  if v_hash is distinct from 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '51c8f43961616831da012bc662fd3421bb0e986a12b7c09ef51926fb6213ee99' else 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' end) then
     raise exception 'C04_0165_WINE_POLICY_DRIFT' using errcode = 'P0001';
   end if;
 end;
@@ -228,7 +253,8 @@ do $c04_0165_postflight$
 declare v_hash text;
 begin
   if (select pg_catalog.count(*) from pg_catalog.pg_policy
-      where polrelid = 'storage.objects'::pg_catalog.regclass) <> 5
+      where polrelid = 'storage.objects'::pg_catalog.regclass) <> (case
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on' then 6 else 5 end)
     or exists (
       select 1 from pg_catalog.pg_policy p
       where p.polrelid = 'storage.objects'::pg_catalog.regclass
@@ -256,9 +282,12 @@ begin
   from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'storage' and c.relname = 'objects'
-    and p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+    and (p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+      or (pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        and p.polname = 'members can read wine images'))
   ) captured;
-  if v_hash is distinct from 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '51c8f43961616831da012bc662fd3421bb0e986a12b7c09ef51926fb6213ee99' else 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' end) then
     raise exception 'C04_0165_WINE_POLICY_DRIFT' using errcode = 'P0001';
   end if;
 

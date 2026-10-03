@@ -250,6 +250,56 @@ The CI lifecycle intentionally mirrors this boundary: legacy live suites execute
 current-schema E2E. A green local cutover is necessary but does not replace the hosted
 backup, maintenance-window, preflight, or postflight evidence above.
 
+### 4d. Staff-cost privacy seal: 0165
+
+The hosted project is already at `0164`; do not replay earlier migrations.
+`0165_staff_cost_seal_contract.sql` seals direct cost-bearing reads and inventory
+writes while retaining capability-checked application commands. It owns its own
+`BEGIN`/`COMMIT` and migration-ledger insert. Do not wrap it in another transaction
+or append a second ledger insert.
+
+Its catalog gates recognize only two reviewed preimages: the disposable local
+baseline and the independently captured hosted baseline in
+`supabase/tests/0165_staff_cost_seal_contract/hosted-baseline.json`. The latter
+includes 352 relation-ACL tuples, six Storage policies, two restaurant-column
+UPDATE grants and the hosted invoice bucket's existing MIME list. They are not
+interchangeable. A changed preimage must stop the release, not select a looser
+profile. Routine bodies and constraints remain pinned separately.
+
+The selected hosted preimage is recorded atomically as a non-executing marker in
+the existing `schema_migrations.statements` column. The paired down and postflight
+derive their profile from that locked marker; an unknown marker fails closed.
+Rollback restores that profile's original grants and policies, not the disposable
+database's permissions. It does not erase application inventory or history.
+
+Before permanent apply:
+
+1. Verify a current backup and the separately retained restore-drill evidence.
+   The successful `0164` data-recovery drill did not certify ownership or grant
+   recovery; do not confuse it with the migration's own catalog rollback check.
+2. Pause both Railway web environments and all shared-database workers, drain
+   in-flight writers, and preserve their exact replica configuration for recovery.
+3. Use the same existing operator connection for the bundled preflight, all three
+   history gates and the rollback-only dry-run. Storage-policy authority is not
+   proved or disproved by role membership alone: hosted Supabase can delegate
+   policy DDL through `supautils.policy_grants`. Verify the registered provider
+   setting and the required lock privileges without changing owners or roles.
+4. Review and hash the exact migration source. The bounded
+   `supabase/tests/0165_staff_cost_seal_contract/prepare-hosted-dry-run.mjs`
+   checks that hash and produces a derivative that changes only the terminal
+   commit to rollback and the receipt label to `DRY_RUN`. It prints SQL; it does
+   not execute it. Retain the source, derivative and actual executor output.
+   A `DRY_RUN` receipt is never an `APPLIED` receipt.
+5. Confirm the rolled-back ledger and complete catalog preimage are unchanged.
+   Only then apply the reviewed original file once and run the bundled postflight
+   plus real low-privilege Data API, application and Storage checks.
+
+The October 2 local apply/down/reapply check passed on the original frozen packet.
+The hosted adaptation and its operator path remain release candidates until their
+own independent review and actual dry-run/apply evidence pass. Never infer a
+hosted apply, complete privacy certification or completed team demo from local
+catalog checks or CI alone.
+
 ### 5. Verify the effect, not the record
 
 Assert the thing the migration was for. A `schema_migrations` row proves only that an

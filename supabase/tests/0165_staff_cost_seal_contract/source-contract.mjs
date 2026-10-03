@@ -120,7 +120,7 @@ assert.match(up, /pg_get_userbyid\(c\.relowner\) = 'supabase_storage_admin'/);
 assert.match(up, /\(\(bucket_id = ''invoice-images''::text\) AND public\.is_member/);
 const businessWrites = /\b(?:delete\s+from|insert\s+into|update\s+(?:public|storage)\.|truncate\s+table|drop\s+table|cascade)/i;
 const stripLedger = (source) => source
-  .replace(/insert into supabase_migrations\.schema_migrations\(version, name\)\s+values \('0165', 'staff_cost_seal_contract'\);/, "")
+  .replace(/insert into supabase_migrations\.schema_migrations\(version, name, statements\)\s+values \('0165', 'staff_cost_seal_contract',[\s\S]*?else null end\);/, "")
   .replace(/delete from supabase_migrations\.schema_migrations\s+where version = '0165' and name = 'staff_cost_seal_contract';/, "");
 assert.doesNotMatch(stripLedger(up + "\n" + down), businessWrites);
 assert.match("delete from public.wines;", businessWrites);
@@ -154,7 +154,7 @@ for (const source of [up, down]) {
   assert.match(source, /current_user <> session_user or current_user not in \('postgres', 'supabase_admin'\)/);
   assert.match(source, /case when current_user = 'supabase_admin' then r\.rolsuper\s+else r\.rolsuper or r\.rolbypassrls end into v_privileged/);
 }
-assert.match(up, /insert into supabase_migrations\.schema_migrations\(version, name\)\s+values \('0165', 'staff_cost_seal_contract'\);/);
+assert.match(up, /insert into supabase_migrations\.schema_migrations\(version, name, statements\)\s+values \('0165', 'staff_cost_seal_contract',/);
 assert(up.indexOf("insert into supabase_migrations") > up.indexOf("$c04_0165_postflight$;"));
 assert(up.indexOf("insert into supabase_migrations") < up.lastIndexOf("commit;"));
 assert.match(down, /delete from supabase_migrations\.schema_migrations\s+where version = '0165' and name = 'staff_cost_seal_contract';/);
@@ -225,4 +225,5 @@ assert.match(ciApply, /-qAt -U supabase_admin -d postgres -f -/);
 assert.doesNotMatch(ciApply, /--single-transaction|insert into supabase_migrations|\.env\.local/);
 assert.doesNotMatch(ciApply, /b5f1d7bc2307650124a1714e9c114ceb263f42bfa7f80643669a1c6bb2b64ecb|7dd7a60a2fd61f3614cb6c417f29ae06ac61730fb801fba1215953d590d4dbcd/);
 
+await import("./hosted-source-contract.mjs");
 console.log("C04_0165_SOURCE_CONTRACT_PASS");

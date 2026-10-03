@@ -35,8 +35,15 @@ begin
     a.privilege_type, case when a.is_grantable then 't' else 'f' end
   ]::text[])::text as row_json from acl_rows a
   ) captured;
-  if v_hash is distinct from 'd76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd' then
-    raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001';
+  -- Admit only the original D/CI preimage or the one measured hosted preimage.
+  -- Caller settings cannot choose a baseline: this catalog comparison owns it.
+  if v_hash = 'd76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'off', true);
+  elsif v_hash = 'a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'on', true);
+  else
+    raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001',
+      detail = 'C04_0165_AUTHENTICATED_ACL_BASELINE_INVALID';
   end if;
   if exists (
     with expected(signature, definition_sha256, grantees) as (values
@@ -103,7 +110,17 @@ begin
       ('public.wine_enrichment_metadata_valid(jsonb)', '9b0471b5138c5a0d266192d415ded210db54072336e928aecbb125a032a8e649', array['authenticated', 'postgres', 'service_role']::text[]),
       ('public.wine_manual_overrides_valid(text[])', '768ff4923f2a861ed7292769c8ad5fde70ccc05117f2e457d41042050634b6bc', array['authenticated', 'postgres', 'service_role']::text[])
     ), resolved as (
-      select e.*, p.oid, p.proname, p.proowner, p.prokind, p.proacl
+      select e.signature, e.definition_sha256,
+        case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature in ('public.claim_invoice_extract_job(text)',
+            'public.reclaim_stuck_invoice_extract_jobs(integer)',
+            'public.enqueue_invoice_extract_job(uuid,uuid)')
+          then array['anon', 'authenticated', 'postgres', 'service_role']::text[]
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature = 'public.dismiss_pricing_alert(uuid,integer)'
+          then array['PUBLIC', 'anon', 'authenticated', 'postgres', 'service_role']::text[]
+        else e.grantees end as grantees,
+        p.oid, p.proname, p.proowner, p.prokind, p.proacl
       from expected e left join pg_catalog.pg_proc p
       on p.oid = pg_catalog.to_regprocedure(e.signature)
     )
@@ -168,7 +185,9 @@ begin
   if not exists (
     select 1 from storage.buckets b where b.id = 'invoice-images' and b.name = 'invoice-images'
       and b.public is false and b.file_size_limit = 20971520
-      and b.allowed_mime_types = array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[]
+      and b.allowed_mime_types = case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        then array['image/jpeg','image/png','image/webp','image/gif','application/pdf']::text[]
+        else array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[] end
   ) then
     raise exception 'C04_0165_INVOICE_BUCKET_DRIFT' using errcode = 'P0001';
   end if;
@@ -192,7 +211,8 @@ begin
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'storage' and c.relname = 'objects'
   ) captured;
-  if v_hash is distinct from 'e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f' then
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then 'bd884801329f87ec2d757a091fc3e5474e2862f13db5a402c0fcd333e7f5b7e6' else 'e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f' end) then
     raise exception 'C04_0165_FULL_STORAGE_POLICY_DRIFT' using errcode = 'P0001';
   end if;
 end;

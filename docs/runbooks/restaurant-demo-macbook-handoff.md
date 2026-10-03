@@ -16,10 +16,12 @@ connected health at this newer SHA; its main CI also passed.
 Test the deployed [Cellar page](https://terroir-web-production.up.railway.app/cellar).
 This is a UI-only release, not a completed restaurant demo or privacy seal.
 
-The reviewed continuation checkpoint `0621581190a5cf2719d27e05cc141367b5382376`
-is pushed on `feat/restaurant-demo-closeout-20261001`; [draft PR #232](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232)
-tracks that source work and its remaining release gates. Its 41 pure launcher
-tests and exact-range security review pass. No continuation browser run is claimed.
+The pre-adaptation checkpoint is `33d662230e376eb53002b6416e38f7c9f8a6ec16` on
+`feat/restaurant-demo-closeout-20261001`; [draft PR #232](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232)
+tracks the remaining release gates. Its required CI passed 5,852 tests, 330
+contracts and five bounded browser journeys, plus build/schema/type checks.
+New hosted-admission and preserved-runtime repairs require their own fresh CI;
+the earlier green result does not certify those changes.
 
 The hosted database already has all 136 source migrations through `0164` and
 physical inventory contract 2. Do not reapply `0153`–`0164`. The latest real
@@ -27,19 +29,41 @@ backup, run `37003308212` / artifact `11224716954`, restored successfully with
 87 compared tables, two sequences and ten content checksums at `0164`. That
 data-recovery drill excludes ownership/grant recovery and extension-owned tables.
 
-Disposable D bootstrapped to `0164`; its actual structural and job-history
-baseline was captured and independently assessed. The pending `0165` packet
-has independently reviewed source and CI-script repairs. Its read-only D catalog
-and three history preflight gates passed after one PostgreSQL name/text cast repair;
-the failed attempt remains preserved. Forward/down and application privacy still
-need runtime verification. The ordinary local postgres role lacks effective Storage
-owner authority; the reviewed local apply lane uses the existing superuser
-supabase_admin without adding role membership or changing owners. Production's
-ACL baseline differs from D, so a passing local packet must not be applied blindly
-to production. Neither inspected Railway environment has an active invoice worker.
-Full privacy proof and the persisted desktop/mobile staff-manager journey remain
-open. Keep the older alternative and archived branches separate; several prototype
-checkpoints are already integrated by squash and must not be applied twice.
+On the same disposable D, the original frozen `0165` packet passed actual
+forward/down/reapply checks, complete ACL/policy comparisons and data/history/role
+conservation. The raw dumps differed only in grant-printing order; they were not
+byte-identical. The operator used the existing local superuser without adding
+membership or changing owners. Real synthetic staff JWT checks then denied 46
+protected Data API requests and conserved inventory after three rejected writes;
+safe staff reads and the owner's positive capability-checked cost read passed.
+This is partial privacy evidence, not complete S01–S22 certification.
+
+The actual mobile journey received two bottles, opened one, poured four glasses,
+verified retry safety, counted stock and reconciled the chosen bottle to 120 mL.
+It then failed between deep-link navigation, reload and the persistence assertion.
+The screenshot shows 120 mL, but the original error log cannot establish the cause.
+That run remains FAILED; do not restart the zero-stock journey or repeat its
+committed commands. A separately reviewed same-D continuation must first admit
+the saved receipts and exact durable state before checking the remaining team
+steps. It must preserve the original failure evidence.
+
+The hosted adaptation now pins the measured production ACL/policy baseline and
+its supported Supautils policy-delegation path. Actual hosted read-only catalog
+and three history gates passed against 1,387 wines, nine scans and zero active
+retry-cache rows. A rollback-only dry-run and permanent apply remain unverified;
+the original D rehearsal cannot certify the revised hosted packet. See
+[the migration procedure](production-migrations.md#4d-staff-cost-privacy-seal-0165).
+Neither inspected Railway environment has an active invoice worker; see
+[worker activation](invoice-extract-worker.md#railway-deployment).
+Full privacy proof and the remaining persisted desktop/mobile staff-manager
+checks remain open. Keep older alternative and archived branches separate;
+several prototype checkpoints already landed by squash and must not be applied twice.
+
+The preserved D source check accounts for two CLI files created during its original
+bootstrap: `supabase/.branches/_current_branch` containing `main`, and
+`supabase/.temp/cli-latest` containing `v2.119.0`, both without a trailing newline.
+It pins their exact hashes and rejects changed values, extra files or source changes.
+This exception does not allow restarting or adopting another retained target.
 
 ### Earlier October 2 evidence
 
