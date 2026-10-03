@@ -1,11 +1,12 @@
 # Restaurant demo MacBook handoff (failed candidate)
 
-## Latest release status: October 2
+## Latest release status: October 3
 
 The owner now authorizes reviewed pushes, protected-main merges and deployment.
 This supersedes the earlier release restrictions below, not the CI, privacy or
-data-preservation gates. The previous native demo goal is blocked; M1–M5 remain
-incomplete.
+data-preservation gates. The current native release goal is ACTIVE, but ZS Vault
+is LOCKED; credential-dependent hosted work remains blocked. Do not bypass that
+boundary. M2, M3 and M4 are accepted locally; whole M1/S21 and M5 remain pending.
 
 [PR #231](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/231) merged
 the Cellar layout fix into `main` at `9821bb7cdc530e5669a524ceff90b4bed804280d`.
@@ -16,20 +17,22 @@ connected health at this newer SHA; its main CI also passed.
 Test the deployed [Cellar page](https://terroir-web-production.up.railway.app/cellar).
 This is a UI-only release, not a completed restaurant demo or privacy seal.
 
-The verified application/script checkpoint is `06cfa74bafdd8e4a535732c873997ed5cf104541` on
+The verified application/script checkpoint is `2630de5fedb509d05528f7581b9f6efc55851189` on
 `feat/restaurant-demo-closeout-20261001`; [draft PR #232](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232)
 tracks the remaining release gates. Its fresh required
-[CI run 37087605519](https://github.com/ZeroSum-Solutions/terroir-prototype/actions/runs/37087605519)
-passed 5,852 tests, 330 contracts and five critical browser journeys, plus
-build/schema/type/design checks and migration/down/manifest ratchets. The actual
-CI database reached 137 migrations through `0165`. These checks do not certify
-the complete privacy matrix, hosted cutover or invoice-worker operation.
+[CI run 37099223190](https://github.com/ZeroSum-Solutions/terroir-prototype/actions/runs/37099223190)
+passed 5,857 tests, 330 contracts and five actual critical browser journeys, plus
+build/schema/type/design checks and migration/down/manifest ratchets. Local D and
+the current CI cutover reached 139 migrations through `0167`. Accepted bounded
+local evidence now covers S01–S20, S22, M2, M3 and bounded M4.
+CI and local acceptance do not certify hosted activation.
 
 The hosted database already has all 136 source migrations through `0164` and
 physical inventory contract 2. Do not reapply `0153`–`0164`. The latest real
-backup, run `37003308212` / artifact `11224716954`, restored successfully with
+backup, run `37093730653` / artifact `11263433507`, restored successfully with
 87 compared tables, two sequences and ten content checksums at `0164`. That
 data-recovery drill excludes ownership/grant recovery and extension-owned tables.
+Refresh physical/logical backup freshness again immediately before hosted cutover.
 
 On the same disposable D, the original frozen `0165` packet passed actual
 forward/down/reapply checks, complete ACL/policy comparisons and data/history/role
@@ -38,7 +41,8 @@ byte-identical. The operator used the existing local superuser without adding
 membership or changing owners. Real synthetic staff JWT checks then denied 46
 protected Data API requests and conserved inventory after three rejected writes;
 safe staff reads and the owner's positive capability-checked cost read passed.
-This is partial privacy evidence, not complete S01–S22 certification.
+That original probe was partial. The later accepted bounded union supplements it;
+no local result certifies hosted privacy or the S21 operator cutover.
 
 The actual mobile journey received two bottles, opened one, poured four glasses,
 verified retry safety, counted stock and reconciled the chosen bottle to 120 mL.
@@ -54,7 +58,7 @@ no horizontal overflow, keyboard interaction and action targets at least 44px.
 These continuations used synthetic SSR sessions from real magic-link/OTP
 verification; they did not retest the original password-login journey.
 Its result is `REMAINING_TEAM_JOURNEY_PASS`, not a rewrite of the original failure
-or a full application/privacy certification. The final checkpoint has twelve
+or a full application/privacy certification. The original team checkpoint has twelve
 completed operation receipts; neither those commands nor earlier committed
 receives may be replayed. The owned app stops after verification; this does not
 provide a running mobile test URL.
@@ -63,7 +67,8 @@ An independently reviewed synthetic historical fixture also passed actual
 poisoned-metadata/constraint refusal, protected SQL-role denial, exact-site
 authorized historical readers and foreign/global denial. Its terminal rollback
 conserved all rows, schema/ACLs, roles, memberships and sequences. This supplements
-the real JWT checks but does not replace the remaining Storage or worker evidence.
+the real JWT checks. Later accepted local image and worker leaves supply those
+bounded criteria; the historical rollback alone does not prove them.
 
 The hosted adaptation now pins the measured production ACL/policy baseline and
 its supported Supautils policy-delegation path. Actual hosted read-only catalog
@@ -71,11 +76,48 @@ and three history gates passed against 1,387 wines, nine scans and zero active
 retry-cache rows. A rollback-only dry-run and permanent apply remain unverified;
 the original D rehearsal cannot certify the revised hosted packet. See
 [the migration procedure](production-migrations.md#4d-staff-cost-privacy-seal-0165).
-Neither inspected Railway environment has an active invoice worker; see
-[worker activation](invoice-extract-worker.md#railway-deployment).
-Full privacy proof, actual image lifecycle/Storage verification, the revised
-hosted rollback rehearsal/cutover and invoice-worker checks remain open. The
-bounded persisted desktop/mobile staff-manager continuation has passed.
+Neither Railway environment had an active invoice worker at its last inspection;
+[hosted worker activation](invoice-extract-worker.md#railway-deployment) remains
+NOT RUN. Separately accepted local evidence includes actual two-page upload,
+two real VISION extractions, review, commit/replays, audited deletion, and first
+invoice/bottle saves. The first-save invoice fixture was manual; it proves no OCR.
+The original invoice-v8 command still records STOPPED after its business callbacks;
+independent read-only postflight supplied conservation evidence without replay.
+Preserve that failure and all earlier failed attempts.
+
+M4's bounded rendered union joins 18 real light/dark captures to the accepted
+four-width team journey and 23-route audit. All 32 resolved contrast measurements
+pass; 42 remain NULL. These captures do not establish full-AA compliance, a positive
+camera scan, hosted behavior or a real-server RPC failure. The accepted no-app M2
+seed rehearsal captured 17 transaction-owned
+rows and the full 490-row state, then rolled back to the conserved 473-row state.
+That proves seed compatibility, not HTTP behavior. After the later committed seed
+attempt stopped, the owner approved a no-seed recovery that preserved all completed
+effects. It passed batch revert (200), closed retry (409), session revert (200,
+descending chunks 2 then 1), stalled-scan GET and reload. Fresh read-only postflight
+confirmed 487 rows: all prior 473 plus exactly 14 retained owned rows, with only
+the three new stocks deleted. The 13 physical-command receipts, catalog/lineages,
+all 83 table/global vectors and ledger139/0167 remained conserved; the app and
+clients drained and the queue was empty. The independent reviewer accepted the
+bounded M2 four-repair evidence union. Preserve the failed seed/bridge runs and do not replay the seed,
+bin rename, completed receiving commands or six accepted anonymous denials.
+
+The M2 import fixture was manual and proves no CSV ingestion or OCR. Its owner
+used the new site's existing manager authority without a cost.read grant. The bin
+403 used the existing staff role at its original site; that staff identity is a
+manager at the new site. These synthetic, existing-user sessions do not retest
+password login or prove every role/site combination. No portable MacBook runtime
+or hosted smoke follows from this local checkpoint.
+
+Whole M1/S21 and M5/R1–R4 remain open. Hosted rollback rehearsal/cutover,
+exact deployment and four HIGH security
+conditions remain STOPPED. Keep both web environments and all workers continuously
+drained from `0165` through `0166`/`0167` and exact compatible deployment;
+[the migration owner](production-migrations.md#4d-staff-cost-privacy-seal-0165)
+defines admission, scale-up and reverse-order rollback. Main/live remains
+`146b5ea572fd64579ddc1ddeac76df928e8cd197`; draft PR #232 is not deployed.
+A later public health response omits app revision and cannot prove candidate release.
+The bounded persisted desktop/mobile staff-manager continuation has passed.
 Keep older alternative and archived branches separate;
 several prototype checkpoints already landed by squash and must not be applied twice.
 
@@ -117,7 +159,7 @@ bottle. A separate staff session must pour successfully but fail reconciliation.
 The launcher runs an automated isolated Chromium demo; it does not publish a
 mobile URL or keep an interactive application running after success.
 
-## Source checkpoint and release status
+## Historical October 2 source checkpoint and release status
 
 Use the [current transfer ledger](../../.claude/handoffs/macbook-transfer.md#current-transfer-ledger)
 for branch/publication status, the verified hosted release and safe resume steps.
@@ -142,7 +184,7 @@ Use the [milestone plan](../plans/2026-09-27-terroir-restaurant-demo-milestone.m
 for current scope and the [production migration runbook](production-migrations.md)
 for separate release gates. This package tests mobile browser layouts, not a native app.
 
-## Current evidence boundary
+## Historical evidence boundary through October 2
 
 ### October 2 fresh disposable bootstrap source checkpoint (independent review passed)
 

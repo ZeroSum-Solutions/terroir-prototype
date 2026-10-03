@@ -1,8 +1,8 @@
 # Handoff: MacBook transfer
 status: release-candidate-gates-in-progress
-date: 2026-10-02
+date: 2026-10-03
 branch: feat/restaurant-demo-closeout-20261001
-verified-application-checkpoint: 06cfa74bafdd8e4a535732c873997ed5cf104541
+verified-application-checkpoint: 2630de5fedb509d05528f7581b9f6efc55851189
 pull-request: https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232
 
 ## Current transfer ledger
@@ -17,28 +17,35 @@ PRs #229, #230, #231 and #227 have merged. Production and staging were verified
 healthy at main `146b5ea572fd64579ddc1ddeac76df928e8cd197`; PR #232 remains draft
 and is not deployed. The hosted database already has 136 migrations through
 `0164`: **do not replay 0151–0164**. The latest real logical-backup restore,
-run37003308212/artifact11224716954, passed 87 tables, two sequences and ten
-checksums; it excludes ownership/grant and extension-owned-table recovery.
+run37093730653/artifact11263433507, passed 87 tables, two sequences and ten
+checksums at `0164`; it excludes ownership/grant and extension-owned-table
+recovery. Refresh backup freshness again immediately before hosted cutover.
 
-Candidate CI37087605519 passed on `06cfa74b`: 5,852 tests, 330 contracts, five
-critical browser journeys and actual local migration137/0165. The preserved
-same-D remaining team continuation passed real owner/staff actions and
-320/390/768/1200px checks. Original failed runs remain failed; completed receiving,
-pouring and reconciliation commands must not be replayed. Full privacy acceptance,
-image lifecycle/Storage, revised hosted rollback rehearsal/cutover and invoice-worker
-runtime still block main merge. Source publication and these bounded passes do not
-mark M1–M5 or the application production-ready.
+Candidate CI37099223190 passed on `2630de5f`: 5,857 tests, 330 contracts and
+five actual critical browser journeys. Local D has 139 migrations through
+`0167`. The accepted bounded local union covers S01–S20, S22 and M3, including
+image lifecycle, the real two-page invoice worker flow, first saves and two-session
+reconciliation. M2, M3 and M4 now have accepted bounded local evidence;
+the latest demo handoff owns their scope and the conserved 487-row checkpoint.
+The accepted no-app seed rehearsal proves fixture compatibility only.
+Original failed runs remain failed; do not replay completed business commands.
+Hosted rehearsal/cutover, final security conditions and exact deployment remain
+open. These local passes do not complete whole M1/S21, M5 or production readiness.
 
-Read the [latest demo handoff](../../docs/runbooks/restaurant-demo-macbook-handoff.md#latest-release-status-october-2)
+Read the [latest demo handoff](../../docs/runbooks/restaurant-demo-macbook-handoff.md#latest-release-status-october-3)
 for current evidence and the [migration procedure](../../docs/runbooks/production-migrations.md#4d-staff-cost-privacy-seal-0165)
 for the separate hosted admission. The GitHub branch preserves source and runbooks;
 credentials, retained local databases and raw private proof remain on the mini.
-The old native goal remains blocked; no background execution follows from this handoff.
+The current native release goal is ACTIVE. ZS Vault is LOCKED, so
+credential-dependent hosted work remains blocked. Do not bypass the lock or infer
+hosted authorization from local acceptance. Keep both web environments and all
+workers continuously drained through the admitted cutover and exact compatible
+deployment; the migration runbook owns the sequence. This handoff runs nothing.
 
 ## Historical September 27 active task
 
 The sections below preserve their September 27 state. They are not current
-release instructions; the current transfer ledger and linked October 2 runbook
+release instructions; the current transfer ledger and linked October 3 runbook
 above supersede their branch, migration, deployment and execution status.
 
 The owner authorized the production migration, protected `main` merge and
