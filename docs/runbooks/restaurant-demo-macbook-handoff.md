@@ -16,12 +16,14 @@ connected health at this newer SHA; its main CI also passed.
 Test the deployed [Cellar page](https://terroir-web-production.up.railway.app/cellar).
 This is a UI-only release, not a completed restaurant demo or privacy seal.
 
-The pre-adaptation checkpoint is `33d662230e376eb53002b6416e38f7c9f8a6ec16` on
+The verified application/script checkpoint is `06cfa74bafdd8e4a535732c873997ed5cf104541` on
 `feat/restaurant-demo-closeout-20261001`; [draft PR #232](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232)
-tracks the remaining release gates. Its required CI passed 5,852 tests, 330
-contracts and five bounded browser journeys, plus build/schema/type checks.
-New hosted-admission and preserved-runtime repairs require their own fresh CI;
-the earlier green result does not certify those changes.
+tracks the remaining release gates. Its fresh required
+[CI run 37087605519](https://github.com/ZeroSum-Solutions/terroir-prototype/actions/runs/37087605519)
+passed 5,852 tests, 330 contracts and five critical browser journeys, plus
+build/schema/type/design checks and migration/down/manifest ratchets. The actual
+CI database reached 137 migrations through `0165`. These checks do not certify
+the complete privacy matrix, hosted cutover or invoice-worker operation.
 
 The hosted database already has all 136 source migrations through `0164` and
 physical inventory contract 2. Do not reapply `0153`–`0164`. The latest real
@@ -43,9 +45,25 @@ verified retry safety, counted stock and reconciled the chosen bottle to 120 mL.
 It then failed between deep-link navigation, reload and the persistence assertion.
 The screenshot shows 120 mL, but the original error log cannot establish the cause.
 That run remains FAILED; do not restart the zero-stock journey or repeat its
-committed commands. A separately reviewed same-D continuation must first admit
-the saved receipts and exact durable state before checking the remaining team
-steps. It must preserve the original failure evidence.
+committed commands. Separately reviewed same-D continuations preserved its
+receipts and verified the remaining workflow: fresh owner login/reload at 120 mL,
+two distinct receives for a staff-test wine, owner opening and an actual staff
+150 mL pour to 600 mL, cross-site denial, and staff reconciliation denial with
+unchanged bottle state. The final continuation passed 320/390/768/1200px checks:
+no horizontal overflow, keyboard interaction and action targets at least 44px.
+These continuations used synthetic SSR sessions from real magic-link/OTP
+verification; they did not retest the original password-login journey.
+Its result is `REMAINING_TEAM_JOURNEY_PASS`, not a rewrite of the original failure
+or a full application/privacy certification. The final checkpoint has twelve
+completed operation receipts; neither those commands nor earlier committed
+receives may be replayed. The owned app stops after verification; this does not
+provide a running mobile test URL.
+
+An independently reviewed synthetic historical fixture also passed actual
+poisoned-metadata/constraint refusal, protected SQL-role denial, exact-site
+authorized historical readers and foreign/global denial. Its terminal rollback
+conserved all rows, schema/ACLs, roles, memberships and sequences. This supplements
+the real JWT checks but does not replace the remaining Storage or worker evidence.
 
 The hosted adaptation now pins the measured production ACL/policy baseline and
 its supported Supautils policy-delegation path. Actual hosted read-only catalog
@@ -55,8 +73,10 @@ the original D rehearsal cannot certify the revised hosted packet. See
 [the migration procedure](production-migrations.md#4d-staff-cost-privacy-seal-0165).
 Neither inspected Railway environment has an active invoice worker; see
 [worker activation](invoice-extract-worker.md#railway-deployment).
-Full privacy proof and the remaining persisted desktop/mobile staff-manager
-checks remain open. Keep older alternative and archived branches separate;
+Full privacy proof, actual image lifecycle/Storage verification, the revised
+hosted rollback rehearsal/cutover and invoice-worker checks remain open. The
+bounded persisted desktop/mobile staff-manager continuation has passed.
+Keep older alternative and archived branches separate;
 several prototype checkpoints already landed by squash and must not be applied twice.
 
 The preserved D source check accounts for two CLI files created during its original
