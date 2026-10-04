@@ -1,12 +1,63 @@
 # Restaurant demo MacBook handoff (failed candidate)
 
-## Latest release status: October 3
+## Latest checkpoint: October 3 evening
+
+The application checkpoint is committed and pushed on
+`feat/restaurant-demo-closeout-20261001` at
+`811443e0a1327dd75f666e3b41706367d13e4da2`. This handoff-only update does not
+change application code. Resolve the branch tip again when checking out elsewhere.
+`main` remains `146b5ea572fd64579ddc1ddeac76df928e8cd197`; draft PR #232 has
+not landed. Production and staging public health checks returned HTTP 200 and
+that old release at 6:13 PM Pacific on October 3. Those checks do not prove a
+completed restaurant demo, database upgrade or invoice-worker release.
+
+The last release goal stopped after the independently reviewed current11
+release-runner replan failed deterministic verification. It was marked BLOCKED;
+the current goal-status query returns no registered goal in this chat. The collector writes
+nested child-observation metadata with a prefixed label; the bootstrap expects
+a flat preflight-observation event. The actual public-function composition
+rejected this format before bootstrap or rehearsal execution. Its passing model
+controls reused an older journal and missed that boundary. Independent review
+also found active imported modules missing from the source-hash authority.
+No current11 maintenance, hosted migration, merge or deployment ran.
+
+ZS Vault is UNLOCKED on the Mac mini. Its status check and a secret-free
+database-credential lookup both passed, including a lookup using the release
+runner's minimal child environment. Do not ask for another unlock to resolve
+these release-runner defects, and do not print credentials or change the vault.
+
+The last encrypted [backup run 37166914052](https://github.com/ZeroSum-Solutions/terroir-prototype/actions/runs/37166914052)
+passed an actual isolated restore and independent captured review: migration
+`0164`, 87 tables, two sequences and ten content checksums. Ownership/grant
+recovery and extension-owned comparison remain excluded. Its verification time
+was 6:10:30 PM Pacific; its two-hour release-admission window expired at
+8:10:30 PM Pacific on October 3. A future release attempt needs a newly verified
+backup. Do not reuse this checkpoint as fresh recovery evidence.
+
+To recover, repair only the event contract and missing imported-module pins.
+Test a journal produced by the collector through the actual bootstrap parser,
+including failed-child and unsafe-output refusals, and obtain independent review
+before any hosted maintenance. Preserve the failed runner and its evidence.
+Do not introduce another release-framework rewrite or count source review as
+the required executed hosted rehearsal. The rehearsal, permanent upgrade,
+hosted privacy/Storage and real-worker tests, protected merge and exact-SHA
+deployment remain required. The user must direct a recovery session after the
+failed-replan stop. Existing runner admissions do not authorize a new branch tip.
+
+Private operational scripts, raw evidence and machine-state files remain on the
+Mac mini outside this repository. They are not a portable or approved release
+package and must not be bulk-added to Git: they can contain sensitive database
+observations or credential-adjacent material. A second machine can check out the
+application and this handoff; it must independently establish its runtime and
+release authority rather than replay those private scripts.
+
+## Earlier October 3 release evidence
 
 The owner now authorizes reviewed pushes, protected-main merges and deployment.
 This supersedes the earlier release restrictions below, not the CI, privacy or
-data-preservation gates. The current native release goal is ACTIVE, but ZS Vault
-is LOCKED; credential-dependent hosted work remains blocked. Do not bypass that
-boundary. M2, M3 and M4 are accepted locally; whole M1/S21 and M5 remain pending.
+data-preservation gates. The earlier credential-lock condition is cleared; the
+latest blocked-goal and unlocked-vault checkpoint above supersedes that status.
+M2, M3 and M4 are accepted locally; whole M1/S21 and M5 remain pending.
 
 [PR #231](https://github.com/ZeroSum-Solutions/terroir-prototype/pull/231) merged
 the Cellar layout fix into `main` at `9821bb7cdc530e5669a524ceff90b4bed804280d`.
