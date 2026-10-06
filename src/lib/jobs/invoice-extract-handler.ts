@@ -225,6 +225,7 @@ export async function runInvoiceExtractJob(params: {
       .from("invoice_scans")
       .update({ status: "processing" } as never)
       .eq("id", scan.id)
+      .eq("restaurant_id", job.restaurantId)
       .eq("status", "failed");
     if (resetError) {
       return { kind: "retry", code: "failed_reset_failed", message: resetError.message };

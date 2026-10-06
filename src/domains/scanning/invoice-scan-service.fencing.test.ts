@@ -124,6 +124,7 @@ describe("processInvoiceScanOnce — Grok-2 fenced invoice_scans writes", () => 
     // already persisted.
     expect(eqCallsByUpdate[0]).toEqual([
       ["id", "scan-a"],
+      ["restaurant_id", "restaurant-a"],
       ["status", "processing"],
     ]);
   });
@@ -152,7 +153,26 @@ describe("processInvoiceScanOnce — Grok-2 fenced invoice_scans writes", () => 
     expect((result.body as { code: string }).code).toBe("upstream_error");
     expect(eqCallsByUpdate[0]).toEqual([
       ["id", "scan-a"],
+      ["restaurant_id", "restaurant-a"],
       ["status", "processing"],
+    ]);
+  });
+
+  it("tenant-filters the no-wines terminal write", async () => {
+    mockExtractFromOcr.mockResolvedValueOnce({
+      ...reconciledInvoice(),
+      lineItems: [],
+      invoiceTotal: 0,
+    });
+    const { supabase, eqCallsByUpdate } = makeFencedSupabase({ data: null, error: null });
+
+    const result = await runScan(supabase);
+
+    expect(result.status).toBe(422);
+    expect((result.body as { code: string }).code).toBe("no_wines_extracted");
+    expect(eqCallsByUpdate[0]).toEqual([
+      ["id", "scan-a"],
+      ["restaurant_id", "restaurant-a"],
     ]);
   });
 });

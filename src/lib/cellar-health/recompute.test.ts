@@ -6,6 +6,25 @@ import { runCellarHealthRecompute } from "./recompute";
 const NOW = new Date("2026-08-19T12:00:00.000Z");
 
 describe("runCellarHealthRecompute", () => {
+  it("returns and persists only the exact cost-free receipt", async () => {
+    const fixture = makeClient();
+
+    const result = await runCellarHealthRecompute(
+      fixture.client,
+      "restaurant-1",
+      "user-1",
+      NOW,
+    );
+
+    const receipt = {
+      version: 1,
+      kind: "cellar_health_recompute",
+      status: "succeeded",
+    };
+    expect(result).toEqual(receipt);
+    expect(fixture.jobUpdates.at(-1)?.result).toEqual(receipt);
+  });
+
   it("EV-2.4: uses defaults without cellar_config and reclassifies after a threshold change", async () => {
     const fixture = makeClient();
 
@@ -60,7 +79,11 @@ describe("runCellarHealthRecompute", () => {
       NOW,
     );
 
-    expect(result.classified).toBe(1);
+    expect(result).toEqual({
+      version: 1,
+      kind: "cellar_health_recompute",
+      status: "succeeded",
+    });
     expect(fixture.healthRows).toHaveLength(1);
   });
 

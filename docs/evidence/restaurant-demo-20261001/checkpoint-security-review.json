@@ -1,0 +1,788 @@
+{
+  "schema_version": "1.0",
+  "ref": "26df60b0e2d26463e6ec00830756e58897d9386f",
+  "base": {
+    "status": "AVAILABLE",
+    "value": "origin/main",
+    "unavailable_reason": null,
+    "evidence": [
+      {
+        "class": "COMMAND",
+        "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-201"
+      }
+    ]
+  },
+  "scope": {
+    "changed_paths": [
+      "docs/evidence/restaurant-demo-20261001/functional-contracts.md",
+      "docs/evidence/restaurant-demo-20261001/import-current-review.md",
+      "docs/evidence/restaurant-demo-20261001/m2-live-test-map.md",
+      "docs/evidence/restaurant-demo-20261001/mobile-c-failure.png",
+      "docs/evidence/restaurant-demo-20261001/mobile-c-journey-result.json",
+      "docs/evidence/restaurant-demo-20261001/portable-security-history-review.json",
+      "docs/evidence/restaurant-demo-20261001/portable-source-review.md",
+      "docs/evidence/restaurant-demo-20261001/portable-startup-replan.md",
+      "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md",
+      "docs/evidence/restaurant-demo-20261001/staff-raw-cost-probe.sql",
+      "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md",
+      "docs/runbooks/restaurant-demo-macbook-handoff.md",
+      "e2e/inventory-command-recovery.test.ts",
+      "e2e/lineage.test.ts",
+      "e2e/mobile-service-readiness.test.ts",
+      "e2e/pour-flow.test.ts",
+      "scripts/local/restaurant-demo/docker-lifecycle.mjs",
+      "scripts/local/restaurant-demo/fixture.sql",
+      "scripts/local/restaurant-demo/fixture.test.mjs",
+      "scripts/local/restaurant-demo/journey.mjs",
+      "scripts/local/restaurant-demo/journey.test.mjs",
+      "scripts/local/restaurant-demo/launcher.mjs",
+      "scripts/local/restaurant-demo/portable-demo.test.mjs",
+      "src/app/(app)/cellar/cellar-list.test.tsx",
+      "src/app/(app)/cellar/cellar-list.tsx",
+      "src/app/(app)/cellar/cellar-masthead.tsx",
+      "src/app/(app)/cellar/cellar-shell-open-bottles.test.tsx",
+      "src/app/(app)/cellar/cellar-shell.tsx",
+      "src/app/(app)/cellar/section-group.test.tsx",
+      "src/app/(app)/cellar/section-group.tsx",
+      "src/app/api/import/sessions/[id]/revert/route.test.ts",
+      "src/app/api/import/sessions/[id]/revert/route.ts",
+      "src/domains/import/import-revert-rpc.test.ts",
+      "src/domains/import/import-revert-rpc.ts"
+    ],
+    "captured_diff_paths": [
+      "docs/evidence/restaurant-demo-20261001/functional-contracts.md",
+      "docs/evidence/restaurant-demo-20261001/import-current-review.md",
+      "docs/evidence/restaurant-demo-20261001/m2-live-test-map.md",
+      "docs/evidence/restaurant-demo-20261001/mobile-c-failure.png",
+      "docs/evidence/restaurant-demo-20261001/mobile-c-journey-result.json",
+      "docs/evidence/restaurant-demo-20261001/portable-security-history-review.json",
+      "docs/evidence/restaurant-demo-20261001/portable-source-review.md",
+      "docs/evidence/restaurant-demo-20261001/portable-startup-replan.md",
+      "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md",
+      "docs/evidence/restaurant-demo-20261001/staff-raw-cost-probe.sql",
+      "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md",
+      "docs/runbooks/restaurant-demo-macbook-handoff.md",
+      "e2e/inventory-command-recovery.test.ts",
+      "e2e/lineage.test.ts",
+      "e2e/mobile-service-readiness.test.ts",
+      "e2e/pour-flow.test.ts",
+      "scripts/local/restaurant-demo/docker-lifecycle.mjs",
+      "scripts/local/restaurant-demo/fixture.sql",
+      "scripts/local/restaurant-demo/fixture.test.mjs",
+      "scripts/local/restaurant-demo/journey.mjs",
+      "scripts/local/restaurant-demo/journey.test.mjs",
+      "scripts/local/restaurant-demo/launcher.mjs",
+      "scripts/local/restaurant-demo/portable-demo.test.mjs",
+      "src/app/(app)/cellar/cellar-list.test.tsx",
+      "src/app/(app)/cellar/cellar-list.tsx",
+      "src/app/(app)/cellar/cellar-masthead.tsx",
+      "src/app/(app)/cellar/cellar-shell-open-bottles.test.tsx",
+      "src/app/(app)/cellar/cellar-shell.tsx",
+      "src/app/(app)/cellar/section-group.test.tsx",
+      "src/app/(app)/cellar/section-group.tsx",
+      "src/app/api/import/sessions/[id]/revert/route.test.ts",
+      "src/app/api/import/sessions/[id]/revert/route.ts",
+      "src/domains/import/import-revert-rpc.test.ts",
+      "src/domains/import/import-revert-rpc.ts"
+    ],
+    "path_classification": [
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/functional-contracts.md",
+        "surfaces": [
+          "authentication",
+          "authorization",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/import-current-review.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/m2-live-test-map.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/mobile-c-failure.png",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/mobile-c-journey-result.json",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/portable-security-history-review.json",
+        "surfaces": [
+          "secrets",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-security-history-review.json"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/portable-source-review.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/portable-startup-replan.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md",
+        "surfaces": [
+          "authentication",
+          "authorization",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md"
+          }
+        ]
+      },
+      {
+        "path": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-probe.sql",
+        "surfaces": [
+          "authentication",
+          "authorization",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md"
+          }
+        ]
+      },
+      {
+        "path": "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "docs/runbooks/restaurant-demo-macbook-handoff.md",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "e2e/inventory-command-recovery.test.ts",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "e2e/lineage.test.ts",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "e2e/mobile-service-readiness.test.ts",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "e2e/pour-flow.test.ts",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/docker-lifecycle.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/fixture.sql",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/fixture.test.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/journey.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/journey.test.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/launcher.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "scripts/local/restaurant-demo/portable-demo.test.mjs",
+        "surfaces": [
+          "secrets",
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/cellar-list.test.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/cellar-list.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/cellar-masthead.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/cellar-shell-open-bottles.test.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/cellar-shell.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/section-group.test.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/(app)/cellar/section-group.tsx",
+        "surfaces": [
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+          }
+        ]
+      },
+      {
+        "path": "src/app/api/import/sessions/[id]/revert/route.test.ts",
+        "surfaces": [
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md"
+          }
+        ]
+      },
+      {
+        "path": "src/app/api/import/sessions/[id]/revert/route.ts",
+        "surfaces": [
+          "authentication",
+          "authorization",
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md"
+          }
+        ]
+      },
+      {
+        "path": "src/domains/import/import-revert-rpc.test.ts",
+        "surfaces": [
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md"
+          }
+        ]
+      },
+      {
+        "path": "src/domains/import/import-revert-rpc.ts",
+        "surfaces": [
+          "untrusted-input",
+          "export"
+        ],
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md"
+          }
+        ]
+      }
+    ],
+    "sensitive_surfaces": [
+      "secrets",
+      "authentication",
+      "authorization",
+      "untrusted-input",
+      "export"
+    ],
+    "diff_command_id": "CMD-202",
+    "evidence": [
+      {
+        "class": "COMMAND",
+        "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-202"
+      }
+    ]
+  },
+  "commands": [
+    {
+      "id": "CMD-202",
+      "purpose": "diff",
+      "command": "git diff --name-only origin/main...26df60b0e2d26463e6ec00830756e58897d9386f",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "scope": "origin/main...26df60b0e2d26463e6ec00830756e58897d9386f",
+      "evidence": [
+        {
+          "class": "COMMAND",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-202"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "id": "CMD-204",
+      "purpose": "secrets-scan",
+      "command": "gitleaks detect --source . --no-banner --redact --log-opts origin/main..26df60b0e2d26463e6ec00830756e58897d9386f",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "scope": "origin/main..26df60b0e2d26463e6ec00830756e58897d9386f",
+      "evidence": [
+        {
+          "class": "COMMAND",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-204"
+        }
+      ],
+      "unavailable_reason": null
+    }
+  ],
+  "exports": {
+    "state": "LISTED",
+    "items": [
+      {
+        "id": "EXP-001",
+        "destination": "Existing GitHub repository ZeroSum-Solutions/terroir-prototype, approved feature branch only",
+        "data_classes": [
+          "application source",
+          "synthetic test evidence",
+          "diagnostic metadata"
+        ],
+        "initiating_identity": "Repository owner-authorized feature-branch Git publisher",
+        "authorization_evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md:M5"
+          }
+        ],
+        "recipient_scope": "Public repository readers; existing repository visibility confirmed by CMD-207",
+        "retention_redaction": "Versioned Git history; synthetic reserved-domain fixtures and diagnostic metadata only. No production dotenv, secret values or production records are copied. An exact immutable synthetic-UUID false-positive fingerprint is documented; no broad scanner suppression.",
+        "failure_behavior": "Do not push until the final policy/report follow-up commit receives an independent clean canonical full-range scan. Preserve explicit demo and product-release failures; no main merge, database upgrade or deployment.",
+        "policy_basis": {
+          "status": "OWNER-APPROVED",
+          "citation": "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md:M5",
+          "owner": "Devin, Terroir repository owner",
+          "reason": null
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "class": "COMMAND",
+        "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-207"
+      }
+    ],
+    "unavailable_reason": null
+  },
+  "secrets_scan": {
+    "result": "PASS",
+    "command_id": "CMD-204",
+    "scope": "RANGE",
+    "comparison": "origin/main..26df60b0e2d26463e6ec00830756e58897d9386f",
+    "evidence": [
+      {
+        "class": "COMMAND",
+        "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-204"
+      }
+    ],
+    "unavailable_reason": null
+  },
+  "export_policy": {
+    "result": "PASS",
+    "evidence": [
+      {
+        "class": "STATIC",
+        "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+      }
+    ],
+    "unavailable_reason": null
+  },
+  "coverage": [
+    {
+      "surface": "prompt-injection",
+      "state": "NOT-APPLICABLE",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "surface": "secrets",
+      "state": "REVIEWED",
+      "evidence": [
+        {
+          "class": "COMMAND",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:CMD-204"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "surface": "authentication",
+      "state": "REVIEWED",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "surface": "authorization",
+      "state": "REVIEWED",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "surface": "untrusted-input",
+      "state": "REVIEWED",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md"
+        }
+      ],
+      "unavailable_reason": null
+    },
+    {
+      "surface": "export",
+      "state": "REVIEWED",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Coverage and release disposition"
+        }
+      ],
+      "unavailable_reason": null
+    }
+  ],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "origin": "MANUAL",
+      "severity": "INFO",
+      "surface": "secrets",
+      "evidence": [
+        {
+          "class": "STATIC",
+          "citation": "docs/evidence/restaurant-demo-20261001/checkpoint-secrets-classification.md:Finding and provenance"
+        }
+      ],
+      "exploit_or_failure": "Confirmed false positive at the exact immutable generic-api-key line-22 fingerprint in staff-raw-cost-probe.sql: the match is the synthetic identity inserted and authenticated inside the same executed rollback-only probe, not a credential. Independent byte equality, transaction order, identity equality and captured 0/0/0 residue assertions passed without executing SQL or printing the literal. The implementer added only that immutable fingerprint to .gitleaksignore; the same three-commit full range then scanned clean. This report pins the earlier checkpoint plus inspected uncommitted policy; the later policy/report commit requires a fresh full-range scan before push.",
+      "disposition": "NOT-ACTIONABLE",
+      "recheck": {
+        "status": "NOT-REQUIRED",
+        "command_id": null,
+        "evidence": [],
+        "unavailable_reason": null
+      },
+      "owner": {
+        "status": "NOT-REQUIRED",
+        "name": null,
+        "evidence": [],
+        "unavailable_reason": null
+      },
+      "acceptance": {
+        "status": "NOT-REQUIRED",
+        "evidence": [],
+        "unavailable_reason": null
+      },
+      "compensating_control": null
+    },
+    {
+      "id": "SEC-002",
+      "origin": "MANUAL",
+      "severity": "HIGH",
+      "surface": "authorization",
+      "evidence": [
+        {
+          "class": "RUNTIME",
+          "citation": "docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md"
+        }
+      ],
+      "exploit_or_failure": "The independently captured rollback-only local-C probe showed a synthetic staff identity without cost.read could SELECT acquisition cost directly through legacy raw table privileges although the governed reader returned no rows. This actual confidentiality control bypass is not introduced by these checkpoint changes and is not fixed by clean source scans, import regressions, functional SQL tests or a feature-branch push. Before normal release, forward privilege/Storage hardening and positive/negative role-and-tenant checks remain required. This reviewer read the captured evidence, did not rerun SQL. Complete mobile journey C also failed at a stale search selector, so this is neither a completed-demo nor production certificate.",
+      "disposition": "OPEN",
+      "recheck": {
+        "status": "NOT-REQUIRED",
+        "command_id": null,
+        "evidence": [],
+        "unavailable_reason": null
+      },
+      "owner": {
+        "status": "ASSIGNED",
+        "name": "Terroir product owner and release coordinator",
+        "evidence": [
+          {
+            "class": "STATIC",
+            "citation": "docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md:M1"
+          }
+        ],
+        "unavailable_reason": null
+      },
+      "acceptance": {
+        "status": "NOT-REQUIRED",
+        "evidence": [],
+        "unavailable_reason": null
+      },
+      "compensating_control": null
+    }
+  ],
+  "verdict": "FAIL"
+}

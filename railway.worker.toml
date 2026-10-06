@@ -7,8 +7,7 @@
 # service's root railway.toml — that stays terroir-web's config.
 #
 # No [build] section: Railpack auto-detects Node/pnpm the same way it does
-# for terroir-web, and the worker needs no extra build step beyond the
-# normal install.
+# for terroir-web, including the package's normal build script.
 #
 # No healthcheckPath: the worker has no HTTP surface (it's a long-poll
 # loop against Postgres, not a request handler), so Railway's restart
@@ -18,7 +17,7 @@
 #
 # Required service variables (identical to terroir-web's — see README.md
 # "Deploy" section and .env.example): NEXT_PUBLIC_SUPABASE_URL,
-# SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, OPENROUTER_API_KEY,
 # AZURE_DOC_INTELLIGENCE_ENDPOINT, AZURE_DOC_INTELLIGENCE_KEY. No new
 # variables are introduced by this slice.
 

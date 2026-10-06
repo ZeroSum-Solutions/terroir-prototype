@@ -1,27 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  createRecomputeReceipt,
+  type RecomputeReceipt,
+} from "@/lib/staff-cost/recompute-receipt";
 import type { Database } from "@/types/database";
 import {
   DEFAULT_HEALTH_THRESHOLDS,
-  HEALTH_SEGMENTS,
   classifyCellarHealth,
   deriveAppreciation,
-  type CellarHealthSegment,
   type CellarHealthThresholds,
 } from "./classify";
 
 type Client = SupabaseClient<Database>;
-
-export type CellarHealthRecomputeResult = {
-  classified: number;
-  segments: Record<CellarHealthSegment, number>;
-};
 
 export async function runCellarHealthRecompute(
   admin: Client,
   restaurantId: string,
   userId: string,
   now: Date = new Date(),
-): Promise<CellarHealthRecomputeResult> {
+): Promise<RecomputeReceipt> {
   const jobId = await startJob(admin, restaurantId, userId, now);
   try {
     const inputs = await loadInputs(admin, restaurantId);
@@ -38,9 +35,9 @@ export async function runCellarHealthRecompute(
       inputs.existingHealthWineIds,
       rows,
     );
-    const segments = countSegments(rows);
-    await finishJob(admin, jobId, new Date(), rows.length, segments);
-    return { classified: rows.length, segments };
+    const receipt = createRecomputeReceipt("cellar_health_recompute");
+    await finishJob(admin, jobId, new Date(), receipt);
+    return receipt;
   } catch (error) {
     await failJob(admin, jobId, new Date(), error);
     throw error;
@@ -238,17 +235,6 @@ function thresholdsFromConfig(
   };
 }
 
-function countSegments(rows: HealthInsert[]) {
-  const counts = Object.fromEntries(
-    HEALTH_SEGMENTS.map((segment) => [segment, 0]),
-  ) as Record<CellarHealthSegment, number>;
-  for (const row of rows) {
-    const segment = row.segment as CellarHealthSegment;
-    counts[segment] += 1;
-  }
-  return counts;
-}
-
 async function removeStaleHealthRows(
   admin: Client,
   restaurantId: string,
@@ -270,15 +256,14 @@ async function finishJob(
   admin: Client,
   jobId: string,
   now: Date,
-  classified: number,
-  segments: Record<CellarHealthSegment, number>,
+  receipt: RecomputeReceipt,
 ) {
   const { error } = await admin
     .from("background_jobs")
     .update({
       status: "succeeded",
       finished_at: now.toISOString(),
-      result: { classified, segments },
+      result: receipt,
     })
     .eq("id", jobId);
   if (error) throw error;

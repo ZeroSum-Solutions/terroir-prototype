@@ -32,8 +32,8 @@ function supabaseFor(opts: {
   stillClaimed?: boolean;
   /** C04: error returned by the failed->processing reset UPDATE, if any. */
   resetError?: unknown;
-  /** C04: records every invoice_scans UPDATE payload issued (the reset write). */
-  resetUpdateCalls?: Array<{ payload: unknown }>;
+  /** C04: records every invoice_scans UPDATE payload and equality fence. */
+  resetUpdateCalls?: Array<{ payload: unknown; filters: Array<[string, unknown]> }>;
   resetRows?: Array<{ id: string }> | null;
 }) {
   const {
@@ -60,9 +60,13 @@ function supabaseFor(opts: {
             })),
           })),
           update: vi.fn((payload: unknown) => {
-            resetUpdateCalls.push({ payload });
+            const filters: Array<[string, unknown]> = [];
+            resetUpdateCalls.push({ payload, filters });
             const chain = {
-              eq: vi.fn(() => chain),
+              eq: vi.fn((column: string, value: unknown) => {
+                filters.push([column, value]);
+                return chain;
+              }),
               is: vi.fn(() => chain),
               select: vi.fn(async () => ({ data: resetRows, error: resetError })),
               then: (
@@ -183,7 +187,10 @@ describe("runInvoiceExtractJob", () => {
       status: 200,
       body: { scanId: "scan-1" },
     });
-    const resetUpdateCalls: Array<{ payload: unknown }> = [];
+    const resetUpdateCalls: Array<{
+      payload: unknown;
+      filters: Array<[string, unknown]>;
+    }> = [];
     const outcome = await runInvoiceExtractJob({
       supabase: supabaseFor({
         scan: { ...validScan, status: "complete" },
@@ -194,7 +201,14 @@ describe("runInvoiceExtractJob", () => {
     });
 
     expect(outcome).toEqual({ kind: "succeeded", skippedExtraction: false });
-    expect(resetUpdateCalls).toEqual([{ payload: { status: "processing" } }]);
+    expect(resetUpdateCalls).toEqual([{
+      payload: { status: "processing" },
+      filters: [
+        ["id", "scan-1"],
+        ["restaurant_id", "restaurant-a"],
+        ["status", "complete"],
+      ],
+    }]);
     expect(mockProcessInvoiceScanOnce).toHaveBeenCalledOnce();
   });
 
@@ -603,7 +617,10 @@ describe("runInvoiceExtractJob", () => {
   describe("C04: failed -> processing reset before a retry", () => {
     it("resets a failed scan back to processing (fenced on status='failed') before calling the extraction service", async () => {
       mockProcessInvoiceScanOnce.mockResolvedValue({ status: 200, body: { scanId: "scan-1" } });
-      const resetUpdateCalls: Array<{ payload: unknown }> = [];
+      const resetUpdateCalls: Array<{
+        payload: unknown;
+        filters: Array<[string, unknown]>;
+      }> = [];
       const outcome = await runInvoiceExtractJob({
         supabase: supabaseFor({
           scan: { ...validScan, status: "failed" },
@@ -613,7 +630,14 @@ describe("runInvoiceExtractJob", () => {
         job: job(),
       });
 
-      expect(resetUpdateCalls).toEqual([{ payload: { status: "processing" } }]);
+      expect(resetUpdateCalls).toEqual([{
+        payload: { status: "processing" },
+        filters: [
+          ["id", "scan-1"],
+          ["restaurant_id", "restaurant-a"],
+          ["status", "failed"],
+        ],
+      }]);
       expect(outcome).toEqual({ kind: "succeeded", skippedExtraction: false });
       expect(mockProcessInvoiceScanOnce).toHaveBeenCalledTimes(1);
     });
@@ -635,7 +659,10 @@ describe("runInvoiceExtractJob", () => {
 
     it("does not attempt a reset when the scan is not 'failed'", async () => {
       mockProcessInvoiceScanOnce.mockResolvedValue({ status: 200, body: { scanId: "scan-1" } });
-      const resetUpdateCalls: Array<{ payload: unknown }> = [];
+      const resetUpdateCalls: Array<{
+        payload: unknown;
+        filters: Array<[string, unknown]>;
+      }> = [];
       await runInvoiceExtractJob({
         supabase: supabaseFor({ scan: validScan, downloadData: fakeBlob, resetUpdateCalls }) as never,
         job: job(),

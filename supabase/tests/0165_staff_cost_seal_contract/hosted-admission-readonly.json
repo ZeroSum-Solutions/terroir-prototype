@@ -1,0 +1,15 @@
+{
+  "project": "qcfmwphlaekfkqwkfyth",
+  "organization": "zljkaiwwkbpeyjsblwyb",
+  "scope": "catalog-admission block only; no operator, history, DDL, or apply proof",
+  "source_sha256": "a1294f7da35ece081a77e873b8c6a4e930f05f83fd60ad597f009b23635e93d7",
+  "result": [
+    {
+      "operator": "supabase_read_only_user",
+      "read_only": "on",
+      "admitted_hosted": "on",
+      "ledger_count": 136,
+      "ledger_max": "0164"
+    }
+  ]
+}

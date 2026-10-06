@@ -16,6 +16,7 @@ const NULLABLE_ARGS = {
   save_bottle_inventory_private: { p_country: "string", p_format: "string", p_vintage: "number" },
   set_wine_pricing_strategy: { p_target_markup_ratio: "number", p_target_pour_cost_pct: "number" },
   assign_wine_sections_private: { p_section: "string" },
+  create_invoice_scan_upload_manifest: { p_invoice_date: "string", p_invoice_number: "string" },
 };
 
 function propertyName(member) {

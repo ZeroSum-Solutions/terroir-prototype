@@ -1,0 +1,19 @@
+{
+  "status": "failed",
+  "lastCompletedStep": "received-main-2-of-2",
+  "inFlightMutation": null,
+  "projectId": "terroir-demo-20261001-mobile-c",
+  "restaurantId": "2f6e6e23-5abf-49dd-9349-2a9275a68209",
+  "viewportWidth": 390,
+  "screenshots": [],
+  "mainReceiveOperationIds": [
+    "e3beb1b9-d12a-4930-9a90-84beaaa41868",
+    "ad577b3e-5879-410f-8988-a706c17a0e76"
+  ],
+  "mainInventoryItemIds": [
+    "502ad436-0942-4c30-9b96-382eb0ea947c",
+    "be98f975-a11d-45b7-b0fc-005661f0908b"
+  ],
+  "receiveReplayVerified": true,
+  "error": "JourneyError at received-main-2-of-2"
+}

@@ -25343,3 +25343,1382 @@ begin
   end if;
 end;
 $c09_0164_postflight$;
+
+-- === 0165_staff_cost_seal_contract.sql ===
+-- 0165_staff_cost_seal_contract.sql
+-- Final direct-ACL and invoice-image read-policy cut for the source-approved
+-- C04 staff-cost boundary. Apply only after the immutable compatible-app and
+-- caller receipts are independently admitted. No business data is rewritten here.
+-- This file owns its transaction AND ledger row; do not use an outer runner
+-- that inserts another 0165 row. Receipt hashes must describe this target.
+-- SQL cannot verify a deployed revision: the operator admits the external
+-- immutable compatible-app/caller receipt before supplying these settings.
+-- The existing local supabase_admin lane must be an unswitched superuser;
+-- grants still have to reproduce postgres-owned object grantor fingerprints.
+
+begin;
+set transaction isolation level repeatable read;
+set local statement_timeout = '30s';
+set local lock_timeout = '5s';
+set local idle_in_transaction_session_timeout = '30s';
+set local search_path = pg_catalog;
+set local row_security = off;
+
+lock table public.inventory_items, public.wines, public.restaurants,
+  public.pricing_recommendations, public.invoice_scans,
+  public.invoice_scan_deletions, public.reconcile_actions,
+  public.identity_merge_log, public.import_batch_rows, public.cellar_health,
+  public.scan_idempotency in access exclusive mode nowait;
+lock table supabase_migrations.schema_migrations in access exclusive mode nowait;
+
+do $c04_0165_preflight$
+declare
+  v_privileged boolean;
+begin
+  if current_user <> session_user or current_user not in ('postgres', 'supabase_admin') then
+    raise exception 'C04_0165_OPERATOR_IDENTITY_INVALID' using errcode = 'P0001';
+  end if;
+  select case when current_user = 'supabase_admin' then r.rolsuper
+              else r.rolsuper or r.rolbypassrls end into v_privileged
+    from pg_catalog.pg_roles r where r.rolname = current_user;
+  if v_privileged is distinct from true then
+    raise exception 'C04_0165_OPERATOR_AUTHORITY_INVALID' using errcode = 'P0001';
+  end if;
+  if pg_catalog.current_setting('terroir.c04_0165_traffic_quiesced', true)
+       is distinct from 'on'
+     or coalesce(pg_catalog.current_setting('terroir.c04_0165_compatible_app_sha', true), '')
+       !~ '^[0-9a-f]{40}$'
+     or coalesce(pg_catalog.current_setting('terroir.c04_0165_structural_receipt_sha256', true), '')
+       !~ '^[0-9a-f]{64}$'
+     or coalesce(pg_catalog.current_setting('terroir.c04_0165_history_receipt_sha256', true), '')
+       !~ '^[0-9a-f]{64}$'
+     or coalesce(pg_catalog.current_setting(
+       'terroir.c04_0165_caller_receipt_sha256', true
+     ), '') !~ '^[0-9a-f]{64}$' then
+    raise exception 'C04_0165_EXTERNAL_APP_RECEIPT_REQUIRED' using errcode = 'P0001';
+  end if;
+  if (select pg_catalog.count(*) from supabase_migrations.schema_migrations) <> 136
+     or (select pg_catalog.max(version) from supabase_migrations.schema_migrations)
+       is distinct from '0164'
+     or exists (
+       select 1 from supabase_migrations.schema_migrations where version = '0165'
+     ) then
+    raise exception 'C04_0165_MIGRATION_LEDGER_INVALID' using errcode = 'P0001';
+  end if;
+
+  if pg_catalog.to_regprocedure('public.read_invoice_image_target(uuid,integer)') is null
+     or pg_catalog.to_regprocedure('public.dismiss_pricing_alert_private(uuid,integer)') is null
+     or pg_catalog.to_regprocedure('public.dismiss_pricing_alert(uuid,integer)') is null
+     or pg_catalog.to_regprocedure('public.claim_scan_idempotency(uuid,uuid,text)') is null
+     or pg_catalog.to_regprocedure('public.read_import_batch_display_rows(uuid,integer,integer)') is null then
+    raise exception 'C04_0165_REQUIRED_BOUNDARY_MISSING' using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1
+      from (values
+        ('inventory_items'), ('wines'), ('restaurants'),
+        ('pricing_recommendations'), ('invoice_scans'),
+        ('invoice_scan_deletions'), ('reconcile_actions'),
+        ('identity_merge_log'), ('import_batch_rows'), ('cellar_health'),
+        ('scan_idempotency')
+      ) expected(relation_name)
+      left join pg_catalog.pg_namespace n on n.nspname = 'public'
+      left join pg_catalog.pg_class c
+        on c.relnamespace = n.oid and c.relname = expected.relation_name
+     where c.oid is null
+        or c.relkind <> 'r'
+        or pg_catalog.pg_get_userbyid(c.relowner) <> 'postgres'
+  ) then
+    raise exception 'C04_0165_RELATION_BASELINE_INVALID' using errcode = 'P0001';
+  end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and p.polname = 'members can read invoice images'
+      and p.polcmd = 'r'
+      and p.polpermissive
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and pg_catalog.pg_get_expr(p.polqual, p.polrelid, false)
+        = '((bucket_id = ''invoice-images''::text) AND public.is_member(((storage.foldername(name))[1])::uuid))'
+  ) then
+    raise exception 'C04_0165_STORAGE_POLICY_BASELINE_INVALID' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and p.polname = 'members can upload invoice images'
+      and p.polcmd = 'a'
+      and p.polpermissive
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and p.polqual is null
+      and pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false)
+        = '((bucket_id = ''invoice-images''::text) AND public.is_member(((storage.foldername(name))[1])::uuid))'
+  ) then
+    raise exception 'C04_0165_STORAGE_UPLOAD_POLICY_BASELINE_INVALID' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_preflight$;
+
+lock table storage.objects in access exclusive mode nowait;
+
+do $c04_0165_locked_policy_preimage$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and p.polname = 'members can read invoice images'
+      and p.polcmd = 'r' and p.polpermissive
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and pg_catalog.pg_get_expr(p.polqual, p.polrelid, false)
+        = '((bucket_id = ''invoice-images''::text) AND public.is_member(((storage.foldername(name))[1])::uuid))'
+  ) or not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and p.polname = 'members can upload invoice images'
+      and p.polcmd = 'a' and p.polpermissive and p.polqual is null
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false)
+        = '((bucket_id = ''invoice-images''::text) AND public.is_member(((storage.foldername(name))[1])::uuid))'
+  ) then
+    raise exception 'C04_0165_LOCKED_STORAGE_POLICY_BASELINE_INVALID' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_locked_policy_preimage$;
+
+-- Frozen 0164 catalog tuples from structural receipt b5f1d7bc2307650124a1714e9c114ceb263f42bfa7f80643669a1c6bb2b64ecb.
+-- Fingerprints use sorted compact JSON text arrays, joined by one newline.
+do $c04_0165_catalog_admission$
+declare v_hash text;
+begin
+  select pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    coalesce(pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), ''), 'UTF8'
+  )), 'hex') into v_hash from (
+  with targets as (
+    select c.oid, c.relname, c.relowner, c.relacl
+    from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname in ('inventory_items', 'wines', 'restaurants', 'pricing_recommendations', 'invoice_scans', 'invoice_scan_deletions', 'reconcile_actions', 'identity_merge_log', 'import_batch_rows', 'cellar_health', 'scan_idempotency')
+  ), acl_rows as (
+    select t.relname, ''::text as column_name, t.relowner, a.*
+    from targets t cross join lateral pg_catalog.aclexplode(
+      coalesce(t.relacl, pg_catalog.acldefault('r', t.relowner))) a
+    union all
+    select t.relname, c.attname::text, t.relowner, a.*
+    from targets t join pg_catalog.pg_attribute c on c.attrelid = t.oid
+      and c.attnum > 0 and not c.attisdropped and c.attacl is not null
+    cross join lateral pg_catalog.aclexplode(c.attacl) a
+  )
+  select pg_catalog.array_to_json(array[
+    'public', a.relname::text, a.column_name, pg_catalog.pg_get_userbyid(a.relowner),
+    pg_catalog.pg_get_userbyid(a.grantor),
+    case when a.grantee = 0 then 'PUBLIC' else pg_catalog.pg_get_userbyid(a.grantee) end,
+    a.privilege_type, case when a.is_grantable then 't' else 'f' end
+  ]::text[])::text as row_json from acl_rows a
+  ) captured;
+  -- Admit only the original D/CI preimage or the one measured hosted preimage.
+  -- Caller settings cannot choose a baseline: this catalog comparison owns it.
+  if v_hash = 'd76bb2eee2068723c227accaa0fc2385f89816ba3145521581c796259ed8b2cd' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'off', true);
+  elsif v_hash = 'a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f' then
+    perform pg_catalog.set_config('terroir.c04_0165_hosted_baseline', 'on', true);
+  else
+    raise exception 'C04_0165_FULL_RELATION_ACL_DRIFT' using errcode = 'P0001',
+      detail = 'C04_0165_AUTHENTICATED_ACL_BASELINE_INVALID';
+  end if;
+  if exists (
+    with expected(signature, definition_sha256, grantees) as (values
+      ('public.abandon_scan_idempotency(uuid,uuid,text)', '19868e4a479cd9b41c9d108923ba147815e4a53c30b8f530c0dc1e0f6b57c33b', array['authenticated', 'postgres']::text[]),
+      ('public.accept_reconcile_batch(uuid,jsonb,uuid)', '7222617de9f7440a0e4e579c94a2eb85ea85387d7c5efffc26b8d38ebe5b187d', array['authenticated', 'postgres']::text[]),
+      ('public.add_manual_overrides(uuid,text[])', '0b188ec60084d9776ff908782f3bafbccbc10c21884f83f823606da138d7eadb', array['authenticated', 'postgres']::text[]),
+      ('public.apply_import_batch_chunk(uuid,integer)', '00aa08b2c6968e5b34df44ccc20bffdf0a9be8c4ab9c6603083277c57593ffab', array['authenticated', 'postgres']::text[]),
+      ('public.assign_wine_sections_private(uuid,uuid[],text)', 'c44a69ab56540c8b5d982849c57f489b62bde3d29faab18a39b44485db724cde', array['authenticated', 'postgres']::text[]),
+      ('public.bulk_resolve_import_batch_rows(uuid,text)', 'd2c8d853eada81255ac286e1ed6ba8574b7ed2b22d074038d2bf77f5dfc197fe', array['authenticated', 'postgres']::text[]),
+      ('public.claim_invoice_extract_job(text)', 'aeb478c1132c6a23556f02ba532ac50fe20c20dbca7eb98d7da675d78ff38ad0', array['postgres', 'service_role']::text[]),
+      ('public.claim_scan_idempotency(uuid,uuid,text)', '4072266c12ba053e35eeab3c94b6bc269a4734e308b0ca52290f58025397210c', array['authenticated', 'postgres']::text[]),
+      ('public.cleanup_scan_idempotency()', 'a7719119e439d97a85db423cf25fcceffaf74f8fc10ed449c46e0467986a86f4', array['postgres', 'service_role']::text[]),
+      ('public.commit_invoice_scan(uuid)', '10fc0c841b6baa2953c09e6364424cbf2d847c1470ab080c038859d0a83ad054', array['authenticated', 'postgres']::text[]),
+      ('public.complete_scan_idempotency(uuid,uuid,text,uuid,integer,integer,uuid)', 'cbd6b5b4147b37992ba52d428b0ab24babff7035ba870ce57623b7374e545656', array['authenticated', 'postgres']::text[]),
+      ('public.count_import_batch_rows(uuid)', 'edb4c231e87324c54832b98654b2cdf4a30ed0d45c74e499a80cb4aa226b000e', array['authenticated', 'postgres']::text[]),
+      ('public.create_import_batch(uuid,uuid,text,integer,jsonb,uuid,integer,integer,text,text)', 'df8487e06bf635bddcc042d1bcfdd75bc83e52b820ca2e8da37f6934bb92e6e8', array['authenticated', 'postgres']::text[]),
+      ('public.create_inventory_item_private(uuid,uuid,integer,numeric,text,uuid,text,text,text,uuid,public.added_via)', '2909ac0b15d7dbcdbe771718e7f3da454d55bcb0895674d7fd72f4ce9e6b109d', array['authenticated', 'postgres']::text[]),
+      ('public.create_invoice_scan_upload(uuid,uuid,text,text,text,date)', '9e82c6aea3e76f37b7905d3f39c0b0eeb911f87e05bdf7af3cc61441cc26a308', array['authenticated', 'postgres']::text[]),
+      ('public.current_inventory_contract_version()', '5898b9c5d5d9ed81487617ded9fb61014522b9ed21bbd5d5aa164061ac6cb2e6', array['authenticated', 'postgres']::text[]),
+      ('public.current_site_role_at_least(uuid,public.membership_role)', '417509ed348fb8317a8671107adc5d4ccbaa53a78f37c5cbf31e0cd154dd3c21', array['postgres']::text[]),
+      ('public.delete_invoice_scan(uuid)', 'b64d58fe4d7e566be07f2b6e4f059647100de917a1b378215889957381cd02f6', array['authenticated', 'postgres']::text[]),
+      ('public.delete_wine_private(uuid,uuid,timestamp with time zone)', '9b1d94188b5dddd20889110396f7321a281080e43a4aa06b9951c6fbbb2eafc2', array['authenticated', 'postgres']::text[]),
+      ('public.dismiss_pricing_alert_private(uuid,integer)', '969c9e06cbac0f9a407af092bb58aa308971782a3a4922413377e8893e6b0ad4', array['authenticated', 'postgres']::text[]),
+      ('public.dismiss_pricing_alert(uuid,integer)', '3a58676d2ecb283c4afa712cf6161f7dba825e3f0c9663fcb9dfc6a7531b245b', array['PUBLIC', 'postgres']::text[]),
+      ('public.effective_site_capability(uuid,text)', 'ba90e657b84892fe24e00c87c96c5c0d61d02d4956211c657201b2a7ed3e17fb', array['authenticated', 'postgres']::text[]),
+      ('public.effective_site_ids(text)', '2d14aecc5dc0d563c42f20f98ee07f8d92c3eb4bcb52690b052ad5b2256fa7dc', array['authenticated', 'postgres']::text[]),
+      ('public.enqueue_invoice_extract_job(uuid,uuid)', '5ac88c60315d46ca8ca102b9ad983be21201d7603c55e3fc6b356cd49e3f3b9b', array['authenticated', 'postgres']::text[]),
+      ('public.enrich_wines_batch(uuid,jsonb)', 'a785b1a41d1a4e55a3604058fbc252cd59394fbdf2773b73993181b765955658', array['authenticated', 'postgres']::text[]),
+      ('public.expire_stalled_invoice_scans(uuid)', 'a02c02e8b441230aa38ff336f86e2c7637b7c1c297c82227aa3f4dae1fb1bb9b', array['authenticated', 'postgres']::text[]),
+      ('public.invoice_edits_valid(jsonb)', 'bf491cf8d8749961bad6cf5d79fff3b636299a35350275b6408eeb8c37e503f4', array['postgres']::text[]),
+      ('public.invoice_image_paths_valid(uuid,uuid,text,jsonb)', '782bf227fad7bfbb39e70b4b466c02b4f4bbf772e5fb5a634ab35cc829060f53', array['authenticated', 'postgres', 'service_role']::text[]),
+      ('public.invoice_line_items_valid(jsonb)', '14fa666068165ba7e56c9e975b95637cc43087efce23ef2e5899fadd3221c7ee', array['postgres']::text[]),
+      ('public.merge_wines(uuid,uuid)', '67d17b5d5d091fa2c7495c39552cc47074b4fbc1b5e108bf46ec00dd19a7ce63', array['authenticated', 'postgres']::text[]),
+      ('public.mirror_bin_code_to_inventory_items()', '0b3abc25c95d636b8d460d9585fb512a92f49757921f82f1fbb37e329da8124f', array['postgres']::text[]),
+      ('public.patch_inventory_item_private(uuid,timestamp with time zone,boolean,integer,boolean,numeric,boolean,text,boolean,uuid,boolean,text,boolean,text,boolean,text)', '0683075e50e26e1081bac9c4d8b79658f14cbcb1ffaa06c326c9284afb77c5d7', array['authenticated', 'postgres']::text[]),
+      ('public.read_cellar_health_private(uuid,uuid[])', '8b024de11c7ba70bf966c837e8ce01919c39ea0a7c7e49d6f797e0f79cd7345a', array['authenticated', 'postgres']::text[]),
+      ('public.read_current_operational_memberships(uuid)', 'dfb8579fc556d2452ae22adba63ef3088bae0f9015c0ddd8ed48128b5682801d', array['authenticated', 'postgres']::text[]),
+      ('public.read_identity_merge_private(uuid)', '14d8d116468407934a282681accaf13d849c130f48b3efb8ec9e886134cf51ad', array['authenticated', 'postgres']::text[]),
+      ('public.read_import_batch_cost_rows(uuid,integer,integer)', 'ce87c85a3306b9849599bc1745decd264fbd139db78942376a2a4d6adac9cb5e', array['authenticated', 'postgres']::text[]),
+      ('public.read_import_batch_display_rows(uuid,integer,integer)', 'b28f41c8a6f2456003606987cf93910ccd61fe2a2ca40fd21e25e5154fa63c51', array['authenticated', 'postgres']::text[]),
+      ('public.read_inventory_costs(uuid,uuid[])', 'fb079bf12d27f6a8f428efee9c582642e66b8a2073f25c0ea5b36e6ece2d15d9', array['authenticated', 'postgres']::text[]),
+      ('public.read_invoice_image_target(uuid,integer)', 'e2d08429a6b596d9398e735619559de72c7a721565433e4435a70912b44dc4cd', array['authenticated', 'postgres']::text[]),
+      ('public.read_invoice_scan_deletion_private(uuid)', 'aed40799e0d0336b978bf39ce524d4fd0d8961b2b3eced8de022c75137d2dfea', array['authenticated', 'postgres']::text[]),
+      ('public.read_invoice_scan_private(uuid)', 'ac9902982db511cd6f40ffe071eebaf857185e7194832348db3e7bdbb7ba07dd', array['authenticated', 'postgres']::text[]),
+      ('public.read_pricing_recommendations(uuid)', '42116ffeb0ed148f5ea5b10b26acf0fa48d40bdd8f77b4aedad7d035113c6d9b', array['authenticated', 'postgres']::text[]),
+      ('public.read_reconcile_action_private(uuid)', '3fbc77af972fce6be95442315d4aa5276be1b01df72aebd25f31fcd9cd170ca8', array['authenticated', 'postgres']::text[]),
+      ('public.read_restaurant_pricing_defaults(uuid)', 'f36c2010ea6230e70404b7ed6f6d8743089d21058a59d37a45f600b474f570d8', array['authenticated', 'postgres']::text[]),
+      ('public.read_wine_cost_flags(uuid,uuid[])', '353cfa564326324f0e8f9b9a4c428149329b1e771c190f31cc476a896ab2d0e6', array['authenticated', 'postgres']::text[]),
+      ('public.read_wine_pricing_strategy(uuid,uuid[])', 'a967eaf8316c0d5e464547b6e2d6defc261232a5194dd560eb2f6f09c1997db4', array['authenticated', 'postgres']::text[]),
+      ('public.receive_bottle_at_location_private(uuid,uuid,uuid,text,uuid)', '31c4a0c6efcf721a087156009180e70d7d5dc99d0860ab319183d74f523a16c1', array['authenticated', 'postgres']::text[]),
+      ('public.reclaim_stuck_invoice_extract_jobs(integer)', 'f1e6a13067a346672d03ab6b9a6b319e8c8c432e80043d508b8195d251e971a5', array['postgres', 'service_role']::text[]),
+      ('public.request_invoice_scan_reextract(uuid)', '1f345ab5f150b506f0f14bfd61434302e7c91fa25b3be9bb07c80d8245d2dec2', array['authenticated', 'postgres']::text[]),
+      ('public.resolve_import_batch_row(uuid,text,numeric)', 'cb93a65b4d8a5e16b0918e577884d44f10ff04c43e90c21ca48942ec73be96f2', array['authenticated', 'postgres']::text[]),
+      ('public.revert_import_batch_core_private(uuid,uuid[])', 'e13f22d4254e056c92c6cfd475d255cc35b52386b97feb54d239967205ea4a02', array['postgres']::text[]),
+      ('public.revert_import_batch_private(uuid)', '028d7f870987625ce254303e2a02c6ef362e5b4363ebd46dbe887d3082ae4088', array['authenticated', 'postgres']::text[]),
+      ('public.revert_import_batch(uuid)', '7beb1e2b6e3c01c01b3d4eb45324469688dd7dc63e54e0315029bdb45f83c285', array['authenticated', 'postgres']::text[]),
+      ('public.revert_import_session(uuid)', '2c77c68620352cc7c1f4655f6aa7b7c7fd1960487b9bac80c540630177accac9', array['authenticated', 'postgres']::text[]),
+      ('public.review_invoice_scan(uuid,timestamp with time zone,text,text,date,jsonb,jsonb)', '381fb4db77e0441bb6070bfe6c18cca47ffd8e28f314eb242af197b2cc1006a4', array['authenticated', 'postgres']::text[]),
+      ('public.save_bottle_inventory_private(uuid,uuid,text,text,integer,text,text,text,text,integer,numeric)', 'b39aaa105b186ae14b879b91a512297cf884a4352a427cf0a5b932fa1d8b95da', array['authenticated', 'postgres']::text[]),
+      ('public.set_restaurant_pricing_defaults(uuid,numeric,numeric)', '11930a20c1d8cce6b1f6b7564c570fb12616899507b92203d00fea3dc1e5611c', array['authenticated', 'postgres']::text[]),
+      ('public.set_wine_overpaid_flag(uuid,uuid,boolean)', 'dd71644d40c44f79c7a8db2bb767cce815a80db5cd5ac259bf355d9ebed4760d', array['authenticated', 'postgres']::text[]),
+      ('public.set_wine_pricing_strategy(uuid,uuid,numeric,numeric)', 'a14d69c3c4e1dc53a98e8dbf9004d2382f5c5651e2499fca858aae13fd6fc7d7', array['authenticated', 'postgres']::text[]),
+      ('public.undo_reconcile_batch(uuid)', '5bb6bd5585ba7b67895f01717fb039ffe4163c836cbfd9fdf4f6b0586bc58071', array['authenticated', 'postgres']::text[]),
+      ('public.wine_enrichment_metadata_valid(jsonb)', '9b0471b5138c5a0d266192d415ded210db54072336e928aecbb125a032a8e649', array['authenticated', 'postgres', 'service_role']::text[]),
+      ('public.wine_manual_overrides_valid(text[])', '768ff4923f2a861ed7292769c8ad5fde70ccc05117f2e457d41042050634b6bc', array['authenticated', 'postgres', 'service_role']::text[])
+    ), resolved as (
+      select e.signature, e.definition_sha256,
+        case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature in ('public.claim_invoice_extract_job(text)',
+            'public.reclaim_stuck_invoice_extract_jobs(integer)',
+            'public.enqueue_invoice_extract_job(uuid,uuid)')
+          then array['anon', 'authenticated', 'postgres', 'service_role']::text[]
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and e.signature = 'public.dismiss_pricing_alert(uuid,integer)'
+          then array['PUBLIC', 'anon', 'authenticated', 'postgres', 'service_role']::text[]
+        else e.grantees end as grantees,
+        p.oid, p.proname, p.proowner, p.prokind, p.proacl
+      from expected e left join pg_catalog.pg_proc p
+      on p.oid = pg_catalog.to_regprocedure(e.signature)
+    )
+    select 1 from resolved r
+    where r.oid is null or r.proowner <> pg_catalog.to_regrole('postgres') or r.prokind <> 'f'
+      or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+        pg_catalog.pg_get_functiondef(r.oid), 'UTF8')), 'hex') <> r.definition_sha256
+      or array(select case when a.grantee = 0 then 'PUBLIC'
+          else pg_catalog.pg_get_userbyid(a.grantee)::text end
+        from pg_catalog.aclexplode(coalesce(r.proacl, pg_catalog.acldefault('f', r.proowner))) a
+        order by (case when a.grantee = 0 then 'PUBLIC'
+          else pg_catalog.pg_get_userbyid(a.grantee) end) collate "C") <> r.grantees
+      or exists (
+        select 1 from pg_catalog.aclexplode(coalesce(r.proacl, pg_catalog.acldefault('f', r.proowner))) a
+        where a.grantor <> pg_catalog.to_regrole('postgres') or a.is_grantable
+          or a.privilege_type <> 'EXECUTE'
+      )
+      or exists (
+        select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = r.proname
+          and not exists (select 1 from resolved admitted where admitted.oid = p.oid)
+      )
+  ) then
+    raise exception 'C04_0165_ROUTINE_DEPENDENCY_DRIFT' using errcode = 'P0001';
+  end if;
+  if exists (
+    with expected(relation_name, constraint_name, constraint_type, definition_sha256) as (values
+      ('background_jobs', 'background_jobs_attempt_window', 'c', '4fbad9b056940bf3916eb0392ca26776c5a298c72906b7e940fdff5d95e07166'),
+      ('background_jobs', 'background_jobs_job_type_check', 'c', '067ffb3d13ff4ec6a287523e8ce9007b2c8fd22032390fdfa35dd27f2eb0f483'),
+      ('background_jobs', 'background_jobs_status_check', 'c', 'a3543a9b48beb3fe479f6a8c08cbc6099aca913ce65a6e9c4b2e72fbd7fc9a61'),
+      ('invoice_scans', 'invoice_scans_image_paths_valid_check', 'c', 'c0fc7187a3c97149d99fe06228384627019c860b7966b27363d2734eeedbda51'),
+      ('scan_idempotency', 'scan_idempotency_pkey', 'p', 'a4ead6746766b1dfbedce39f875b7005601651248a496f375f33e7f70c973b65'),
+      ('wines', 'wines_enrichment_metadata_valid_check', 'c', '72fe9823fcc2ba003214d62b9d63fd25e6fafbc6601f5b3c4711037da2012005'),
+      ('wines', 'wines_manual_overrides_valid_check', 'c', '857d6bbea8a2fcc814be21aa11c93fbb26cc3dd857c241a8263ea22b45618508')
+    )
+    select 1 from expected e
+    left join pg_catalog.pg_constraint c
+      on c.conrelid = pg_catalog.to_regclass('public.' || e.relation_name)
+      and c.conname = e.constraint_name
+    where c.oid is null or c.contype::text <> e.constraint_type
+      or not c.convalidated or c.condeferrable or c.condeferred
+      or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+        pg_catalog.pg_get_constraintdef(c.oid, true), 'UTF8')), 'hex') <> e.definition_sha256
+  ) then
+    raise exception 'C04_0165_CONSTRAINT_DEPENDENCY_DRIFT' using errcode = 'P0001';
+  end if;
+  if (select pg_catalog.count(*) from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname in ('inventory_items', 'wines', 'restaurants', 'pricing_recommendations', 'invoice_scans', 'invoice_scan_deletions', 'reconcile_actions', 'identity_merge_log', 'import_batch_rows', 'cellar_health', 'scan_idempotency')
+        and c.relkind = 'r' and c.relowner = pg_catalog.to_regrole('postgres')
+        and c.relrowsecurity and not c.relforcerowsecurity) <> 11
+    or exists (
+      select 1 from pg_catalog.pg_depend d join pg_catalog.pg_class seq on seq.oid = d.objid
+      join pg_catalog.pg_class c on c.oid = d.refobjid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where d.classid = 'pg_catalog.pg_class'::pg_catalog.regclass
+        and d.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass and d.deptype in ('a', 'i')
+        and seq.relkind = 'S' and n.nspname = 'public' and c.relname in ('inventory_items', 'wines', 'restaurants', 'pricing_recommendations', 'invoice_scans', 'invoice_scan_deletions', 'reconcile_actions', 'identity_merge_log', 'import_batch_rows', 'cellar_health', 'scan_idempotency')
+    ) then
+    raise exception 'C04_0165_RELATION_OR_SEQUENCE_DRIFT' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from storage.buckets b where b.id = 'invoice-images' and b.name = 'invoice-images'
+      and b.public is false and b.file_size_limit = 20971520
+      and b.allowed_mime_types = case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        then array['image/jpeg','image/png','image/webp','image/gif','application/pdf']::text[]
+        else array['image/jpeg','image/png','image/heic','image/heif','application/pdf']::text[] end
+  ) then
+    raise exception 'C04_0165_INVOICE_BUCKET_DRIFT' using errcode = 'P0001';
+  end if;
+  select pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    coalesce(pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), ''), 'UTF8'
+  )), 'hex') into v_hash from (
+  select pg_catalog.array_to_json(array[
+    n.nspname::text, c.relname::text, pg_catalog.pg_get_userbyid(c.relowner),
+    case when c.relrowsecurity then 't' else 'f' end,
+    case when c.relforcerowsecurity then 't' else 'f' end,
+    p.polname::text, case when p.polpermissive then 't' else 'f' end,
+    p.polcmd::text,
+    array(select case when r.role_oid = 0 then 'PUBLIC'
+      else pg_catalog.pg_get_userbyid(r.role_oid) end
+      from pg_catalog.unnest(p.polroles) r(role_oid)
+      order by 1)::text,
+    coalesce(pg_catalog.pg_get_expr(p.polqual, p.polrelid, false), ''),
+    coalesce(pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false), '')
+  ]::text[])::text as row_json
+  from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage' and c.relname = 'objects'
+  ) captured;
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then 'bd884801329f87ec2d757a091fc3e5474e2862f13db5a402c0fcd333e7f5b7e6' else 'e1fe621ce2259ec98853b54e0e94a051b4915313573a5cef2fcb38c9029c4b0f' end) then
+    raise exception 'C04_0165_FULL_STORAGE_POLICY_DRIFT' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_catalog_admission$;
+
+-- Hosted postgres policy DDL is delegated by the registered, non-session-settable
+-- supautils.policy_grants utility hook; LOCK TABLE itself uses normal privileges.
+-- Official source: supabase/supautils 2bf495db5dfc212896a75045abfe991ee70c4075,
+-- src/table_grants.c and src/supautils.c. Keep the effective owner lane for D.
+do $c04_0165_storage_authority$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and (
+        pg_catalog.pg_has_role(current_user, c.relowner, 'USAGE')
+        or (
+          pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+          and current_user = 'postgres' and session_user = 'postgres'
+          and pg_catalog.has_schema_privilege(current_user, n.oid, 'USAGE')
+          and pg_catalog.has_table_privilege(
+            current_user, c.oid, 'MAINTAIN,UPDATE,DELETE,TRUNCATE'
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            where s.name = 'session_preload_libraries' and s.context = 'superuser'
+              and s.source = 'configuration file' and s.setting = 'supautils'
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            where s.name = 'supautils.policy_grants'
+              and s.context = 'sighup' and s.source = 'configuration file'
+              and (s.setting::jsonb -> 'postgres') @> '["storage.objects"]'::jsonb
+          )
+          and exists (
+            select 1 from pg_catalog.pg_settings s
+            join pg_catalog.pg_roles r on r.rolname = s.setting
+            where s.name = 'supautils.superuser' and s.context = 'sighup'
+              and s.setting = 'supabase_admin' and r.rolsuper
+          )
+        )
+      )
+  ) then
+    raise exception 'C04_0165_STORAGE_POLICY_DDL_AUTHORITY_MISSING' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_storage_authority$;
+
+-- Admit validator definitions before invoking them as the privileged operator.
+do $c04_0165_locked_history_admission$
+begin
+  if exists (
+    select 1 from public.wines w
+     where not public.wine_manual_overrides_valid(w.manual_overrides)
+        or not public.wine_enrichment_metadata_valid(w.enrichment_metadata)
+  ) then
+    raise exception 'C04_0165_WINE_METADATA_HISTORY_INVALID' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.invoice_scans s
+     where not public.invoice_image_paths_valid(
+       s.restaurant_id, s.id, s.raw_image_path, s.extra_image_paths
+     )
+  ) then
+    raise exception 'C04_0165_INVOICE_PATH_HISTORY_INVALID' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.scan_idempotency c
+     where c.created_at >= statement_timestamp() - interval '24 hours'
+       and (
+         c.claimed_by_user_id is null
+         or (
+           (c.response_status is null and c.response_body in (
+             pg_catalog.jsonb_build_object(
+               'version', 1, 'kind', 'invoice_scan_upload', 'status', 'claimed'
+             ),
+             pg_catalog.jsonb_build_object(
+               'version', 1, 'kind', 'invoice_inventory_save', 'status', 'claimed'
+             ),
+             pg_catalog.jsonb_build_object(
+               'version', 1, 'kind', 'bottle_inventory_save', 'status', 'claimed'
+             )
+           ))
+           or (c.response_status = 202
+             and pg_catalog.jsonb_typeof(c.response_body) = 'object'
+             and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(c.response_body)) = 5
+             and c.response_body @> '{"version":1,"kind":"invoice_scan_upload","status":"queued","itemCount":0}'::pg_catalog.jsonb
+             and pg_catalog.jsonb_typeof(c.response_body->'scanId') = 'string'
+             and exists (
+               select 1 from public.invoice_scans s
+                where s.id::text = c.response_body->>'scanId'
+                  and s.restaurant_id = c.restaurant_id
+             ))
+           or (c.response_status = 200
+             and pg_catalog.jsonb_typeof(c.response_body) = 'object'
+             and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(c.response_body)) = 6
+             and c.response_body @> '{"version":1,"kind":"invoice_inventory_save","status":"committed"}'::pg_catalog.jsonb
+             and pg_catalog.jsonb_typeof(c.response_body->'scanId') = 'string'
+             and pg_catalog.jsonb_typeof(c.response_body->'itemCount') = 'number'
+             and pg_catalog.jsonb_typeof(c.response_body->'wineCount') = 'number'
+             and (c.response_body->>'itemCount') ~ '^[0-9]+$'
+             and (c.response_body->>'wineCount') ~ '^[0-9]+$'
+             and (c.response_body->>'itemCount')::numeric between 0 and 500
+             and (c.response_body->>'wineCount')::numeric between 0
+               and (c.response_body->>'itemCount')::numeric
+             and exists (
+               select 1 from public.invoice_scans s
+                where s.id::text = c.response_body->>'scanId'
+                  and s.restaurant_id = c.restaurant_id
+             ))
+           or (c.response_status = 200
+             and pg_catalog.jsonb_typeof(c.response_body) = 'object'
+             and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(c.response_body)) = 5
+             and c.response_body @> '{"version":1,"kind":"bottle_inventory_save","status":"committed","itemCount":1}'::pg_catalog.jsonb
+             and pg_catalog.jsonb_typeof(c.response_body->'wineId') = 'string'
+             and exists (
+               select 1 from public.wines w
+                where w.id::text = c.response_body->>'wineId'
+                  and w.restaurant_id = c.restaurant_id
+             ))
+         ) is distinct from true
+       )
+  ) then
+    raise exception 'C04_0165_ACTIVE_RETRY_CACHE_HISTORY_INVALID' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_locked_history_admission$;
+
+revoke all privileges on table
+  public.inventory_items, public.wines, public.restaurants,
+  public.pricing_recommendations, public.invoice_scans,
+  public.invoice_scan_deletions, public.reconcile_actions,
+  public.identity_merge_log, public.import_batch_rows, public.cellar_health,
+  public.scan_idempotency
+from authenticated;
+
+grant select (
+  added_at, added_via, bin_id, bin_location, currency, format, id,
+  invoice_scan_id, quantity, restaurant_id, section, updated_at, wine_id
+) on public.inventory_items to authenticated;
+
+grant select (
+  alert_snoozed_until, canonical_wine_id, colour, country, created_at,
+  decant_minutes, drink_window_basis, drink_window_end, drink_window_set_at,
+  drink_window_set_by, drink_window_start, eightysixed_at, eightysixed_by,
+  enrichment_metadata, hero_image_url, id, is_eightysixed, last_enriched_at,
+  lineage_id, lwin_id, lwin_match_score, manual_overrides, name, peak_year,
+  producer, rating, rating_source, region, restaurant_id, retail_max,
+  retail_median, retail_min, retail_refreshed_at, retail_retailer_count,
+  review_excerpt, serving_temp_label, serving_temp_max, serving_temp_min,
+  size_ml, tasting_notes, updated_at, varietal, vintage, wine_variant_id
+) on public.wines to authenticated;
+
+grant select (
+  auto_eightysix_from_inventory, created_at, eightysix_ml_threshold,
+  eightysix_strategy, id, logo_url, name, updated_at, workspace_id,
+  workspace_kind
+) on public.restaurants to authenticated;
+
+grant select (
+  accuracy_score, committed_at, created_at, created_by, distributor_name, id,
+  invoice_date, invoice_number, item_count, restaurant_id, status,
+  status_reason, updated_at
+) on public.invoice_scans to authenticated;
+
+grant select (
+  bottles_removed, deleted_at, deleted_by, distributor_name, id,
+  inventory_rows_deleted, invoice_number, invoice_scan_id, item_count,
+  restaurant_id, scan_status
+) on public.invoice_scan_deletions to authenticated;
+
+grant select (
+  action_type, batch_id, created_at, id, ordinal, restaurant_id, subject_id,
+  subject_table
+) on public.reconcile_actions to authenticated;
+
+grant select (
+  id, merge_type, merged_at, merged_by, moved_counts, restaurant_id,
+  source_id, target_id
+) on public.identity_merge_log to authenticated;
+
+grant select (
+  applied_inventory_item_id, applied_wine_id, apply_attempts, apply_status,
+  batch_id, cost_status, created_at, duplicate_reason, id, lwin_id,
+  lwin_score, lwin_status, resolution, resolved_at, resolved_by,
+  restaurant_id, row_number, row_state, updated_at
+) on public.import_batch_rows to authenticated;
+
+grant select (computed_at, id, restaurant_id, wine_id)
+  on public.cellar_health to authenticated;
+
+grant insert (
+  alert_snoozed_until, canonical_wine_id, colour, country, decant_minutes,
+  drink_window_basis, drink_window_end, drink_window_set_at,
+  drink_window_set_by, drink_window_start, eightysixed_at, eightysixed_by,
+  hero_image_url, id, is_eightysixed, last_enriched_at, lineage_id, lwin_id,
+  lwin_match_score, name, peak_year, producer, rating, rating_source, region,
+  restaurant_id, retail_max, retail_median, retail_min, retail_refreshed_at,
+  retail_retailer_count, review_excerpt, serving_temp_label,
+  serving_temp_max, serving_temp_min, size_ml, tasting_notes, varietal,
+  vintage, wine_variant_id
+) on public.wines to authenticated;
+
+grant update (
+  alert_snoozed_until, canonical_wine_id, colour, country, decant_minutes,
+  drink_window_basis, drink_window_end, drink_window_set_at,
+  drink_window_set_by, drink_window_start, eightysixed_at, eightysixed_by,
+  hero_image_url, is_eightysixed, last_enriched_at, lineage_id, lwin_id,
+  lwin_match_score, name, peak_year, producer, rating, rating_source, region,
+  retail_max, retail_median, retail_min, retail_refreshed_at,
+  retail_retailer_count, review_excerpt, serving_temp_label,
+  serving_temp_max, serving_temp_min, size_ml, tasting_notes, updated_at,
+  varietal, vintage, wine_variant_id
+) on public.wines to authenticated;
+
+grant insert (
+  auto_eightysix_from_inventory, eightysix_ml_threshold, eightysix_strategy,
+  id, logo_url, name, workspace_id, workspace_kind
+) on public.restaurants to authenticated;
+grant update (
+  auto_eightysix_from_inventory, eightysix_ml_threshold, eightysix_strategy,
+  logo_url, name, updated_at
+) on public.restaurants to authenticated;
+
+revoke execute on function public.dismiss_pricing_alert(uuid,integer)
+  from public, anon, authenticated, service_role;
+
+drop policy "members can read invoice images" on storage.objects;
+create policy "members can read invoice images"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'invoice-images'
+    and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$'
+    and exists (
+      select 1
+        from public.read_invoice_image_target(
+          substring(name from '^[^/]+/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})')::uuid,
+          coalesce(substring(name from '_page([1-8])[.]')::integer - 1, 0)
+        ) target
+       where target.object_name = name
+    )
+  );
+
+drop policy "members can upload invoice images" on storage.objects;
+create policy "members can upload invoice images"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'invoice-images'
+    and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$'
+    and exists (
+      select 1
+        from public.read_current_operational_memberships((select auth.uid())) member
+       where member.restaurant_id = ((storage.foldername(name))[1])::uuid
+    )
+  );
+
+do $c04_0165_postflight$
+declare v_hash text;
+begin
+  select pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    coalesce(pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), ''), 'UTF8'
+  )), 'hex') into v_hash from (
+  with targets as (
+    select c.oid, c.relname, c.relowner, c.relacl
+    from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname in ('inventory_items', 'wines', 'restaurants', 'pricing_recommendations', 'invoice_scans', 'invoice_scan_deletions', 'reconcile_actions', 'identity_merge_log', 'import_batch_rows', 'cellar_health', 'scan_idempotency')
+  ), acl_rows as (
+    select t.relname, ''::text as column_name, t.relowner, a.*
+    from targets t cross join lateral pg_catalog.aclexplode(
+      coalesce(t.relacl, pg_catalog.acldefault('r', t.relowner))) a
+    union all
+    select t.relname, c.attname::text, t.relowner, a.*
+    from targets t join pg_catalog.pg_attribute c on c.attrelid = t.oid
+      and c.attnum > 0 and not c.attisdropped and c.attacl is not null
+    cross join lateral pg_catalog.aclexplode(c.attacl) a
+  )
+  select pg_catalog.array_to_json(array[
+    'public', a.relname::text, a.column_name, pg_catalog.pg_get_userbyid(a.relowner),
+    pg_catalog.pg_get_userbyid(a.grantor),
+    case when a.grantee = 0 then 'PUBLIC' else pg_catalog.pg_get_userbyid(a.grantee) end,
+    a.privilege_type, case when a.is_grantable then 't' else 'f' end
+  ]::text[])::text as row_json from acl_rows a
+  ) captured;
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '453a8013bb768e7e83a98905a6dbdfcc2b729a7413aab48d4b7565a1640649aa' else 'e6a44f7cf6a3d23a391db720c9707fb9fe749ec1bdda0fdd7dfdd125b22e44fd' end) then
+    raise exception 'C04_0165_FULL_CONTRACT_ACL_DRIFT' using errcode = 'P0001';
+  end if;
+  if (select pg_catalog.count(*) from pg_catalog.pg_policy
+      where polrelid = 'storage.objects'::pg_catalog.regclass) <> (case
+        when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on' then 6 else 5 end)
+    or exists (
+      select 1 from pg_catalog.pg_policy p
+      where p.polrelid = 'storage.objects'::pg_catalog.regclass
+        and (not p.polpermissive
+          or p.polroles <> array[pg_catalog.to_regrole('authenticated')]::oid[])
+    ) then
+    raise exception 'C04_0165_POLICY_SET_DRIFT' using errcode = 'P0001';
+  end if;
+  select pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    coalesce(pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), ''), 'UTF8'
+  )), 'hex') into v_hash from (
+  select pg_catalog.array_to_json(array[
+    n.nspname::text, c.relname::text, pg_catalog.pg_get_userbyid(c.relowner),
+    case when c.relrowsecurity then 't' else 'f' end,
+    case when c.relforcerowsecurity then 't' else 'f' end,
+    p.polname::text, case when p.polpermissive then 't' else 'f' end,
+    p.polcmd::text,
+    array(select case when r.role_oid = 0 then 'PUBLIC'
+      else pg_catalog.pg_get_userbyid(r.role_oid) end
+      from pg_catalog.unnest(p.polroles) r(role_oid)
+      order by 1)::text,
+    coalesce(pg_catalog.pg_get_expr(p.polqual, p.polrelid, false), ''),
+    coalesce(pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false), '')
+  ]::text[])::text as row_json
+  from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage' and c.relname = 'objects'
+    and (p.polname in ('members can delete wine images', 'members can update wine images', 'members can upload wine images')
+      or (pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+        and p.polname = 'members can read wine images'))
+  ) captured;
+  if v_hash is distinct from (case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then '51c8f43961616831da012bc662fd3421bb0e986a12b7c09ef51926fb6213ee99' else 'e49c5f1a9073eef48d97a40728ae6f91de78f9776f55929dcd4eed238218c0f0' end) then
+    raise exception 'C04_0165_WINE_POLICY_DRIFT' using errcode = 'P0001';
+  end if;
+
+  if pg_catalog.has_table_privilege('authenticated', 'public.inventory_items', 'SELECT')
+     or pg_catalog.has_table_privilege('authenticated', 'public.wines', 'SELECT')
+     or pg_catalog.has_table_privilege('authenticated', 'public.restaurants', 'SELECT')
+     or pg_catalog.has_table_privilege('authenticated', 'public.pricing_recommendations', 'SELECT')
+     or pg_catalog.has_table_privilege('authenticated', 'public.invoice_scans', 'SELECT')
+     or pg_catalog.has_table_privilege('authenticated', 'public.scan_idempotency', 'SELECT') then
+    raise exception 'C04_0165_TABLE_PRIVILEGE_REMAINS' using errcode = 'P0001';
+  end if;
+  if not pg_catalog.has_column_privilege(
+       'authenticated', 'public.inventory_items', 'quantity', 'SELECT'
+     )
+     or pg_catalog.has_column_privilege(
+       'authenticated', 'public.inventory_items', 'unit_cost', 'SELECT'
+     )
+     or pg_catalog.has_column_privilege(
+       'authenticated', 'public.wines', 'pricing_target_markup_ratio', 'SELECT'
+     )
+     or pg_catalog.has_column_privilege(
+       'authenticated', 'public.invoice_scans', 'raw_image_path', 'SELECT'
+     ) then
+    raise exception 'C04_0165_COLUMN_PRIVILEGE_INVALID' using errcode = 'P0001';
+  end if;
+  if pg_catalog.has_function_privilege(
+       'authenticated', 'public.dismiss_pricing_alert(uuid,integer)', 'EXECUTE'
+     ) then
+    raise exception 'C04_0165_LEGACY_DISMISS_EXECUTE_REMAINS' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and p.polname = 'members can read invoice images'
+      and p.polcmd = 'r' and p.polpermissive
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and pg_catalog.pg_get_expr(p.polqual, p.polrelid, false)
+        like '%read_invoice_image_target%'
+      and pg_catalog.pg_get_expr(p.polqual, p.polrelid, false)
+        not like '%is_member(%'
+  ) or not exists (
+    select 1 from pg_catalog.pg_policy p
+    join pg_catalog.pg_class c on c.oid = p.polrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'
+      and pg_catalog.pg_get_userbyid(c.relowner) = 'supabase_storage_admin'
+      and p.polname = 'members can upload invoice images'
+      and p.polcmd = 'a' and p.polpermissive and p.polqual is null
+      and p.polroles = array[(select oid from pg_catalog.pg_roles where rolname = 'authenticated')]
+      and pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false)
+        like '%(_page[1-8])%'
+      and pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false)
+        like '%read_current_operational_memberships%'
+      and pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false)
+        not like '%is_member(%'
+  ) then
+    raise exception 'C04_0165_STORAGE_POLICY_POSTIMAGE_INVALID' using errcode = 'P0001';
+  end if;
+end;
+$c04_0165_postflight$;
+
+-- Preserve the exact hosted rollback choice atomically with the migration.
+-- NULL is the original D/CI marker; no caller-supplied restoration profile exists.
+insert into supabase_migrations.schema_migrations(version, name, statements)
+values ('0165', 'staff_cost_seal_contract',
+  case when pg_catalog.current_setting('terroir.c04_0165_hosted_baseline', true) = 'on'
+    then array['-- C04_0165_HOSTED_BASELINE_ACL_SHA256|a8a92931df21d2d4e7e114389351e73453b0c8b02564539cd022e07ec953423f']::text[] else null end);
+select 'C04_0165_APPLIED_STORAGE_POLICY_SHA256|' ||
+  pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    pg_catalog.string_agg(row_json, E'\n' order by row_json collate "C"), 'UTF8'
+  )), 'hex')
+from (
+  select pg_catalog.array_to_json(array[
+    n.nspname::text, c.relname::text, pg_catalog.pg_get_userbyid(c.relowner),
+    case when c.relrowsecurity then 't' else 'f' end,
+    case when c.relforcerowsecurity then 't' else 'f' end,
+    p.polname::text, case when p.polpermissive then 't' else 'f' end,
+    p.polcmd::text,
+    array(select case when r.role_oid = 0 then 'PUBLIC'
+      else pg_catalog.pg_get_userbyid(r.role_oid) end
+      from pg_catalog.unnest(p.polroles) r(role_oid)
+      order by 1)::text,
+    coalesce(pg_catalog.pg_get_expr(p.polqual, p.polrelid, false), ''),
+    coalesce(pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid, false), '')
+  ]::text[])::text as row_json
+  from pg_catalog.pg_policy p join pg_catalog.pg_class c on c.oid = p.polrelid
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage' and c.relname = 'objects'
+) captured;
+notify pgrst, 'reload schema';
+commit;
+
+-- === 0166_reconcile_lineage_poststate.sql ===
+-- 0166_reconcile_lineage_poststate.sql
+-- Preserve derivation-owned lineage hardening. A rejected lineage change
+-- must not produce an accepted action history; undo must restore actual state.
+-- Caller owns the migration-plus-ledger transaction. Existing rows are untouched.
+
+do $c04_0166_forward_admission$
+begin
+  if exists (
+    select 1
+      from (values
+        (
+          'public.accept_reconcile_batch(uuid,jsonb,uuid)'::text,
+          'a0a2c184d486303e02e0cfbaf8b53cc516c89dc54811e0d85679dddb2a7cff36'::text,
+          '["p_restaurant_id", "p_actions", "p_idempotency_key"]'::pg_catalog.jsonb
+        ),
+        (
+          'public.undo_reconcile_batch(uuid)'::text,
+          '99619be5de0e9c6cc79dbb17167e3483c7352e1f7a950260438d7a61340a95de'::text,
+          '["p_batch_id"]'::pg_catalog.jsonb
+        )
+      ) expected(identity, body_sha256, argument_names)
+      left join pg_catalog.pg_proc p
+        on p.oid = pg_catalog.to_regprocedure(expected.identity)
+     where p.oid is null
+        or pg_catalog.encode(
+             pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')),
+             'hex'
+           ) is distinct from expected.body_sha256
+        or pg_catalog.pg_get_userbyid(p.proowner) is distinct from 'postgres'
+        or p.prolang is distinct from (
+             select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+           )
+        or p.prorettype is distinct from pg_catalog.to_regtype('pg_catalog.jsonb')
+        or p.prokind is distinct from 'f'
+        or p.provolatile is distinct from 'v'
+        or p.prosecdef is distinct from true
+        or p.proisstrict is distinct from false
+        or p.proretset is distinct from false
+        or p.proparallel is distinct from 'u'
+        or p.proleakproof is distinct from false
+        or p.procost is distinct from 100::real
+        or p.prorows is distinct from 0::real
+        or p.pronargdefaults is distinct from 0
+        or p.provariadic is distinct from 0::pg_catalog.oid
+        or p.prosupport is distinct from 0::pg_catalog.oid
+        or p.proconfig is distinct from array['search_path=""']::text[]
+        or pg_catalog.to_jsonb(p.proacl) is distinct from
+             '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+        or pg_catalog.to_jsonb(p.proargnames) is distinct from expected.argument_names
+        or p.proargmodes is not null
+        or p.proallargtypes is not null
+        or p.protrftypes is not null
+        or p.proargdefaults is not null
+        or p.prosqlbody is not null
+        or p.probin is not null
+  ) then
+    raise exception 'C04_0166_FORWARD_ADMISSION_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c04_0166_forward_admission$;
+
+create or replace function public.accept_reconcile_batch(
+  p_restaurant_id uuid,p_actions jsonb,p_idempotency_key uuid
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid()); v_action jsonb; v_patch jsonb; v_record public.reconcile_actions%rowtype;
+  v_index integer; v_subject_id uuid; v_bin_id uuid; v_wine_id uuid; v_lineage_id uuid;
+  v_line_index integer; v_prior jsonb; v_new jsonb; v_lines jsonb; v_expected jsonb; v_bin_code text;
+  v_existing public.reconcile_batches%rowtype;
+  v_existing_found boolean;
+  v_error text;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'manager') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_idempotency_key is null or p_actions is null or jsonb_typeof(p_actions)<>'array' then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+  if jsonb_array_length(p_actions) not between 1 and 100 then
+    raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+  end if;
+
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    if jsonb_typeof(v_action)<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    if (select count(*) from jsonb_object_keys(v_action))<>4
+       or not (v_action ?& array['action_type','subject_table','subject_id','patch'])
+       or exists(select 1 from jsonb_object_keys(v_action) k where k not in ('action_type','subject_table','subject_id','patch'))
+       or jsonb_typeof(v_action->'action_type')<>'string'
+       or jsonb_typeof(v_action->'subject_table')<>'string'
+       or jsonb_typeof(v_action->'subject_id')<>'string'
+       or (v_action->>'subject_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+       or jsonb_typeof(v_action->'patch')<>'object' then
+      raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+    end if;
+    v_patch:=v_action->'patch';
+    if v_action->>'action_type'='place_bin' then
+      if v_action->>'subject_table'<>'inventory_items' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'bin_id') or jsonb_typeof(v_patch->'bin_id')<>'string'
+         or (v_patch->>'bin_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='match_scan' then
+      if v_action->>'subject_table'<>'invoice_scans' or (select count(*) from jsonb_object_keys(v_patch))<>3
+         or not (v_patch?&array['line_index','wine_id','expected_line'])
+         or exists(select 1 from jsonb_object_keys(v_patch) k where k not in ('line_index','wine_id','expected_line'))
+         or jsonb_typeof(v_patch->'line_index')<>'number'
+         or (v_patch->>'line_index')::numeric<>trunc((v_patch->>'line_index')::numeric)
+         or (v_patch->>'line_index')::numeric not between 0 and 499
+         or jsonb_typeof(v_patch->'wine_id')<>'string'
+         or (v_patch->>'wine_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+         or not public.invoice_line_items_valid(jsonb_build_array(v_patch->'expected_line')) then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='link_lineage' then
+      if v_action->>'subject_table'<>'wines' or (select count(*) from jsonb_object_keys(v_patch))<>1
+         or not (v_patch?'lineage_id') or jsonb_typeof(v_patch->'lineage_id')<>'string'
+         or (v_patch->>'lineage_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    elsif v_action->>'action_type'='dismiss' then
+      if v_action->>'subject_table' not in ('inventory_items','invoice_scans','wines')
+         or (select count(*) from jsonb_object_keys(v_patch))<>0 then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      end if;
+    else raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001'; end if;
+    v_index:=v_index+1;
+  end loop;
+  if exists(
+    select 1 from (
+      select (a->>'subject_table')||':'||(a->>'subject_id')||
+             case when a->>'action_type'='match_scan' then ':'||(a->'patch'->>'line_index') else '' end as k,
+             count(*) from jsonb_array_elements(p_actions) a group by 1 having count(*)>1
+    ) duplicates
+  ) then raise exception 'C04_RECONCILE_DUPLICATE_SUBJECT' using errcode='P0001'; end if;
+
+  -- Existing idempotency rows lock before their subjects, matching undo.
+  -- New batches have no row yet and serialize on the later unique insert.
+  select * into v_existing from public.reconcile_batches b
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id for update;
+  v_existing_found:=found;
+
+  -- Shared identity mutations lock exact-site rows in scan -> wine ->
+  -- inventory order. match_scan wine targets are wine locks too even though
+  -- their subject_table is invoice_scans.
+  perform 1 from public.invoice_scans s join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='invoice_scans'
+  ) q on q.id=s.id
+   where s.restaurant_id=p_restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join (
+    select (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='wines'
+    union
+    select (a->'patch'->>'wine_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'action_type'='match_scan'
+  ) q on q.id=w.id
+   where w.restaurant_id=p_restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join (
+    select distinct (a->>'subject_id')::uuid id from jsonb_array_elements(p_actions) a
+     where a->>'subject_table'='inventory_items'
+  ) q on q.id=ii.id
+   where ii.restaurant_id=p_restaurant_id order by ii.id for update of ii;
+
+  if v_existing_found then
+    if v_existing.restaurant_id is distinct from p_restaurant_id
+       or v_existing.created_by is distinct from v_actor
+       or v_existing.action_count is distinct from jsonb_array_length(p_actions)
+       or v_existing.undone_at is not null then
+      raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+    end if;
+    v_index:=0;
+    for v_action in select value from jsonb_array_elements(p_actions) loop
+      select * into v_record from public.reconcile_actions a
+       where a.batch_id=p_idempotency_key and a.restaurant_id=p_restaurant_id
+         and a.ordinal=v_index;
+      if not found or v_record.action_type is distinct from v_action->>'action_type'
+         or v_record.subject_table is distinct from v_action->>'subject_table'
+         or v_record.subject_id is distinct from (v_action->>'subject_id')::uuid then
+        raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+      end if;
+      v_patch:=v_action->'patch';
+      if (v_record.action_type='place_bin' and v_record.new_state->>'bin_id' is distinct from v_patch->>'bin_id')
+         or (v_record.action_type='link_lineage' and v_record.new_state->>'lineage_id' is distinct from v_patch->>'lineage_id')
+         or (v_record.action_type='dismiss' and (v_record.prior_state<>'{}'::jsonb or v_record.new_state<>'{}'::jsonb))
+         or (v_record.action_type='match_scan' and (
+           v_record.prior_state->'final_line_items'->((v_patch->>'line_index')::integer) is distinct from v_patch->'expected_line'
+           or v_record.new_state->'final_line_items'->((v_patch->>'line_index')::integer)->>'wine_id' is distinct from v_patch->>'wine_id'
+         )) then raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001'; end if;
+      v_index:=v_index+1;
+    end loop;
+    return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_existing.action_count,'status','accepted');
+  end if;
+
+  insert into public.reconcile_batches(id,restaurant_id,created_by,action_count)
+  values(p_idempotency_key,p_restaurant_id,v_actor,0);
+  v_index:=0;
+  for v_action in select value from jsonb_array_elements(p_actions) loop
+    v_patch:=v_action->'patch'; v_subject_id:=(v_action->>'subject_id')::uuid;
+    if v_action->>'action_type'='place_bin' then
+      v_bin_id:=(v_patch->>'bin_id')::uuid;
+      select jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)
+        into v_prior from public.inventory_items ii
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id;
+      select b.code into v_bin_code from public.bins b
+       where b.id=v_bin_id and b.restaurant_id=p_restaurant_id and b.retired_at is null;
+      if v_prior is null or v_bin_code is null or v_prior->'bin_id'<>'null'::jsonb then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_new:=jsonb_build_object('bin_id',v_bin_id,'bin_location',v_bin_code);
+      update public.inventory_items ii set bin_id=v_bin_id,bin_location=v_bin_code
+       where ii.id=v_subject_id and ii.restaurant_id=p_restaurant_id and ii.bin_id is null;
+      if not found then raise exception 'reconcile_subject_conflict' using errcode='P0001'; end if;
+    elsif v_action->>'action_type'='match_scan' then
+      v_line_index:=(v_patch->>'line_index')::integer; v_wine_id:=(v_patch->>'wine_id')::uuid;
+      select s.final_line_items into v_lines from public.invoice_scans s
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id and s.committed_at is null;
+      if v_lines is null or jsonb_typeof(v_lines)<>'array' or jsonb_array_length(v_lines)<=v_line_index
+         or v_lines->v_line_index is distinct from v_patch->'expected_line'
+         or not exists(select 1 from public.wines w where w.id=v_wine_id and w.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      v_prior:=jsonb_build_object('final_line_items',v_lines);
+      v_lines:=jsonb_set(v_lines,array[v_line_index::text],(v_patch->'expected_line')||jsonb_build_object('wine_id',v_wine_id),false);
+      v_new:=jsonb_build_object('final_line_items',v_lines);
+      update public.invoice_scans s set final_line_items=v_lines
+       where s.id=v_subject_id and s.restaurant_id=p_restaurant_id;
+    elsif v_action->>'action_type'='link_lineage' then
+      v_lineage_id:=(v_patch->>'lineage_id')::uuid;
+      select jsonb_build_object('lineage_id',w.lineage_id) into v_prior from public.wines w
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id;
+      if v_prior is null or not exists(select 1 from public.wine_lineages l
+        where l.id=v_lineage_id and l.restaurant_id=p_restaurant_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+      update public.wines w set lineage_id=v_lineage_id
+       where w.id=v_subject_id and w.restaurant_id=p_restaurant_id
+       returning jsonb_build_object('lineage_id',w.lineage_id) into v_new;
+      if v_new is distinct from jsonb_build_object('lineage_id',v_lineage_id) then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      end if;
+    else
+      if (v_action->>'subject_table'='inventory_items' and not exists(select 1 from public.inventory_items x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='invoice_scans' and not exists(select 1 from public.invoice_scans x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id))
+         or (v_action->>'subject_table'='wines' and not exists(select 1 from public.wines x where x.id=v_subject_id and x.restaurant_id=p_restaurant_id)) then
+        raise exception 'reconcile_subject_not_found' using errcode='P0002';
+      end if;
+      v_prior:='{}'::jsonb; v_new:='{}'::jsonb;
+    end if;
+    insert into public.reconcile_actions(
+      batch_id,restaurant_id,action_type,subject_table,subject_id,ordinal,prior_state,new_state
+    ) values (
+      p_idempotency_key,p_restaurant_id,v_action->>'action_type',v_action->>'subject_table',
+      v_subject_id,v_index,v_prior,v_new
+    );
+    v_index:=v_index+1;
+  end loop;
+  update public.reconcile_batches b set action_count=v_index
+   where b.id=p_idempotency_key and b.restaurant_id=p_restaurant_id;
+  return jsonb_build_object('batchId',p_idempotency_key,'actionCount',v_index,'status','accepted');
+exception
+  when invalid_text_representation or numeric_value_out_of_range then
+    raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode='42501';
+  when unique_violation then
+    raise exception 'reconcile_batch_conflict' using errcode='23505';
+  when sqlstate 'P0002' then
+    get stacked diagnostics v_error = message_text;
+    if v_error = 'reconcile_subject_not_found' then
+      raise exception 'reconcile_subject_not_found' using errcode='P0002';
+    end if;
+    raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+  when sqlstate 'P0001' then
+    get stacked diagnostics v_error = message_text;
+    case v_error
+      when 'C04_RECONCILE_BATCH_INVALID' then
+        raise exception 'C04_RECONCILE_BATCH_INVALID' using errcode='P0001';
+      when 'C04_RECONCILE_ACTION_INVALID' then
+        raise exception 'C04_RECONCILE_ACTION_INVALID' using errcode='P0001';
+      when 'C04_RECONCILE_DUPLICATE_SUBJECT' then
+        raise exception 'C04_RECONCILE_DUPLICATE_SUBJECT' using errcode='P0001';
+      when 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' then
+        raise exception 'C04_RECONCILE_IDEMPOTENCY_CONFLICT' using errcode='P0001';
+      when 'reconcile_subject_conflict' then
+        raise exception 'reconcile_subject_conflict' using errcode='P0001';
+      else
+        raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+    end case;
+  when others then
+    raise exception 'C04_RECONCILE_ACCEPT_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+create or replace function public.undo_reconcile_batch(p_batch_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare
+  v_actor uuid:=(select auth.uid());
+  v_batch public.reconcile_batches%rowtype;
+  v_action public.reconcile_actions%rowtype;
+  v_now timestamptz;
+  v_error text;
+  v_restored jsonb;
+begin
+  select * into v_batch from public.reconcile_batches b
+   where b.id=p_batch_id
+     and public.current_site_role_at_least(b.restaurant_id,'manager')
+   for update;
+  if not found or v_actor is null then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if v_batch.undone_at is not null then raise exception 'reconcile_batch_already_undone' using errcode='P0001'; end if;
+  perform 1 from public.reconcile_actions a
+   where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+   order by a.ordinal for update;
+  perform 1 from public.invoice_scans s join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='invoice_scans' and a.subject_id=s.id
+   where s.restaurant_id=v_batch.restaurant_id order by s.id for update of s;
+  perform 1 from public.wines w join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='wines' and a.subject_id=w.id
+   where w.restaurant_id=v_batch.restaurant_id order by w.id for update of w;
+  perform 1 from public.inventory_items ii join public.reconcile_actions a
+    on a.batch_id=p_batch_id and a.subject_table='inventory_items' and a.subject_id=ii.id
+   where ii.restaurant_id=v_batch.restaurant_id order by ii.id for update of ii;
+  for v_action in select * from public.reconcile_actions a
+    where a.batch_id=p_batch_id and a.restaurant_id=v_batch.restaurant_id
+      and a.ordinal<v_batch.action_count
+    order by a.ordinal desc
+  loop
+    if v_action.action_type='place_bin' then
+      if not exists(select 1 from public.inventory_items ii where ii.id=v_action.subject_id
+        and ii.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('bin_id',ii.bin_id,'bin_location',ii.bin_location)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.inventory_items ii set
+        bin_id=(v_action.prior_state->>'bin_id')::uuid,
+        bin_location=v_action.prior_state->>'bin_location'
+      where ii.id=v_action.subject_id and ii.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='match_scan' then
+      if not exists(select 1 from public.invoice_scans s where s.id=v_action.subject_id
+        and s.restaurant_id=v_batch.restaurant_id
+        and s.final_line_items=v_action.new_state->'final_line_items') then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.invoice_scans s set final_line_items=v_action.prior_state->'final_line_items'
+       where s.id=v_action.subject_id and s.restaurant_id=v_batch.restaurant_id;
+    elsif v_action.action_type='link_lineage' then
+      if not exists(select 1 from public.wines w where w.id=v_action.subject_id
+        and w.restaurant_id=v_batch.restaurant_id
+        and jsonb_build_object('lineage_id',w.lineage_id)=v_action.new_state) then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+      update public.wines w set lineage_id=(v_action.prior_state->>'lineage_id')::uuid
+       where w.id=v_action.subject_id and w.restaurant_id=v_batch.restaurant_id
+       returning jsonb_build_object('lineage_id',w.lineage_id) into v_restored;
+      if v_restored is distinct from v_action.prior_state then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      end if;
+    elsif v_action.action_type<>'dismiss' then
+      raise exception 'reconcile_action_invalid' using errcode='P0001';
+    end if;
+  end loop;
+  v_now:=statement_timestamp();
+  update public.reconcile_batches b set undone_at=v_now,undone_by=v_actor
+   where b.id=p_batch_id and b.restaurant_id=v_batch.restaurant_id and b.undone_at is null;
+  if not found then raise exception 'reconcile_batch_conflict' using errcode='P0001'; end if;
+  return jsonb_build_object('batchId',p_batch_id,'actionCount',v_batch.action_count,'status','undone','undoneAt',v_now);
+exception
+  when sqlstate '42501' then
+    raise exception 'forbidden' using errcode='42501';
+  when sqlstate 'P0001' then
+    get stacked diagnostics v_error = message_text;
+    case v_error
+      when 'reconcile_batch_already_undone' then
+        raise exception 'reconcile_batch_already_undone' using errcode='P0001';
+      when 'reconcile_subject_changed' then
+        raise exception 'reconcile_subject_changed' using errcode='P0001';
+      when 'reconcile_action_invalid' then
+        raise exception 'reconcile_action_invalid' using errcode='P0001';
+      when 'reconcile_batch_conflict' then
+        raise exception 'reconcile_batch_conflict' using errcode='P0001';
+      else
+        raise exception 'C04_RECONCILE_UNDO_REFUSED' using errcode='P0001';
+    end case;
+  when others then
+    raise exception 'C04_RECONCILE_UNDO_REFUSED' using errcode='P0001';
+end;
+$function$;
+
+do $c04_0166_forward_postcondition$
+begin
+  if exists (
+    select 1
+      from (values
+        (
+          'public.accept_reconcile_batch(uuid,jsonb,uuid)'::text,
+          '1a3f0f31410ea0a83fac4297e0b98dc974aaa85127adb923fa3e989f9677ed29'::text,
+          '["p_restaurant_id", "p_actions", "p_idempotency_key"]'::pg_catalog.jsonb
+        ),
+        (
+          'public.undo_reconcile_batch(uuid)'::text,
+          '5efc5d09d1a9a08a5b8566449406b2e8481e043318bc12513a6dfca7cd1440e1'::text,
+          '["p_batch_id"]'::pg_catalog.jsonb
+        )
+      ) expected(identity, body_sha256, argument_names)
+      left join pg_catalog.pg_proc p
+        on p.oid = pg_catalog.to_regprocedure(expected.identity)
+     where p.oid is null
+        or pg_catalog.encode(
+             pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')),
+             'hex'
+           ) is distinct from expected.body_sha256
+        or pg_catalog.pg_get_userbyid(p.proowner) is distinct from 'postgres'
+        or p.prolang is distinct from (
+             select l.oid from pg_catalog.pg_language l where l.lanname = 'plpgsql'
+           )
+        or p.prorettype is distinct from pg_catalog.to_regtype('pg_catalog.jsonb')
+        or p.prokind is distinct from 'f'
+        or p.provolatile is distinct from 'v'
+        or p.prosecdef is distinct from true
+        or p.proisstrict is distinct from false
+        or p.proretset is distinct from false
+        or p.proparallel is distinct from 'u'
+        or p.proleakproof is distinct from false
+        or p.procost is distinct from 100::real
+        or p.prorows is distinct from 0::real
+        or p.pronargdefaults is distinct from 0
+        or p.provariadic is distinct from 0::pg_catalog.oid
+        or p.prosupport is distinct from 0::pg_catalog.oid
+        or p.proconfig is distinct from array['search_path=""']::text[]
+        or pg_catalog.to_jsonb(p.proacl) is distinct from
+             '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+        or pg_catalog.to_jsonb(p.proargnames) is distinct from expected.argument_names
+        or p.proargmodes is not null
+        or p.proallargtypes is not null
+        or p.protrftypes is not null
+        or p.proargdefaults is not null
+        or p.prosqlbody is not null
+        or p.probin is not null
+  ) then
+    raise exception 'C04_0166_FORWARD_POSTCONDITION_MISMATCH' using errcode = 'P0001';
+  end if;
+end;
+$c04_0166_forward_postcondition$;
+
+-- === 0167_invoice_upload_resume.sql ===
+-- Insert-only uploads need no invoice-image SELECT or UPDATE permission.
+-- A boolean boundary admits only the current actor's exact pending page.
+-- Caller owns the migration-plus-ledger transaction; existing rows are untouched.
+do $invoice_creator_preimage$
+declare v_function pg_catalog.pg_proc%rowtype;
+begin
+  select p.* into v_function from pg_catalog.pg_proc p
+   where p.oid=pg_catalog.to_regprocedure('public.create_invoice_scan_upload(uuid,uuid,text,text,text,date)');
+  if not found or pg_catalog.pg_get_userbyid(v_function.proowner) is distinct from 'postgres'
+     or v_function.prosecdef is distinct from true
+     or v_function.proconfig is distinct from array['search_path=""']::text[]
+     or pg_catalog.to_jsonb(v_function.proacl) is distinct from
+       '["postgres=X/postgres", "authenticated=X/postgres"]'::pg_catalog.jsonb
+     or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_function.prosrc,'UTF8')),'hex')
+        is distinct from '733e75fdf63e71eb956a4cb798a341e2f7d291a14469b1f6838b68c5fed1be1f' then
+    raise exception 'C04_0167_CREATOR_BASELINE_MISMATCH' using errcode='P0001';
+  end if;
+end;
+$invoice_creator_preimage$;
+
+create function public.can_resume_invoice_upload(
+  p_restaurant_id uuid,
+  p_scan_id uuid,
+  p_object_name text,
+  p_sha256 text,
+  p_byte_size integer,
+  p_mime_type text
+) returns boolean
+language sql stable security definer set search_path = ''
+as $function$
+  select coalesce(
+    (select auth.uid()) is not null
+    and p_scan_id is not null
+    and p_object_name ~ ('^' || p_restaurant_id::text || '/' || p_scan_id::text
+      || '(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$')
+    and p_sha256 ~ '^[0-9a-f]{64}$'
+    and p_byte_size between 1 and 10485760
+    and p_mime_type in ('image/jpeg','image/png','image/heic','image/heif','application/pdf')
+    and public.current_site_role_at_least(p_restaurant_id,'staff')
+    and exists (
+      select 1 from public.scan_idempotency c
+       where c.restaurant_id=p_restaurant_id and c.key=p_scan_id
+         and c.claimed_by_user_id=(select auth.uid())
+         and c.response_status is null
+         and c.response_body='{"version":1,"kind":"invoice_scan_upload","status":"claimed"}'::jsonb
+         and c.created_at > statement_timestamp()-interval '24 hours'
+    )
+    and not exists (select 1 from public.invoice_scans s where s.id=p_scan_id)
+    and exists (
+      select 1 from storage.objects o
+       where o.bucket_id='invoice-images' and o.name=p_object_name
+         and coalesce(nullif(o.owner_id,''),o.owner::text)=(select auth.uid())::text
+         and o.user_metadata->>'sha256'=p_sha256
+         and o.metadata->'size'=to_jsonb(p_byte_size)
+         and o.metadata->>'mimetype'=p_mime_type
+    ), false
+  );
+$function$;
+
+alter function public.can_resume_invoice_upload(uuid,uuid,text,text,integer,text) owner to postgres;
+revoke all on function public.can_resume_invoice_upload(uuid,uuid,text,text,integer,text)
+  from public,anon,authenticated,service_role;
+grant execute on function public.can_resume_invoice_upload(uuid,uuid,text,text,integer,text)
+  to authenticated;
+
+-- The exact request manifest prevents stale or cross-actor pages from being
+-- silently adopted by the internal pre-0167 creator's prefix aggregation.
+create function public.create_invoice_scan_upload_manifest(
+  p_restaurant_id uuid, p_scan_id uuid, p_object_name text,
+  p_distributor_name text, p_invoice_number text, p_invoice_date date,
+  p_object_names text[]
+) returns jsonb
+language plpgsql security definer set search_path = ''
+as $function$
+declare v_actor uuid:=(select auth.uid()); v_names text[]; v_expected text[];
+ v_prefix text:=p_restaurant_id::text||'/'||p_scan_id::text;
+ v_primary text; v_extra jsonb; v_count integer; v_pdf_count integer; v_page_count integer;
+begin
+  if v_actor is null or not public.current_site_role_at_least(p_restaurant_id,'staff') then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_object_names is null or array_ndims(p_object_names) is distinct from 1
+     or cardinality(p_object_names) not between 1 and 8
+     or p_object_names[1] is distinct from p_object_name
+     or (select count(distinct n) from unnest(p_object_names) n) <> cardinality(p_object_names)
+     or exists(select 1 from unnest(p_object_names) n where n is null
+       or n !~ ('^'||v_prefix||'(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$')) then
+    raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+  end if;
+  select array_agg(n order by n collate "C") into v_expected from unnest(p_object_names) n;
+  select array_agg(o.name order by o.name collate "C") into v_names from storage.objects o
+   where o.bucket_id='invoice-images'
+     and o.name ~ ('^'||v_prefix||'(_page[1-8])?[.](jpg|jpeg|png|heic|heif|pdf)$');
+  if v_names is distinct from v_expected
+     or exists(select 1 from storage.objects o where o.bucket_id='invoice-images'
+       and o.name=any(p_object_names)
+       and coalesce(nullif(o.owner_id,''),o.owner::text) is distinct from v_actor::text) then
+    raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+  end if;
+  if p_distributor_name is null or octet_length(p_distributor_name) not between 1 and 500
+     or (p_invoice_number is not null and octet_length(p_invoice_number)>500) then
+    raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+  end if;
+  -- Never reaggregate the prefix through the old helper. Concurrent appended
+  -- pages cannot enter this exact manifest/actor-filtered final object set.
+  select count(*)::integer,
+         count(*) filter(where lower(right(o.name,4))='.pdf')::integer,
+         count(*) filter(where o.name ~ ('^'||v_prefix||'_page[1-8][.](jpg|jpeg|png|heic|heif)$'))::integer,
+         min(o.name) filter(where o.name=p_object_name),
+         coalesce(jsonb_agg(o.name order by o.name) filter(where o.name<>p_object_name),'[]'::jsonb)
+    into v_count,v_pdf_count,v_page_count,v_primary,v_extra
+    from storage.objects o
+   where o.bucket_id='invoice-images' and o.name=any(p_object_names)
+     and coalesce(nullif(o.owner_id,''),o.owner::text)=v_actor::text
+     and coalesce((o.metadata->>'size')::numeric,-1) between 1 and 10485760
+     and o.metadata->>'mimetype' in ('image/jpeg','image/png','image/heic','image/heif','application/pdf');
+  if v_primary is null or v_count<>cardinality(p_object_names)
+     or (v_pdf_count>0 and (v_pdf_count<>1 or v_count<>1))
+     or (v_count>1 and v_page_count<>v_count)
+     or (v_count>1 and exists(select 1 from generate_series(1,v_count) n
+       where not exists(select 1 from unnest(p_object_names) object_name
+         where object_name ~ ('^'||v_prefix||'_page'||n::text||'[.](jpg|jpeg|png|heic|heif)$')))) then
+    raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+  end if;
+  insert into public.invoice_scans(
+    id,restaurant_id,created_by,distributor_name,invoice_number,invoice_date,
+    raw_image_path,extra_image_paths,parsed_line_items,final_line_items,edits,item_count,status
+  ) values(p_scan_id,p_restaurant_id,v_actor,p_distributor_name,p_invoice_number,p_invoice_date,
+    p_object_name,v_extra,'[]'::jsonb,'[]'::jsonb,'{}'::jsonb,0,'processing');
+  perform public.enqueue_invoice_extract_job(p_restaurant_id,p_scan_id);
+  return jsonb_build_object('scanId',p_scan_id,'status','queued');
+exception
+  when sqlstate '42501' then raise exception 'forbidden' using errcode='42501';
+  when unique_violation then raise exception 'scan_upload_conflict' using errcode='23505';
+  when others then raise exception 'C04_SCAN_UPLOAD_REFUSED' using errcode='P0001';
+end;
+$function$;
+alter function public.create_invoice_scan_upload_manifest(uuid,uuid,text,text,text,date,text[]) owner to postgres;
+revoke all on function public.create_invoice_scan_upload_manifest(uuid,uuid,text,text,text,date,text[])
+  from public,anon,authenticated,service_role;
+grant execute on function public.create_invoice_scan_upload_manifest(uuid,uuid,text,text,text,date,text[])
+  to authenticated;
+revoke execute on function public.create_invoice_scan_upload(uuid,uuid,text,text,text,date)
+  from authenticated;

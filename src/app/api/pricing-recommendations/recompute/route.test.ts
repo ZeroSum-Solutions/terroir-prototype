@@ -113,13 +113,19 @@ describe("POST /api/pricing-recommendations/recompute", () => {
     mockResolveSitePricingAccess.mockResolvedValue(manageAccess());
     mockCreateClient.mockReturnValue(admin);
     mockRunRecompute.mockResolvedValue({
-      recommended: 1,
-      classes: { feature_btg: 1 },
+      version: 1,
+      kind: "pricing_recommendations_recompute",
+      status: "succeeded",
     });
 
     const response = await POST();
 
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      version: 1,
+      kind: "pricing_recommendations_recompute",
+      status: "succeeded",
+    });
     expect(mockResolveSitePricingAccess).toHaveBeenCalledWith(
       authenticatedClient,
       "restaurant-1",
@@ -134,6 +140,23 @@ describe("POST /api/pricing-recommendations/recompute", () => {
       "restaurant-1",
       "user-1",
     );
+  });
+
+  it("rejects a legacy or expanded recompute result", async () => {
+    mockRequireMembership.mockResolvedValue(authResult("staff"));
+    mockResolveSitePricingAccess.mockResolvedValue(manageAccess());
+    mockCreateClient.mockReturnValue({ kind: "admin" });
+    mockRunRecompute.mockResolvedValue({
+      version: 1,
+      kind: "pricing_recommendations_recompute",
+      status: "succeeded",
+      classes: { feature_btg: 1 },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await POST();
+
+    expect(response.status).toBe(500);
   });
 
   it("returns a redacted 500 when the job fails", async () => {
