@@ -22,6 +22,13 @@ const batchReceipt = {
 } as const;
 
 describe("revertImportBatchRpc", () => {
+  it("accepts PostgreSQL's canonical receipt for an uppercase batch UUID", async () => {
+    const canonicalId = "abcdefab-1234-4567-89ab-abcdefabcdef";
+    const receipt = { ...batchReceipt, batchId: canonicalId };
+    expect(await revertImportBatchRpc(client({ data: receipt, error: null }) as never, canonicalId.toUpperCase()))
+      .toEqual({ ok: true, receipt });
+  });
+
   it("calls only the typed user-scoped entry and accepts its exact retained-catalog receipt", async () => {
     const supabase = client({ data: batchReceipt, error: null });
 
@@ -146,6 +153,13 @@ describe("revertImportSessionRpc", () => {
     expect(supabase.rpc).toHaveBeenCalledWith("revert_import_session", {
       p_session_id: SESSION_ID,
     });
+  });
+
+  it("accepts PostgreSQL's canonical receipt for an uppercase session UUID", async () => {
+    const canonicalId = "abcdefab-1234-4567-89ab-abcdefabcdef";
+    const canonicalReceipt = { ...receipt, sessionId: canonicalId };
+    expect(await revertImportSessionRpc(client({ data: canonicalReceipt, error: null }) as never, canonicalId.toUpperCase()))
+      .toEqual({ ok: true, receipt: canonicalReceipt });
   });
 
   it.each([

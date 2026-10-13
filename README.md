@@ -28,7 +28,7 @@ prototype improvement.
 - Node.js >= 20
 - pnpm >= 9
 - A Supabase project (URL + publishable key + service-role key)
-- An Anthropic API key
+- An OpenRouter API key (`OPENROUTER_API_KEY`)
 - Azure Document Intelligence endpoint + key
 - (Optional) An AssemblyAI API key — speech-to-text for voice cellar search
   (`ASSEMBLYAI_API_KEY`). Without it the voice-resolve route fails closed.
@@ -137,7 +137,7 @@ The target is [Railway](https://railway.app/). `railway.toml` at the repo root d
 Before your first deploy, set these as Railway service variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY`
 - `AZURE_DOC_INTELLIGENCE_ENDPOINT`, `AZURE_DOC_INTELLIGENCE_KEY`
 - `ASSEMBLYAI_API_KEY` (optional; enables voice cellar search)
 - `WINE_SEARCHER_API_KEY` (optional; enables retail-price enrichment)
@@ -145,9 +145,10 @@ Before your first deploy, set these as Railway service variables:
 
 See `.env.example` for the full list with notes.
 
-The protected `staging` branch has a separately deployed Railway and Supabase
-environment. Its required smoke check binds the deployed candidate to the Git
-SHA. A separate PR-preview health workflow exists, but `main` branch protection
+Production and staging have separate Railway web services but currently share
+one Supabase project; staging is not an isolated database rehearsal. The staging
+smoke check binds the deployed candidate to its Git SHA. A separate PR-preview
+health workflow exists, but `main` branch protection
 does not currently require it. Do not use a PR preview with production data,
 provider credentials, or a production service-role key. See
 [`docs/STAGING-SETUP.md`](docs/STAGING-SETUP.md) for the current gate state,

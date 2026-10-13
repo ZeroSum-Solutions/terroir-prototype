@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "ref": "WORKTREE-at-c4bf61b453706925d2c97646250c0b3ac686b260",
+  "base": {
+    "status": "UNAVAILABLE",
+    "value": null,
+    "unavailable_reason": "At the recorded source-admission snapshot the portable candidate and import repairs were uncommitted. This is the reduced broad-history fallback, not the later immutable application range or final portable candidate certificate.",
+    "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:14"}]
+  },
+  "scope": {
+    "changed_paths": [
+      "scripts/local/restaurant-demo/fixture.sql",
+      "scripts/local/restaurant-demo/journey.mjs",
+      "scripts/local/restaurant-demo/launcher.mjs",
+      "scripts/local/restaurant-demo/portable-demo.test.mjs",
+      "src/app/api/import/sessions/[id]/revert/route.test.ts",
+      "src/app/api/import/sessions/[id]/revert/route.ts",
+      "src/domains/import/import-revert-rpc.test.ts",
+      "src/domains/import/import-revert-rpc.ts"
+    ],
+    "captured_diff_paths": [
+      "scripts/local/restaurant-demo/fixture.sql",
+      "scripts/local/restaurant-demo/journey.mjs",
+      "scripts/local/restaurant-demo/launcher.mjs",
+      "scripts/local/restaurant-demo/portable-demo.test.mjs",
+      "src/app/api/import/sessions/[id]/revert/route.test.ts",
+      "src/app/api/import/sessions/[id]/revert/route.ts",
+      "src/domains/import/import-revert-rpc.test.ts",
+      "src/domains/import/import-revert-rpc.ts"
+    ],
+    "path_classification": [
+      {"path": "scripts/local/restaurant-demo/fixture.sql", "surfaces": ["authentication", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "scripts/local/restaurant-demo/fixture.sql:47"}]},
+      {"path": "scripts/local/restaurant-demo/journey.mjs", "surfaces": ["secrets", "authentication", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "scripts/local/restaurant-demo/journey.mjs:206"}]},
+      {"path": "scripts/local/restaurant-demo/launcher.mjs", "surfaces": ["secrets", "authentication", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "scripts/local/restaurant-demo/launcher.mjs:163"}]},
+      {"path": "scripts/local/restaurant-demo/portable-demo.test.mjs", "surfaces": ["secrets", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "scripts/local/restaurant-demo/portable-demo.test.mjs:36"}]},
+      {"path": "src/app/api/import/sessions/[id]/revert/route.test.ts", "surfaces": ["authentication", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md:180"}]},
+      {"path": "src/app/api/import/sessions/[id]/revert/route.ts", "surfaces": ["authentication", "authorization", "untrusted-input"], "evidence": [{"class": "STATIC", "citation": "src/app/api/import/sessions/[id]/revert/route.ts:24"}]},
+      {"path": "src/domains/import/import-revert-rpc.test.ts", "surfaces": ["untrusted-input"], "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/import-current-review.md:58"}]},
+      {"path": "src/domains/import/import-revert-rpc.ts", "surfaces": ["untrusted-input"], "evidence": [{"class": "STATIC", "citation": "src/domains/import/import-revert-rpc.ts:93"}]}
+    ],
+    "sensitive_surfaces": ["secrets", "authentication", "authorization", "untrusted-input"],
+    "diff_command_id": "CMD-109",
+    "evidence": [{"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:89"}]
+  },
+  "commands": [
+    {
+      "id": "CMD-109",
+      "purpose": "diff",
+      "command": "git diff --name-only HEAD -- 'src/app/api/import/sessions/[id]/revert/route.ts' 'src/app/api/import/sessions/[id]/revert/route.test.ts' scripts/local/restaurant-demo/launcher.mjs scripts/local/restaurant-demo/journey.mjs scripts/local/restaurant-demo/fixture.sql scripts/local/restaurant-demo/portable-demo.test.mjs src/domains/import/import-revert-rpc.ts src/domains/import/import-revert-rpc.test.ts",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "scope": "Tracked selected WORKTREE delta before ffced31d; untracked package files separately hash-reviewed as expanded context",
+      "evidence": [{"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:89"}],
+      "unavailable_reason": null
+    },
+    {
+      "id": "CMD-108",
+      "purpose": "secrets-scan",
+      "command": "gitleaks detect --source . --no-banner --redact",
+      "outcome": "FINDINGS",
+      "exit_code": 1,
+      "scope": "WORKTREE",
+      "evidence": [{"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:88"}],
+      "unavailable_reason": null
+    }
+  ],
+  "exports": {
+    "state": "NONE",
+    "items": [],
+    "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:118"}],
+    "unavailable_reason": null
+  },
+  "secrets_scan": {
+    "result": "FINDINGS",
+    "command_id": "CMD-108",
+    "scope": "REDUCED",
+    "comparison": null,
+    "evidence": [{"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:88"}],
+    "unavailable_reason": null
+  },
+  "export_policy": {
+    "result": "PASS",
+    "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:118"}],
+    "unavailable_reason": null
+  },
+  "coverage": [
+    {"surface": "prompt-injection", "state": "NOT-APPLICABLE", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:113"}], "unavailable_reason": null},
+    {"surface": "secrets", "state": "REVIEWED", "evidence": [{"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:88"}], "unavailable_reason": null},
+    {"surface": "authentication", "state": "REVIEWED", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:115"}], "unavailable_reason": null},
+    {"surface": "authorization", "state": "REVIEWED", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:116"}], "unavailable_reason": null},
+    {"surface": "untrusted-input", "state": "REVIEWED", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:117"}], "unavailable_reason": null},
+    {"surface": "export", "state": "NOT-APPLICABLE", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:118"}], "unavailable_reason": null}
+  ],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "origin": "SECRETS-SCAN",
+      "severity": "MEDIUM",
+      "surface": "secrets",
+      "evidence": [
+        {"class": "COMMAND", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:88"},
+        {"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:Historical scanner metadata appendix"}
+      ],
+      "exploit_or_failure": "The reduced scan of 857 historical commits reported ten credential-shaped matches. They are known historical findings outside the captured delta, not independently dispositioned here; three dotenv-example matches are excluded from runtime copying, three historical files are now absent, and unchanged test-path matches still require separate historical triage. This finding records the adverse broad-history scan and triage gap, not a verified new application leak or a denial of the separately admitted local synthetic execution.",
+      "disposition": "OPEN",
+      "recheck": {"status": "NOT-REQUIRED", "command_id": null, "evidence": [], "unavailable_reason": null},
+      "owner": {"status": "ASSIGNED", "name": "Terroir project owner", "evidence": [{"class": "STATIC", "citation": "docs/evidence/restaurant-demo-20261001/portable-source-review.md:120"}], "unavailable_reason": null},
+      "acceptance": {"status": "NOT-REQUIRED", "evidence": [], "unavailable_reason": null},
+      "compensating_control": null
+    }
+  ],
+  "verdict": "FAIL"
+}

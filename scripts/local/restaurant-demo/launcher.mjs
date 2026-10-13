@@ -2,22 +2,30 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { cp, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { cp, lstat, mkdir, readFile, readdir, readlink, realpath, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { RAW_PROJECT_LABELS, admitLocalDockerDaemon, assertCleanupAdmitted, assertDockerSocketIdentity, assertNamespaceAbsent, cleanupOwnedStack, createOwnedNetwork, namespaceResources, readDockerInventory, readProjectDockerInventory, recordOwnedStack } from "./docker-lifecycle.mjs";
+import { PRESERVED_D, admitPreservedDBootstrap, admitPreservedDPrivacyReceipt, assertFrozenPreservedDSource, assertPreservedDDockerDaemon, assertPreservedDSettings, runPreservedDContinuation, sha256 } from "./preserved-d-continuation.mjs";
 
 export const EXECUTION_ACK = "I_ACKNOWLEDGE_DISPOSABLE_RESTAURANT_DEMO";
 const PROJECT_ID = /^terroir-demo-[a-z0-9][a-z0-9-]{2,40}$/;
 const EMAIL = /^[a-z0-9][a-z0-9.+_-]*@terroir\.test$/i;
 const OWNERSHIP_MARKER = ".terroir-demo-owned.json";
+let admittedDockerDaemon;
 
 export function parseLauncherArgs(argv) {
   const values = new Map();
   let execute = false;
+  let bootstrapOnly = false;
+  let continuePreservedD = false;
   for (const raw of argv) {
     if (raw === "--execute") { execute = true; continue; }
+    if (raw === "--bootstrap-only") { bootstrapOnly = true; continue; }
+    if (raw === "--continue-preserved-d") { continuePreservedD = true; continue; }
     const match = raw.match(/^--([^=]+)=(.+)$/);
     assert(match, `invalid argument: ${raw}`);
     assert(!values.has(match[1]), `duplicate argument: --${match[1]}`);
@@ -28,7 +36,11 @@ export function parseLauncherArgs(argv) {
     "db-port", "shadow-port", "studio-port", "mail-port", "app-port",
     "owner-email", "staff-email",
   ];
-  const allowed = new Set([...required, "ack"]);
+  const continuationOnly = [
+    "privacy-receipt", "privacy-receipt-sha256", "privacy-migration-sha256",
+    "privacy-review-sha256", "reviewed-launcher-sha256",
+  ];
+  const allowed = new Set([...required, "ack", "journey-width", ...continuationOnly]);
   for (const key of values.keys()) assert(allowed.has(key), `unknown argument: --${key}`);
   for (const key of required) assert(values.has(key), `missing argument: --${key}=...`);
   const ports = Object.fromEntries(
@@ -46,21 +58,38 @@ export function parseLauncherArgs(argv) {
     projectId: values.get("project-id"),
     ownerEmail: values.get("owner-email"),
     staffEmail: values.get("staff-email"),
-    ack: values.get("ack"), execute, ports,
+    ack: values.get("ack"), execute, bootstrapOnly, continuePreservedD, ports,
+    journeyWidth: Number(values.get("journey-width") ?? 390),
+    privacyReceipt: values.get("privacy-receipt"),
+    privacyReceiptSha256: values.get("privacy-receipt-sha256"),
+    privacyMigrationSha256: values.get("privacy-migration-sha256"),
+    privacyReviewSha256: values.get("privacy-review-sha256"),
+    reviewedLauncherSha256: values.get("reviewed-launcher-sha256"),
   };
+  assert([390, 1200].includes(result.journeyWidth), "journey width must be 390 or 1200");
   assert(PROJECT_ID.test(result.projectId), "project ID must use the terroir-demo-* disposable namespace");
   assert(EMAIL.test(result.ownerEmail), "owner email must be synthetic @terroir.test");
   assert(EMAIL.test(result.staffEmail), "staff email must be synthetic @terroir.test");
   assert.notEqual(result.ownerEmail.toLowerCase(), result.staffEmail.toLowerCase(), "synthetic emails must be distinct");
   for (const [label, target] of [["runtime", result.runtimeRoot], ["evidence", result.evidenceDir]]) {
+    assert(path.isAbsolute(values.get(label === "runtime" ? "runtime-root" : "evidence-dir")), `${label} directory must be absolute`);
+    assert(/^terroir-demo-[a-z0-9][a-z0-9-]+$/i.test(path.basename(target)), `${label} directory must be a dedicated terroir-demo-* leaf`);
     assert(!isInside(result.sourceRoot, target), `${label} directory must be outside the source checkout`);
+    assert(!isInside(target, result.sourceRoot), `${label} directory must not contain the source checkout`);
   }
   assert(!isInside(result.runtimeRoot, result.evidenceDir), "evidence directory must survive runtime cleanup");
-  if (execute) {
+  assert(!isInside(result.evidenceDir, result.runtimeRoot), "runtime directory must not be inside evidence");
+  assert(!(bootstrapOnly && continuePreservedD), "bootstrap and preserved D continuation modes are mutually exclusive");
+  if (continuePreservedD) {
+    assertPreservedDSettings(result);
+  } else if (execute) {
     assert.equal(result.ack, EXECUTION_ACK, "exact disposable execution acknowledgement required");
-    assert.fail("portable execution is disabled pending independent Docker resource ownership admission");
+    for (const key of continuationOnly) assert.equal(values.get(key), undefined, `--${key} requires preserved D continuation`);
+  } else {
+    assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
+    assert.equal(result.bootstrapOnly, false, "bootstrap-only requires execution");
+    for (const key of continuationOnly) assert.equal(values.get(key), undefined, `--${key} requires preserved D continuation`);
   }
-  assert.equal(result.ack, undefined, "dry-run does not accept an execution acknowledgement");
   return result;
 }
 
@@ -71,6 +100,7 @@ export function assertSafeSourcePath(relativePath) {
   assert(parts.every((part) => part && part !== "." && part !== ".."), "source path traversal refused");
   assert(!parts.some((part) => part === ".git" || part === "node_modules" || part === ".tmp"), "local/runtime source path refused");
   assert(!parts.some((part) => part === ".env" || part.startsWith(".env.")), "dotenv source path refused");
+  assert(!parts.includes(OWNERSHIP_MARKER), "runtime ownership marker cannot come from source");
   return relativePath;
 }
 
@@ -83,6 +113,7 @@ export function rewriteSupabaseConfig(raw, settings) {
   next = replaceTomlValue(next, "studio", "port", String(settings.ports.studio));
   next = replaceTomlValue(next, "local_smtp", "port", String(settings.ports.mail));
   next = replaceTomlValue(next, "db.seed", "enabled", "false");
+  next = replaceTomlValue(next, "db.migrations", "enabled", "false");
   next = replaceTomlValue(next, "auth", "site_url", `"http://127.0.0.1:${settings.ports.app}"`);
   next = replaceTomlValue(
     next,
@@ -136,17 +167,47 @@ function isInside(parent, candidate) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+export async function admitDestinationPaths(settings) {
+  const sourceRoot = await realpath(settings.sourceRoot);
+  if (settings.continuePreservedD) {
+    const runtimeRoot = await realpath(settings.runtimeRoot);
+    const runtime = await lstat(runtimeRoot);
+    assert(runtime.isDirectory() && !runtime.isSymbolicLink(), "preserved D runtime must be the original directory");
+    assert.equal(runtimeRoot, PRESERVED_D.runtimeRoot, "preserved D runtime path changed");
+    const evidence = path.join(await realpath(path.dirname(settings.evidenceDir)), path.basename(settings.evidenceDir));
+    try { await lstat(evidence); assert.fail("continuation evidence destination already exists"); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    assert(!isInside(sourceRoot, evidence) && !isInside(evidence, sourceRoot), "continuation evidence aliases the source checkout");
+    assert(!isInside(runtimeRoot, evidence) && !isInside(evidence, runtimeRoot), "continuation evidence aliases the preserved runtime");
+    settings.sourceRoot = sourceRoot;
+    settings.runtimeRoot = runtimeRoot;
+    settings.evidenceDir = evidence;
+    return;
+  }
+  for (const key of ["runtimeRoot", "evidenceDir"]) {
+    const target = settings[key];
+    const canonical = path.join(await realpath(path.dirname(target)), path.basename(target));
+    assert(!isInside(sourceRoot, canonical) && !isInside(canonical, sourceRoot), "destination aliases the source checkout");
+    try { await lstat(canonical); assert.fail("demo destination already exists"); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    settings[key] = canonical;
+  }
+  assert(!isInside(settings.runtimeRoot, settings.evidenceDir) && !isInside(settings.evidenceDir, settings.runtimeRoot), "demo destination aliases overlap");
+  settings.sourceRoot = sourceRoot;
+}
+
 function minimalEnvironment(extra = {}) {
   const base = {};
   for (const key of ["HOME", "PATH", "TMPDIR", "DOCKER_CONFIG"]) {
     if (process.env[key]) base[key] = process.env[key];
   }
-  return { ...base, OPENAI_API_KEY: "local-demo-disabled", ...extra };
+  return { ...base, OPENAI_API_KEY: "local-demo-disabled", ...extra, pnpm_config_verify_deps_before_run: "false", ...(admittedDockerDaemon ? { DOCKER_HOST: admittedDockerDaemon.endpoint } : {}) };
 }
 
 function run(command, args, options = {}) {
+  if (admittedDockerDaemon && (command === "docker" || args.includes("supabase"))) assertDockerSocketIdentity(admittedDockerDaemon);
   try {
-    return execFileSync(command, args, {
+    const output = execFileSync(command, args, {
       cwd: options.cwd,
       env: options.env ?? minimalEnvironment(),
       input: options.input,
@@ -154,7 +215,8 @@ function run(command, args, options = {}) {
       timeout: options.timeout ?? 300_000,
       maxBuffer: 30_000_000,
       stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
-    }).trim();
+    });
+    return options.trim === false ? output : output.trim();
   } catch {
     throw new Error(`${path.basename(command)} failed without exposing child output`);
   }
@@ -162,32 +224,54 @@ function run(command, args, options = {}) {
 
 async function materializeRuntime(settings) {
   await mkdir(settings.runtimeRoot, { mode: 0o700 });
-  let owned = false;
-  try {
-    await writeFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), `${JSON.stringify({ version: 1, projectId: settings.projectId })}\n`, { flag: "wx", mode: 0o600 });
-    owned = true;
-    const listed = run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: settings.sourceRoot }).split("\0").filter(Boolean);
-    assert(listed.length > 0, "source checkout is empty");
-    for (const raw of listed) {
-      const relative = assertSafeSourcePath(raw);
-      const source = path.join(settings.sourceRoot, relative);
-      const metadata = await lstat(source);
-      assert(metadata.isFile() && !metadata.isSymbolicLink(), `source entry must be a regular file: ${relative}`);
-      const destination = path.join(settings.runtimeRoot, relative);
-      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
-      await cp(source, destination, { preserveTimestamps: true });
-    }
-    const nodeModules = await realpath(path.join(settings.sourceRoot, "node_modules"));
-    await symlink(nodeModules, path.join(settings.runtimeRoot, "node_modules"));
-    const configPath = path.join(settings.runtimeRoot, "supabase/config.toml");
-    const rewritten = rewriteSupabaseConfig(await readFile(configPath, "utf8"), settings);
-    await writeFile(configPath, rewritten, { mode: 0o600 });
-    await assertRuntimeHasNoDotenv(settings.runtimeRoot);
-    return { sourceFiles: listed.length, configPath };
-  } catch (error) {
-    if (owned) await rm(settings.runtimeRoot, { recursive: true }).catch(() => {});
-    throw error;
+  const marker = { version: 2, projectId: settings.projectId, executionId: settings.executionId, runtimeRoot: settings.runtimeRoot };
+  await writeFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), `${JSON.stringify(marker)}\n`, { flag: "wx", mode: 0o600 });
+  const identity = await lstat(settings.runtimeRoot);
+  // Omit even tracked dotenv examples without opening them; none may enter runtime.
+  const listed = run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: settings.sourceRoot }).split("\0").filter((relative) => relative && !relative.split("/").some((part) => part === ".env" || part.startsWith(".env.")));
+  assert(listed.length > 0, "source checkout is empty");
+  for (const raw of listed) {
+    const relative = assertSafeSourcePath(raw);
+    const source = path.join(settings.sourceRoot, relative);
+    const metadata = await lstat(source);
+    assert(metadata.isFile() && !metadata.isSymbolicLink(), `source entry must be a regular file: ${relative}`);
+    const destination = path.join(settings.runtimeRoot, relative);
+    await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+    await cp(source, destination, { preserveTimestamps: true });
   }
+  await materializeDependencies(settings.sourceRoot, settings.runtimeRoot);
+  const configPath = path.join(settings.runtimeRoot, "supabase/config.toml");
+  const rewritten = rewriteSupabaseConfig(await readFile(configPath, "utf8"), settings);
+  await writeFile(configPath, rewritten, { mode: 0o600 });
+  await assertRuntimeHasNoDotenv(settings.runtimeRoot);
+  return { sourceFiles: listed.length, configPath, marker, dev: identity.dev, ino: identity.ino };
+}
+
+export async function assertContainedDependencyLinks(root) {
+  const canonical = await realpath(root);
+  assert((await lstat(canonical)).isDirectory(), "dependencies must be a directory");
+  const pending = [canonical];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      assert(entry.name !== ".env" && !entry.name.startsWith(".env."), "dotenv dependency file refused before copying");
+      const target = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        assert(!path.isAbsolute(await readlink(target)), "absolute dependency symlink refused");
+        assert(isInside(canonical, await realpath(target)), "dependency symlink escapes node_modules");
+      } else if (entry.isDirectory()) pending.push(target);
+    }
+  }
+}
+
+export async function materializeDependencies(sourceRoot, runtimeRoot) {
+  const source = await realpath(path.join(sourceRoot, "node_modules"));
+  await assertContainedDependencyLinks(source);
+  const destination = path.join(runtimeRoot, "node_modules");
+  await cp(source, destination, { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
+  const metadata = await lstat(destination);
+  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), "runtime dependencies must be contained, not a root symlink");
+  await assertContainedDependencyLinks(destination);
 }
 
 async function assertRuntimeHasNoDotenv(root) {
@@ -201,7 +285,9 @@ function inspectAdmittedStack(settings) {
   return import(pathToFileURL(modulePath).href).then(({ parseLocalStackConfig, admitLocalStack }) => {
     const config = parseLocalStackConfig(configText);
     assert.deepEqual(config, { projectId: settings.projectId, apiPort: settings.ports.api, dbPort: settings.ports.db });
-    const target = admitLocalStack(configText);
+    // Its default subprocess runner inherits the host environment; inject our
+    // pinned local-daemon runner rather than allowing a second context lookup.
+    const target = admitLocalStack(configText, (command, args) => ({ status: 0, stdout: run(command, args), stderr: "" }));
     assertExactLoopbackBinding(target.database.id, 5432, settings.ports.db);
     assertExactLoopbackBinding(target.api.id, 8000, settings.ports.api);
     return target;
@@ -237,7 +323,7 @@ function applyFixture(settings, target, users, ids) {
     bin_id: ids.binId, list_id: ids.listId, section_id: ids.sectionId,
     item_id: ids.itemId, staff_item_id: ids.staffItemId, list_slug: ids.listSlug,
   };
-  const args = ["exec", "-i", target.database.id, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"];
+  const args = ["exec", "-i", target.database.id, "psql", "-X", "--no-password", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"];
   for (const [name, value] of Object.entries(variables)) args.push("-v", `${name}=${value}`);
   const output = run("docker", args, { input: fixture });
   const receipt = JSON.parse(output.split("\n").at(-1));
@@ -315,89 +401,287 @@ function ownedProcessGroupExists(child) {
   }
 }
 
-async function cleanupOwnedRuntime(settings, stopStack) {
-  try {
-    const marker = JSON.parse(await readFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), "utf8"));
-    assert.deepEqual(marker, { version: 1, projectId: settings.projectId });
-  } catch { throw new Error("runtime cleanup ownership marker missing or invalid"); }
-  if (stopStack) run("pnpm", ["exec", "supabase", "stop", "--workdir", settings.runtimeRoot, "--no-backup"], { cwd: settings.runtimeRoot, timeout: 300_000 });
-  await rm(settings.runtimeRoot, { recursive: true });
+export async function assertOwnedRuntime(settings, owned) {
+  const metadata = await lstat(settings.runtimeRoot);
+  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), "runtime cleanup refuses symlink/replaced root");
+  assert.equal(await realpath(settings.runtimeRoot), settings.runtimeRoot, "runtime parent alias changed");
+  assert.equal(metadata.dev, owned.dev, "runtime device identity changed");
+  assert.equal(metadata.ino, owned.ino, "runtime inode identity changed");
+  const marker = JSON.parse(await readFile(path.join(settings.runtimeRoot, OWNERSHIP_MARKER), "utf8"));
+  assert.deepEqual(marker, owned.marker, "runtime cleanup ownership marker changed");
+}
+
+async function cleanupOwnedServices(settings, owned, ledger) {
+  await assertOwnedRuntime(settings, owned);
+  cleanupOwnedStack(ledger, run);
+  await assertOwnedRuntime(settings, owned);
+}
+
+export function transactionalMigrationArgs(databaseId, filename) {
+  assert(/^[a-f0-9]{64}$/.test(databaseId), "migration database identity is invalid");
+  const matched = filename.match(/^([0-9]{4})_([a-z0-9_]+)\.sql$/);
+  assert(matched, "migration filename refused");
+  const [, version, name] = matched;
+  return ["exec", "-i", databaseId, "psql", "-X", "--no-password", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-U", "postgres", "-d", "postgres", "-f", "-", "-c", `insert into supabase_migrations.schema_migrations(version,name) values ('${version}','${name}');`];
+}
+
+async function applySourceMigrations(settings, target, ledger, readInventory = readDockerInventory) {
+  const databaseId = target.database.id;
+  const query = ["exec", "-i", databaseId, "psql", "-X", "--no-password", "-v", "ON_ERROR_STOP=1", "-qAt", "-U", "postgres", "-d", "postgres"];
+  assertCleanupAdmitted(ledger, readInventory(run));
+  assert.equal(run("docker", [...query, "-c", "select 1"]), "1", "migration database health check failed");
+  assert.equal(run("docker", [...query, "-c", "select to_regclass('supabase_migrations.schema_migrations') is not null"]), "f", "migration target is not empty");
+  run("docker", [...query, "--single-transaction", "-c", "create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[]);"]);
+  const directory = path.join(settings.runtimeRoot, "supabase/migrations");
+  const filenames = (await readdir(directory)).filter((filename) => /^[0-9].*\.sql$/.test(filename)).sort();
+  assert.equal(filenames.at(-1), "0164_import_revert_cleanup.sql", "portable migration ceiling must be reviewed 0164");
+  for (const filename of filenames) {
+    const sql = await readFile(path.join(directory, filename), "utf8");
+    assert(!/^\s*(?:begin|commit)\s*;/im.test(sql), "migration owns a conflicting transaction");
+    assert(!/^\s*create\s+(?:unique\s+)?index\s+concurrently/im.test(sql), "concurrent index cannot use migration transaction");
+    assertCleanupAdmitted(ledger, readInventory(run));
+    const version = filename.slice(0, 4);
+    if (["0156", "0157", "0158"].includes(version)) {
+      const preflight = await readFile(path.join(settings.runtimeRoot, `scripts/${version}-production-preflight.sql`), "utf8");
+      run("docker", [...query, ...(version === "0158" ? ["-v", "bottle_route_drained=1"] : [])], { input: preflight });
+    }
+    run("docker", transactionalMigrationArgs(databaseId, filename), { input: sql });
+    if (["0156", "0157", "0158"].includes(version)) {
+      run("docker", query, { input: await readFile(path.join(settings.runtimeRoot, `scripts/${version}-production-postflight.sql`), "utf8") });
+    }
+    process.stderr.write(`portable demo: applied local migration ${version}\n`);
+  }
+  assert.equal(run("docker", [...query, "-c", "select count(*) || '/' || max(version) from supabase_migrations.schema_migrations"]), `${filenames.length}/0164`, "portable migration ledger mismatch");
+  run("docker", [...query, "-c", "notify pgrst, 'reload schema'"]);
+  return filenames.length;
+}
+
+async function runPortableJourneyTail(settings, local, target, result, onApp) {
+  const users = await createSyntheticUsers(local, settings);
+  result.lastCompletedStep = "synthetic-auth-created";
+  const ids = fixtureIds(settings.projectId);
+  const fixture = applyFixture(settings, target, users, ids);
+  result.lastCompletedStep = "zero-stock-fixture-applied";
+  const baseURL = `http://127.0.0.1:${settings.ports.app}`;
+  const ready = {
+    version: 1, result: "READY_FOR_PORTABLE_JOURNEY", projectId: settings.projectId,
+    baseURL, database: "postgres", databaseContainerId: target.database.id,
+    apiURL: local.apiURL, ownerEmail: settings.ownerEmail, staffEmail: settings.staffEmail,
+    ownerId: users.ownerId, staffId: users.staffId, ...fixture,
+  };
+  const readyPath = path.join(settings.evidenceDir, "ready.json");
+  await writeFile(readyPath, `${JSON.stringify(ready, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  const app = spawn("scripts/local/dev-local.sh", [`--port=${settings.ports.app}`, "--hostname=127.0.0.1"], {
+    cwd: settings.runtimeRoot,
+    env: minimalEnvironment({ ACTIVE_RESTAURANT_COOKIE_SECRET: randomBytes(32).toString("hex") }),
+    stdio: ["ignore", "ignore", "ignore"],
+    detached: true,
+  });
+  onApp(app);
+  await waitForHealth(baseURL, app);
+  result.lastCompletedStep = "local-app-admitted";
+  const journeyOutput = run("node", [
+    "scripts/local/restaurant-demo/journey.mjs",
+    `--ready-json=${readyPath}`,
+    `--project-root=${settings.runtimeRoot}`,
+    `--evidence-dir=${path.join(settings.evidenceDir, "journey")}`,
+    `--viewport-width=${settings.journeyWidth}`,
+  ], {
+    cwd: settings.runtimeRoot,
+    timeout: 1_800_000,
+    env: minimalEnvironment({
+      TERROIR_DEMO_OWNER_PASSWORD: users.ownerPassword,
+      TERROIR_DEMO_STAFF_PASSWORD: users.staffPassword,
+    }),
+  });
+  const journey = JSON.parse(journeyOutput.split("\n").at(-1));
+  assert.equal(journey.status, "passed", "portable browser journey did not pass");
+  result.status = "passed";
+  result.lastCompletedStep = "portable-journey-passed";
 }
 
 async function execute(settings) {
   let app;
-  let runtimeCreated = false;
-  let stackStartAttempted = false;
+  let ownedRuntime;
+  let ledger;
+  const readInventory = settings.bootstrapOnly
+    ? (runner) => readProjectDockerInventory(settings.projectId, runner)
+    : readDockerInventory;
+  settings.executionId = randomUUID();
   const result = { status: "failed", lastCompletedStep: "source-admission", projectId: settings.projectId };
   await mkdir(settings.evidenceDir, { mode: 0o700 });
   const resultPath = path.join(settings.evidenceDir, "launcher-result.json");
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   let thrown;
   try {
+    // Inspect with the same stripped environment, then pin every child to that
+    // admitted Unix endpoint rather than trusting a mutable Docker context.
+    admittedDockerDaemon = admitLocalDockerDaemon(run);
+    result.lastCompletedStep = "local-docker-daemon-admitted";
     await assertPortsAbsent(Object.values(settings.ports));
+    assertNamespaceAbsent(settings.projectId, readInventory(run));
     result.lastCompletedStep = "requested-ports-admitted-absent";
     const materialized = await materializeRuntime(settings);
-    runtimeCreated = true;
+    ownedRuntime = materialized;
     result.lastCompletedStep = "safe-runtime-materialized";
     result.sourceFiles = materialized.sourceFiles;
-    stackStartAttempted = true;
-    run("pnpm", ["exec", "supabase", "start", "--workdir", settings.runtimeRoot, "--exclude", "studio,imgproxy,edge-runtime,logflare,vector,supavisor"], { cwd: settings.runtimeRoot, timeout: 900_000 });
+    const network = createOwnedNetwork(settings.projectId, settings.executionId, run, readInventory);
+    result.networkId = network.id;
+    result.lastCompletedStep = "owned-loopback-network-created";
+    run("pnpm", ["exec", "supabase", "start", "--workdir", settings.runtimeRoot, "--network-id", network.name, "--exclude", "studio,imgproxy,edge-runtime,realtime,analytics,logflare,vector,supavisor"], { cwd: settings.runtimeRoot, timeout: 900_000 });
+    ledger = recordOwnedStack({ ...settings, network }, readInventory(run));
+    await writeFile(path.join(settings.evidenceDir, "docker-ownership.json"), `${JSON.stringify(ledger, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     const local = parseLocalStatus(run("pnpm", ["exec", "supabase", "status", "--workdir", settings.runtimeRoot, "-o", "json"], { cwd: settings.runtimeRoot }), settings);
     const target = await inspectAdmittedStack(settings);
     result.databaseContainerId = target.database.id;
     result.lastCompletedStep = "isolated-stack-admitted";
-    const users = await createSyntheticUsers(local, settings);
-    result.lastCompletedStep = "synthetic-auth-created";
-    const ids = fixtureIds(settings.projectId);
-    const fixture = applyFixture(settings, target, users, ids);
-    result.lastCompletedStep = "zero-stock-fixture-applied";
-    const baseURL = `http://127.0.0.1:${settings.ports.app}`;
-    const ready = {
-      version: 1, result: "READY_FOR_PORTABLE_JOURNEY", projectId: settings.projectId,
-      baseURL, database: "postgres", databaseContainerId: target.database.id,
-      apiURL: local.apiURL, ownerEmail: settings.ownerEmail, staffEmail: settings.staffEmail,
-      ownerId: users.ownerId, staffId: users.staffId, ...fixture,
-    };
-    const readyPath = path.join(settings.evidenceDir, "ready.json");
-    await writeFile(readyPath, `${JSON.stringify(ready, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-    app = spawn("scripts/local/dev-local.sh", [`--port=${settings.ports.app}`, "--hostname=127.0.0.1"], {
-      cwd: settings.runtimeRoot,
-      env: minimalEnvironment({ ACTIVE_RESTAURANT_COOKIE_SECRET: randomBytes(32).toString("hex") }),
-      stdio: ["ignore", "ignore", "ignore"],
-      detached: true,
-    });
-    await waitForHealth(baseURL, app);
-    result.lastCompletedStep = "local-app-admitted";
-    const journeyOutput = run("node", [
-      "scripts/local/restaurant-demo/journey.mjs",
-      `--ready-json=${readyPath}`,
-      `--project-root=${settings.runtimeRoot}`,
-      `--evidence-dir=${path.join(settings.evidenceDir, "journey")}`,
-    ], {
-      cwd: settings.runtimeRoot,
-      timeout: 1_800_000,
-      env: minimalEnvironment({
-        TERROIR_DEMO_OWNER_PASSWORD: users.ownerPassword,
-        TERROIR_DEMO_STAFF_PASSWORD: users.staffPassword,
-      }),
-    });
-    const journey = JSON.parse(journeyOutput.split("\n").at(-1));
-    assert.equal(journey.status, "passed", "portable browser journey did not pass");
-    result.status = "passed";
-    result.lastCompletedStep = "portable-journey-passed";
+    result.migrationCount = await applySourceMigrations(settings, target, ledger, readInventory);
+    result.lastCompletedStep = "transactional-migrations-applied";
+    if (settings.bootstrapOnly) {
+      Object.assign(result, {
+        status: "READY_FOR_READ_ONLY_PREFLIGHT",
+        result: "READY_FOR_READ_ONLY_PREFLIGHT",
+        executionId: settings.executionId,
+        sourceHead: settings.sourceHead,
+        sourceTree: settings.sourceTree,
+        runtimeRoot: settings.runtimeRoot,
+        evidenceRoot: settings.evidenceDir,
+        runtimeIdentity: {
+          dev: ownedRuntime.dev,
+          ino: ownedRuntime.ino,
+          marker: ownedRuntime.marker,
+        },
+        database: "postgres",
+        databaseBinding: `127.0.0.1:${settings.ports.db}`,
+        apiBinding: `127.0.0.1:${settings.ports.api}`,
+        rawProjectLabelKeys: RAW_PROJECT_LABELS,
+        migrationLedger: `${result.migrationCount}/0164`,
+        fixtureApplied: false,
+        appStarted: false,
+        browserStarted: false,
+        privacyMigrationApplied: false,
+      });
+      return;
+    }
+    await runPortableJourneyTail(settings, local, target, result, (child) => { app = child; });
   } catch (error) {
     result.status = "failed";
     result.error = `${error instanceof assert.AssertionError ? "AssertionError" : "LauncherError"} at ${result.lastCompletedStep}`;
     thrown = error;
   } finally {
-    await stopChild(app).catch(() => {});
+    try { await stopChild(app); } catch {
+      result.status = "failed";
+      result.error = `AppCleanupError at ${result.lastCompletedStep}`;
+      thrown ??= new Error("owned app cleanup failed");
+    }
     try {
-      if (runtimeCreated) await cleanupOwnedRuntime(settings, stackStartAttempted);
+      // Failed runs retain even partially created resources and mutation latches.
+      if (!settings.bootstrapOnly && !thrown && ownedRuntime && ledger) await cleanupOwnedServices(settings, ownedRuntime, ledger);
+      // Goal safety freezes directory deletion outside the source checkout.
+      result.runtimePreserved = true;
     } catch {
       result.status = "failed";
       result.error = `CleanupError at ${result.lastCompletedStep}`;
       thrown ??= new Error("owned runtime cleanup failed");
+      result.runtimePreserved = true;
     }
+    if (result.runtimePreserved) {
+      try {
+        const observed = namespaceResources(settings.projectId, readInventory(run));
+        await writeFile(path.join(settings.evidenceDir, "preserved-docker-observation.json"), `${JSON.stringify({ ownedForCleanup: false, resources: observed }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      } catch { result.preservedResourceObservationUnavailable = true; }
+    }
+    await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
+  }
+  if (thrown) throw thrown;
+}
+
+export async function preservedDLauncherSourceSha256() {
+  const directory = path.dirname(fileURLToPath(import.meta.url));
+  const files = ["launcher.mjs", "preserved-d-continuation.mjs", "docker-lifecycle.mjs"];
+  const contents = await Promise.all(files.map((filename) => readFile(path.join(directory, filename), "utf8")));
+  return sha256(JSON.stringify(files.map((filename, index) => [filename, contents[index]])));
+}
+
+async function readExactRegularFile(filename, label) {
+  assert(path.isAbsolute(filename), `${label} path must be absolute`);
+  const metadata = await lstat(filename);
+  assert(metadata.isFile() && !metadata.isSymbolicLink(), `${label} must be a regular file`);
+  assert.equal(await realpath(filename), filename, `${label} path aliases another file`);
+  return readFile(filename, "utf8");
+}
+
+async function admitPreservedDContinuation(settings) {
+  const bootstrapResultText = await readExactRegularFile(path.join(PRESERVED_D.bootstrapEvidenceRoot, "launcher-result.json"), "bootstrap result receipt");
+  const ownershipText = await readExactRegularFile(path.join(PRESERVED_D.bootstrapEvidenceRoot, "docker-ownership.json"), "Docker ownership receipt");
+  const markerText = await readExactRegularFile(path.join(PRESERVED_D.runtimeRoot, OWNERSHIP_MARKER), "runtime ownership marker");
+  const privacyReceiptText = await readExactRegularFile(settings.privacyReceipt, "privacy application receipt");
+  const sourceTree = run("git", ["ls-tree", "-rz", "--full-tree", PRESERVED_D.sourceHead], { cwd: settings.sourceRoot, trim: false });
+  const originalConfig = run("git", ["show", `${PRESERVED_D.sourceHead}:supabase/config.toml`], { cwd: settings.sourceRoot, trim: false });
+  const runtimeIdentity = await assertFrozenPreservedDSource({
+    runtimeRoot: settings.runtimeRoot,
+    treeText: sourceTree,
+    expectedConfigText: rewriteSupabaseConfig(originalConfig, settings),
+  });
+  const admitted = admitPreservedDBootstrap({
+    settings, bootstrapResultText, ownershipText, markerText, runtimeIdentity,
+    actualLauncherSha256: await preservedDLauncherSourceSha256(),
+  });
+  admitted.privacy = admitPreservedDPrivacyReceipt(settings, privacyReceiptText);
+  await assertOwnedRuntime(settings, { ...runtimeIdentity, marker: admitted.marker });
+
+  admittedDockerDaemon = assertPreservedDDockerDaemon(admitLocalDockerDaemon(run));
+  await assertPortsAbsent([settings.ports.app]);
+  const inventory = readProjectDockerInventory(settings.projectId, run);
+  assertCleanupAdmitted(admitted.ownership, inventory);
+  const target = await inspectAdmittedStack(settings);
+  assert.equal(target.database.id, PRESERVED_D.databaseContainerId, "preserved D database identity changed");
+  const phase = run("docker", [
+    "exec", "-i", "-e", "PGOPTIONS=-c default_transaction_read_only=on -c row_security=off -c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000",
+    target.database.id, "psql", "-X", "--no-password", "-qAt",
+    "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres", "-c",
+    `select count(*) || '/' || max(version) || '/' || (select count(*) from auth.users where lower(email) in ('${PRESERVED_D.ownerEmail}','${PRESERVED_D.staffEmail}')) || '/' || (select count(*) from public.membership_capability_grants) || '/' || (select count(*) from public.wines) || '/' || (select count(*) from public.inventory_items) from supabase_migrations.schema_migrations`,
+  ]);
+  assert.equal(phase, "137/0165/0/0/0/0", "preserved D phase is not the untouched post-privacy continuation boundary");
+  const local = parseLocalStatus(run("pnpm", ["exec", "supabase", "status", "--workdir", settings.runtimeRoot, "-o", "json"], { cwd: settings.runtimeRoot }), settings);
+  return { ...admitted, local, target };
+}
+
+async function executePreservedDContinuation(settings) {
+  let app;
+  const result = {
+    status: "failed", lastCompletedStep: "preserved-d-source-admission",
+    projectId: settings.projectId, executionId: PRESERVED_D.executionId,
+  };
+  await mkdir(settings.evidenceDir, { mode: 0o700 });
+  const resultPath = path.join(settings.evidenceDir, "continuation-result.json");
+  await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  let thrown;
+  try {
+    await runPreservedDContinuation({
+      admit: async () => admitPreservedDContinuation(settings),
+      tail: async (admitted) => {
+        result.lastCompletedStep = "preserved-d-post-privacy-admitted";
+        result.applicationSourceHead = PRESERVED_D.sourceHead;
+        result.applicationSourceTree = PRESERVED_D.sourceTree;
+        result.reviewedLauncherSha256 = settings.reviewedLauncherSha256;
+        result.privacyReceiptSha256 = settings.privacyReceiptSha256;
+        result.migrationLedger = admitted.privacy.migrationLedger;
+        await runPortableJourneyTail(settings, admitted.local, admitted.target, result, (child) => { app = child; });
+      },
+    });
+  } catch (error) {
+    result.status = "failed";
+    result.error = `${error instanceof assert.AssertionError ? "AssertionError" : "LauncherError"} at ${result.lastCompletedStep}`;
+    thrown = error;
+  } finally {
+    try { await stopChild(app); } catch {
+      result.status = "failed";
+      result.error = `AppCleanupError at ${result.lastCompletedStep}`;
+      thrown ??= new Error("owned app cleanup failed");
+    }
+    result.runtimePreserved = true;
+    result.stackPreserved = true;
     await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
   }
   if (thrown) throw thrown;
@@ -405,16 +689,21 @@ async function execute(settings) {
 
 async function main() {
   const settings = parseLauncherArgs(process.argv.slice(2));
+  await admitDestinationPaths(settings);
   const actualRoot = await realpath(settings.sourceRoot);
   const gitRoot = run("git", ["rev-parse", "--show-toplevel"], { cwd: actualRoot });
   assert.equal(actualRoot, gitRoot, "source root must be the exact Git checkout root");
+  settings.sourceHead = run("git", ["rev-parse", "HEAD"], { cwd: actualRoot });
+  settings.sourceTree = run("git", ["rev-parse", "HEAD^{tree}"], { cwd: actualRoot });
+  if (settings.bootstrapOnly) assert.equal(run("git", ["status", "--porcelain"], { cwd: actualRoot }), "", "bootstrap source checkout must be clean");
   await lstat(path.join(actualRoot, "scripts/local/dev-local.sh"));
   await lstat(path.join(actualRoot, "supabase/migrations/0164_import_revert_cleanup.sql"));
   if (!settings.execute) {
-    process.stdout.write(`${JSON.stringify({ status: "DRY_RUN_SOURCE_ONLY", executionReady: false, blockedReason: "docker-resource-ownership-not-admitted", projectId: settings.projectId, ports: settings.ports })}\n`);
+    process.stdout.write(`${JSON.stringify({ status: "SOURCE_ONLY_UNEXECUTED", executionReady: true, projectId: settings.projectId, ports: settings.ports })}\n`);
     return;
   }
-  await execute(settings);
+  if (settings.continuePreservedD) await executePreservedDContinuation(settings);
+  else await execute(settings);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

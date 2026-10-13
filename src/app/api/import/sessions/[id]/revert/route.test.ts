@@ -14,7 +14,12 @@ vi.mock("@/domains/import/session-service", () => ({
 const { POST } = await import("./route");
 
 const SESSION_ID = "44444444-4444-4444-8444-444444444444";
-const supabase = { rpc: vi.fn() };
+const query = {
+  select: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  maybeSingle: vi.fn(),
+};
+const supabase = { rpc: vi.fn(), from: vi.fn(() => query) };
 
 function request() {
   return new Request(`http://localhost/api/import/sessions/${SESSION_ID}/revert`, { method: "POST" }) as NextRequest;
@@ -28,6 +33,26 @@ describe("POST /api/import/sessions/[id]/revert", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireMembership.mockResolvedValue({ supabase, restaurantId: "restaurant-a", role: "staff" });
+    query.maybeSingle.mockResolvedValue({ data: { id: SESSION_ID }, error: null });
+    mockRevertImportSession.mockResolvedValue({ ok: true, sessionId: SESSION_ID, batches: [] });
+  });
+
+  it("does not revert a session outside the active site, even when the actor belongs to both", async () => {
+    query.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const response = await POST(request(), { params: params() });
+    expect(response.status).toBe(404);
+    expect(supabase.from).toHaveBeenCalledWith("import_sessions");
+    expect(query.eq).toHaveBeenCalledWith("id", SESSION_ID);
+    expect(query.eq).toHaveBeenCalledWith("restaurant_id", "restaurant-a");
+    expect(mockRevertImportSession).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without an RPC when active-site lookup fails", async () => {
+    query.maybeSingle.mockResolvedValue({ data: null, error: { message: "private database detail" } });
+    const response = await POST(request(), { params: params() });
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain("private database detail");
+    expect(mockRevertImportSession).not.toHaveBeenCalled();
   });
 
   it("returns 409 with no child outcomes for a rolled-back dependency-blocked session", async () => {

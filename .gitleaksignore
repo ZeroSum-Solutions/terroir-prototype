@@ -1,0 +1,5 @@
+# Executed rollback-only cost probe: line 22 is a synthetic auth-user UUID,
+# not a credential. Independent provenance and zero residue are recorded in
+# docs/evidence/restaurant-demo-20261001/staff-raw-cost-failure.md.
+# Suppress only this immutable historical finding, not its path or future edits.
+26df60b0e2d26463e6ec00830756e58897d9386f:docs/evidence/restaurant-demo-20261001/staff-raw-cost-probe.sql:generic-api-key:22

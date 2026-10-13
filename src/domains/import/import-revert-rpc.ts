@@ -90,7 +90,7 @@ export async function revertImportBatchRpc(
   if (result.error) return { ok: false, error: mapRpcError(result.error, "batch") };
 
   const parsed = BatchRevertReceiptSchema.safeParse(result.data);
-  if (!parsed.success || parsed.data.batchId !== batchId) return internalError("batch");
+  if (!parsed.success || parsed.data.batchId.toLowerCase() !== batchId.toLowerCase()) return internalError("batch");
   return { ok: true, receipt: parsed.data };
 }
 
@@ -107,7 +107,7 @@ export async function revertImportSessionRpc(
   if (result.error) return { ok: false, error: mapRpcError(result.error, "session") };
 
   const parsed = SessionRevertReceiptSchema.safeParse(result.data);
-  if (!parsed.success || parsed.data.sessionId !== sessionId) return internalError("session");
+  if (!parsed.success || parsed.data.sessionId.toLowerCase() !== sessionId.toLowerCase()) return internalError("session");
   return { ok: true, receipt: parsed.data };
 }
 

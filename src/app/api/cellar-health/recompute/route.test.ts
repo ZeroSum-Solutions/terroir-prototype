@@ -46,19 +46,24 @@ describe("POST /api/cellar-health/recompute", () => {
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
-  it("runs with a non-persistent service-role client and returns segment counts", async () => {
+  it("runs with a non-persistent service-role client and returns the exact safe receipt", async () => {
     const admin = { kind: "admin" };
     mockRequireRole.mockResolvedValue(authResult());
     mockCreateClient.mockReturnValue(admin);
     mockRunRecompute.mockResolvedValue({
-      classified: 1,
-      segments: { healthy: 1 },
+      version: 1,
+      kind: "cellar_health_recompute",
+      status: "succeeded",
     });
 
     const response = await POST();
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ classified: 1, segments: { healthy: 1 } });
+    expect(await response.json()).toEqual({
+      version: 1,
+      kind: "cellar_health_recompute",
+      status: "succeeded",
+    });
     expect(mockRequireRole).toHaveBeenCalledWith(["owner", "manager"]);
     expect(mockCreateClient).toHaveBeenCalledWith(
       "https://example.supabase.co",
@@ -72,6 +77,22 @@ describe("POST /api/cellar-health/recompute", () => {
     );
   });
 
+  it("rejects a legacy or expanded recompute result", async () => {
+    mockRequireRole.mockResolvedValue(authResult());
+    mockCreateClient.mockReturnValue({ kind: "admin" });
+    mockRunRecompute.mockResolvedValue({
+      version: 1,
+      kind: "cellar_health_recompute",
+      status: "succeeded",
+      segments: { healthy: 1 },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await POST();
+
+    expect(response.status).toBe(500);
+  });
+
   it("returns a redacted 500 when the job fails", async () => {
     mockRequireRole.mockResolvedValue(authResult());
     mockCreateClient.mockReturnValue({ kind: "admin" });
@@ -83,6 +104,9 @@ describe("POST /api/cellar-health/recompute", () => {
 
     expect(response.status).toBe(500);
     expect(text).not.toContain("secret database detail");
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      "secret database detail",
+    );
   });
 });
 

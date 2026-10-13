@@ -101,7 +101,7 @@ worker — which an earlier version of this runbook understated.
    (client retry, double form submit) hits the unique index and the
    function returns the existing job instead of inserting a second one —
    the same scan can never have two `invoice_extract` jobs racing to call
-   Anthropic on it. Enforced by `background_jobs_idempotency_key_uniq`, not
+   the extraction provider on it. Enforced by `background_jobs_idempotency_key_uniq`, not
    application-level de-duplication.
 2. **A requeued/reclaimed job that already persisted a result skips
    re-calling the provider.** Before invoking `processInvoiceScanOnce`,
@@ -111,19 +111,18 @@ worker — which an earlier version of this runbook understated.
    G1-12's arithmetic-mismatch outcome: the extraction succeeded and
    persisted, HTTP 200, just flagged for manual review of the numbers —
    not a reason to re-run it). If the scan is in either state, the job is
-   marked `succeeded` without touching Azure or Anthropic. This is the
+   marked `succeeded` without touching Azure or OpenRouter. This is the
    case a stuck-job reclaim can hit *after* a worker has actually crashed:
    it dies after `processInvoiceScanOnce` finishes writing but before the
    job row is marked `succeeded`; the reclaim sweep requeues the job; the
    next attempt sees the persisted status and short-circuits.
 3. **A worker that is slow but still alive — not crashed — must not be
    treated the same as a dead one.** `processInvoiceScanOnce`'s underlying
-   Azure/Anthropic calls have no configured timeout, so a legitimate call
-   can run long enough to cross `STUCK_AFTER_SECONDS` (5 minutes) on its
+   Azure/OpenRouter calls can cross `STUCK_AFTER_SECONDS` (5 minutes) on their
    own. Without anything addressing this, the stuck-job reclaim sweep would
    reclaim that job out from under the still-working original worker, a
    second worker would claim it, and — since neither has written
-   `invoice_scans.status = "complete"` yet — *both* would call Anthropic on
+   `invoice_scans.status = "complete"` yet — *both* would call the provider on
    the same job. Claim atomicity (`FOR UPDATE SKIP LOCKED`) does not by
    itself prevent this: it only guarantees two workers can't claim the
    *same row at the same instant*, not that a reclaim can't hand an
@@ -217,49 +216,46 @@ pnpm exec vitest run src/lib/jobs/tenant-isolation.test.ts
 
 ## Railway deployment
 
-**Current state of the `terroir-worker` service** (project
-`industrious-courtesy`, checked 2026-08-22):
+**Verified state on October 2, 2026** (project `industrious-courtesy`):
 
-- **Production**: the service exists but has **zero deployments** — it has
-  never run any code.
-- **Staging**: has one active deployment, but from `integration/ter-020d25-on-d22`
-  — an old, abandoned branch never merged to `main` (it doesn't share
-  `main`'s migration history; its `0084_*` migration doesn't fit `main`'s
-  current sequence). Its `pnpm worker` runs a generic multi-job-type
-  framework (`src/worker/{handlers,runtime,supabase-job-store}.ts`) for
-  `wine_enrichment` and `wine_list_pdf` — **not** `invoice_extract`, and not
-  present anywhere on `main`. This PR does not touch or depend on that
-  branch or that deployment.
+- **Production**: the service exists but has no deployment or running instance.
+  All five required variables below are absent; they already exist on the
+  production web service.
+- **Staging**: no running instance. Its removed historical deployment used a
+  different repository and is not evidence for this worker.
+- Both environments use the same hosted Supabase project. Run one production
+  invoice worker; leave the staging worker dormant to avoid duplicate consumers.
+- A read-only grouped queue check at October 3, 01:09 UTC found zero jobs of any
+  type or status. This is a point-in-time observation, not permission to assume
+  the queue stays empty. Activation immediately starts claiming and reclaiming jobs.
 
 **To run this slice's worker**, once this PR is approved and merged:
 
-1. Apply migration `0075_invoice_extract_jobs.sql` to the target Supabase
-   project (same path as any other migration).
+1. Verify the current migration ledger and required invoice-job routines. The
+   hosted project already has migrations through `0164`, including `0075`;
+   do not replay existing migrations. Complete the pending privacy release
+   checks in [production migrations](production-migrations.md) first.
 2. In the Railway dashboard, open the `terroir-worker` service -> Settings
    -> Config-as-code, and set the Config Path to `railway.worker.toml` (at
    the repo root, alongside the web service's `railway.toml`).
-3. Copy `terroir-web`'s service variables to `terroir-worker` for the same
-   environment: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+3. Copy only these existing production `terroir-web` variables to `terroir-worker`:
+   `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
    `OPENROUTER_API_KEY`, `AZURE_DOC_INTELLIGENCE_ENDPOINT`,
    `AZURE_DOC_INTELLIGENCE_KEY`. No new variables are introduced by this
-   slice.
-4. Redeploy `terroir-worker` from `main` (or whichever branch this lands
-   on). It will start `pnpm run worker` and begin polling for
-   `invoice_extract` jobs — of which there are currently none, since
-   nothing enqueues them yet (see Follow-up below).
+   slice. Do not print values, change credentials, or configure a second consumer.
+4. Recheck queue state and deploy the reviewed release SHA using
+   `railway.worker.toml`. Confirm the service runs `pnpm run worker`, records a
+   successful boot and idle polling, and has no repeated errors. Never enqueue a
+   synthetic invoice on the shared hosted database to prove this; provider-backed
+   extraction needs its own authorized, controlled verification.
 
-This runbook documents the change; it was not applied to any Railway
-environment as part of this PR.
+Activation and runtime verification remain open. Deterministic invoice-worker,
+provider and route tests passed (15 files, 165 tests, no skips); that is not a
+running-worker or successful OCR receipt.
 
-## Follow-up: wiring enqueue into the live scan path
+## Live scan enqueue path
 
-This slice ships `enqueueInvoiceExtractJob` fully implemented and tested,
-but does not call it from `src/app/api/scan/route.ts` or any other
-scan-intake route — those are out of bounds for this slice (owned by
-another in-flight agent, and `fix/m0-1-scan-intake` may touch the same
-files). The integration point for a follow-up slice: after a scan's image
-is uploaded to storage and its `invoice_scans` row is created with
-`raw_image_path` set, call `enqueueInvoiceExtractJob({ supabase,
-restaurantId, scanId })` instead of (or behind a flag alongside)
-`processInvoiceScanOnce`'s synchronous call. G1-7 ("moves extraction onto
-the runner") is expected to make this switch.
+`src/app/api/scan/route.ts` already creates uploads through the closed
+`create_invoice_scan_upload` database command, which atomically creates the scan
+and enqueues its extraction job. Do not add a second enqueue path. The worker's
+central LLM adapter uses OpenRouter, not a directly billed Anthropic client.

@@ -175,8 +175,8 @@ local test data and an isolated profile, never the personal browser profile or
 production data. The owner also approved catalog retention on import undo and
 autonomous routine implementation decisions. These resolve the earlier approval gates.
 
-For advisory review, the owner requests Opus 5.5 first; if unavailable, use the latest
-available Grok together with DeepSeek V4.1 Flash as two independent reviewers. Verify
+For advisory review, the owner's latest resume approval permits an independent Codex
+reviewer while Opus is unavailable, superseding the earlier provider fallback preference. Verify
 actual provider model identifiers and availability; never label a different model as
 the requested one. Use existing approved billing/auth lanes. Provider review remains
 advisory and cannot replace executable database/browser evidence. JEV remains advisory
@@ -234,3 +234,277 @@ check is necessary, not sufficient. A demo milestone pass never completes C00–
 
 No M1–M5 criterion is complete at this checkpoint. No hosted migration or deployment
 has occurred, and the feature branch has not been published with this milestone.
+
+## Resume checkpoint — October 2, 04:15 UTC
+
+The owner reapproved catalog-retaining import undo, isolated Playwright with synthetic
+local data, and a separate Codex reviewer. The native goal is active again. This
+approval is limited to the demo milestone and feature-branch commit/push; it does not
+authorize a new `main` merge, hosted database change or production deployment.
+
+Fresh GitHub inspection confirms PR #229 merged on September 27. The source now
+includes migration 0164 and the later physical/authority cutover repairs; the saved
+September 27 goal state and draft handoff describe earlier incomplete checkpoints,
+not the current implementation. Current `origin/main` is `2d76a701`; the new demo
+closeout branch starts at `c4bf61b4`, retaining the reviewed Cellar layout repair.
+
+The next critical path is the existing portable demo package: prove absent Docker
+resources and exact cleanup ownership, apply fresh migrations transactionally, admit
+loopback-only services, then demonstrate the complete restaurant journey without
+replaying a failed mutation. Current import/caller review proceeds independently.
+All M1–M5 acceptance criteria remain unchanged and require revision-bound evidence.
+
+## STOP checkpoint: October 2 mobile attempt C
+
+The independently reviewed attempt-C replan exhausted the authorized portable
+startup attempts. No fourth launch or automatic replay is allowed from this
+checkpoint.
+
+Attempt C reached `local-app-admitted` on a fresh loopback-only target. The launcher
+applied 136 migrations through `0164`, admitted the zero-stock catalog fixture,
+created synthetic users, and started the database-backed application. The real
+mobile journey received two bottles with distinct committed identities and passed
+the explicit same-key receive replay check. It then **FAILED** at
+`received-main-2-of-2`, before opening a bottle. The journey still queried the stale
+placeholder `Search name, producer, region…`; the current Cellar search exposes
+`Filter this cellar`. This is a journey-selector failure. It does not demonstrate an
+application stock defect or satisfy the remaining open/pour/count/reconcile,
+persistence, staff-denial, responsive, or accessibility results. See the
+[journey result](../evidence/restaurant-demo-20261001/mobile-c-journey-result.json)
+and [failure screenshot](../evidence/restaurant-demo-20261001/mobile-c-failure.png).
+
+Independent attempt-C database checks passed the bounded `0162` and `0163`
+functional rollback contracts and left no prefixed fixture rows. The separate staff
+acquisition-cost confidentiality result **FAILED**: a staff identity with no effective
+`cost.read` received zero rows from the governed reader but successfully selected raw
+`inventory_items.unit_cost = 47.75`. The diagnostic transaction rolled back with no
+residual user, wine, or inventory rows. M1 remains incomplete pending a forward raw
+cost privacy seal and its reviewed negative/positive runtime matrix. The retained
+proof is in [functional contracts](../evidence/restaurant-demo-20261001/functional-contracts.md)
+and [staff raw-cost failure](../evidence/restaurant-demo-20261001/staff-raw-cost-failure.md).
+
+Current non-runtime checks are bounded: 29 portable source tests passed with zero
+skips; the normal Turbopack build completed 73 pages; the focused import/session set
+passed 36 tests; and the full unit run passed 5,633 with 141 skips. These results do
+not replace live-database suites or the failed real-browser path.
+
+M1–M5 remain incomplete. Nobody reproduced the package on the MacBook, no native
+application passed, and no hosted migration, production deployment, new `main`
+merge, credential change, or retained-data reset occurred.
+
+Attempts A, B, and C remain preserved. Goal safety freezes deletion of the external
+runtime directory even after success; owned Docker service cleanup remains gated on a
+passing journey plus exact re-admission. Do not stop, delete, reseed, adopt, or rerun
+the failed targets. Resume only from a reviewed stable accessible locator and privacy
+seal with a fresh namespace; do not roll the current application UI back to the stale
+placeholder. The pushed and remotely verified application checkpoint remains
+`ffced31d0964082c2554b1e566d5762e4c36619a` at evidence capture. It is not a
+permanent claim about the latest feature-branch tip. The portable source snapshot
+is the commit containing this checkpoint; resolve its exact `HEAD` and verify the
+remote branch ref before reuse.
+
+## Source-only locator repair checkpoint: October 2, 05:50 UTC
+
+Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, the journey's
+single Cellar filter lookup now uses Playwright role `searchbox` with exact accessible
+name `Filter this cellar`, matching the current Cellar UI. A regression requires that
+role-and-name locator and rejects the stale placeholder selector. The regression was
+red before the source change, with two tests passing and one failing. The one-line
+selector repair made all three focused tests pass, and the complete portable source
+suite passed 30 of 30 tests with zero skips. Independent Codex source review passed.
+
+This checkpoint contains no browser or application-runtime execution and makes no
+new journey claim. No Docker service, SQL, credential, dotenv file, failed-target
+restart or adoption, mutation replay, commit, or push occurred. Attempt C remains
+failed, its retained evidence remains authoritative for that run, and the prohibition
+on a fourth launch or replay remains in force. The staff raw-cost privacy failure is
+still open. M1–M5 remain incomplete.
+
+## Source-only S10 recompute-receipt checkpoint: October 2, 06:03 UTC
+
+Against branch base `e115b54b1903b9880da270df4856130e0e368f43`, both protected
+recompute services now return and persist exact cost-free success receipts. The
+Cellar-health kind is `cellar_health_recompute`; the pricing kind is
+`pricing_recommendations_recompute`. Each receipt contains only `version: 1`, its
+fixed `kind`, and `status: "succeeded"`. The API routes validate those exact contracts
+and reject legacy derived counts, segment or class maps, and any additional key.
+
+The bounded source suite passed 49 tests with zero skips. It covers both service
+returns, exact future `background_jobs.result` writes, strict HTTP bodies, rejected
+legacy and expanded receipts, unchanged client request behavior, and successful
+pricing recompute for a delegate with `pricing.manage = true`, `cost.read = false`,
+and `margin.read = false`. TypeScript, targeted lint, the file-size ratchet, and diff
+hygiene passed. A broader unit attempt did not complete as evidence because unrelated
+search and theme tests required an absent localhost application and unavailable Node
+local storage. Independent S10 source review is running; no verdict is recorded yet.
+
+This checkpoint changes future source output only. Historical detailed job results,
+the authenticated table ACL cut, invoice-image Storage policy, real JWT/Data API and
+Storage checks, paired migration proof, and browser runtime verification remain open.
+No SQL, migration, Docker service, credential, dotenv file, browser or application
+runtime, commit, or push was used. Attempt C remains failed, attempts A–C remain
+closed evidence, and no fourth launch or replay is authorized. Any later attempt D
+requires full independent privacy-seal acceptance, a frozen candidate, separate owner
+authorization, and a fresh namespace, paths, and ports. Staff-cost privacy, M1, and
+M1–M5 remain incomplete.
+
+## Source-only S10 review retry checkpoint: October 2, 06:11 UTC
+
+The first independent S10 source review failed because
+`scripts/seed-local-operational.ts` still read the removed `health.classified`,
+`health.segments`, `pricing.recommended`, and `pricing.classes` result fields. That
+script is outside the TypeScript compile boundary, so the earlier green typecheck did
+not cover the stale caller.
+
+A new static source regression failed with 12 tests passing and one failing before the
+repair. The seeder now logs only each closed receipt's `kind` and `status`, preserving
+the recompute order and all seed business actions. The repaired seven-file focused
+suite passed 50 of 50 tests with zero skips. TypeScript, targeted lint, and diff hygiene
+passed, and a fresh search of `src` and `scripts` found no runtime caller reading those
+four legacy result fields. The independent review retry is pending; no independent S10
+pass is claimed.
+
+The earlier broad `pnpm test` attempt still is not evidence: its terminal exit was not
+observed. A later process-state check found no remaining `pnpm test` or Vitest process,
+but no pass or failure is inferred from that absence.
+
+This remains a source-only checkpoint. Historical detailed job results, the raw table
+ACL cut, invoice-image Storage policy, real JWT/Data API and Storage checks, paired
+migration proof, the full privacy seal, and browser runtime verification remain open.
+No seeder, SQL, migration, Docker service, credential, dotenv file, browser or
+application runtime, commit, or push was used. Attempts A–C remain closed evidence,
+and no fourth launch, replay, or attempt D is authorized. Any later attempt D still
+requires full independent privacy-seal acceptance, a frozen candidate, separate owner
+authorization, and fresh paths, ports, and namespace. Staff-cost privacy, M1, and
+M1–M5 remain incomplete.
+
+## Independent S10 source-review disposition: October 2
+
+Independent review passed the repaired eleven-path source leaf. The reviewer reran
+the seven focused files: all 50 focused tests passed with zero focused skips. The
+preimage probe failed on the stale seeder fields and the repaired probe passed.
+TypeScript, targeted lint, the file-size ratchet, scoped diff hygiene, and the
+whole-tree caller search also passed. Vitest's global setup separately listed 25
+unavailable live-database suites; they are not counted as passes and are outside this
+source-only verdict. The earlier broad `pnpm test` attempt remains unaccepted because
+its terminal exit was not observed, although no owned test process remained at the
+later process-state check.
+
+This approval is limited to exact future HTTP and successful-job receipts plus the
+compatible seeder caller. Historical job results, raw-table ACLs, invoice-image
+Storage policy, real JWT/Data API and Storage checks, paired migration proof, the full
+privacy seal, runtime verification, and the final committed-range security scan remain
+open. Attempts A–C remain closed evidence. No fourth launch, replay, or attempt D is
+authorized; any later attempt D still requires full independent privacy-seal
+acceptance, a frozen candidate, separate owner authorization, and fresh paths, ports,
+and namespace. Staff-cost privacy, M1, and M1–M5 remain incomplete.
+
+## Source-only invoice-job error checkpoint: October 2
+
+Against base `e7ad3b335d4173e6deee3debe467bfa791f2713c`, both
+`invoice_extract` failure-completion writers now store one closed pair. A private
+total mapper preserves the 24 admitted handler and scan-service codes, maps any
+unrecognized or dynamic code to the existing `unknown`, and writes only
+`Invoice extraction job failed.`. It never persists the handler's raw failure prose.
+
+The direct regression failed with 34 failures and eight passes before the source
+change and passed all 42 tests afterward. The six-file completion, run-once, handler,
+scan recovery, fencing, and arithmetic set passed all 105 focused tests with zero
+focused skips. Independent review repeated those gates and passed this bounded
+two-file source leaf. Vitest global setup separately listed 25 unavailable
+live-database suites; they are not counted as passes.
+
+Retry versus dead classification, attempt accounting, exponential backoff, claim
+clearing, tenant/job/worker/status fencing, database write-error propagation, success
+clearing, provider-call behavior, scan recovery, the fixed SQL reclaim pair, and all
+`result` and `metadata` behavior remain unchanged.
+
+A separate fixture source leaf retains safe synthetic job ordinals 1, 2, 3, 4, 8, 9,
+11, and 12 and omits only four unsupported legacy error fixtures. Both deterministic
+IDs derive from the original ordinal, and every retained job is hard-projected to
+empty `result` and `metadata` objects plus null error fields. Independent review
+reproduced the three-failure, one-pass baseline and passed the current two-file set at
+17 of 17 focused tests. The leaf never deletes or rewrites old database rows.
+
+This remains source-only preparation. Historical job rows, raw-table ACLs,
+invoice-image Storage policy, real JWT/Data API, RPC, Storage and service-worker
+proof and the full privacy seal remain open. The fixture leaf does not alter or waive
+M4 rendered-state coverage or S16 worker, retry, recovery, and exactly-once coverage.
+No database,
+SQL, migration, seed execution, browser, runtime, Docker service, credential, dotenv
+file, commit, or push was used. Attempts A–C remain closed evidence. No fourth launch,
+replay, or attempt D is authorized; any later attempt D still requires full
+independent privacy-seal acceptance, a frozen candidate, separate owner authority,
+and fresh paths, ports, and namespace. M1–M5 remain incomplete.
+
+## Source-only invoice-scan tenant-fence and job-history preflight checkpoint: October 2
+
+Against immutable base `0662ee1553e05186e2961952f807afe607f987e2`, the five-file
+invoice-scan leaf adds the exact `restaurant_id` predicate to every identified
+service-role `invoice_scans` update in the handler and scan service. The new
+regressions exercise the actual database-builder chains for failed-reset,
+no-wines-terminal, success, and catch-path failure writes. Existing job and scan
+identity, worker, status, claim, and tenant fences remain in place. Reset, retry,
+re-extract, no-row rejection, provider calls, update-count checks, and generic stored
+job errors are unchanged.
+
+The preimage regression failed four tests while 46 passed. After the bounded repair,
+the direct set passed 50 of 50. The combined non-live compatibility set passed 126 of
+126 tests, and TypeScript, targeted lint, the file-size ratchet, and diff hygiene
+passed. Independent source review passed that same bounded 126-test contract. This is
+a source result only; it is not a live database, worker, or browser result.
+
+The separate `scripts/staff-cost-background-jobs-preflight.sql` candidate is a
+read-only, repeatable-read snapshot probe over historical `background_jobs` shapes.
+It fails closed on null payload drift, compares exact recompute receipts and the
+24-code invoice failure set, emits aggregate violation classes and counts without row
+material, and rolls back. Its first independent source review failed because nullable
+JSON comparisons could admit nulls. The repaired candidate passed independent source
+review, and its static contract passed 84 tests.
+
+The one frozen retained-target diagnostic ran at 07:29:54 UTC. Source revision, SQL
+and test hashes, local Docker Unix-socket transport, database identity and name, and
+running-state guards passed. Its operator wrapper then checked the raw Docker label
+key `supabase` and failed that equality guard. The repository field
+`ownershipProof.labels.supabase` is a normalized alias for the raw
+`com.supabase.cli.project` label; the wrapper did not execute the canonical raw-key
+guard. This was a command-preparation error, not evidence of target label drift or
+compromise. The wrapper exited 1 before `DATABASE_SESSION_BEGIN`, so no database
+session, SQL statement, or preflight query occurred. Historical compatibility is
+unknown, not proved by SQL grammar or source review. The diagnostic admission is
+consumed; inspecting or repairing target labels, requerying, and rerunning are not
+authorized. No runnable database command is admitted by this checkpoint.
+
+The dormant restaurant deletion route remains unsupported, with no demonstrated UI
+caller and no RLS delete policy. Independent database review classifies it as a
+deferred, lower-priority M4 and full-production API-quality gap. It does not, by
+itself, block the bounded demo caller contract. A new closed owner RPC would activate
+destructive history cascades and is not authorized or migration-ready. Historical-row
+repair or acceptance, final table ACLs, invoice-image Storage policy, real JWT/Data
+API and worker proof, immutable operator receipt, and the full runtime privacy seal
+remain open.
+
+No database query, SQL apply, migration, seed execution, browser, application runtime,
+Docker service, credential, dotenv file, commit, or push was used for this checkpoint.
+Attempts A–C remain closed evidence. No fourth launch, replay, or attempt D is
+authorized. M1–M5 remain incomplete, and the failed attempt-C and raw-cost evidence
+remain authoritative.
+
+## Source-only staff-cost baseline-query checkpoint: October 2
+
+The [canonical handoff checkpoint](../runbooks/restaurant-demo-macbook-handoff.md#october-2-staff-cost-baseline-query-source-checkpoint)
+owns the operational scope, source locations, review failures, and remaining admission
+gates for the unregistered structural baseline query. Final independent review accepted it
+as a bounded source prerequisite only. No runnable target admission, target result,
+permissions migration, runtime proof, or activation authority is claimed here. Attempts
+A–C remain closed, no attempt D or local rehearsal is authorized, and M1–M5 remain
+incomplete.
+
+## Source-only known-wine search and receive-summary checkpoint: October 2
+
+The [canonical handoff checkpoint](../runbooks/restaurant-demo-macbook-handoff.md#october-2-known-wine-search-and-receive-summary-source-repairs)
+records the latest-request search guard, idle reset behavior, actionable receive-summary
+link, test-first evidence, and independent source review. This closes the two bounded
+source findings only. It does not supply the browser, database, responsive, role,
+privacy, or persistence evidence required by M3 or M4. Attempts A–C remain closed,
+the fresh local rehearsal decision remains pending, and M1–M5 remain incomplete.

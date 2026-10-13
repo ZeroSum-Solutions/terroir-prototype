@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -32,10 +33,13 @@ function makeSupabase(options: {
   complete?: { data: unknown; error: unknown };
   abandon?: { data: unknown; error: unknown };
   uploadErrorAt?: number;
+  pending?: { data: unknown; error: unknown };
+  pendingPages?: boolean[];
 } = {}) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const uploadCalls: Array<{ path: string; bytes: Buffer; options: unknown }> = [];
   let uploadIndex = 0;
+  let pendingIndex = 0;
   return {
     rpcCalls,
     uploadCalls,
@@ -47,11 +51,17 @@ function makeSupabase(options: {
           error: null,
         };
       }
-      if (name === "create_invoice_scan_upload") {
+      if (name === "create_invoice_scan_upload_manifest") {
         return options.create ?? {
           data: { scanId: KEY, status: "queued" },
           error: null,
         };
+      }
+      if (name === "can_resume_invoice_upload") {
+        if (options.pendingPages) {
+          return { data: options.pendingPages[pendingIndex++], error: null };
+        }
+        return options.pending ?? { data: false, error: null };
       }
       if (name === "complete_scan_idempotency") {
         return options.complete ?? { data: receipt(), error: null };
@@ -176,15 +186,20 @@ describe("POST /api/scan upload/enqueue", () => {
     expect(supabase.uploadCalls).toEqual([
       expect.objectContaining({
         path: `${SITE}/${KEY}.jpg`,
-        options: { contentType: "image/jpeg", upsert: true },
+        options: {
+          contentType: "image/jpeg",
+          upsert: false,
+          metadata: { sha256: createHash("sha256").update("invoice bytes").digest("hex") },
+        },
       }),
     ]);
     expect(supabase.rpcCalls).toContainEqual({
-      name: "create_invoice_scan_upload",
+      name: "create_invoice_scan_upload_manifest",
       args: {
         p_restaurant_id: SITE,
         p_scan_id: KEY,
         p_object_name: `${SITE}/${KEY}.jpg`,
+        p_object_names: [`${SITE}/${KEY}.jpg`],
         p_distributor_name: "Unknown",
         p_invoice_number: null,
         p_invoice_date: null,
@@ -216,9 +231,10 @@ describe("POST /api/scan upload/enqueue", () => {
       `${SITE}/${KEY}_page2.png`,
     ]);
     expect(supabase.rpcCalls).toContainEqual({
-      name: "create_invoice_scan_upload",
+      name: "create_invoice_scan_upload_manifest",
       args: expect.objectContaining({
         p_object_name: `${SITE}/${KEY}_page1.jpg`,
+        p_object_names: [`${SITE}/${KEY}_page1.jpg`, `${SITE}/${KEY}_page2.png`],
       }),
     });
   });
@@ -234,7 +250,54 @@ describe("POST /api/scan upload/enqueue", () => {
     expect(response.status).toBe(500);
     expect(supabase.rpcCalls.map((call) => call.name)).toEqual([
       "claim_scan_idempotency",
+      "can_resume_invoice_upload",
+      "can_resume_invoice_upload",
       "abandon_scan_idempotency",
+    ]);
+  });
+
+  it("resumes an exact actor-owned pending page without overwriting storage", async () => {
+    const supabase = makeSupabase({ pending: { data: true, error: null } });
+    allow(supabase);
+    const response = await POST(formRequest([image()]));
+    expect(response.status).toBe(202);
+    expect(supabase.uploadCalls).toEqual([]);
+    expect(supabase.rpcCalls).toContainEqual({
+      name: "can_resume_invoice_upload",
+      args: {
+        p_restaurant_id: SITE, p_scan_id: KEY, p_object_name: `${SITE}/${KEY}.jpg`,
+        p_sha256: createHash("sha256").update("invoice bytes").digest("hex"),
+        p_byte_size: 13, p_mime_type: "image/jpeg",
+      },
+    });
+  });
+
+  it("reuses the first pending page and inserts only the missing second page", async () => {
+    const supabase = makeSupabase({ pendingPages: [true, false] });
+    allow(supabase);
+    const response = await POST(formRequest([image("one.jpg"), image("two.png", "image/png")]));
+    expect(response.status).toBe(202);
+    expect(supabase.uploadCalls.map((call) => call.path)).toEqual([`${SITE}/${KEY}_page2.png`]);
+    expect(supabase.rpcCalls).toContainEqual({
+      name: "create_invoice_scan_upload_manifest",
+      args: expect.objectContaining({
+        p_object_names: [`${SITE}/${KEY}_page1.jpg`, `${SITE}/${KEY}_page2.png`],
+      }),
+    });
+  });
+
+  it.each([
+    { data: true, error: { message: "private" } },
+    { data: null, error: null },
+    { data: "true", error: null },
+  ])("refuses invalid pending-page admission before storage or enqueue", async (pending) => {
+    const supabase = makeSupabase({ pending });
+    allow(supabase);
+    const response = await POST(formRequest([image()]));
+    expect(response.status).toBe(500);
+    expect(supabase.uploadCalls).toEqual([]);
+    expect(supabase.rpcCalls.map((call) => call.name)).toEqual([
+      "claim_scan_idempotency", "can_resume_invoice_upload", "abandon_scan_idempotency",
     ]);
   });
 
@@ -263,10 +326,11 @@ describe("POST /api/scan upload/enqueue", () => {
     expect(await response.json()).toEqual(receipt(objectScan));
     expect(supabase.uploadCalls).toEqual([]);
     expect(supabase.rpcCalls).toContainEqual({
-      name: "create_invoice_scan_upload",
+      name: "create_invoice_scan_upload_manifest",
       args: expect.objectContaining({
         p_scan_id: objectScan,
         p_object_name: `${SITE}/${objectScan}.heic`,
+        p_object_names: [`${SITE}/${objectScan}.heic`],
       }),
     });
   });

@@ -6,6 +6,7 @@
  * the tenant-filtered worker. No provider or protected scan payload is
  * returned from this request.
  */
+import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireMembership } from "@/lib/api/auth";
@@ -134,11 +135,12 @@ async function postInvoiceScan(request: NextRequest) {
       kind: "invoice_scan_upload",
       handler: async () => {
         const { data, error } = await supabase.rpc(
-          "create_invoice_scan_upload",
+          "create_invoice_scan_upload_manifest",
           {
             p_restaurant_id: restaurantId,
             p_scan_id: target.scanId,
             p_object_name: parsed.data.imagePath,
+            p_object_names: [parsed.data.imagePath],
             p_distributor_name: "Unknown",
             p_invoice_number: null,
             p_invoice_date: null,
@@ -193,7 +195,7 @@ async function postInvoiceScan(request: NextRequest) {
 
   // The transport key is already a UUID and remains stable across retries.
   // Reusing it as the upload scan id gives partial storage uploads a stable,
-  // tenant-scoped upsert target without another persistence mechanism.
+  // tenant-scoped immutable insert target without another persistence mechanism.
   const scanId = rawKey;
   const paths = files.map((file, index) => {
     const extension = MIME_EXTENSIONS.get(file.type) ?? "jpg";
@@ -211,26 +213,41 @@ async function postInvoiceScan(request: NextRequest) {
         for (let index = 0; index < files.length; index += 1) {
           const file = files[index];
           const bytes = Buffer.from(new Uint8Array(await file.arrayBuffer()));
+          const sha256 = createHash("sha256").update(bytes).digest("hex");
+          const pending = await supabase.rpc("can_resume_invoice_upload", {
+            p_restaurant_id: restaurantId,
+            p_scan_id: scanId,
+            p_object_name: paths[index],
+            p_sha256: sha256,
+            p_byte_size: bytes.length,
+            p_mime_type: file.type,
+          } as never);
+          if (pending.error || typeof pending.data !== "boolean") {
+            return abandonedInternalError();
+          }
+          if (pending.data) continue;
           const { error } = await supabase.storage
             .from("invoice-images")
             .upload(paths[index], bytes, {
               contentType: file.type,
-              upsert: true,
+              upsert: false,
+              metadata: { sha256 },
             });
           if (error) return abandonedInternalError();
         }
       } catch {
-        // Storage objects use deterministic upsert paths, so a partial upload
-        // is safe to retry after abandoning the database cache claim.
+        // Already-uploaded pages remain immutable. A later claimed retry may
+        // reuse only its actor-owned page with the same bytes, size and MIME.
         return abandonedInternalError();
       }
 
       const { data, error } = await supabase.rpc(
-        "create_invoice_scan_upload",
+        "create_invoice_scan_upload_manifest",
         {
           p_restaurant_id: restaurantId,
           p_scan_id: scanId,
           p_object_name: paths[0],
+          p_object_names: paths,
           p_distributor_name: "Unknown",
           p_invoice_number: null,
           p_invoice_date: null,

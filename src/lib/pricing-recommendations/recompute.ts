@@ -4,14 +4,16 @@ import {
   isCellarHealthSegment,
 } from "@/lib/cellar-health/classify";
 import { getMarkupRatio, getPourCostPct } from "@/lib/pricing/status";
+import {
+  createRecomputeReceipt,
+  type RecomputeReceipt,
+} from "@/lib/staff-cost/recompute-receipt";
 import type { Database } from "@/types/database";
 import {
   DAYS_OF_WEEK,
-  PRICING_RECOMMENDATION_CLASSES,
   recommendPricingPortfolio,
   type DayOfWeek,
   type DayOfWeekProfile,
-  type PricingRecommendationClass,
   type PricingRecommendationInput,
 } from "./recommend";
 
@@ -19,17 +21,12 @@ type Client = SupabaseClient<Database>;
 type RecommendationInsert =
   Database["public"]["Tables"]["pricing_recommendations"]["Insert"];
 
-export type PricingRecommendationsRecomputeResult = {
-  recommended: number;
-  classes: Record<PricingRecommendationClass, number>;
-};
-
 export async function runPricingRecommendationsRecompute(
   admin: Client,
   restaurantId: string,
   userId: string,
   now: Date = new Date(),
-): Promise<PricingRecommendationsRecomputeResult> {
+): Promise<RecomputeReceipt> {
   const jobId = await startJob(admin, restaurantId, userId, now);
   try {
     const inputs = await loadInputs(admin, restaurantId, now);
@@ -46,9 +43,9 @@ export async function runPricingRecommendationsRecompute(
       if (error) throw error;
     }
     await removeStaleRows(admin, restaurantId, inputs.existingWineIds, rows);
-    const classes = countClasses(rows);
-    await finishJob(admin, jobId, new Date(), rows.length, classes);
-    return { recommended: rows.length, classes };
+    const receipt = createRecomputeReceipt("pricing_recommendations_recompute");
+    await finishJob(admin, jobId, new Date(), receipt);
+    return receipt;
   } catch (error) {
     await failJob(admin, jobId, new Date(), error);
     throw error;
@@ -280,14 +277,6 @@ function dayFromUtc(date: Date): DayOfWeek {
   return DAYS_OF_WEEK[(date.getUTCDay() + 6) % 7];
 }
 
-function countClasses(rows: RecommendationInsert[]) {
-  const counts = Object.fromEntries(
-    PRICING_RECOMMENDATION_CLASSES.map((value) => [value, 0]),
-  ) as Record<PricingRecommendationClass, number>;
-  for (const row of rows) counts[row.class as PricingRecommendationClass] += 1;
-  return counts;
-}
-
 async function removeStaleRows(
   admin: Client,
   restaurantId: string,
@@ -310,15 +299,14 @@ async function finishJob(
   admin: Client,
   jobId: string,
   now: Date,
-  recommended: number,
-  classes: Record<PricingRecommendationClass, number>,
+  receipt: RecomputeReceipt,
 ) {
   const { error } = await admin
     .from("background_jobs")
     .update({
       status: "succeeded",
       finished_at: now.toISOString(),
-      result: { recommended, classes },
+      result: receipt,
     })
     .eq("id", jobId);
   if (error) throw error;

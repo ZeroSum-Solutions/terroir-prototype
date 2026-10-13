@@ -16,15 +16,13 @@ describe("runPricingRecommendationsRecompute", () => {
       NOW,
     );
 
-    expect(result).toEqual({
-      recommended: 1,
-      classes: {
-        discount_to_move: 0,
-        raise_appreciating: 0,
-        feature_btg: 1,
-        hold: 0,
-      },
-    });
+    const receipt = {
+      version: 1,
+      kind: "pricing_recommendations_recompute",
+      status: "succeeded",
+    };
+    expect(result).toEqual(receipt);
+    expect(fixture.jobUpdates.at(-1)?.result).toEqual(receipt);
     expect(fixture.recommendationRows).toEqual([
       expect.objectContaining({
         restaurant_id: "restaurant-1",

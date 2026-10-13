@@ -1,11 +1,52 @@
 # Handoff: MacBook transfer
 status: release-candidate-gates-in-progress
-date: 2026-09-27
-branch: feat/production-readiness-20260923
-published-release-candidate: e8d0af313bd7e01f622b27c4abb638d43c8b96fd
-pull-request: https://github.com/ZeroSum-Solutions/terroir-prototype/pull/229
+date: 2026-10-03
+branch: feat/restaurant-demo-closeout-20261001
+verified-application-checkpoint: 2630de5fedb509d05528f7581b9f6efc55851189
+pull-request: https://github.com/ZeroSum-Solutions/terroir-prototype/pull/232
 
-## Active Task
+## Current transfer ledger
+
+Use `ZeroSum-Solutions/terroir-prototype`, checkout
+`/Users/zero/projects/_archive/terroir-prototype`, and the feature branch above.
+Resolve its latest remote SHA before starting; subsequent documentation commits
+may advance it beyond the verified application checkpoint. One worktree remains.
+Do not overwrite local changes or reapply archived branches already landed by squash.
+
+PRs #229, #230, #231 and #227 have merged. Production and staging were verified
+healthy at main `146b5ea572fd64579ddc1ddeac76df928e8cd197`; PR #232 remains draft
+and is not deployed. The hosted database already has 136 migrations through
+`0164`: **do not replay 0151–0164**. The latest real logical-backup restore,
+run37093730653/artifact11263433507, passed 87 tables, two sequences and ten
+checksums at `0164`; it excludes ownership/grant and extension-owned-table
+recovery. Refresh backup freshness again immediately before hosted cutover.
+
+Candidate CI37099223190 passed on `2630de5f`: 5,857 tests, 330 contracts and
+five actual critical browser journeys. Local D has 139 migrations through
+`0167`. The accepted bounded local union covers S01–S20, S22 and M3, including
+image lifecycle, the real two-page invoice worker flow, first saves and two-session
+reconciliation. M2, M3 and M4 now have accepted bounded local evidence;
+the latest demo handoff owns their scope and the conserved 487-row checkpoint.
+The accepted no-app seed rehearsal proves fixture compatibility only.
+Original failed runs remain failed; do not replay completed business commands.
+Hosted rehearsal/cutover, final security conditions and exact deployment remain
+open. These local passes do not complete whole M1/S21, M5 or production readiness.
+
+Read the [latest demo handoff](../../docs/runbooks/restaurant-demo-macbook-handoff.md#latest-release-status-october-3)
+for current evidence and the [migration procedure](../../docs/runbooks/production-migrations.md#4d-staff-cost-privacy-seal-0165)
+for the separate hosted admission. The GitHub branch preserves source and runbooks;
+credentials, retained local databases and raw private proof remain on the mini.
+The current native release goal is ACTIVE. ZS Vault is LOCKED, so
+credential-dependent hosted work remains blocked. Do not bypass the lock or infer
+hosted authorization from local acceptance. Keep both web environments and all
+workers continuously drained through the admitted cutover and exact compatible
+deployment; the migration runbook owns the sequence. This handoff runs nothing.
+
+## Historical September 27 active task
+
+The sections below preserve their September 27 state. They are not current
+release instructions; the current transfer ledger and linked October 3 runbook
+above supersede their branch, migration, deployment and execution status.
 
 The owner authorized the production migration, protected `main` merge and
 mobile-testable release once the recorded gates pass. PR #229 is the active
@@ -17,14 +58,14 @@ deployments and `/api/health` before declaring release complete. The five stale
 worktrees were removed after preserving their exact histories on remote archive
 branches. Coordinate writers before changing this checkout or its local database.
 
-## Goal
+## Historical September 27 goal
 
 Complete the final CI/security gates, refresh backup freshness, drain both web
 environments, apply and verify production migrations 0151–0164, merge PR #229
 through protected `main`, verify exact-SHA Railway deployments, and smoke-test
 the production restaurant flow at phone size.
 
-## Decisions
+## Historical September 27 decisions
 
 - Main deploys to both Railway environments sharing one hosted database, but
   does not apply migrations. Apply and verify the migration cutover during the
@@ -38,7 +79,7 @@ the production restaurant flow at phone size.
   `docs/runbooks/local-stack.md`; start with `scripts/local/dev-local.sh`, never
   bare `pnpm dev`. Use `DEV_BYPASS_EMAIL=owner+local@terroir.test`.
 
-## Current transfer ledger
+## Historical September 27 transfer ledger
 
 Current repository: `ZeroSum-Solutions/terroir-prototype`. The Mac mini checkout
 is `/Users/zero/projects/_archive/terroir-prototype`, not a similarly named
@@ -63,7 +104,7 @@ diff passed a redacted secret scan; that is not full security approval. Credenti
 for hosted inspection/application was unavailable at this checkpoint; do not
 work around it with `.env.local`, copied secrets or weaker gates.
 
-### Resume safely on another computer
+### Historical September 27 resume instructions
 
 Read [AGENTS.md](../../AGENTS.md), the
 [demo milestone](../../docs/plans/2026-09-27-terroir-restaurant-demo-milestone.md)
@@ -117,7 +158,7 @@ Ignored screenshots, generated fixtures and documentation evidence were moved to
 under each original worktree basename. Those raw artifacts remain mini-only.
 Removed dependency/build caches are reproducible; no retained database was deleted.
 
-### What can be tested now
+### Historical September 27 test status
 
 Open https://terroir-web-production.up.railway.app/ in a phone browser. The public
 login screen was checked at 390 × 844 without horizontal overflow; both production
@@ -126,7 +167,7 @@ and staging health endpoints reported database connectivity and release
 source checkpoint. No authenticated production journey or native mobile release
 was verified. The portable local demo remains deliberately execution-disabled.
 
-### Exact release continuation
+### Historical September 27 release continuation
 
 1. Resolve the required CI run for the final branch HEAD and validate the exact
    final-HEAD security report. Do not source production `.env.local`.

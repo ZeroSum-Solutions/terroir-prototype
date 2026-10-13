@@ -321,7 +321,14 @@ describe.skipIf(!hasLiveDb)(
       const { error: authMove } = await a.client.from("restaurants")
         .update({ workspace_id: b.workspaceId })
         .eq("id", a.restaurantId);
-      expect(authMove?.message).toMatch(/workspace_reassignment_requires_review/);
+      expect(authMove?.code).toBe("42501");
+      expect(authMove?.message).toMatch(/permission denied for table restaurants/);
+      const { data: unchanged, error: unchangedError } = await admin.from("restaurants")
+        .select("workspace_id")
+        .eq("id", a.restaurantId)
+        .single();
+      expect(unchangedError).toBeNull();
+      expect(unchanged?.workspace_id).toBe(a.workspaceId);
     });
 
     it("keeps role edits compatible but requires delete-insert for grant identity moves", async () => {

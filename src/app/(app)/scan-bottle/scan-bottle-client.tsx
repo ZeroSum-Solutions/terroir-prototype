@@ -45,9 +45,9 @@ async function lookupWine(payload: string): Promise<MatchedWine> {
  */
 type WineSearchResult = Omit<MatchedWine, "country">;
 
-async function searchWines(query: string): Promise<MatchedWine[]> {
+async function searchWines(query: string, signal: AbortSignal): Promise<MatchedWine[]> {
   if (query.length < 2) return [];
-  const res = await fetch("/api/wines/search?q=" + encodeURIComponent(query));
+  const res = await fetch("/api/wines/search?q=" + encodeURIComponent(query), { signal });
   if (!res.ok) {
     // A swallowed non-ok here is indistinguishable from "no such wine": this
     // call used to hit a route that does not exist and reported an empty
@@ -70,6 +70,8 @@ export default function ScanBottleClient({ userId }: { userId: string | null }) 
 
 function BottleReceivingSession({ userId, restaurantId }: { userId: string | null; restaurantId: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const searchRequest = useRef<{ id: number; controller: AbortController } | null>(null);
+  const nextSearchRequestId = useRef(0);
   const [state, dispatch] = useReducer(bottleScanReducer, initialBottleScanState);
   const { phase, error, wine, payload, manualCode, searchQuery, searchResults, searching, searchError, locationError, section, binLocation, binId, receivingWineId, session } = state;
   const bins = useActiveBins(phase === "location");
@@ -105,6 +107,14 @@ function BottleReceivingSession({ userId, restaurantId }: { userId: string | nul
       });
   }, []);
 
+  useEffect(() => {
+    return () => {
+      nextSearchRequestId.current += 1;
+      searchRequest.current?.controller.abort();
+      searchRequest.current = null;
+    };
+  }, [phase]);
+
   const handleDecode = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -133,18 +143,28 @@ function BottleReceivingSession({ userId, restaurantId }: { userId: string | nul
 
   const handleCorrectSearch = useCallback(async (q: string) => {
     dispatch({ type: "correct-search-query-changed", query: q });
+    const requestId = ++nextSearchRequestId.current;
+    searchRequest.current?.controller.abort();
+    searchRequest.current = null;
     if (q.length < 2) {
+      dispatch({ type: "correct-search-completed", results: [] });
       return;
     }
+    const controller = new AbortController();
+    searchRequest.current = { id: requestId, controller };
     dispatch({ type: "correct-search-started" });
     try {
-      const results = await searchWines(q);
+      const results = await searchWines(q, controller.signal);
+      if (searchRequest.current?.id !== requestId || controller.signal.aborted) return;
       dispatch({ type: "correct-search-completed", results });
     } catch (err) {
+      if (searchRequest.current?.id !== requestId || controller.signal.aborted) return;
       dispatch({
         type: "correct-search-failed",
         message: err instanceof Error ? err.message : "Search failed.",
       });
+    } finally {
+      if (searchRequest.current?.id === requestId) searchRequest.current = null;
     }
   }, []);
 

@@ -2901,6 +2901,17 @@ export type Database = {
         Args: { p_action: string; p_batch_id: string }
         Returns: Json
       }
+      can_resume_invoice_upload: {
+        Args: {
+          p_byte_size: number
+          p_mime_type: string
+          p_object_name: string
+          p_restaurant_id: string
+          p_scan_id: string
+          p_sha256: string
+        }
+        Returns: boolean
+      }
       claim_invoice_extract_job: {
         Args: { p_worker_id: string }
         Returns: {
@@ -3057,6 +3068,18 @@ export type Database = {
           p_invoice_date: string | null
           p_invoice_number: string | null
           p_object_name: string
+          p_restaurant_id: string
+          p_scan_id: string
+        }
+        Returns: Json
+      }
+      create_invoice_scan_upload_manifest: {
+        Args: {
+          p_distributor_name: string
+          p_invoice_date: string | null
+          p_invoice_number: string | null
+          p_object_name: string
+          p_object_names: string[]
           p_restaurant_id: string
           p_scan_id: string
         }

@@ -14,6 +14,7 @@ const functions = {
   save_bottle_inventory_private: { p_country: "string", p_format: "string", p_vintage: "number" },
   assign_wine_sections_private: { p_section: "string" },
   set_wine_pricing_strategy: { p_target_markup_ratio: "number", p_target_pour_cost_pct: "number" },
+  create_invoice_scan_upload_manifest: { p_invoice_date: "string", p_invoice_number: "string" },
 };
 
 function multilineFunction(name: string, args: Record<string, string>) {
@@ -49,11 +50,11 @@ export const Constants = {
 `;
 
 describe("closed nullable RPC argument normalization", () => {
-  it("changes only the 30 exact accepted nullable argument type spans", () => {
+  it("changes only the 32 exact accepted nullable argument type spans", () => {
     const result = applyNullableRpcArgs(body);
-    expect(result.match(/ \| null/g)).toHaveLength(30);
+    expect(result.match(/ \| null/g)).toHaveLength(32);
     const expected = [...body.matchAll(/p_(?:bin_id|bin_location|country|currency|format|invoice_scan_id|section|invoice_date|invoice_number|quantity|unit_cost|vintage|wine_ids|scan_id|wine_count|wine_id|target_markup_ratio|target_pour_cost_pct)\??: (?:string\[\]|string|number)/g)];
-    expect(expected).toHaveLength(30);
+    expect(expected).toHaveLength(32);
 
     let restored = result;
     for (const [name, args] of entries) {

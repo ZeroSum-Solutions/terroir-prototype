@@ -3,6 +3,40 @@ import type { Database } from "@/types/database";
 import { computeBackoffMs } from "@/lib/jobs/backoff";
 import type { ClaimedInvoiceExtractJob } from "@/lib/jobs/types";
 
+const recognizedStoredFailureCodes: ReadonlySet<string> = new Set([
+  "missing_subject",
+  "subject_fetch_failed",
+  "tenant_mismatch_or_missing_subject",
+  "reextract_reset_failed",
+  "reextract_superseded",
+  "failed_reset_failed",
+  "missing_or_mistenanted_image_path",
+  "invalid_invoice_image_paths",
+  "invalid_invoice_page_count",
+  "unsupported_extension",
+  "image_download_failed",
+  "invalid_invoice_page_size",
+  "invalid_invoice_page_mime",
+  "claim_lost_before_extraction",
+  "extraction_threw",
+  "not_configured",
+  "upstream_error",
+  "empty_text",
+  "parse_failed",
+  "validation_failed",
+  "rate_limited",
+  "bad_input",
+  "unknown",
+  "no_wines_extracted",
+]);
+
+function mapFailureForStorage(failure: { code: string; message: string }) {
+  return {
+    error_code: recognizedStoredFailureCodes.has(failure.code) ? failure.code : "unknown",
+    error_message: "Invoice extraction job failed.",
+  };
+}
+
 /**
  * Write a completion update, fenced to the exact ownership this worker
  * claimed: id + restaurant_id + claimed_by + status='processing'. If the
@@ -52,13 +86,13 @@ export async function markJobRetryOrDead(
 ): Promise<boolean> {
   const nextAttempt = job.attemptCount + 1;
   const dead = nextAttempt >= job.maxAttempts;
+  const storedFailure = mapFailureForStorage(failure);
 
   const patch: Record<string, unknown> = {
     attempt_count: nextAttempt,
     claimed_at: null,
     claimed_by: null,
-    error_code: failure.code,
-    error_message: failure.message,
+    ...storedFailure,
   };
   if (dead) {
     patch.status = "dead";
@@ -81,13 +115,13 @@ export async function markJobDeadImmediately(
   job: ClaimedInvoiceExtractJob,
   failure: { code: string; message: string },
 ): Promise<boolean> {
+  const storedFailure = mapFailureForStorage(failure);
   return updateFenced(supabase, job, {
     status: "dead",
     attempt_count: job.maxAttempts,
     finished_at: new Date().toISOString(),
     claimed_at: null,
     claimed_by: null,
-    error_code: failure.code,
-    error_message: failure.message,
+    ...storedFailure,
   });
 }

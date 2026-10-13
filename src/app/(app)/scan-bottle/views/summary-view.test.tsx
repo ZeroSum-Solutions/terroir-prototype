@@ -65,10 +65,10 @@ describe("SummaryView", () => {
     expect(onNewSession).toHaveBeenCalledTimes(1);
   });
 
-  it("links a recovered receipt to the wine without invented metadata", async () => {
-    await act(async () => { root.render(<SummaryView session={[{ ...scan, wine: null }]} onNewSession={vi.fn()} />); });
+  it("links a recovered receipt to the actionable Cellar drawer without invented metadata", async () => {
+    await act(async () => { root.render(<SummaryView session={[{ ...scan, wineId: "wine/1?x", wine: null }]} onNewSession={vi.fn()} />); });
     expect(container.textContent).toContain("Recovered bottle receipt");
     expect(container.textContent).not.toContain("Test Producer");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("/cellar/wine-1");
+    expect(container.querySelector("a")?.getAttribute("href")).toBe("/cellar?wine=wine%2F1%3Fx");
   });
 });
