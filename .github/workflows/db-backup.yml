@@ -264,9 +264,24 @@ jobs:
           ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
         run: |
           set -euo pipefail
-          metadata="$(
-            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
-          )"
+          # The artifact API is eventually consistent: a read issued right
+          # after upload can return 404 for an artifact that exists (seen
+          # 2026-10-13). Poll briefly before treating it as missing.
+          metadata=""
+          for attempt in $(seq 1 12); do
+            if metadata="$(
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+            )"; then
+              break
+            fi
+            metadata=""
+            echo "Artifact $ARTIFACT_ID metadata not readable yet (attempt $attempt/12); retrying in 5s."
+            sleep 5
+          done
+          if [ -z "$metadata" ]; then
+            echo "::error::Artifact $ARTIFACT_ID metadata was not readable after 12 attempts."
+            exit 1
+          fi
           expires_at="$(jq -r '.expires_at' <<< "$metadata")"
           immutable="$(jq -r '.expired == false' <<< "$metadata")"
           api_digest="$(jq -r '.digest // empty' <<< "$metadata")"

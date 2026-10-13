@@ -44,6 +44,8 @@ describe("database backup workflow", () => {
     );
     expect(workflow).toContain("Database backup integrity ledger");
     expect(workflow).toContain("retention-days: 90");
+    // Artifact metadata reads retry: the API can 404 right after upload.
+    expect(workflow).toContain("for attempt in $(seq 1 12); do");
     expect(workflow).toContain("\"$dump_file\"");
     expect(workflow).toContain("\"$PGSERVICEFILE\"");
     expect(workflow).toContain("set -euo pipefail");
